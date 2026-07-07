@@ -634,6 +634,60 @@ describe("KnowledgeGapsPage", () => {
     expect(mockClick).toHaveBeenCalled();
     expect(mockCreateObjectURL).toHaveBeenCalled();
     expect(mockRevokeObjectURL).toHaveBeenCalled();
+
+    // The export is single-consumption on the backend — the button must disappear immediately
+    // rather than staying visible for something that's already gone.
+    await waitFor(() => {
+      expect(screen.queryByText("Threads ready")).not.toBeInTheDocument();
+    });
+  });
+
+  it("clears the stale Threads ready button and shows a message when the export was already consumed", async () => {
+    mockUseAnalysis.mockReturnValue({
+      data: mockAnalysisData,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockApiFetch.mockImplementation((url) => {
+      if (url === "/api/summary-data/export/start?days=7") {
+        return Promise.resolve({ status: 202, ok: true } as Response);
+      }
+      if (url === "/api/summary-data/export/status") {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              running: false,
+              error: null,
+              ready: true,
+              filename: "downloaded-threads-2026-06-26-to-2026-07-03.zip",
+              threadCount: 12,
+              completedAt: "2026-07-03T10:00:00Z",
+            }),
+        } as Response);
+      }
+      if (url === "/api/summary-data/export/download") {
+        return Promise.resolve({ status: 404, ok: false } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ enabled: false }),
+      } as Response);
+    });
+
+    renderWithToast(<KnowledgeGapsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+    fireEvent.click(screen.getByText("Download threads"));
+
+    const readyButton = await screen.findByText("Threads ready");
+    fireEvent.click(readyButton);
+
+    await screen.findByText("This export is no longer available. Start a new one.");
+    await waitFor(() => {
+      expect(screen.queryByText("Threads ready")).not.toBeInTheDocument();
+    });
   });
 
   it("keeps the settings panel open when picking a query window and applies it to the export", async () => {

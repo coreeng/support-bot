@@ -8,14 +8,13 @@ import com.coreeng.supportbot.summarydata.SummaryExportService;
 import com.coreeng.supportbot.summarydata.SummaryExportService.CompletedExport;
 import com.coreeng.supportbot.summarydata.SummaryExportService.ExportStatus;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.Resource;
@@ -30,12 +29,19 @@ class SummaryExportControllerTest {
 
     private SummaryExportController controller;
 
-    @TempDir
-    Path tempDir;
-
     @BeforeEach
     void setUp() {
         controller = new SummaryExportController(exportService);
+    }
+
+    private static CompletedExport completedExport(
+            String content, String filename, int threadCount, Instant completedAt) {
+        return new CompletedExport(
+                content.getBytes(StandardCharsets.UTF_8),
+                filename,
+                threadCount,
+                completedAt,
+                completedAt.plus(8, ChronoUnit.HOURS));
     }
 
     // --- start ---
@@ -106,11 +112,8 @@ class SummaryExportControllerTest {
     @Test
     void status_reportsReady_withExportDetails_whenCompleted() {
         Instant completedAt = Instant.now();
-        CompletedExport export = new CompletedExport(
-                Path.of("/tmp/summary-export/downloaded-threads-2026-06-03-to-2026-07-03.zip"),
-                "downloaded-threads-2026-06-03-to-2026-07-03.zip",
-                12,
-                completedAt);
+        CompletedExport export =
+                completedExport("zip bytes", "downloaded-threads-2026-06-03-to-2026-07-03.zip", 12, completedAt);
         when(exportService.getStatus()).thenReturn(new ExportStatus(false, completedAt, null));
         when(exportService.currentServableExport()).thenReturn(Optional.of(export));
 
@@ -142,7 +145,7 @@ class SummaryExportControllerTest {
 
     @Test
     void download_returns404_whenNoExportReady() {
-        when(exportService.currentServableExport()).thenReturn(Optional.empty());
+        when(exportService.consumeCurrentExport()).thenReturn(Optional.empty());
 
         ResponseEntity<Resource> response = controller.download();
 
@@ -150,33 +153,33 @@ class SummaryExportControllerTest {
     }
 
     @Test
-    void download_returns200_withCorrectHeadersAndStreamedBody_whenReady() throws IOException {
-        Path file = tempDir.resolve("downloaded-threads-2026-06-03-to-2026-07-03.zip");
-        Files.writeString(file, "zip bytes go here");
-        CompletedExport export =
-                new CompletedExport(file, "downloaded-threads-2026-06-03-to-2026-07-03.zip", 3, Instant.now());
-        when(exportService.currentServableExport()).thenReturn(Optional.of(export));
+    void download_returns200_withCorrectHeadersAndBody_whenReady() throws IOException {
+        CompletedExport export = completedExport(
+                "zip bytes go here", "downloaded-threads-2026-06-03-to-2026-07-03.zip", 3, Instant.now());
+        when(exportService.consumeCurrentExport()).thenReturn(Optional.of(export));
 
         ResponseEntity<Resource> response = controller.download();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getHeaders().getFirst("Content-Disposition"))
                 .isEqualTo("attachment; filename=\"downloaded-threads-2026-06-03-to-2026-07-03.zip\"");
-        assertThat(response.getHeaders().getContentLength()).isEqualTo(Files.size(file));
+        assertThat(response.getHeaders().getContentLength()).isEqualTo(export.content().length);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getContentAsByteArray()).isEqualTo(Files.readAllBytes(file));
+        assertThat(response.getBody().getContentAsByteArray()).isEqualTo(export.content());
     }
 
     @Test
-    void download_returns404_whenFileDisappearsBetweenCheckAndRead() {
-        // currentServableExport() reports an export, but the file itself is gone by the time we try
-        // to read it — the same race the controller's javadoc/comment calls out explicitly.
-        Path missingFile = tempDir.resolve("already-deleted.zip");
-        CompletedExport export = new CompletedExport(missingFile, "already-deleted.zip", 3, Instant.now());
-        when(exportService.currentServableExport()).thenReturn(Optional.of(export));
+    void download_returns404_onASecondCall_becauseTheFirstAlreadyConsumedIt() {
+        // Mirrors consumeCurrentExport()'s single-consumption contract: the controller doesn't cache
+        // or re-serve anything itself, so a service that's already handed the export out once
+        // correctly yields a 404 on the next call.
+        CompletedExport export = completedExport("zip bytes", "downloaded-threads.zip", 3, Instant.now());
+        when(exportService.consumeCurrentExport()).thenReturn(Optional.of(export), Optional.empty());
 
-        ResponseEntity<Resource> response = controller.download();
+        ResponseEntity<Resource> first = controller.download();
+        ResponseEntity<Resource> second = controller.download();
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 }

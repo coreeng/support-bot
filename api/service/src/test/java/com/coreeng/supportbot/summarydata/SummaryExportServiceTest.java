@@ -10,10 +10,9 @@ import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.summarydata.SummaryExportService.CompletedExport;
 import com.coreeng.supportbot.summarydata.SummaryExportService.ExportStatus;
 import com.google.common.collect.ImmutableList;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -24,7 +23,6 @@ import java.util.zip.ZipInputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
@@ -42,9 +40,6 @@ class SummaryExportServiceTest {
     @Mock
     private ApplicationContext applicationContext;
 
-    @TempDir
-    Path tempDir;
-
     private SlackChannelRegistry channelRegistry;
     private SummaryExportService service;
 
@@ -53,18 +48,16 @@ class SummaryExportServiceTest {
         channelRegistry = new SlackChannelRegistry(
                 new SlackTicketsProps("C123", List.of(), "eyes", "eyes", "white_check_mark", "sos"));
         service = new SummaryExportService(asyncJobRepository, threadService, channelRegistry, applicationContext);
-        service.exportDirectory = tempDir;
     }
 
-    private Path createTempFile(String name) throws IOException {
-        Path file = tempDir.resolve(name);
-        Files.writeString(file, "content");
-        return file;
+    private static CompletedExport completedExport(
+            String content, String filename, Instant completedAt, Instant expiresAt) {
+        return new CompletedExport(content.getBytes(StandardCharsets.UTF_8), filename, 1, completedAt, expiresAt);
     }
 
-    private static List<String> zipEntryNames(Path zipFile) throws IOException {
+    private static List<String> zipEntryNames(byte[] zipBytes) throws IOException {
         List<String> names = new ArrayList<>();
-        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipFile))) {
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 names.add(entry.getName());
@@ -74,9 +67,9 @@ class SummaryExportServiceTest {
         return names;
     }
 
-    private static List<String> zipEntryContents(Path zipFile) throws IOException {
+    private static List<String> zipEntryContents(byte[] zipBytes) throws IOException {
         List<String> contents = new ArrayList<>();
-        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipFile))) {
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 contents.add(new String(zis.readAllBytes(), StandardCharsets.UTF_8));
@@ -111,7 +104,7 @@ class SummaryExportServiceTest {
         verifyNoInteractions(applicationContext, threadService);
     }
 
-    // --- start()/status/eviction (unchanged behavior, still covered) ---
+    // --- start()/status ---
 
     @Test
     void start_shouldStartJobWhenNotRunning() {
@@ -148,9 +141,9 @@ class SummaryExportServiceTest {
     }
 
     @Test
-    void start_discardsPreviousCompletedExport_andDeletesOldFileImmediately() throws IOException {
-        Path oldFile = createTempFile("old-export.zip");
-        service.currentExport.set(new CompletedExport(oldFile, "old-export.zip", 3, Instant.now()));
+    void start_discardsPreviousCompletedExport_immediately() {
+        service.currentExport.set(completedExport(
+                "old content", "old-export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.DAYS)));
 
         when(asyncJobRepository.tryStartJob("summary-export", "7")).thenReturn(true);
         when(applicationContext.getBean(SummaryExportService.class)).thenReturn(service);
@@ -158,7 +151,37 @@ class SummaryExportServiceTest {
 
         service.start(7);
 
-        assertThat(Files.exists(oldFile)).isFalse();
+        Optional<CompletedExport> result = service.currentServableExport();
+        assertThat(result).isPresent();
+        assertThat(result.get().displayFilename()).isNotEqualTo("old-export.zip");
+    }
+
+    @Test
+    void start_clearsThePreviousExportReference_asItsOwnStep_independentOfWhatTheNewRunProduces() {
+        // start_discardsPreviousCompletedExport_immediately (above) only proves the END state holds a
+        // different export — but runAsyncExport unconditionally overwrites currentExport when it
+        // succeeds, so that alone can't tell apart "the old export was actively discarded" from
+        // "nothing discarded anything, the successful run just overwrote it anyway". Making the run
+        // itself fail (so nothing overwrites the reference) isolates the discard step specifically.
+        service.currentExport.set(completedExport(
+                "old content", "old-export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.DAYS)));
+
+        SlackChannelRegistry brokenRegistry = mock(SlackChannelRegistry.class);
+        when(brokenRegistry.monitoredChannelIds()).thenThrow(new RuntimeException("registry unavailable"));
+        SummaryExportService brokenService =
+                new SummaryExportService(asyncJobRepository, threadService, brokenRegistry, applicationContext);
+        brokenService.currentExport.set(completedExport(
+                "old content", "old-export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.DAYS)));
+
+        when(asyncJobRepository.tryStartJob("summary-export", "7")).thenReturn(true);
+        when(applicationContext.getBean(SummaryExportService.class)).thenReturn(brokenService);
+
+        brokenService.start(7);
+
+        // The run failed (no new export produced), yet the old one is still gone — proof the discard
+        // happened as its own step, not as a side effect of a successful new export overwriting it.
+        assertThat(brokenService.currentExport.get()).isNull();
+        assertThat(brokenService.getStatus().error()).isNotNull();
     }
 
     @Test
@@ -170,22 +193,100 @@ class SummaryExportServiceTest {
         assertThat(status.error()).isNull();
     }
 
+    // --- currentServableExport / consumeCurrentExport: peek vs. single-consumption ---
+
     @Test
     void currentServableExport_returnsEmptyWhenNoneCompleted() {
         assertThat(service.currentServableExport()).isEmpty();
     }
 
     @Test
-    void currentServableExport_returnsCurrentExport_regardlessOfAge() throws IOException {
-        Path file = createTempFile("export.zip");
-        CompletedExport export =
-                new CompletedExport(file, "export.zip", 5, Instant.now().minus(10, ChronoUnit.DAYS));
+    void currentServableExport_returnsExport_whenNotYetExpired() {
+        CompletedExport export = completedExport(
+                "content", "export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
         service.currentExport.set(export);
 
-        Optional<CompletedExport> result = service.currentServableExport();
+        assertThat(service.currentServableExport()).contains(export);
+        // a peek must not consume it
+        assertThat(service.currentServableExport()).contains(export);
+    }
 
-        assertThat(result).contains(export);
-        assertThat(Files.exists(file)).isTrue();
+    @Test
+    void currentServableExport_evictsAndReturnsEmpty_whenPastRetention() {
+        CompletedExport export = completedExport(
+                "content",
+                "export.zip",
+                Instant.now().minus(9, ChronoUnit.HOURS),
+                Instant.now().minus(1, ChronoUnit.HOURS));
+        service.currentExport.set(export);
+
+        assertThat(service.currentServableExport()).isEmpty();
+        // eviction actually clears the reference, not just hides it from this one call
+        assertThat(service.currentExport.get()).isNull();
+    }
+
+    @Test
+    void consumeCurrentExport_returnsEmptyWhenNoneCompleted() {
+        assertThat(service.consumeCurrentExport()).isEmpty();
+    }
+
+    @Test
+    void consumeCurrentExport_returnsExport_thenClearsIt_soASecondCallGetsNothing() {
+        CompletedExport export = completedExport(
+                "content", "export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
+        service.currentExport.set(export);
+
+        assertThat(service.consumeCurrentExport()).contains(export);
+        // the reference itself is cleared, not just hidden from subsequent reads
+        assertThat(service.currentExport.get()).isNull();
+        assertThat(service.consumeCurrentExport()).isEmpty();
+        assertThat(service.currentServableExport()).isEmpty();
+    }
+
+    @Test
+    void consumeCurrentExport_returnsEmpty_whenPastRetention() {
+        CompletedExport export = completedExport(
+                "content",
+                "export.zip",
+                Instant.now().minus(9, ChronoUnit.HOURS),
+                Instant.now().minus(1, ChronoUnit.HOURS));
+        service.currentExport.set(export);
+
+        assertThat(service.consumeCurrentExport()).isEmpty();
+    }
+
+    // --- expireStaleExport: the active backstop sweep ---
+
+    @Test
+    void expireStaleExport_clearsExport_pastRetention() {
+        CompletedExport export = completedExport(
+                "content",
+                "export.zip",
+                Instant.now().minus(9, ChronoUnit.HOURS),
+                Instant.now().minus(1, ChronoUnit.HOURS));
+        service.currentExport.set(export);
+
+        service.expireStaleExport();
+
+        assertThat(service.currentExport.get()).isNull();
+    }
+
+    @Test
+    void expireStaleExport_leavesFreshExportInPlace() {
+        CompletedExport export = completedExport(
+                "content", "export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
+        service.currentExport.set(export);
+
+        service.expireStaleExport();
+
+        assertThat(service.currentExport.get()).isEqualTo(export);
+    }
+
+    @Test
+    void expireStaleExport_doesNothingWhenNoneCompleted() {
+        service.expireStaleExport();
+
+        assertThat(service.currentExport.get()).isNull();
     }
 
     // --- runAsyncExport: real zip-writing logic ---
@@ -208,11 +309,11 @@ class SummaryExportServiceTest {
         assertThat(export.get().threadCount()).isEqualTo(2);
         assertThat(export.get().displayFilename())
                 .matches("downloaded-threads-\\d{4}-\\d{2}-\\d{2}-to-\\d{4}-\\d{2}-\\d{2}\\.zip");
-        assertThat(export.get().filePath()).exists();
+        assertThat(export.get().expiresAt()).isAfter(export.get().completedAt());
 
-        assertThat(zipEntryNames(export.get().filePath()))
+        assertThat(zipEntryNames(export.get().content()))
                 .containsExactly("1700000000.000001.txt", "1700000000.000002.txt");
-        assertThat(zipEntryContents(export.get().filePath()))
+        assertThat(zipEntryContents(export.get().content()))
                 .containsExactly("Thread one content", "Thread two content");
     }
 
@@ -229,7 +330,6 @@ class SummaryExportServiceTest {
                 "sos"));
         SummaryExportService multiService =
                 new SummaryExportService(asyncJobRepository, threadService, multiChannel, applicationContext);
-        multiService.exportDirectory = tempDir;
 
         when(threadService.getThreadsWithCheckMarkAsText("C-a", 31)).thenThrow(new RuntimeException("not_in_channel"));
         when(threadService.getThreadsWithCheckMarkAsText("C-b", 31))
@@ -240,7 +340,7 @@ class SummaryExportServiceTest {
         assertThat(multiService.getStatus().error()).isNull();
         Optional<CompletedExport> export = multiService.currentServableExport();
         assertThat(export).isPresent();
-        assertThat(zipEntryNames(export.get().filePath())).containsExactly("1700000000.000009.txt");
+        assertThat(zipEntryNames(export.get().content())).containsExactly("1700000000.000009.txt");
     }
 
     @Test
@@ -256,7 +356,6 @@ class SummaryExportServiceTest {
                 "sos"));
         SummaryExportService multiService =
                 new SummaryExportService(asyncJobRepository, threadService, multiChannel, applicationContext);
-        multiService.exportDirectory = tempDir;
 
         when(threadService.getThreadsWithCheckMarkAsText("C-a", 31))
                 .thenReturn(ImmutableList.of(new ThreadService.ThreadData("1700000000.000001", "from A")));
@@ -267,9 +366,9 @@ class SummaryExportServiceTest {
 
         Optional<CompletedExport> export = multiService.currentServableExport();
         assertThat(export).isPresent();
-        assertThat(zipEntryNames(export.get().filePath()))
+        assertThat(zipEntryNames(export.get().content()))
                 .containsExactlyInAnyOrder("1700000000.000001.txt", "1700000000.000001-2.txt");
-        assertThat(zipEntryContents(export.get().filePath())).containsExactlyInAnyOrder("from A", "from B");
+        assertThat(zipEntryContents(export.get().content())).containsExactlyInAnyOrder("from A", "from B");
     }
 
     @Test
@@ -281,7 +380,7 @@ class SummaryExportServiceTest {
         Optional<CompletedExport> export = service.currentServableExport();
         assertThat(export).isPresent();
         assertThat(export.get().threadCount()).isEqualTo(0);
-        assertThat(zipEntryNames(export.get().filePath())).isEmpty();
+        assertThat(zipEntryNames(export.get().content())).isEmpty();
     }
 
     @Test
@@ -296,23 +395,18 @@ class SummaryExportServiceTest {
 
         Optional<CompletedExport> export = service.currentServableExport();
         assertThat(export).isPresent();
-        assertThat(zipEntryNames(export.get().filePath()))
+        assertThat(zipEntryNames(export.get().content()))
                 .containsExactly("1700000000.000001.txt", "1700000000.000001-2.txt", "1700000000.000002.txt");
-        assertThat(zipEntryContents(export.get().filePath()))
+        assertThat(zipEntryContents(export.get().content()))
                 .containsExactly("First content", "Duplicate content", "Second content");
     }
 
     @Test
-    void runAsyncExport_onFailure_setsErrorStatus_andLeavesNoServableExport() throws IOException {
-        // exportDirectory points at a path that already exists as a plain file, so
-        // Files.createDirectories(...) fails and the run errors out before writing anything
-        Path blocked = tempDir.resolve("blocked-file");
-        Files.writeString(blocked, "not a directory");
+    void runAsyncExport_onFailure_setsErrorStatus_andLeavesNoServableExport() {
+        SlackChannelRegistry brokenRegistry = mock(SlackChannelRegistry.class);
+        when(brokenRegistry.monitoredChannelIds()).thenThrow(new RuntimeException("registry unavailable"));
         SummaryExportService badService =
-                new SummaryExportService(asyncJobRepository, threadService, channelRegistry, applicationContext);
-        badService.exportDirectory = blocked;
-
-        when(threadService.getThreadsWithCheckMarkAsText("C123", 31)).thenReturn(ImmutableList.of());
+                new SummaryExportService(asyncJobRepository, threadService, brokenRegistry, applicationContext);
 
         badService.runAsyncExport(31);
 
@@ -320,5 +414,6 @@ class SummaryExportServiceTest {
         assertThat(badService.getStatus().error()).isNotNull();
         assertThat(badService.currentServableExport()).isEmpty();
         verify(asyncJobRepository).deleteJob("summary-export");
+        verifyNoInteractions(threadService);
     }
 }

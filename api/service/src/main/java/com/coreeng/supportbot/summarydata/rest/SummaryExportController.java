@@ -4,14 +4,12 @@ import com.coreeng.supportbot.summarydata.SummaryExportService;
 import com.coreeng.supportbot.summarydata.SummaryExportService.CompletedExport;
 import com.coreeng.supportbot.summarydata.SummaryExportService.ExportStatus;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -69,34 +67,22 @@ public class SummaryExportController {
     }
 
     /**
-     * Streams the currently servable export, if any — never buffers it into a {@code byte[]}.
+     * Serves the currently servable export, if any — single-consumption: this claims and clears it
+     * atomically, so a second concurrent request (or a retry) gets 404, not the same content again.
+     * That's deliberate, not a bug — see {@link SummaryExportService#consumeCurrentExport}.
      */
     @GetMapping(value = "/download", produces = "application/zip")
     public ResponseEntity<Resource> download() {
-        Optional<CompletedExport> export = exportService.currentServableExport();
+        Optional<CompletedExport> export = exportService.consumeCurrentExport();
         if (export.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         CompletedExport completed = export.get();
-        try {
-            long size = Files.size(completed.filePath());
-            return ResponseEntity.ok()
-                    .header(
-                            HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=\"" + completed.displayFilename() + "\"")
-                    .contentLength(size)
-                    .body(new FileSystemResource(completed.filePath()));
-        } catch (IOException e) {
-            // Not a server fault: the file existed a moment ago in currentServableExport(), so this
-            // is a concurrent new export discarding it between that check and this read. Same
-            // outcome as "nothing ready" — not found, not an internal error.
-            log.warn(
-                    "Export file {} disappeared before it could be read (likely a concurrent new export)",
-                    completed.filePath(),
-                    e);
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + completed.displayFilename() + "\"")
+                .contentLength(completed.content().length)
+                .body(new ByteArrayResource(completed.content()));
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

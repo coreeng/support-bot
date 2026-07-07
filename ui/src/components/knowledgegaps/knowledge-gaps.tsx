@@ -443,6 +443,15 @@ export default function KnowledgeGapsPage() {
     setIsDownloading(true);
     try {
       const response = await apiFetch("/api/summary-data/export/download");
+
+      if (response.status === 404) {
+        // The export is single-consumption on the backend — this means it was already claimed
+        // (e.g. a stale "Threads ready" left over from an earlier download) or expired. Either way,
+        // it's gone; reset local state to match rather than leaving a dead button on screen.
+        setExportStatus(null);
+        toast.error("This export is no longer available. Start a new one.");
+        return;
+      }
       if (!response.ok) {
         throw new Error("Failed to download export");
       }
@@ -456,6 +465,10 @@ export default function KnowledgeGapsPage() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+
+      // Consuming it on the backend clears it there immediately — clear it here too so "Threads
+      // ready" disappears instead of staying visible for something that's already gone.
+      setExportStatus(null);
     } catch (error) {
       console.error("Error downloading export:", error);
       toast.error("Failed to download export. Please try again.");
