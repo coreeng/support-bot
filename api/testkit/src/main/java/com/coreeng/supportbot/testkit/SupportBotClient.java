@@ -48,6 +48,10 @@ public class SupportBotClient {
         return new AnalysisMethods();
     }
 
+    public ExportMethods export() {
+        return new ExportMethods();
+    }
+
     public TestMethods test() {
         return new TestMethods();
     }
@@ -57,9 +61,29 @@ public class SupportBotClient {
     }
 
     private RequestSpecification request() {
+        return request(TEST_BYPASS_ROLE);
+    }
+
+    private RequestSpecification request(String role) {
         return given().config(REST_ASSURED_CONFIG)
                 .header("X-Test-User", TEST_BYPASS_USER)
-                .header("X-Test-Role", TEST_BYPASS_ROLE);
+                .header("X-Test-Role", role);
+    }
+
+    /**
+     * Issues a GET as the given test-bypass role (see {@code TestAuthBypassFilter}) and returns just
+     * the status code — for asserting role-boundary enforcement, not response bodies.
+     */
+    public int getStatusCodeAsRole(String path, String role) {
+        return request(role).when().get(baseUrl + path).then().extract().statusCode();
+    }
+
+    /**
+     * Issues a POST as the given test-bypass role (see {@code TestAuthBypassFilter}) and returns just
+     * the status code — for asserting role-boundary enforcement, not response bodies.
+     */
+    public int postStatusCodeAsRole(String path, String role) {
+        return request(role).when().post(baseUrl + path).then().extract().statusCode();
     }
 
     public void assertQueryExistsByMessageRef(@NonNull String channelId, @NonNull MessageTs ts) {
@@ -158,6 +182,38 @@ public class SupportBotClient {
                 .statusCode(200)
                 .extract()
                 .as(TicketResponse.class);
+    }
+
+    public class ExportMethods {
+        public int startStatusCode(int days) {
+            return request()
+                    .when()
+                    .post(baseUrl + "/summary-data/export/start?days={days}", days)
+                    .then()
+                    .extract()
+                    .statusCode();
+        }
+
+        public ExportStatusResponse status() {
+            return request()
+                    .when()
+                    .get(baseUrl + "/summary-data/export/status")
+                    .then()
+                    .log()
+                    .ifValidationFails(LogDetail.ALL, true)
+                    .statusCode(200)
+                    .extract()
+                    .as(ExportStatusResponse.class);
+        }
+
+        public int downloadStatusCode() {
+            return request()
+                    .when()
+                    .get(baseUrl + "/summary-data/export/download")
+                    .then()
+                    .extract()
+                    .statusCode();
+        }
     }
 
     public class AnalysisMethods {
@@ -547,6 +603,15 @@ public class SupportBotClient {
 
     public record AnalysisStatusResponse(
             boolean running, @Nullable String error) {}
+
+    public record ExportStatusResponse(
+            boolean running,
+            @Nullable Instant startedAt,
+            @Nullable String error,
+            boolean ready,
+            @Nullable String filename,
+            @Nullable Integer threadCount,
+            @Nullable Instant completedAt) {}
 
     public record SummaryDataResultsResponse(ImmutableList<SupportAreaResponse> supportAreas) {}
 
