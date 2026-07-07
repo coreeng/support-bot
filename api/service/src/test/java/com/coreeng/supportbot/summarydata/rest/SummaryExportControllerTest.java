@@ -80,6 +80,7 @@ class SummaryExportControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(body).isNotNull();
         assertThat(body.running()).isFalse();
+        assertThat(body.startedAt()).isNull();
         assertThat(body.error()).isNull();
         assertThat(body.ready()).isFalse();
         assertThat(body.filename()).isNull();
@@ -98,6 +99,7 @@ class SummaryExportControllerTest {
         SummaryExportController.SummaryExportStatusResponse body = response.getBody();
         assertThat(body).isNotNull();
         assertThat(body.running()).isTrue();
+        assertThat(body.startedAt()).isEqualTo(startedAt);
         assertThat(body.ready()).isFalse();
     }
 

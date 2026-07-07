@@ -60,6 +60,7 @@ public class SummaryExportController {
 
         return ResponseEntity.ok(new SummaryExportStatusResponse(
                 status.running(),
+                status.startedAt(),
                 status.error(),
                 export.isPresent(),
                 export.map(CompletedExport::displayFilename).orElse(null),
@@ -101,6 +102,7 @@ public class SummaryExportController {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record SummaryExportStatusResponse(
             boolean running,
+            @Nullable Instant startedAt,
             @Nullable String error,
             boolean ready,
             @Nullable String filename,

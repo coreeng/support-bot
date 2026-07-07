@@ -479,7 +479,16 @@ describe("KnowledgeGapsPage", () => {
       if (url === "/api/summary-data/export/status") {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ running: true, error: null, ready: false, filename: null, threadCount: null, completedAt: null }),
+          json: () =>
+            Promise.resolve({
+              running: true,
+              startedAt: new Date().toISOString(),
+              error: null,
+              ready: false,
+              filename: null,
+              threadCount: null,
+              completedAt: null,
+            }),
         } as Response);
       }
       // Default for other calls
@@ -505,6 +514,41 @@ describe("KnowledgeGapsPage", () => {
     });
     expect(screen.queryByText("Analysis settings")).not.toBeInTheDocument();
     expect(mockClick).not.toHaveBeenCalled();
+  });
+
+  it("shows a live elapsed-time indicator while the export is running", async () => {
+    mockUseAnalysis.mockReturnValue({
+      data: mockAnalysisData,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    // Started ~65s ago, so the indicator should render in "Xm Ys" form, not just seconds
+    const startedAt = new Date(Date.now() - 65_000).toISOString();
+
+    mockApiFetch.mockImplementation((url, options) => {
+      if (url === "/api/summary-data/export/start?days=7" && (options as RequestInit)?.method === "POST") {
+        return Promise.resolve({ status: 202, ok: true } as Response);
+      }
+      if (url === "/api/summary-data/export/status") {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({ running: true, startedAt, error: null, ready: false, filename: null, threadCount: null, completedAt: null }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ enabled: false }),
+      } as Response);
+    });
+
+    renderWithToast(<KnowledgeGapsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+    fireEvent.click(screen.getByText("Download threads"));
+
+    await screen.findByText(/Exporting threads\.\.\. \d+m \d+s/);
   });
 
   it("shows a toast when an export is already in progress", async () => {

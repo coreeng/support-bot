@@ -24,11 +24,19 @@ interface AnalysisStatus {
 
 interface ThreadExportStatus {
   running: boolean;
+  startedAt: string | null;
   error: string | null;
   ready: boolean;
   filename: string | null;
   threadCount: number | null;
   completedAt: string | null;
+}
+
+function formatElapsed(startedAt: string, now: number): string {
+  const elapsedSeconds = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const seconds = elapsedSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
 export default function KnowledgeGapsPage() {
@@ -58,6 +66,10 @@ export default function KnowledgeGapsPage() {
   const [exportStatus, setExportStatus] = useState<ThreadExportStatus | null>(null);
   const [isStartingExport, setIsStartingExport] = useState(false);
   const exportPollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Value itself is never read — setting it just forces a re-render every second so the elapsed-time
+  // display below recomputes against the current time.
+  const [, setExportElapsedTick] = useState(0);
+  const exportElapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const settingsTitleId = useId();
   const settingsDescriptionId = useId();
@@ -285,6 +297,22 @@ export default function KnowledgeGapsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportStatus?.running]);
 
+  // Tick a local clock every second while an export is running, purely to re-render the elapsed-time
+  // display below — this does not poll the backend, it just reformats exportStatus.startedAt against
+  // the current time so the user sees visible progress instead of a static "Exporting..." label.
+  useEffect(() => {
+    if (exportStatus?.running) {
+      exportElapsedIntervalRef.current = setInterval(() => setExportElapsedTick((tick) => tick + 1), 1000);
+    }
+
+    return () => {
+      if (exportElapsedIntervalRef.current) {
+        clearInterval(exportElapsedIntervalRef.current);
+        exportElapsedIntervalRef.current = null;
+      }
+    };
+  }, [exportStatus?.running]);
+
   const handleStartAnalysis = async () => {
     closeSettingsAndRun(() => setIsStartingAnalysis(true));
     try {
@@ -385,7 +413,15 @@ export default function KnowledgeGapsPage() {
       });
 
       if (response.status === 202) {
-        setExportStatus({ running: true, error: null, ready: false, filename: null, threadCount: null, completedAt: null });
+        setExportStatus({
+          running: true,
+          startedAt: new Date().toISOString(),
+          error: null,
+          ready: false,
+          filename: null,
+          threadCount: null,
+          completedAt: null,
+        });
         const status = await fetchExportStatus();
         if (status?.running) {
           startExportPolling();
@@ -623,6 +659,12 @@ export default function KnowledgeGapsPage() {
         </div>
         {isSupportEngineer && (
           <div className="flex items-center gap-2">
+            {!isAnalysisEnabled && exportStatus?.running && (
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                <div className="border-secondary inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-b-2"></div>
+                <span>Exporting threads... {exportStatus.startedAt && formatElapsed(exportStatus.startedAt, Date.now())}</span>
+              </div>
+            )}
             {!isAnalysisEnabled && exportStatus?.ready && (
               <Tooltip>
                 <TooltipTrigger asChild>
