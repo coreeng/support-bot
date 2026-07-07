@@ -465,19 +465,21 @@ describe("KnowledgeGapsPage", () => {
     expect(screen.getByText("Deploying & Configuring Tenant Applications")).toBeInTheDocument();
   });
 
-  it("handles export button click", async () => {
+  it("starts an export when Download threads is clicked, without downloading immediately", async () => {
     mockUseAnalysis.mockReturnValue({
       data: mockAnalysisData,
       isLoading: false,
       error: null,
     } as any);
 
-    // Mock apiFetch for export
-    mockApiFetch.mockImplementation((url) => {
-      if (url === "/api/summary-data/export?days=7") {
+    mockApiFetch.mockImplementation((url, options) => {
+      if (url === "/api/summary-data/export/start?days=7" && (options as RequestInit)?.method === "POST") {
+        return Promise.resolve({ status: 202, ok: true } as Response);
+      }
+      if (url === "/api/summary-data/export/status") {
         return Promise.resolve({
           ok: true,
-          blob: () => Promise.resolve(new Blob(["test"], { type: "application/zip" })),
+          json: () => Promise.resolve({ running: true, error: null, ready: false, filename: null, threadCount: null, completedAt: null }),
         } as Response);
       }
       // Default for other calls
@@ -487,13 +489,6 @@ describe("KnowledgeGapsPage", () => {
       } as Response);
     });
 
-    // Mock URL.createObjectURL and revokeObjectURL
-    const mockCreateObjectURL = jest.fn(() => "blob:test-url");
-    const mockRevokeObjectURL = jest.fn();
-    global.URL.createObjectURL = mockCreateObjectURL;
-    global.URL.revokeObjectURL = mockRevokeObjectURL;
-
-    // Mock HTMLAnchorElement click
     const mockClick = jest.fn();
     HTMLAnchorElement.prototype.click = mockClick;
 
@@ -501,16 +496,97 @@ describe("KnowledgeGapsPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
 
-    const exportButton = screen.getByText("Export");
-    fireEvent.click(exportButton);
+    const downloadButton = screen.getByText("Download threads");
+    fireEvent.click(downloadButton);
 
-    // Verify apiFetch was called with default value of 7 days (Week)
+    // Starts the background job — does NOT trigger an immediate file download
     await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export?days=7");
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/start?days=7", expect.objectContaining({ method: "POST" }));
     });
     expect(screen.queryByText("Analysis settings")).not.toBeInTheDocument();
+    expect(mockClick).not.toHaveBeenCalled();
+  });
 
-    // Verify download was triggered
+  it("shows a toast when an export is already in progress", async () => {
+    mockUseAnalysis.mockReturnValue({
+      data: mockAnalysisData,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockApiFetch.mockImplementation((url, options) => {
+      if (url === "/api/summary-data/export/start?days=7" && (options as RequestInit)?.method === "POST") {
+        return Promise.resolve({ status: 409, ok: false } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ enabled: false }),
+      } as Response);
+    });
+
+    renderWithToast(<KnowledgeGapsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+    fireEvent.click(screen.getByText("Download threads"));
+
+    await screen.findByText("An export is already in progress");
+  });
+
+  it("shows Threads ready once the export completes, and downloads it on click", async () => {
+    mockUseAnalysis.mockReturnValue({
+      data: mockAnalysisData,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockApiFetch.mockImplementation((url) => {
+      if (url === "/api/summary-data/export/start?days=7") {
+        return Promise.resolve({ status: 202, ok: true } as Response);
+      }
+      if (url === "/api/summary-data/export/status") {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              running: false,
+              error: null,
+              ready: true,
+              filename: "downloaded-threads-2026-06-26-to-2026-07-03.zip",
+              threadCount: 12,
+              completedAt: "2026-07-03T10:00:00Z",
+            }),
+        } as Response);
+      }
+      if (url === "/api/summary-data/export/download") {
+        return Promise.resolve({
+          ok: true,
+          blob: () => Promise.resolve(new Blob(["zip bytes"], { type: "application/zip" })),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ enabled: false }),
+      } as Response);
+    });
+
+    const mockCreateObjectURL = jest.fn(() => "blob:test-url");
+    const mockRevokeObjectURL = jest.fn();
+    global.URL.createObjectURL = mockCreateObjectURL;
+    global.URL.revokeObjectURL = mockRevokeObjectURL;
+    const mockClick = jest.fn();
+    HTMLAnchorElement.prototype.click = mockClick;
+
+    renderWithToast(<KnowledgeGapsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+    fireEvent.click(screen.getByText("Download threads"));
+
+    const readyButton = await screen.findByText("Threads ready");
+    fireEvent.click(readyButton);
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/download");
+    });
     expect(mockClick).toHaveBeenCalled();
     expect(mockCreateObjectURL).toHaveBeenCalled();
     expect(mockRevokeObjectURL).toHaveBeenCalled();
@@ -525,22 +601,15 @@ describe("KnowledgeGapsPage", () => {
       error: null,
     } as any);
 
-    mockApiFetch.mockImplementation((url) => {
-      if (url === "/api/summary-data/export?days=31") {
-        return Promise.resolve({
-          ok: true,
-          blob: () => Promise.resolve(new Blob(["test"], { type: "application/zip" })),
-        } as Response);
+    mockApiFetch.mockImplementation((url, options) => {
+      if (url === "/api/summary-data/export/start?days=31" && (options as RequestInit)?.method === "POST") {
+        return Promise.resolve({ status: 202, ok: true } as Response);
       }
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ enabled: false }),
       } as Response);
     });
-
-    global.URL.createObjectURL = jest.fn(() => "blob:test-url");
-    global.URL.revokeObjectURL = jest.fn();
-    HTMLAnchorElement.prototype.click = jest.fn();
 
     renderWithToast(<KnowledgeGapsPage />);
 
@@ -554,10 +623,10 @@ describe("KnowledgeGapsPage", () => {
 
     expect(screen.getByText("Analysis settings")).toBeInTheDocument();
 
-    await user.click(screen.getByText("Export"));
+    await user.click(screen.getByText("Download threads"));
 
     await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export?days=31");
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/start?days=31", expect.objectContaining({ method: "POST" }));
     });
   });
 
@@ -720,7 +789,7 @@ describe("KnowledgeGapsPage", () => {
 
       renderWithToast(<KnowledgeGapsPage />);
 
-      expect(screen.queryByText("Export")).not.toBeInTheDocument();
+      expect(screen.queryByText("Download threads")).not.toBeInTheDocument();
       expect(screen.queryByText("Analysis Bundle")).not.toBeInTheDocument();
       expect(screen.queryByText("Import")).not.toBeInTheDocument();
     });
@@ -739,7 +808,7 @@ describe("KnowledgeGapsPage", () => {
 
       renderWithToast(<KnowledgeGapsPage />);
 
-      expect(screen.queryByText("Export")).not.toBeInTheDocument();
+      expect(screen.queryByText("Download threads")).not.toBeInTheDocument();
       expect(screen.queryByText("Analysis Bundle")).not.toBeInTheDocument();
       expect(screen.queryByText("Import")).not.toBeInTheDocument();
     });
@@ -1098,7 +1167,7 @@ describe("KnowledgeGapsPage", () => {
       await screen.findByText("Run Analysis");
 
       // Verify all three buttons are not present when feature is enabled
-      expect(screen.queryByText("Export")).not.toBeInTheDocument();
+      expect(screen.queryByText("Download threads")).not.toBeInTheDocument();
       expect(screen.queryByText("Analysis Bundle")).not.toBeInTheDocument();
       expect(screen.queryByText("Import")).not.toBeInTheDocument();
     });
@@ -1145,7 +1214,7 @@ describe("KnowledgeGapsPage", () => {
 
       expect(screen.getByText("Analysis settings")).toBeInTheDocument();
 
-      const exportButton = screen.getByText("Export");
+      const exportButton = screen.getByText("Download threads");
       const bundleButton = screen.getByText("Analysis Bundle");
       const importButton = screen.getByText("Import");
 
