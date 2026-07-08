@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { apiFetch, useAnalysis } from "@/lib/hooks";
 import type { DimensionSummary, QuerySummary } from "@/lib/types";
@@ -19,6 +20,23 @@ interface AnalysisStatus {
   analyzedCount: number | null;
   running: boolean;
   error: string | null;
+}
+
+interface ThreadExportStatus {
+  running: boolean;
+  startedAt: string | null;
+  error: string | null;
+  ready: boolean;
+  filename: string | null;
+  threadCount: number | null;
+  completedAt: string | null;
+}
+
+function formatElapsed(startedAt: string, now: number): string {
+  const elapsedSeconds = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const seconds = elapsedSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
 export default function KnowledgeGapsPage() {
@@ -45,6 +63,12 @@ export default function KnowledgeGapsPage() {
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const isCompletedRef = useRef(false);
   const [isAnalysisEnabled, setIsAnalysisEnabled] = useState(false);
+  const [exportStatus, setExportStatus] = useState<ThreadExportStatus | null>(null);
+  const [isStartingExport, setIsStartingExport] = useState(false);
+  const exportPollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Unused value — just forces a re-render each tick.
+  const [, setExportElapsedTick] = useState(0);
+  const exportElapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const settingsTitleId = useId();
   const settingsDescriptionId = useId();
@@ -164,6 +188,41 @@ export default function KnowledgeGapsPage() {
     }, 3000);
   };
 
+  const stopExportPolling = () => {
+    if (exportPollingIntervalRef.current) {
+      clearInterval(exportPollingIntervalRef.current);
+      exportPollingIntervalRef.current = null;
+    }
+  };
+
+  const fetchExportStatus = async () => {
+    try {
+      const response = await apiFetch("/api/summary-data/export/status");
+      if (response.ok) {
+        const status: ThreadExportStatus = await response.json();
+        setExportStatus(status);
+        return status;
+      }
+      console.error("Export status request failed:", response.status);
+    } catch (error) {
+      console.error("Error fetching export status:", error);
+    }
+    return null;
+  };
+
+  const startExportPolling = () => {
+    if (exportPollingIntervalRef.current) return;
+
+    exportPollingIntervalRef.current = setInterval(async () => {
+      const status = await fetchExportStatus();
+
+      // null (fetch failure) means "couldn't tell", not "finished" — keep polling either way.
+      if (status && !status.running) {
+        stopExportPolling();
+      }
+    }, 3000);
+  };
+
   // Fetch analysis enabled status
   useEffect(() => {
     const fetchAnalysisEnabled = async () => {
@@ -208,6 +267,51 @@ export default function KnowledgeGapsPage() {
     // startPolling and stopPolling are stable functions that don't need to be in deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analysisStatus?.running]);
+
+  // Manual mode only (automated analysis disabled). Doesn't manage polling lifecycle itself — see
+  // the effect below, which owns that exclusively based on exportStatus?.running.
+  useEffect(() => {
+    if (isSupportEngineer && !isAnalysisEnabled) {
+      fetchExportStatus();
+    }
+  }, [isSupportEngineer, isAnalysisEnabled]);
+
+  useEffect(() => {
+    if (exportStatus?.running) {
+      startExportPolling();
+    } else {
+      stopExportPolling();
+    }
+
+    return () => {
+      stopExportPolling();
+    };
+    // startExportPolling and stopExportPolling are stable functions that don't need to be in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exportStatus?.running]);
+
+  // Toasts once per distinct error, regardless of which fetch site discovered it.
+  const previousExportErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (exportStatus?.error && exportStatus.error !== previousExportErrorRef.current) {
+      toast.error(`Export failed: ${exportStatus.error}`);
+    }
+    previousExportErrorRef.current = exportStatus?.error ?? null;
+  }, [exportStatus?.error]);
+
+  // Re-renders the elapsed-time display every second; doesn't poll the backend.
+  useEffect(() => {
+    if (exportStatus?.running) {
+      exportElapsedIntervalRef.current = setInterval(() => setExportElapsedTick((tick) => tick + 1), 1000);
+    }
+
+    return () => {
+      if (exportElapsedIntervalRef.current) {
+        clearInterval(exportElapsedIntervalRef.current);
+        exportElapsedIntervalRef.current = null;
+      }
+    };
+  }, [exportStatus?.running]);
 
   const handleStartAnalysis = async () => {
     closeSettingsAndRun(() => setIsStartingAnalysis(true));
@@ -299,23 +403,65 @@ export default function KnowledgeGapsPage() {
     });
   };
 
-  const handleExportDownload = async () => {
+  const handleStartExport = async () => {
+    setIsStartingExport(true);
+    try {
+      const response = await apiFetch(`/api/summary-data/export/start?days=${selectedDays}`, {
+        method: "POST",
+      });
+
+      if (response.status === 202) {
+        // No immediate status fetch here — it could race the backend's own flip to running:true
+        // and clobber this optimistic state. The polling effect picks up from here instead.
+        setExportStatus({
+          running: true,
+          startedAt: new Date().toISOString(),
+          error: null,
+          ready: false,
+          filename: null,
+          threadCount: null,
+          completedAt: null,
+        });
+      } else if (response.status === 409) {
+        toast.error("An export is already in progress");
+      } else {
+        toast.error("Failed to start export. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error starting export:", error);
+      toast.error("Failed to start export. Please try again.");
+    } finally {
+      setIsStartingExport(false);
+    }
+  };
+
+  const handleDownloadReadyExport = async () => {
     setIsDownloading(true);
     try {
-      const response = await apiFetch(`/api/summary-data/export?days=${selectedDays}`);
+      const response = await apiFetch("/api/summary-data/export/download");
+
+      if (response.status === 404) {
+        // Already claimed or expired — reset local state to match rather than leaving a dead button.
+        setExportStatus(null);
+        toast.error("This export is no longer available. Start a new one.");
+        return;
+      }
       if (!response.ok) {
-        throw new Error("Failed to download export");
+        throw new Error(`Failed to download export (${response.status})`);
       }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "content.zip";
+      a.download = exportStatus?.filename ?? "threads.zip";
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+
+      // Backend already cleared it on consumption — clear locally too so the button disappears.
+      setExportStatus(null);
     } catch (error) {
       console.error("Error downloading export:", error);
       toast.error("Failed to download export. Please try again.");
@@ -518,91 +664,122 @@ export default function KnowledgeGapsPage() {
           <p className="text-muted-foreground text-sm">Overview of support areas and knowledge gaps requiring attention</p>
         </div>
         {isSupportEngineer && (
-          <Popover open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-            {!isAnalysisEnabled && <input ref={fileInputRef} type="file" accept=".jsonl" onChange={handleFileChange} className="hidden" />}
-            <PopoverTrigger asChild>
-              <Button type="button" disabled={isAnalysisEnabled && (analysisStatus?.running || isStartingAnalysis || showCompletedStatus)}>
-                <Play className="h-4 w-4" />
-                {isAnalysisEnabled && isStartingAnalysis ? "Checking..." : "Run Analysis"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              role="dialog"
-              aria-labelledby={settingsTitleId}
-              aria-describedby={settingsDescriptionId}
-              className="w-72"
-            >
-              <div className="space-y-4">
-                <div>
-                  <h2 id={settingsTitleId} className="text-foreground text-sm font-semibold">
-                    Analysis settings
-                  </h2>
-                  <p id={settingsDescriptionId} className="text-muted-foreground mt-1 text-xs">
-                    Choose how far back to pull queries for this run.
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="query-window" className="text-foreground text-sm font-medium">
-                    Query window
-                  </Label>
-                  <Select value={String(selectedDays)} onValueChange={(v) => setSelectedDays(Number(v))}>
-                    <SelectTrigger id="query-window" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7">Week</SelectItem>
-                      <SelectItem value="31">Month</SelectItem>
-                      <SelectItem value="92">Quarter</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {isAnalysisEnabled ? (
-                  <Button
-                    type="button"
-                    onClick={handleStartAnalysis}
-                    disabled={analysisStatus?.running || isStartingAnalysis || showCompletedStatus}
-                    className="w-full"
-                  >
-                    <Play className="h-4 w-4" />
-                    {isStartingAnalysis ? "Checking..." : "Run Analysis"}
-                  </Button>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      variant="outline"
-                      type="button"
-                      onClick={() => closeSettingsAndRun(handleExportDownload)}
-                      disabled={isDownloading}
-                      className="w-full justify-start"
-                    >
-                      <Download className="h-4 w-4" />
-                      {isDownloading ? "Downloading..." : "Export"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      type="button"
-                      onClick={() => closeSettingsAndRun(handleAnalysisBundleDownload)}
-                      className="w-full justify-start"
-                    >
-                      <FileText className="h-4 w-4" />
-                      Analysis Bundle
-                    </Button>
-                    <Button
-                      variant="outline"
-                      type="button"
-                      onClick={() => closeSettingsAndRun(handleImportClick)}
-                      disabled={isUploading}
-                      className="w-full justify-start"
-                    >
-                      <Upload className="h-4 w-4" />
-                      {isUploading ? "Uploading..." : "Import"}
-                    </Button>
-                  </div>
-                )}
+          <div className="flex items-center gap-2">
+            {!isAnalysisEnabled && exportStatus?.running && (
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                <div className="border-secondary inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-b-2"></div>
+                <span>Exporting threads... {exportStatus.startedAt && formatElapsed(exportStatus.startedAt, Date.now())}</span>
               </div>
-            </PopoverContent>
-          </Popover>
+            )}
+            {!isAnalysisEnabled && exportStatus?.error && !exportStatus?.running && (
+              // Persistent, not just a toast, so it's not missed if the tab wasn't open when it failed.
+              <div className="text-destructive flex items-center gap-2 text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Export failed: {exportStatus.error}</span>
+              </div>
+            )}
+            {!isAnalysisEnabled && exportStatus?.ready && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="outline" onClick={handleDownloadReadyExport} disabled={isDownloading}>
+                    <Download className="h-4 w-4" />
+                    {isDownloading ? "Downloading..." : "Threads ready"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{exportStatus.filename}</TooltipContent>
+              </Tooltip>
+            )}
+            <Popover open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+              {!isAnalysisEnabled && (
+                <input ref={fileInputRef} type="file" accept=".jsonl" onChange={handleFileChange} className="hidden" />
+              )}
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  disabled={isAnalysisEnabled && (analysisStatus?.running || isStartingAnalysis || showCompletedStatus)}
+                >
+                  <Play className="h-4 w-4" />
+                  {isAnalysisEnabled && isStartingAnalysis ? "Checking..." : "Run Analysis"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                role="dialog"
+                aria-labelledby={settingsTitleId}
+                aria-describedby={settingsDescriptionId}
+                className="w-72"
+              >
+                <div className="space-y-4">
+                  <div>
+                    <h2 id={settingsTitleId} className="text-foreground text-sm font-semibold">
+                      Analysis settings
+                    </h2>
+                    <p id={settingsDescriptionId} className="text-muted-foreground mt-1 text-xs">
+                      Choose how far back to pull queries for this run.
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="query-window" className="text-foreground text-sm font-medium">
+                      Query window
+                    </Label>
+                    <Select value={String(selectedDays)} onValueChange={(v) => setSelectedDays(Number(v))}>
+                      <SelectTrigger id="query-window" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="7">Week</SelectItem>
+                        <SelectItem value="31">Month</SelectItem>
+                        <SelectItem value="92">Quarter</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {isAnalysisEnabled ? (
+                    <Button
+                      type="button"
+                      onClick={handleStartAnalysis}
+                      disabled={analysisStatus?.running || isStartingAnalysis || showCompletedStatus}
+                      className="w-full"
+                    >
+                      <Play className="h-4 w-4" />
+                      {isStartingAnalysis ? "Checking..." : "Run Analysis"}
+                    </Button>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => closeSettingsAndRun(handleStartExport)}
+                        disabled={isStartingExport || exportStatus?.running}
+                        className="w-full justify-start"
+                      >
+                        <Download className="h-4 w-4" />
+                        {exportStatus?.running ? "Exporting..." : isStartingExport ? "Starting..." : "Download threads"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => closeSettingsAndRun(handleAnalysisBundleDownload)}
+                        className="w-full justify-start"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Analysis Bundle
+                      </Button>
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => closeSettingsAndRun(handleImportClick)}
+                        disabled={isUploading}
+                        className="w-full justify-start"
+                      >
+                        <Upload className="h-4 w-4" />
+                        {isUploading ? "Uploading..." : "Import"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         )}
       </div>
 

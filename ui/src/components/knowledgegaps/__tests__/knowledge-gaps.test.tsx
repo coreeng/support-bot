@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { Toaster } from "sonner";
@@ -465,19 +465,30 @@ describe("KnowledgeGapsPage", () => {
     expect(screen.getByText("Deploying & Configuring Tenant Applications")).toBeInTheDocument();
   });
 
-  it("handles export button click", async () => {
+  it("starts an export when Download threads is clicked, without downloading immediately", async () => {
     mockUseAnalysis.mockReturnValue({
       data: mockAnalysisData,
       isLoading: false,
       error: null,
     } as any);
 
-    // Mock apiFetch for export
-    mockApiFetch.mockImplementation((url) => {
-      if (url === "/api/summary-data/export?days=7") {
+    mockApiFetch.mockImplementation((url, options) => {
+      if (url === "/api/summary-data/export/start?days=7" && (options as RequestInit)?.method === "POST") {
+        return Promise.resolve({ status: 202, ok: true } as Response);
+      }
+      if (url === "/api/summary-data/export/status") {
         return Promise.resolve({
           ok: true,
-          blob: () => Promise.resolve(new Blob(["test"], { type: "application/zip" })),
+          json: () =>
+            Promise.resolve({
+              running: true,
+              startedAt: new Date().toISOString(),
+              error: null,
+              ready: false,
+              filename: null,
+              threadCount: null,
+              completedAt: null,
+            }),
         } as Response);
       }
       // Default for other calls
@@ -487,13 +498,6 @@ describe("KnowledgeGapsPage", () => {
       } as Response);
     });
 
-    // Mock URL.createObjectURL and revokeObjectURL
-    const mockCreateObjectURL = jest.fn(() => "blob:test-url");
-    const mockRevokeObjectURL = jest.fn();
-    global.URL.createObjectURL = mockCreateObjectURL;
-    global.URL.revokeObjectURL = mockRevokeObjectURL;
-
-    // Mock HTMLAnchorElement click
     const mockClick = jest.fn();
     HTMLAnchorElement.prototype.click = mockClick;
 
@@ -501,19 +505,187 @@ describe("KnowledgeGapsPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
 
-    const exportButton = screen.getByText("Export");
-    fireEvent.click(exportButton);
+    const downloadButton = screen.getByText("Download threads");
+    fireEvent.click(downloadButton);
 
-    // Verify apiFetch was called with default value of 7 days (Week)
     await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export?days=7");
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/start?days=7", expect.objectContaining({ method: "POST" }));
     });
     expect(screen.queryByText("Analysis settings")).not.toBeInTheDocument();
+    expect(mockClick).not.toHaveBeenCalled();
+  });
 
-    // Verify download was triggered
+  it("shows a live elapsed-time indicator while the export is running", async () => {
+    mockUseAnalysis.mockReturnValue({
+      data: mockAnalysisData,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    // Started ~65s ago, so the indicator should render in "Xm Ys" form, not just seconds
+    const startedAt = new Date(Date.now() - 65_000).toISOString();
+
+    mockApiFetch.mockImplementation((url, options) => {
+      if (url === "/api/summary-data/export/start?days=7" && (options as RequestInit)?.method === "POST") {
+        return Promise.resolve({ status: 202, ok: true } as Response);
+      }
+      if (url === "/api/summary-data/export/status") {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({ running: true, startedAt, error: null, ready: false, filename: null, threadCount: null, completedAt: null }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ enabled: false }),
+      } as Response);
+    });
+
+    renderWithToast(<KnowledgeGapsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+    fireEvent.click(screen.getByText("Download threads"));
+
+    await screen.findByText(/Exporting threads\.\.\. \d+m \d+s/);
+  });
+
+  it("shows a toast when an export is already in progress", async () => {
+    mockUseAnalysis.mockReturnValue({
+      data: mockAnalysisData,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockApiFetch.mockImplementation((url, options) => {
+      if (url === "/api/summary-data/export/start?days=7" && (options as RequestInit)?.method === "POST") {
+        return Promise.resolve({ status: 409, ok: false } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ enabled: false }),
+      } as Response);
+    });
+
+    renderWithToast(<KnowledgeGapsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+    fireEvent.click(screen.getByText("Download threads"));
+
+    await screen.findByText("An export is already in progress");
+  });
+
+  it("shows Threads ready once the export completes, and downloads it on click", async () => {
+    mockUseAnalysis.mockReturnValue({
+      data: mockAnalysisData,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockApiFetch.mockImplementation((url) => {
+      if (url === "/api/summary-data/export/start?days=7") {
+        return Promise.resolve({ status: 202, ok: true } as Response);
+      }
+      if (url === "/api/summary-data/export/status") {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              running: false,
+              error: null,
+              ready: true,
+              filename: "downloaded-threads-2026-06-26-to-2026-07-03.zip",
+              threadCount: 12,
+              completedAt: "2026-07-03T10:00:00Z",
+            }),
+        } as Response);
+      }
+      if (url === "/api/summary-data/export/download") {
+        return Promise.resolve({
+          ok: true,
+          blob: () => Promise.resolve(new Blob(["zip bytes"], { type: "application/zip" })),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ enabled: false }),
+      } as Response);
+    });
+
+    const mockCreateObjectURL = jest.fn(() => "blob:test-url");
+    const mockRevokeObjectURL = jest.fn();
+    global.URL.createObjectURL = mockCreateObjectURL;
+    global.URL.revokeObjectURL = mockRevokeObjectURL;
+    const mockClick = jest.fn();
+    HTMLAnchorElement.prototype.click = mockClick;
+
+    renderWithToast(<KnowledgeGapsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+    fireEvent.click(screen.getByText("Download threads"));
+
+    const readyButton = await screen.findByText("Threads ready");
+    fireEvent.click(readyButton);
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/download");
+    });
     expect(mockClick).toHaveBeenCalled();
     expect(mockCreateObjectURL).toHaveBeenCalled();
     expect(mockRevokeObjectURL).toHaveBeenCalled();
+
+    // Single-consumption on the backend — the button must disappear immediately.
+    await waitFor(() => {
+      expect(screen.queryByText("Threads ready")).not.toBeInTheDocument();
+    });
+  });
+
+  it("clears the stale Threads ready button and shows a message when the export was already consumed", async () => {
+    mockUseAnalysis.mockReturnValue({
+      data: mockAnalysisData,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockApiFetch.mockImplementation((url) => {
+      if (url === "/api/summary-data/export/start?days=7") {
+        return Promise.resolve({ status: 202, ok: true } as Response);
+      }
+      if (url === "/api/summary-data/export/status") {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              running: false,
+              error: null,
+              ready: true,
+              filename: "downloaded-threads-2026-06-26-to-2026-07-03.zip",
+              threadCount: 12,
+              completedAt: "2026-07-03T10:00:00Z",
+            }),
+        } as Response);
+      }
+      if (url === "/api/summary-data/export/download") {
+        return Promise.resolve({ status: 404, ok: false } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ enabled: false }),
+      } as Response);
+    });
+
+    renderWithToast(<KnowledgeGapsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+    fireEvent.click(screen.getByText("Download threads"));
+
+    const readyButton = await screen.findByText("Threads ready");
+    fireEvent.click(readyButton);
+
+    await screen.findByText("This export is no longer available. Start a new one.");
+    await waitFor(() => {
+      expect(screen.queryByText("Threads ready")).not.toBeInTheDocument();
+    });
   });
 
   it("keeps the settings panel open when picking a query window and applies it to the export", async () => {
@@ -525,22 +697,15 @@ describe("KnowledgeGapsPage", () => {
       error: null,
     } as any);
 
-    mockApiFetch.mockImplementation((url) => {
-      if (url === "/api/summary-data/export?days=31") {
-        return Promise.resolve({
-          ok: true,
-          blob: () => Promise.resolve(new Blob(["test"], { type: "application/zip" })),
-        } as Response);
+    mockApiFetch.mockImplementation((url, options) => {
+      if (url === "/api/summary-data/export/start?days=31" && (options as RequestInit)?.method === "POST") {
+        return Promise.resolve({ status: 202, ok: true } as Response);
       }
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ enabled: false }),
       } as Response);
     });
-
-    global.URL.createObjectURL = jest.fn(() => "blob:test-url");
-    global.URL.revokeObjectURL = jest.fn();
-    HTMLAnchorElement.prototype.click = jest.fn();
 
     renderWithToast(<KnowledgeGapsPage />);
 
@@ -554,10 +719,197 @@ describe("KnowledgeGapsPage", () => {
 
     expect(screen.getByText("Analysis settings")).toBeInTheDocument();
 
-    await user.click(screen.getByText("Export"));
+    await user.click(screen.getByText("Download threads"));
 
     await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export?days=31");
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/start?days=31", expect.objectContaining({ method: "POST" }));
+    });
+  });
+
+  describe("export failure visibility and polling resilience", () => {
+    it("shows a persistent error banner in addition to the toast when the export has failed", async () => {
+      mockUseAnalysis.mockReturnValue({
+        data: mockAnalysisData,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      mockApiFetch.mockImplementation((url) => {
+        if (url === "/api/analysis/enabled") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ enabled: false }) } as Response);
+        }
+        if (url === "/api/summary-data/export/status") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                running: false,
+                startedAt: null,
+                error: "Slack API error",
+                ready: false,
+                filename: null,
+                threadCount: null,
+                completedAt: null,
+              }),
+          } as Response);
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
+      });
+
+      renderWithToast(<KnowledgeGapsPage />);
+
+      // One match from the toast, one from the persistent banner.
+      await waitFor(() => {
+        expect(screen.getAllByText("Export failed: Slack API error")).toHaveLength(2);
+      });
+    });
+
+    it("keeps polling instead of freezing when a status fetch transiently fails", async () => {
+      // Must enable fake timers before startExportPolling() ever runs, or the real interval it
+      // creates won't be affected by later jest.advanceTimersByTime calls.
+      jest.useFakeTimers();
+      try {
+        mockUseAnalysis.mockReturnValue({
+          data: mockAnalysisData,
+          isLoading: false,
+          error: null,
+        } as any);
+
+        let statusCallCount = 0;
+        mockApiFetch.mockImplementation((url, options) => {
+          if (url === "/api/analysis/enabled") {
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ enabled: false }) } as Response);
+          }
+          if (url === "/api/summary-data/export/start?days=7" && (options as RequestInit)?.method === "POST") {
+            return Promise.resolve({ status: 202, ok: true } as Response);
+          }
+          if (url === "/api/summary-data/export/status") {
+            statusCallCount++;
+            if (statusCallCount === 1) {
+              // mount-time fetch: nothing running yet
+              return Promise.resolve({
+                ok: true,
+                json: () =>
+                  Promise.resolve({
+                    running: false,
+                    startedAt: null,
+                    error: null,
+                    ready: false,
+                    filename: null,
+                    threadCount: null,
+                    completedAt: null,
+                  }),
+              } as Response);
+            }
+            if (statusCallCount === 2) {
+              // first poll tick: transient failure, must not be treated as "done"
+              return Promise.resolve({ ok: false, status: 502 } as Response);
+            }
+            // second poll tick: genuinely finished
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  running: false,
+                  startedAt: new Date().toISOString(),
+                  error: null,
+                  ready: true,
+                  filename: "downloaded-threads-2026-06-26-to-2026-07-03.zip",
+                  threadCount: 5,
+                  completedAt: new Date().toISOString(),
+                }),
+            } as Response);
+          }
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
+        });
+
+        renderWithToast(<KnowledgeGapsPage />);
+
+        // Flush the mount-time fetch first so it can't resolve later and clobber the optimistic
+        // running:true state set below. (Not findByText/waitFor — their retry needs real timers.)
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+        fireEvent.click(screen.getByText("Download threads"));
+
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+        expect(screen.getByText(/Exporting threads/)).toBeInTheDocument();
+
+        // advanceTimersByTimeAsync (not the sync version) properly awaits the interval callback's
+        // own promise chain between ticks.
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(3000);
+        });
+
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(3000);
+        });
+
+        expect(screen.getByText("Threads ready")).toBeInTheDocument();
+        expect(statusCallCount).toBeGreaterThanOrEqual(3);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("does not fetch status immediately after starting, avoiding a race with the optimistic running state", async () => {
+      mockUseAnalysis.mockReturnValue({
+        data: mockAnalysisData,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      mockApiFetch.mockImplementation((url, options) => {
+        if (url === "/api/analysis/enabled") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ enabled: false }) } as Response);
+        }
+        if (url === "/api/summary-data/export/start?days=7" && (options as RequestInit)?.method === "POST") {
+          return Promise.resolve({ status: 202, ok: true } as Response);
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              running: false,
+              startedAt: null,
+              error: null,
+              ready: false,
+              filename: null,
+              threadCount: null,
+              completedAt: null,
+            }),
+        } as Response);
+      });
+
+      renderWithToast(<KnowledgeGapsPage />);
+
+      // Let the mount-time status fetch settle first, so it doesn't get counted below.
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/status");
+      });
+      const statusCallsBeforeStart = mockApiFetch.mock.calls.filter((call) => call[0] === "/api/summary-data/export/status").length;
+
+      fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+      fireEvent.click(screen.getByText("Download threads"));
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/start?days=7", expect.objectContaining({ method: "POST" }));
+      });
+      // Flush microtasks without waiting long enough for the poll interval to fire, so only a
+      // genuinely immediate fetch would show up here.
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const statusCallsRightAfterStart = mockApiFetch.mock.calls.filter((call) => call[0] === "/api/summary-data/export/status").length;
+      expect(statusCallsRightAfterStart).toBe(statusCallsBeforeStart);
+      expect(screen.getByText(/Exporting threads/)).toBeInTheDocument();
     });
   });
 
@@ -720,7 +1072,7 @@ describe("KnowledgeGapsPage", () => {
 
       renderWithToast(<KnowledgeGapsPage />);
 
-      expect(screen.queryByText("Export")).not.toBeInTheDocument();
+      expect(screen.queryByText("Download threads")).not.toBeInTheDocument();
       expect(screen.queryByText("Analysis Bundle")).not.toBeInTheDocument();
       expect(screen.queryByText("Import")).not.toBeInTheDocument();
     });
@@ -739,7 +1091,7 @@ describe("KnowledgeGapsPage", () => {
 
       renderWithToast(<KnowledgeGapsPage />);
 
-      expect(screen.queryByText("Export")).not.toBeInTheDocument();
+      expect(screen.queryByText("Download threads")).not.toBeInTheDocument();
       expect(screen.queryByText("Analysis Bundle")).not.toBeInTheDocument();
       expect(screen.queryByText("Import")).not.toBeInTheDocument();
     });
@@ -1098,7 +1450,7 @@ describe("KnowledgeGapsPage", () => {
       await screen.findByText("Run Analysis");
 
       // Verify all three buttons are not present when feature is enabled
-      expect(screen.queryByText("Export")).not.toBeInTheDocument();
+      expect(screen.queryByText("Download threads")).not.toBeInTheDocument();
       expect(screen.queryByText("Analysis Bundle")).not.toBeInTheDocument();
       expect(screen.queryByText("Import")).not.toBeInTheDocument();
     });
@@ -1145,7 +1497,7 @@ describe("KnowledgeGapsPage", () => {
 
       expect(screen.getByText("Analysis settings")).toBeInTheDocument();
 
-      const exportButton = screen.getByText("Export");
+      const exportButton = screen.getByText("Download threads");
       const bundleButton = screen.getByText("Analysis Bundle");
       const importButton = screen.getByText("Import");
 
