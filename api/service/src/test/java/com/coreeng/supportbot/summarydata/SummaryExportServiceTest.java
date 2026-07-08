@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.summarydata;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
@@ -142,7 +143,7 @@ class SummaryExportServiceTest {
 
     @Test
     void start_discardsPreviousCompletedExport_immediately() {
-        service.currentExport.set(completedExport(
+        service.seedCompletedExportForTest(completedExport(
                 "old content", "old-export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.DAYS)));
 
         when(asyncJobRepository.tryStartJob("summary-export", "7")).thenReturn(true);
@@ -163,14 +164,14 @@ class SummaryExportServiceTest {
         // succeeds, so that alone can't tell apart "the old export was actively discarded" from
         // "nothing discarded anything, the successful run just overwrote it anyway". Making the run
         // itself fail (so nothing overwrites the reference) isolates the discard step specifically.
-        service.currentExport.set(completedExport(
+        service.seedCompletedExportForTest(completedExport(
                 "old content", "old-export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.DAYS)));
 
         SlackChannelRegistry brokenRegistry = mock(SlackChannelRegistry.class);
         when(brokenRegistry.monitoredChannelIds()).thenThrow(new RuntimeException("registry unavailable"));
         SummaryExportService brokenService =
                 new SummaryExportService(asyncJobRepository, threadService, brokenRegistry, applicationContext);
-        brokenService.currentExport.set(completedExport(
+        brokenService.seedCompletedExportForTest(completedExport(
                 "old content", "old-export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.DAYS)));
 
         when(asyncJobRepository.tryStartJob("summary-export", "7")).thenReturn(true);
@@ -180,7 +181,7 @@ class SummaryExportServiceTest {
 
         // The run failed (no new export produced), yet the old one is still gone — proof the discard
         // happened as its own step, not as a side effect of a successful new export overwriting it.
-        assertThat(brokenService.currentExport.get()).isNull();
+        assertThat(brokenService.currentExportForTest()).isNull();
         assertThat(brokenService.getStatus().error()).isNotNull();
     }
 
@@ -191,6 +192,53 @@ class SummaryExportServiceTest {
         assertThat(status.running()).isFalse();
         assertThat(status.startedAt()).isNull();
         assertThat(status.error()).isNull();
+    }
+
+    @Test
+    void completedExport_equalsAndHashCode_areContentBased_notReferenceBased() {
+        Instant completedAt = Instant.now();
+        Instant expiresAt = completedAt.plus(1, ChronoUnit.HOURS);
+
+        CompletedExport first = completedExport("same content", "same.zip", completedAt, expiresAt);
+        CompletedExport second = completedExport("same content", "same.zip", completedAt, expiresAt);
+        CompletedExport differentContent = completedExport("different content", "same.zip", completedAt, expiresAt);
+
+        assertThat(first).isEqualTo(second);
+        assertThat(first.hashCode()).isEqualTo(second.hashCode());
+        assertThat(first).isNotEqualTo(differentContent);
+    }
+
+    @Test
+    void completedExport_rejectsNegativeThreadCount() {
+        Instant completedAt = Instant.now();
+
+        assertThatThrownBy(() -> new CompletedExport(
+                        "content".getBytes(StandardCharsets.UTF_8),
+                        "export.zip",
+                        -1,
+                        completedAt,
+                        completedAt.plus(1, ChronoUnit.HOURS)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void completedExport_rejectsExpiresAtNotAfterCompletedAt() {
+        Instant completedAt = Instant.now();
+
+        assertThatThrownBy(() -> new CompletedExport(
+                        "content".getBytes(StandardCharsets.UTF_8), "export.zip", 1, completedAt, completedAt))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void exportStatus_rejectsRunningWithAnError() {
+        assertThatThrownBy(() -> new ExportStatus(true, Instant.now(), "boom"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void exportStatus_rejectsRunningWithoutAStartedAt() {
+        assertThatThrownBy(() -> new ExportStatus(true, null, null)).isInstanceOf(IllegalArgumentException.class);
     }
 
     // --- currentServableExport / consumeCurrentExport: peek vs. single-consumption ---
@@ -204,7 +252,7 @@ class SummaryExportServiceTest {
     void currentServableExport_returnsExport_whenNotYetExpired() {
         CompletedExport export = completedExport(
                 "content", "export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
-        service.currentExport.set(export);
+        service.seedCompletedExportForTest(export);
 
         assertThat(service.currentServableExport()).contains(export);
         // a peek must not consume it
@@ -218,11 +266,11 @@ class SummaryExportServiceTest {
                 "export.zip",
                 Instant.now().minus(9, ChronoUnit.HOURS),
                 Instant.now().minus(1, ChronoUnit.HOURS));
-        service.currentExport.set(export);
+        service.seedCompletedExportForTest(export);
 
         assertThat(service.currentServableExport()).isEmpty();
         // eviction actually clears the reference, not just hides it from this one call
-        assertThat(service.currentExport.get()).isNull();
+        assertThat(service.currentExportForTest()).isNull();
     }
 
     @Test
@@ -234,11 +282,11 @@ class SummaryExportServiceTest {
     void consumeCurrentExport_returnsExport_thenClearsIt_soASecondCallGetsNothing() {
         CompletedExport export = completedExport(
                 "content", "export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
-        service.currentExport.set(export);
+        service.seedCompletedExportForTest(export);
 
         assertThat(service.consumeCurrentExport()).contains(export);
         // the reference itself is cleared, not just hidden from subsequent reads
-        assertThat(service.currentExport.get()).isNull();
+        assertThat(service.currentExportForTest()).isNull();
         assertThat(service.consumeCurrentExport()).isEmpty();
         assertThat(service.currentServableExport()).isEmpty();
     }
@@ -250,9 +298,12 @@ class SummaryExportServiceTest {
                 "export.zip",
                 Instant.now().minus(9, ChronoUnit.HOURS),
                 Instant.now().minus(1, ChronoUnit.HOURS));
-        service.currentExport.set(export);
+        service.seedCompletedExportForTest(export);
 
         assertThat(service.consumeCurrentExport()).isEmpty();
+        // consistent with its sibling clearing-path tests: assert the reference itself, not just
+        // the return value
+        assertThat(service.currentExportForTest()).isNull();
     }
 
     // --- expireStaleExport: the active backstop sweep ---
@@ -264,29 +315,29 @@ class SummaryExportServiceTest {
                 "export.zip",
                 Instant.now().minus(9, ChronoUnit.HOURS),
                 Instant.now().minus(1, ChronoUnit.HOURS));
-        service.currentExport.set(export);
+        service.seedCompletedExportForTest(export);
 
         service.expireStaleExport();
 
-        assertThat(service.currentExport.get()).isNull();
+        assertThat(service.currentExportForTest()).isNull();
     }
 
     @Test
     void expireStaleExport_leavesFreshExportInPlace() {
         CompletedExport export = completedExport(
                 "content", "export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
-        service.currentExport.set(export);
+        service.seedCompletedExportForTest(export);
 
         service.expireStaleExport();
 
-        assertThat(service.currentExport.get()).isEqualTo(export);
+        assertThat(service.currentExportForTest()).isEqualTo(export);
     }
 
     @Test
     void expireStaleExport_doesNothingWhenNoneCompleted() {
         service.expireStaleExport();
 
-        assertThat(service.currentExport.get()).isNull();
+        assertThat(service.currentExportForTest()).isNull();
     }
 
     // --- runAsyncExport: real zip-writing logic ---

@@ -12,6 +12,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -47,7 +48,7 @@ public class SummaryExportController {
             return ResponseEntity.accepted().build();
         } else {
             log.warn("Export already running");
-            return ResponseEntity.status(409).build(); // Conflict
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
     }
 

@@ -220,12 +220,11 @@ export default function KnowledgeGapsPage() {
     exportPollingIntervalRef.current = setInterval(async () => {
       const status = await fetchExportStatus();
 
-      if (!status || !status.running) {
+      // A failed fetch (network blip, transient 5xx) returns null — that means "we couldn't tell",
+      // not "the job finished". Keep polling in that case; only stop once the backend has actually
+      // confirmed it's no longer running, so a transient failure can't freeze the UI mid-export.
+      if (status && !status.running) {
         stopExportPolling();
-      }
-
-      if (status?.error) {
-        toast.error(`Export failed: ${status.error}`);
       }
     }, 3000);
   };
@@ -275,27 +274,42 @@ export default function KnowledgeGapsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analysisStatus?.running]);
 
-  // Check export status on mount — only relevant in manual mode (automated analysis disabled)
+  // Check export status on mount — only relevant in manual mode (automated analysis disabled).
+  // Polling lifecycle itself is NOT this effect's responsibility (see the one below) — it must not
+  // stop polling as a side effect of unrelated deps changing here, only the export's own running
+  // state should start/stop it.
   useEffect(() => {
     if (isSupportEngineer && !isAnalysisEnabled) {
       fetchExportStatus();
     }
-
-    return () => {
-      stopExportPolling();
-    };
   }, [isSupportEngineer, isAnalysisEnabled]);
 
-  // Start polling if an export is running
+  // Start/stop polling based on whether an export is running. This owns the polling lifecycle
+  // exclusively — including on unmount — so nothing else needs (or should) stop it independently.
   useEffect(() => {
     if (exportStatus?.running) {
       startExportPolling();
     } else {
       stopExportPolling();
     }
+
+    return () => {
+      stopExportPolling();
+    };
     // startExportPolling and stopExportPolling are stable functions that don't need to be in deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportStatus?.running]);
+
+  // Toast exactly once per distinct export failure, regardless of whether it was discovered via the
+  // initial mount fetch, a live poll, or the immediate post-start check — single source of truth
+  // instead of duplicating this per fetch site.
+  const previousExportErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (exportStatus?.error && exportStatus.error !== previousExportErrorRef.current) {
+      toast.error(`Export failed: ${exportStatus.error}`);
+    }
+    previousExportErrorRef.current = exportStatus?.error ?? null;
+  }, [exportStatus?.error]);
 
   // Tick a local clock every second while an export is running, purely to re-render the elapsed-time
   // display below — this does not poll the backend, it just reformats exportStatus.startedAt against
@@ -413,6 +427,12 @@ export default function KnowledgeGapsPage() {
       });
 
       if (response.status === 202) {
+        // Set optimistic running state and let the polling-lifecycle effect (keyed on
+        // exportStatus?.running) react to it and start polling — do NOT also fetch status
+        // immediately here. The backend only flips its own running flag as the first line of the
+        // background job, on a separate thread from the one that just returned this 202; an
+        // immediate fetch can race that and read the still-stale prior status, overwriting this
+        // optimistic state with running:false before the job has actually started.
         setExportStatus({
           running: true,
           startedAt: new Date().toISOString(),
@@ -422,10 +442,6 @@ export default function KnowledgeGapsPage() {
           threadCount: null,
           completedAt: null,
         });
-        const status = await fetchExportStatus();
-        if (status?.running) {
-          startExportPolling();
-        }
       } else if (response.status === 409) {
         toast.error("An export is already in progress");
       } else {
@@ -453,7 +469,7 @@ export default function KnowledgeGapsPage() {
         return;
       }
       if (!response.ok) {
-        throw new Error("Failed to download export");
+        throw new Error(`Failed to download export (${response.status})`);
       }
 
       const blob = await response.blob();
@@ -676,6 +692,14 @@ export default function KnowledgeGapsPage() {
               <div className="text-muted-foreground flex items-center gap-2 text-sm">
                 <div className="border-secondary inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-b-2"></div>
                 <span>Exporting threads... {exportStatus.startedAt && formatElapsed(exportStatus.startedAt, Date.now())}</span>
+              </div>
+            )}
+            {!isAnalysisEnabled && exportStatus?.error && !exportStatus?.running && (
+              // Persistent, not just a toast — a toast alone is missed if the failure happens while
+              // nobody has this tab open/focused, since it only fires at the moment it's detected.
+              <div className="text-destructive flex items-center gap-2 text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Export failed: {exportStatus.error}</span>
               </div>
             )}
             {!isAnalysisEnabled && exportStatus?.ready && (

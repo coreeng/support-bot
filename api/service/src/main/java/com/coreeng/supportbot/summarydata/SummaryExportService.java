@@ -10,8 +10,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -33,10 +35,10 @@ import org.springframework.stereotype.Service;
  * thread so the triggering HTTP request never blocks on the (often 10+ minute) Slack fetch. See
  * {@code SummaryExportController} for the REST surface.
  *
- * <p>The finished zip is held in memory, never written to disk. It's consumed
- * (served once, then cleared) on first download, and swept away after {@link #retentionDuration}
- * regardless of whether anyone claimed it, so nothing lingers indefinitely just because no one
- * checked back.
+ * <p>The finished zip is held in memory. It's consumed
+ * (served once, then cleared) on first download, and swept away within about 15 minutes of
+ * {@link #RETENTION_DURATION} elapsing even if nobody claimed it — see {@link #expireStaleExport}
+ * for the exact bound — so nothing lingers indefinitely just because no one checked back.
  *
  * <p>Concurrency is controlled the same way as {@code AnalysisService} — via a unique constraint
  * on the {@code async_job} table (a distinct {@code "summary-export"} row alongside the existing
@@ -57,13 +59,25 @@ public class SummaryExportService {
     private static final ExportStatus IDLE_STATUS = new ExportStatus(false, null, null);
     private final AtomicReference<ExportStatus> currentStatus = new AtomicReference<>(IDLE_STATUS);
 
-    // Package-private (not private) so tests can seed a completed export directly — there's no
-    // production path to populate one without running the real (slow, Slack-calling) export.
-    final AtomicReference<@Nullable CompletedExport> currentExport = new AtomicReference<>();
+    private final AtomicReference<@Nullable CompletedExport> currentExport = new AtomicReference<>();
 
-    // Package-private (not private) so tests can shrink this to something they can wait out. No
-    // operational need has ever come up to make this configurable otherwise.
-    Duration retentionDuration = Duration.ofHours(8);
+    private static final Duration RETENTION_DURATION = Duration.ofHours(8);
+
+    /**
+     * Test-only seam: seeds a completed export directly, since there's no production path to
+     * populate one without running the real (slow, Slack-calling) export.
+     */
+    void seedCompletedExportForTest(CompletedExport export) {
+        currentExport.set(export);
+    }
+
+    /**
+     * Test-only seam: reads the raw held reference, so a test can verify a clearing path actually
+     * cleared it rather than just inferring that from later behavior.
+     */
+    @Nullable CompletedExport currentExportForTest() {
+        return currentExport.get();
+    }
 
     /**
      * @param running whether an export is currently in progress
@@ -73,19 +87,58 @@ public class SummaryExportService {
     public record ExportStatus(
             boolean running,
             @Nullable Instant startedAt,
-            @Nullable String error) {}
+            @Nullable String error) {
+        public ExportStatus {
+            if (running && error != null) {
+                throw new IllegalArgumentException("A running export cannot already have a result error");
+            }
+            if (running && startedAt == null) {
+                throw new IllegalArgumentException("A running export must have a startedAt");
+            }
+        }
+    }
 
     /**
      * The single most recently finished export artifact, held in memory only. Cleared the instant
      * it's served (see {@link #consumeCurrentExport}), replaced the instant a new export starts (see
      * {@link #start}), or swept away once {@code expiresAt} passes, whichever happens first.
      */
-    // Array component means the generated equals/hashCode compare by reference, not content — fine
-    // here, since we only ever compare a CompletedExport against the exact instance it came from
-    // (an AtomicReference read), never reconstruct a separate "equal" one to compare against.
+    // ErrorProne flags any array record component unconditionally, regardless of whether equals and
+    // hashCode are actually overridden below — they are, content-aware via Arrays.equals/hashCode,
+    // so the default reference-only comparison this check warns about doesn't apply here.
     @SuppressWarnings("ArrayRecordComponent")
     public record CompletedExport(
-            byte[] content, String displayFilename, int threadCount, Instant completedAt, Instant expiresAt) {}
+            byte[] content, String displayFilename, int threadCount, Instant completedAt, Instant expiresAt) {
+
+        public CompletedExport {
+            if (threadCount < 0) {
+                throw new IllegalArgumentException("threadCount cannot be negative: " + threadCount);
+            }
+            if (!expiresAt.isAfter(completedAt)) {
+                throw new IllegalArgumentException("expiresAt must be after completedAt");
+            }
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof CompletedExport other)) {
+                return false;
+            }
+            return threadCount == other.threadCount
+                    && Arrays.equals(content, other.content)
+                    && displayFilename.equals(other.displayFilename)
+                    && completedAt.equals(other.completedAt)
+                    && expiresAt.equals(other.expiresAt);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hash(displayFilename, threadCount, completedAt, expiresAt) + Arrays.hashCode(content);
+        }
+    }
 
     /**
      * Discards any export job left running by a pod restart, rather than resuming it.
@@ -127,6 +180,11 @@ public class SummaryExportService {
 
         try {
             log.info("Started new async job: id={}, days={}", ASYNC_ID, days);
+            // Fetched through the Spring-managed bean, not called as this.runAsyncExport(days) —
+            // @Async only takes effect through the CGLIB proxy Spring wraps around the bean. A
+            // direct "this" call would bypass that proxy and run synchronously on this thread,
+            // blocking the request for the full 10+ minute Slack fetch this whole feature exists to
+            // avoid. Same pattern as AnalysisService.
             applicationContext.getBean(SummaryExportService.class).runAsyncExport(days);
             return true;
         } catch (TaskRejectedException e) {
@@ -152,7 +210,10 @@ public class SummaryExportService {
 
             // A failure for one channel (e.g. the bot is not a member, or a Slack API error) must
             // not fail the whole export, so each channel is fetched independently and a failing
-            // one is skipped.
+            // one is skipped. Only logged, not surfaced to the caller — acceptable while there's
+            // typically just one monitored channel. If multi-channel monitoring becomes common,
+            // we'd need to track skipped channels and expose them (e.g. on ExportStatus) so a
+            // "successful" export can't silently be missing a whole channel's threads.
             List<ThreadService.ThreadData> threads = new ArrayList<>();
             for (String channelId : channelIds) {
                 try {
@@ -169,7 +230,7 @@ public class SummaryExportService {
 
             Instant completedAt = Instant.now();
             String displayFilename = displayFilename(days, completedAt);
-            Instant expiresAt = completedAt.plus(retentionDuration);
+            Instant expiresAt = completedAt.plus(RETENTION_DURATION);
 
             currentExport.set(new CompletedExport(content, displayFilename, threads.size(), completedAt, expiresAt));
             currentStatus.set(new ExportStatus(false, startedAt, null));

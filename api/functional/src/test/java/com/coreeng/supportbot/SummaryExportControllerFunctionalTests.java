@@ -32,9 +32,9 @@ public class SummaryExportControllerFunctionalTests {
     private SlackWiremock slackWiremock;
     private SupportBotClient supportBotClient;
 
-    // TestAuthBypassFilter maps the "leadership" test role to BOTH Role.LEADERSHIP and
-    // Role.SUPPORT_ENGINEER (TestAuthBypassFilter.java:46: isSupportEngineer is true whenever
-    // isLeadership is true), so it can't simulate a leadership-only principal. "escalation" grants
+    // TestAuthBypassFilter.createTestPrincipal maps the "leadership" test role to BOTH
+    // Role.LEADERSHIP and Role.SUPPORT_ENGINEER (isSupportEngineer is true whenever isLeadership is
+    // true), so it can't simulate a leadership-only principal. "escalation" grants
     // only Role.ESCALATION + Role.USER — no SUPPORT_ENGINEER — making it a valid stand-in for "any
     // authenticated user without SUPPORT_ENGINEER" when proving the /summary-data/** security rule
     // (SecurityConfig.java) is enforced end-to-end, not just assumed.
@@ -81,6 +81,11 @@ public class SummaryExportControllerFunctionalTests {
     void fullExportFlow_startsAsync_completesFromMockedSlack_andIsSingleConsumption() throws IOException {
         String threadTs = "1700000000.000100";
 
+        // Deliberately no request-body matcher: Slack's web API sends form-encoded bodies, not
+        // JSON, so a matchingJsonPath matcher here would silently never match and fall through to
+        // the permanent conversations.history catch-all (empty messages) instead — this relies on
+        // WireMock's newest-stub-wins tie-break for otherwise-identical-priority matches on the same
+        // URL, same as the conversations.replies stub just below.
         slackWiremock.stubFor(post("/api/conversations.history")
                 .withName("export flow: channel history with a checked-off thread")
                 .willReturn(aResponse()

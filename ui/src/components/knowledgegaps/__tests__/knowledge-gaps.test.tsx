@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { Toaster } from "sonner";
@@ -725,6 +725,205 @@ describe("KnowledgeGapsPage", () => {
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/start?days=31", expect.objectContaining({ method: "POST" }));
+    });
+  });
+
+  describe("export failure visibility and polling resilience", () => {
+    it("shows a persistent error banner in addition to the toast when the export has failed", async () => {
+      mockUseAnalysis.mockReturnValue({
+        data: mockAnalysisData,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      mockApiFetch.mockImplementation((url) => {
+        if (url === "/api/analysis/enabled") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ enabled: false }) } as Response);
+        }
+        if (url === "/api/summary-data/export/status") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                running: false,
+                startedAt: null,
+                error: "Slack API error",
+                ready: false,
+                filename: null,
+                threadCount: null,
+                completedAt: null,
+              }),
+          } as Response);
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
+      });
+
+      renderWithToast(<KnowledgeGapsPage />);
+
+      // One match from the toast, one from the persistent banner — a toast alone would be missed
+      // by anyone not looking at the tab the moment it fired. waitFor (not findAllByText) because
+      // the toast can mount a render tick after the banner; findAllByText would resolve as soon as
+      // just the banner appeared, before asserting both are present.
+      await waitFor(() => {
+        expect(screen.getAllByText("Export failed: Slack API error")).toHaveLength(2);
+      });
+    });
+
+    it("keeps polling instead of freezing when a status fetch transiently fails", async () => {
+      // Fake timers must be active BEFORE startExportPolling() ever runs, since jest.useFakeTimers()
+      // only replaces setInterval/setTimeout for calls made after it's invoked — switching mid-test
+      // does not retroactively convert an already-scheduled real interval into a fake one.
+      jest.useFakeTimers();
+      try {
+        mockUseAnalysis.mockReturnValue({
+          data: mockAnalysisData,
+          isLoading: false,
+          error: null,
+        } as any);
+
+        let statusCallCount = 0;
+        mockApiFetch.mockImplementation((url, options) => {
+          if (url === "/api/analysis/enabled") {
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ enabled: false }) } as Response);
+          }
+          if (url === "/api/summary-data/export/start?days=7" && (options as RequestInit)?.method === "POST") {
+            return Promise.resolve({ status: 202, ok: true } as Response);
+          }
+          if (url === "/api/summary-data/export/status") {
+            statusCallCount++;
+            if (statusCallCount === 1) {
+              // The mount-time fetch: nothing running yet.
+              return Promise.resolve({
+                ok: true,
+                json: () =>
+                  Promise.resolve({
+                    running: false,
+                    startedAt: null,
+                    error: null,
+                    ready: false,
+                    filename: null,
+                    threadCount: null,
+                    completedAt: null,
+                  }),
+              } as Response);
+            }
+            if (statusCallCount === 2) {
+              // First poll tick after starting: a transient failure — must NOT be treated as "done".
+              return Promise.resolve({ ok: false, status: 502 } as Response);
+            }
+            // Second poll tick: genuinely finished.
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  running: false,
+                  startedAt: new Date().toISOString(),
+                  error: null,
+                  ready: true,
+                  filename: "downloaded-threads-2026-06-26-to-2026-07-03.zip",
+                  threadCount: 5,
+                  completedAt: new Date().toISOString(),
+                }),
+            } as Response);
+          }
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
+        });
+
+        renderWithToast(<KnowledgeGapsPage />);
+
+        // Flush the mount-time status fetch's async chain (apiFetch -> response.json() -> setState)
+        // before clicking — otherwise it's still in flight when we click, and could resolve after
+        // (and clobber) the optimistic running:true update below with its own stale running:false.
+        // Not using findByText/waitFor here since their internal retry relies on a real setTimeout,
+        // which fake timers never advance on their own.
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+        fireEvent.click(screen.getByText("Download threads"));
+
+        // Flush handleStartExport's own async chain (apiFetch -> setExportStatus) the same way.
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+        expect(screen.getByText(/Exporting threads/)).toBeInTheDocument();
+
+        // First poll tick hits the transient failure — polling must survive it.
+        // advanceTimersByTimeAsync (unlike the sync advanceTimersByTime) properly interleaves timer
+        // advancement with the interval callback's own pending promise chain.
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(3000);
+        });
+
+        // Second poll tick succeeds and reports ready — only reachable if polling kept going.
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(3000);
+        });
+
+        expect(screen.getByText("Threads ready")).toBeInTheDocument();
+        expect(statusCallCount).toBeGreaterThanOrEqual(3);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("does not fetch status immediately after starting, avoiding a race with the optimistic running state", async () => {
+      mockUseAnalysis.mockReturnValue({
+        data: mockAnalysisData,
+        isLoading: false,
+        error: null,
+      } as any);
+
+      mockApiFetch.mockImplementation((url, options) => {
+        if (url === "/api/analysis/enabled") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ enabled: false }) } as Response);
+        }
+        if (url === "/api/summary-data/export/start?days=7" && (options as RequestInit)?.method === "POST") {
+          return Promise.resolve({ status: 202, ok: true } as Response);
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              running: false,
+              startedAt: null,
+              error: null,
+              ready: false,
+              filename: null,
+              threadCount: null,
+              completedAt: null,
+            }),
+        } as Response);
+      });
+
+      renderWithToast(<KnowledgeGapsPage />);
+
+      // Let the mount-time status fetch settle first, so it doesn't get counted below.
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/status");
+      });
+      const statusCallsBeforeStart = mockApiFetch.mock.calls.filter((call) => call[0] === "/api/summary-data/export/status").length;
+
+      fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
+      fireEvent.click(screen.getByText("Download threads"));
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/start?days=7", expect.objectContaining({ method: "POST" }));
+      });
+      // Flush pending microtasks without advancing the fake timer, so only a genuinely immediate
+      // fetch (not one gated behind the next poll interval) would show up here.
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const statusCallsRightAfterStart = mockApiFetch.mock.calls.filter((call) => call[0] === "/api/summary-data/export/status").length;
+      expect(statusCallsRightAfterStart).toBe(statusCallsBeforeStart);
+
+      // The optimistic state stands on its own until the next poll tick.
+      expect(screen.getByText(/Exporting threads/)).toBeInTheDocument();
     });
   });
 
