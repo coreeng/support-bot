@@ -14,9 +14,11 @@ type SortDir = "asc" | "desc";
 
 const STATUS_SEVERITY: Record<string, number> = {
   ESCALATED: 0,
+  MERGE_ESCALATED: 0,
   OPEN: 1,
   CHANGES_REQUESTED: 2,
   APPROVED: 3,
+  AWAITING_MERGE: 3,
 };
 
 function statusSeverity(status: string): number {
@@ -30,8 +32,10 @@ function statusBadgeStyle(status: string): string {
     case "CHANGES_REQUESTED":
       return "bg-warning/10 text-warning";
     case "APPROVED":
+    case "AWAITING_MERGE":
       return "bg-success/10 text-success";
     case "ESCALATED":
+    case "MERGE_ESCALATED":
       return "bg-destructive/10 text-destructive";
     default:
       return "bg-muted text-foreground";
@@ -42,6 +46,10 @@ function statusLabel(status: string): string {
   switch (status) {
     case "CHANGES_REQUESTED":
       return "Changes Requested";
+    case "AWAITING_MERGE":
+      return "Awaiting Merge";
+    case "MERGE_ESCALATED":
+      return "Merge Escalated";
     default:
       return status.charAt(0) + status.slice(1).toLowerCase();
   }
@@ -77,17 +85,19 @@ interface SlaInfo {
 
 type SlaState =
   | { kind: "none" }
-  | { kind: "unknown" }
   | { kind: "paused"; remainingSeconds: number }
   | { kind: "active"; deadlineMs: number; remainingSec: number }
   | { kind: "breached"; deadlineMs: number; remainingSec: number }
   | { kind: "missing" };
 
 function classifySla(pr: InFlightPr, now: number): SlaState {
-  if (pr.hasSla === false) {
-    return { kind: "none" };
-  }
-  const unknownGate: "unknown" | "active" | "paused" | "missing" | "breached" = pr.hasSla === undefined ? "unknown" : "active";
+  // A live or paused clock is authoritative regardless of the persisted `hasSla` flag. Code-owner
+  // PRs are inserted with hasSla=false (the merge clock is deferred until the code owners approve)
+  // and only start a real merge clock on entry to AWAITING_MERGE — and `has_sla` is immutable after
+  // insert (JdbcPrTrackingRepositoryInvariantTest), so it stays false for the whole merge phase.
+  // Classifying off the actual SLA fields first keeps that phase showing its countdown instead of a
+  // spurious "No SLA". This is unambiguous because a genuine no-SLA repo never carries a deadline or
+  // remaining, so hasSla=false only ever coincides with a clock during the code-owner merge phase.
   if (pr.slaRemainingSeconds != null && pr.slaDeadline == null) {
     return { kind: "paused", remainingSeconds: pr.slaRemainingSeconds };
   }
@@ -96,7 +106,11 @@ function classifySla(pr: InFlightPr, now: number): SlaState {
     const remainingSec = (deadlineMs - now) / 1000;
     return remainingSec > 0 ? { kind: "active", deadlineMs, remainingSec } : { kind: "breached", deadlineMs, remainingSec };
   }
-  void unknownGate;
+  // No clock in play: hasSla=false is the benign no-SLA repo; hasSla=true or undefined (API/UI skew)
+  // with both fields null is a genuine data gap surfaced as "SLA data missing".
+  if (pr.hasSla === false) {
+    return { kind: "none" };
+  }
   return { kind: "missing" };
 }
 
@@ -126,7 +140,6 @@ function slaInfo(pr: InFlightPr, now: number): SlaInfo {
         sortValue: state.remainingSec,
       };
     }
-    case "unknown":
     case "missing":
       return {
         label: "SLA data missing",

@@ -152,6 +152,30 @@ describe("InFlightPrsTab", () => {
       expect(screen.getByText("Escalated")).toBeInTheDocument();
     });
 
+    it("should render AWAITING_MERGE status as human-readable label", () => {
+      mockUseInFlightPrs.mockReturnValue({
+        data: [makePr({ status: "AWAITING_MERGE" })],
+        isLoading: false,
+        error: null,
+      });
+
+      render(<InFlightPrsTab />);
+
+      expect(screen.getByText("Awaiting Merge")).toBeInTheDocument();
+    });
+
+    it("should render MERGE_ESCALATED status as human-readable label", () => {
+      mockUseInFlightPrs.mockReturnValue({
+        data: [makePr({ status: "MERGE_ESCALATED" })],
+        isLoading: false,
+        error: null,
+      });
+
+      render(<InFlightPrsTab />);
+
+      expect(screen.getByText("Merge Escalated")).toBeInTheDocument();
+    });
+
     it("should render Slack thread link when channelId and queryTs are present", () => {
       mockUseInFlightPrs.mockReturnValue({
         data: [makePr({ ticketChannelId: "C999", ticketQueryTs: "111.222" })],
@@ -253,6 +277,50 @@ describe("InFlightPrsTab", () => {
 
       // "No SLA" appears in the stat card label AND the table SLA cell badge
       expect(screen.getAllByText("No SLA").length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("should show the merge SLA countdown for a code-owner PR even though hasSla=false", () => {
+      // Regression: code-owner PRs are inserted with hasSla=false (deferred clock) but run a real
+      // merge clock once in AWAITING_MERGE. The SLA cell must show that countdown, not "No SLA".
+      mockUseInFlightPrs.mockReturnValue({
+        data: [
+          makePr({
+            status: "AWAITING_MERGE",
+            hasSla: false,
+            slaDeadline: new Date(NOW + 24 * 3600 * 1000).toISOString(),
+            slaRemainingSeconds: null,
+          }),
+        ],
+        isLoading: false,
+        error: null,
+      });
+
+      const { container } = render(<InFlightPrsTab />);
+
+      expect(screen.getByText("24.0h left")).toBeInTheDocument();
+      expect(container.querySelector(".text-success")).toBeInTheDocument();
+    });
+
+    it("should show breached for a code-owner merge SLA past its deadline even though hasSla=false", () => {
+      // The merge clock can breach (→ MERGE_ESCALATED); with hasSla=false it must still surface as
+      // breached (counting toward the Breached card), not collapse into the benign "No SLA".
+      mockUseInFlightPrs.mockReturnValue({
+        data: [
+          makePr({
+            status: "MERGE_ESCALATED",
+            hasSla: false,
+            slaDeadline: new Date(NOW - 2 * 86400 * 1000).toISOString(),
+            slaRemainingSeconds: null,
+          }),
+        ],
+        isLoading: false,
+        error: null,
+      });
+
+      const { container } = render(<InFlightPrsTab />);
+
+      expect(screen.getByText(/Breached 2d ago/)).toBeInTheDocument();
+      expect(container.querySelector(".text-destructive")).toBeInTheDocument();
     });
 
     it("should show SLA data missing badge when hasSla=true but both SLA fields are null", () => {
