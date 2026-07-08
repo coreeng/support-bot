@@ -1,5 +1,5 @@
+import { backendAccessToken, errorResponse, proxyFetch, unauthorizedResponse } from "@/app/api/_lib/backend-fetch";
 import { NextRequest } from "next/server";
-import { backendAccessToken, errorResponse, proxyFetch, unauthorizedResponse } from "../../../_lib/backend-fetch";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 

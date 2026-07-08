@@ -66,8 +66,7 @@ export default function KnowledgeGapsPage() {
   const [exportStatus, setExportStatus] = useState<ThreadExportStatus | null>(null);
   const [isStartingExport, setIsStartingExport] = useState(false);
   const exportPollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  // Value itself is never read — setting it just forces a re-render every second so the elapsed-time
-  // display below recomputes against the current time.
+  // Unused value — just forces a re-render each tick.
   const [, setExportElapsedTick] = useState(0);
   const exportElapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -189,7 +188,6 @@ export default function KnowledgeGapsPage() {
     }, 3000);
   };
 
-  // Stop polling for export status
   const stopExportPolling = () => {
     if (exportPollingIntervalRef.current) {
       clearInterval(exportPollingIntervalRef.current);
@@ -197,7 +195,6 @@ export default function KnowledgeGapsPage() {
     }
   };
 
-  // Fetch export status
   const fetchExportStatus = async () => {
     try {
       const response = await apiFetch("/api/summary-data/export/status");
@@ -213,16 +210,13 @@ export default function KnowledgeGapsPage() {
     return null;
   };
 
-  // Start polling for export status
   const startExportPolling = () => {
     if (exportPollingIntervalRef.current) return;
 
     exportPollingIntervalRef.current = setInterval(async () => {
       const status = await fetchExportStatus();
 
-      // A failed fetch (network blip, transient 5xx) returns null — that means "we couldn't tell",
-      // not "the job finished". Keep polling in that case; only stop once the backend has actually
-      // confirmed it's no longer running, so a transient failure can't freeze the UI mid-export.
+      // null (fetch failure) means "couldn't tell", not "finished" — keep polling either way.
       if (status && !status.running) {
         stopExportPolling();
       }
@@ -274,18 +268,14 @@ export default function KnowledgeGapsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analysisStatus?.running]);
 
-  // Check export status on mount — only relevant in manual mode (automated analysis disabled).
-  // Polling lifecycle itself is NOT this effect's responsibility (see the one below) — it must not
-  // stop polling as a side effect of unrelated deps changing here, only the export's own running
-  // state should start/stop it.
+  // Manual mode only (automated analysis disabled). Doesn't manage polling lifecycle itself — see
+  // the effect below, which owns that exclusively based on exportStatus?.running.
   useEffect(() => {
     if (isSupportEngineer && !isAnalysisEnabled) {
       fetchExportStatus();
     }
   }, [isSupportEngineer, isAnalysisEnabled]);
 
-  // Start/stop polling based on whether an export is running. This owns the polling lifecycle
-  // exclusively — including on unmount — so nothing else needs (or should) stop it independently.
   useEffect(() => {
     if (exportStatus?.running) {
       startExportPolling();
@@ -300,9 +290,7 @@ export default function KnowledgeGapsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportStatus?.running]);
 
-  // Toast exactly once per distinct export failure, regardless of whether it was discovered via the
-  // initial mount fetch, a live poll, or the immediate post-start check — single source of truth
-  // instead of duplicating this per fetch site.
+  // Toasts once per distinct error, regardless of which fetch site discovered it.
   const previousExportErrorRef = useRef<string | null>(null);
   useEffect(() => {
     if (exportStatus?.error && exportStatus.error !== previousExportErrorRef.current) {
@@ -311,9 +299,7 @@ export default function KnowledgeGapsPage() {
     previousExportErrorRef.current = exportStatus?.error ?? null;
   }, [exportStatus?.error]);
 
-  // Tick a local clock every second while an export is running, purely to re-render the elapsed-time
-  // display below — this does not poll the backend, it just reformats exportStatus.startedAt against
-  // the current time so the user sees visible progress instead of a static "Exporting..." label.
+  // Re-renders the elapsed-time display every second; doesn't poll the backend.
   useEffect(() => {
     if (exportStatus?.running) {
       exportElapsedIntervalRef.current = setInterval(() => setExportElapsedTick((tick) => tick + 1), 1000);
@@ -417,8 +403,6 @@ export default function KnowledgeGapsPage() {
     });
   };
 
-  // Kicks off the background export job; the actual download happens later via
-  // handleDownloadReadyExport once the "Threads ready" action appears.
   const handleStartExport = async () => {
     setIsStartingExport(true);
     try {
@@ -427,12 +411,8 @@ export default function KnowledgeGapsPage() {
       });
 
       if (response.status === 202) {
-        // Set optimistic running state and let the polling-lifecycle effect (keyed on
-        // exportStatus?.running) react to it and start polling — do NOT also fetch status
-        // immediately here. The backend only flips its own running flag as the first line of the
-        // background job, on a separate thread from the one that just returned this 202; an
-        // immediate fetch can race that and read the still-stale prior status, overwriting this
-        // optimistic state with running:false before the job has actually started.
+        // No immediate status fetch here — it could race the backend's own flip to running:true
+        // and clobber this optimistic state. The polling effect picks up from here instead.
         setExportStatus({
           running: true,
           startedAt: new Date().toISOString(),
@@ -461,9 +441,7 @@ export default function KnowledgeGapsPage() {
       const response = await apiFetch("/api/summary-data/export/download");
 
       if (response.status === 404) {
-        // The export is single-consumption on the backend — this means it was already claimed
-        // (e.g. a stale "Threads ready" left over from an earlier download) or expired. Either way,
-        // it's gone; reset local state to match rather than leaving a dead button on screen.
+        // Already claimed or expired — reset local state to match rather than leaving a dead button.
         setExportStatus(null);
         toast.error("This export is no longer available. Start a new one.");
         return;
@@ -482,8 +460,7 @@ export default function KnowledgeGapsPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      // Consuming it on the backend clears it there immediately — clear it here too so "Threads
-      // ready" disappears instead of staying visible for something that's already gone.
+      // Backend already cleared it on consumption — clear locally too so the button disappears.
       setExportStatus(null);
     } catch (error) {
       console.error("Error downloading export:", error);
@@ -695,8 +672,7 @@ export default function KnowledgeGapsPage() {
               </div>
             )}
             {!isAnalysisEnabled && exportStatus?.error && !exportStatus?.running && (
-              // Persistent, not just a toast — a toast alone is missed if the failure happens while
-              // nobody has this tab open/focused, since it only fires at the moment it's detected.
+              // Persistent, not just a toast, so it's not missed if the tab wasn't open when it failed.
               <div className="text-destructive flex items-center gap-2 text-sm">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>Export failed: {exportStatus.error}</span>

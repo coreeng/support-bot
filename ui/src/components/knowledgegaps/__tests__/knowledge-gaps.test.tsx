@@ -508,7 +508,6 @@ describe("KnowledgeGapsPage", () => {
     const downloadButton = screen.getByText("Download threads");
     fireEvent.click(downloadButton);
 
-    // Starts the background job — does NOT trigger an immediate file download
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/start?days=7", expect.objectContaining({ method: "POST" }));
     });
@@ -635,8 +634,7 @@ describe("KnowledgeGapsPage", () => {
     expect(mockCreateObjectURL).toHaveBeenCalled();
     expect(mockRevokeObjectURL).toHaveBeenCalled();
 
-    // The export is single-consumption on the backend — the button must disappear immediately
-    // rather than staying visible for something that's already gone.
+    // Single-consumption on the backend — the button must disappear immediately.
     await waitFor(() => {
       expect(screen.queryByText("Threads ready")).not.toBeInTheDocument();
     });
@@ -760,19 +758,15 @@ describe("KnowledgeGapsPage", () => {
 
       renderWithToast(<KnowledgeGapsPage />);
 
-      // One match from the toast, one from the persistent banner — a toast alone would be missed
-      // by anyone not looking at the tab the moment it fired. waitFor (not findAllByText) because
-      // the toast can mount a render tick after the banner; findAllByText would resolve as soon as
-      // just the banner appeared, before asserting both are present.
+      // One match from the toast, one from the persistent banner.
       await waitFor(() => {
         expect(screen.getAllByText("Export failed: Slack API error")).toHaveLength(2);
       });
     });
 
     it("keeps polling instead of freezing when a status fetch transiently fails", async () => {
-      // Fake timers must be active BEFORE startExportPolling() ever runs, since jest.useFakeTimers()
-      // only replaces setInterval/setTimeout for calls made after it's invoked — switching mid-test
-      // does not retroactively convert an already-scheduled real interval into a fake one.
+      // Must enable fake timers before startExportPolling() ever runs, or the real interval it
+      // creates won't be affected by later jest.advanceTimersByTime calls.
       jest.useFakeTimers();
       try {
         mockUseAnalysis.mockReturnValue({
@@ -792,7 +786,7 @@ describe("KnowledgeGapsPage", () => {
           if (url === "/api/summary-data/export/status") {
             statusCallCount++;
             if (statusCallCount === 1) {
-              // The mount-time fetch: nothing running yet.
+              // mount-time fetch: nothing running yet
               return Promise.resolve({
                 ok: true,
                 json: () =>
@@ -808,10 +802,10 @@ describe("KnowledgeGapsPage", () => {
               } as Response);
             }
             if (statusCallCount === 2) {
-              // First poll tick after starting: a transient failure — must NOT be treated as "done".
+              // first poll tick: transient failure, must not be treated as "done"
               return Promise.resolve({ ok: false, status: 502 } as Response);
             }
-            // Second poll tick: genuinely finished.
+            // second poll tick: genuinely finished
             return Promise.resolve({
               ok: true,
               json: () =>
@@ -831,11 +825,8 @@ describe("KnowledgeGapsPage", () => {
 
         renderWithToast(<KnowledgeGapsPage />);
 
-        // Flush the mount-time status fetch's async chain (apiFetch -> response.json() -> setState)
-        // before clicking — otherwise it's still in flight when we click, and could resolve after
-        // (and clobber) the optimistic running:true update below with its own stale running:false.
-        // Not using findByText/waitFor here since their internal retry relies on a real setTimeout,
-        // which fake timers never advance on their own.
+        // Flush the mount-time fetch first so it can't resolve later and clobber the optimistic
+        // running:true state set below. (Not findByText/waitFor — their retry needs real timers.)
         await act(async () => {
           await Promise.resolve();
           await Promise.resolve();
@@ -844,21 +835,18 @@ describe("KnowledgeGapsPage", () => {
         fireEvent.click(screen.getByRole("button", { name: "Run Analysis" }));
         fireEvent.click(screen.getByText("Download threads"));
 
-        // Flush handleStartExport's own async chain (apiFetch -> setExportStatus) the same way.
         await act(async () => {
           await Promise.resolve();
           await Promise.resolve();
         });
         expect(screen.getByText(/Exporting threads/)).toBeInTheDocument();
 
-        // First poll tick hits the transient failure — polling must survive it.
-        // advanceTimersByTimeAsync (unlike the sync advanceTimersByTime) properly interleaves timer
-        // advancement with the interval callback's own pending promise chain.
+        // advanceTimersByTimeAsync (not the sync version) properly awaits the interval callback's
+        // own promise chain between ticks.
         await act(async () => {
           await jest.advanceTimersByTimeAsync(3000);
         });
 
-        // Second poll tick succeeds and reports ready — only reachable if polling kept going.
         await act(async () => {
           await jest.advanceTimersByTimeAsync(3000);
         });
@@ -913,16 +901,14 @@ describe("KnowledgeGapsPage", () => {
       await waitFor(() => {
         expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export/start?days=7", expect.objectContaining({ method: "POST" }));
       });
-      // Flush pending microtasks without advancing the fake timer, so only a genuinely immediate
-      // fetch (not one gated behind the next poll interval) would show up here.
+      // Flush microtasks without waiting long enough for the poll interval to fire, so only a
+      // genuinely immediate fetch would show up here.
       await act(async () => {
         await Promise.resolve();
       });
 
       const statusCallsRightAfterStart = mockApiFetch.mock.calls.filter((call) => call[0] === "/api/summary-data/export/status").length;
       expect(statusCallsRightAfterStart).toBe(statusCallsBeforeStart);
-
-      // The optimistic state stands on its own until the next poll tick.
       expect(screen.getByText(/Exporting threads/)).toBeInTheDocument();
     });
   });

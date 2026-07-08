@@ -67,11 +67,8 @@ public class SummaryExportController {
                 export.map(CompletedExport::completedAt).orElse(null)));
     }
 
-    /**
-     * Serves the currently servable export, if any — single-consumption: this claims and clears it
-     * atomically, so a second concurrent request (or a retry) gets 404, not the same content again.
-     * That's deliberate, not a bug — see {@link SummaryExportService#consumeCurrentExport}.
-     */
+    // Single-consumption (see SummaryExportService#consumeCurrentExport): a second request after
+    // the first gets 404, not a bug.
     @GetMapping(value = "/download", produces = "application/zip")
     public ResponseEntity<Resource> download() {
         Optional<CompletedExport> export = exportService.consumeCurrentExport();

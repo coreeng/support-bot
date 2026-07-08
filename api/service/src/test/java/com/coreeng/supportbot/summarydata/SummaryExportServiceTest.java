@@ -159,11 +159,7 @@ class SummaryExportServiceTest {
 
     @Test
     void start_clearsThePreviousExportReference_asItsOwnStep_independentOfWhatTheNewRunProduces() {
-        // start_discardsPreviousCompletedExport_immediately (above) only proves the END state holds a
-        // different export — but runAsyncExport unconditionally overwrites currentExport when it
-        // succeeds, so that alone can't tell apart "the old export was actively discarded" from
-        // "nothing discarded anything, the successful run just overwrote it anyway". Making the run
-        // itself fail (so nothing overwrites the reference) isolates the discard step specifically.
+        // Making the run fail isolates the discard step from a successful run simply overwriting it.
         service.seedCompletedExportForTest(completedExport(
                 "old content", "old-export.zip", Instant.now(), Instant.now().plus(1, ChronoUnit.DAYS)));
 
@@ -179,8 +175,6 @@ class SummaryExportServiceTest {
 
         brokenService.start(7);
 
-        // The run failed (no new export produced), yet the old one is still gone — proof the discard
-        // happened as its own step, not as a side effect of a successful new export overwriting it.
         assertThat(brokenService.currentExportForTest()).isNull();
         assertThat(brokenService.getStatus().error()).isNotNull();
     }

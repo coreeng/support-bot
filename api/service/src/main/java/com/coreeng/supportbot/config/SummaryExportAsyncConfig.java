@@ -15,11 +15,10 @@ public class SummaryExportAsyncConfig {
     @Bean(name = "summaryExportTaskExecutor")
     public Executor summaryExportTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        // DB gate (async_job unique constraint) allows only a single request to run @Async export
+        // Only one export can run at a time (enforced separately by the DB gate); no queue needed
+        // since a concurrent request gets a 409 before it would ever reach one.
         executor.setCorePoolSize(1);
         executor.setMaxPoolSize(1);
-        // No need to queue - once @Async export is running, no other request will be allowed to run it
-        // We return 409 Conflict before hitting the queue
         executor.setQueueCapacity(0);
         executor.setThreadNamePrefix("summary-export-");
         executor.initialize();

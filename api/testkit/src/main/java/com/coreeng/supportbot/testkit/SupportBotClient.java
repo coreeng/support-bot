@@ -70,18 +70,11 @@ public class SupportBotClient {
                 .header("X-Test-Role", role);
     }
 
-    /**
-     * Issues a GET as the given test-bypass role (see {@code TestAuthBypassFilter}) and returns just
-     * the status code — for asserting role-boundary enforcement, not response bodies.
-     */
+    // For asserting role-boundary enforcement (see TestAuthBypassFilter) — status code only.
     public int getStatusCodeAsRole(String path, String role) {
         return request(role).when().get(baseUrl + path).then().extract().statusCode();
     }
 
-    /**
-     * Issues a POST as the given test-bypass role (see {@code TestAuthBypassFilter}) and returns just
-     * the status code — for asserting role-boundary enforcement, not response bodies.
-     */
     public int postStatusCodeAsRole(String path, String role) {
         return request(role).when().post(baseUrl + path).then().extract().statusCode();
     }

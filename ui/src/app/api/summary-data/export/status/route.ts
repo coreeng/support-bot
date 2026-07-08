@@ -1,5 +1,5 @@
+import { backendFetch, errorResponse, unauthorizedResponse } from "@/app/api/_lib/backend-fetch";
 import { NextRequest } from "next/server";
-import { backendFetch, errorResponse, unauthorizedResponse } from "../../../_lib/backend-fetch";
 
 export async function GET(request: NextRequest) {
   const response = await backendFetch(request, "/summary-data/export/status");

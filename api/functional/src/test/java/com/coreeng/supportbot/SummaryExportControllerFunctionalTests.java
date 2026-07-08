@@ -20,11 +20,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
- * Exercises the real Spring Security filter chain for the export endpoints — something
- * {@code SummaryExportControllerTest} (a unit test constructing the controller directly) cannot
- * cover, since it bypasses security entirely. Also covers the full async flow (start → poll →
- * download) against mocked Slack responses, same as {@code AnalysisApiTests}, since that path also
- * needs a real executor/DB/HTTP stack that unit tests mock away.
+ * Exercises the real Spring Security filter chain for the export endpoints, plus the full async
+ * flow (start → poll → download) against mocked Slack — both need a real executor/DB/HTTP stack
+ * that {@code SummaryExportControllerTest}'s unit tests mock away.
  */
 @ExtendWith(TestKitExtension.class)
 public class SummaryExportControllerFunctionalTests {
@@ -32,18 +30,12 @@ public class SummaryExportControllerFunctionalTests {
     private SlackWiremock slackWiremock;
     private SupportBotClient supportBotClient;
 
-    // TestAuthBypassFilter.createTestPrincipal maps the "leadership" test role to BOTH
-    // Role.LEADERSHIP and Role.SUPPORT_ENGINEER (isSupportEngineer is true whenever isLeadership is
-    // true), so it can't simulate a leadership-only principal. "escalation" grants
-    // only Role.ESCALATION + Role.USER — no SUPPORT_ENGINEER — making it a valid stand-in for "any
-    // authenticated user without SUPPORT_ENGINEER" when proving the /summary-data/** security rule
-    // (SecurityConfig.java) is enforced end-to-end, not just assumed.
+    // Not "leadership": TestAuthBypassFilter grants it SUPPORT_ENGINEER too, so it can't represent
+    // a non-support-engineer principal. "escalation" has neither.
     private static final String NON_SUPPORT_ENGINEER_ROLE = "escalation";
 
-    // SecurityConfig's custom authenticationEntryPoint fires for BOTH missing authentication and
-    // insufficient role (confirmed empirically: an authenticated-but-wrong-role request gets the
-    // exact same {"error":"Unauthorized"} 401 body as a fully anonymous one) — there's no separate
-    // 403/AccessDeniedHandler path in this app, so 401 is the correct expectation here, not 403.
+    // 401, not 403: this app has no AccessDeniedHandler, so insufficient role and missing auth both
+    // go through the same authenticationEntryPoint.
     @Test
     void start_returns401_forNonSupportEngineerRole() {
         int statusCode =
@@ -81,11 +73,8 @@ public class SummaryExportControllerFunctionalTests {
     void fullExportFlow_startsAsync_completesFromMockedSlack_andIsSingleConsumption() throws IOException {
         String threadTs = "1700000000.000100";
 
-        // Deliberately no request-body matcher: Slack's web API sends form-encoded bodies, not
-        // JSON, so a matchingJsonPath matcher here would silently never match and fall through to
-        // the permanent conversations.history catch-all (empty messages) instead — this relies on
-        // WireMock's newest-stub-wins tie-break for otherwise-identical-priority matches on the same
-        // URL, same as the conversations.replies stub just below.
+        // No request-body matcher: Slack sends form-encoded bodies, not JSON, so a JSON path
+        // matcher here would silently never match and fall through to the empty catch-all stub.
         slackWiremock.stubFor(post("/api/conversations.history")
                 .withName("export flow: channel history with a checked-off thread")
                 .willReturn(aResponse()
@@ -152,14 +141,11 @@ public class SummaryExportControllerFunctionalTests {
             assertThat(entryNames).containsExactly(threadTs + ".txt");
             assertThat(entryContent).contains("How do I configure a new ingress?", "Docs are at go/ingress-howto");
 
-            // Single-consumption, end-to-end through the real HTTP + in-memory store: a second
-            // download after a successful one finds nothing left to serve.
+            // Single-consumption: a second download finds nothing left to serve.
             assertThat(supportBotClient.export().downloadStatusCode()).isEqualTo(404);
         } finally {
-            // Best-effort drain: if an earlier assertion in this test failed before reaching the
-            // consumption check above, a completed export could otherwise be left sitting in the
-            // real, shared in-memory store — contaminating whichever test runs next (this service
-            // instance stays up across multiple test runs, so it's not just this JVM at risk).
+            // Drain defensively in case an earlier assertion failed first — this service instance
+            // stays up across test runs, so a leftover export would leak into a later test.
             supportBotClient.export().downloadStatusCode();
             slackWiremock.cleanupTestStubs();
         }

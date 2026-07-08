@@ -32,17 +32,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Orchestrates the async Knowledge Gap thread export: a single shared zip built on a background
- * thread so the triggering HTTP request never blocks on the (often 10+ minute) Slack fetch. See
- * {@code SummaryExportController} for the REST surface.
- *
- * <p>The finished zip is held in memory. It's consumed
- * (served once, then cleared) on first download, and swept away within about 15 minutes of
- * {@link #RETENTION_DURATION} elapsing even if nobody claimed it — see {@link #expireStaleExport}
- * for the exact bound — so nothing lingers indefinitely just because no one checked back.
- *
- * <p>Concurrency is controlled the same way as {@code AnalysisService} — via a unique constraint
- * on the {@code async_job} table (a distinct {@code "summary-export"} row alongside the existing
- * {@code "analysis"} one) — so only one export can be running at a time.
+ * thread so the triggering HTTP request never blocks on the (often 10+ minute) Slack fetch. Held in
+ * memory, single-consumption on download, swept after {@link #RETENTION_DURATION} if unclaimed.
  */
 @Service
 @RequiredArgsConstructor
@@ -63,18 +54,11 @@ public class SummaryExportService {
 
     private static final Duration RETENTION_DURATION = Duration.ofHours(8);
 
-    /**
-     * Test-only seam: seeds a completed export directly, since there's no production path to
-     * populate one without running the real (slow, Slack-calling) export.
-     */
+    // Test-only seam: there's no production path to populate/inspect a completed export directly.
     void seedCompletedExportForTest(CompletedExport export) {
         currentExport.set(export);
     }
 
-    /**
-     * Test-only seam: reads the raw held reference, so a test can verify a clearing path actually
-     * cleared it rather than just inferring that from later behavior.
-     */
     @Nullable CompletedExport currentExportForTest() {
         return currentExport.get();
     }
@@ -98,14 +82,8 @@ public class SummaryExportService {
         }
     }
 
-    /**
-     * The single most recently finished export artifact, held in memory only. Cleared the instant
-     * it's served (see {@link #consumeCurrentExport}), replaced the instant a new export starts (see
-     * {@link #start}), or swept away once {@code expiresAt} passes, whichever happens first.
-     */
-    // ErrorProne flags any array record component unconditionally, regardless of whether equals and
-    // hashCode are actually overridden below — they are, content-aware via Arrays.equals/hashCode,
-    // so the default reference-only comparison this check warns about doesn't apply here.
+    // equals/hashCode overridden below (content-aware via Arrays.equals/hashCode), so the
+    // reference-only comparison ErrorProne warns about here doesn't apply.
     @SuppressWarnings("ArrayRecordComponent")
     public record CompletedExport(
             byte[] content, String displayFilename, int threadCount, Instant completedAt, Instant expiresAt) {
@@ -140,15 +118,8 @@ public class SummaryExportService {
         }
     }
 
-    /**
-     * Discards any export job left running by a pod restart, rather than resuming it.
-     *
-     * <p>Unlike {@code AnalysisService}, which checkpoints each analyzed thread to a DB repository
-     * as it goes, this job's only output is a single artifact with no incremental progress to resume
-     * from — re-running it would just mean silently kicking off a fresh 10+ minute Slack fetch on
-     * every startup that nobody asked for. Simpler and safer to let the next manual click start
-     * fresh, consistent with this feature not needing to survive a restart.
-     */
+    // Discards rather than resumes a job left running by a restart — unlike AnalysisService, there's
+    // no incremental progress to resume from, so re-running would just silently redo the whole fetch.
     @EventListener(ApplicationReadyEvent.class)
     public void resumeExportOnStartup() {
         AsyncJobRepository.AsyncJob existingJob = asyncJobRepository.findJob(ASYNC_ID);
@@ -173,18 +144,13 @@ public class SummaryExportService {
             return false;
         }
 
-        // Discard whatever finished export is already sitting there — a new export replaces the old
-        // one from the moment it's requested, not from the moment it finishes. Nothing to clean up
-        // beyond dropping the reference: the old content is just heap memory now, not a file.
+        // A new export replaces the old one from the moment it's requested, not once it finishes.
         currentExport.set(null);
 
         try {
             log.info("Started new async job: id={}, days={}", ASYNC_ID, days);
-            // Fetched through the Spring-managed bean, not called as this.runAsyncExport(days) —
-            // @Async only takes effect through the CGLIB proxy Spring wraps around the bean. A
-            // direct "this" call would bypass that proxy and run synchronously on this thread,
-            // blocking the request for the full 10+ minute Slack fetch this whole feature exists to
-            // avoid. Same pattern as AnalysisService.
+            // Via the Spring-managed bean, not this.runAsyncExport(days) — @Async only applies
+            // through the proxy; a direct call would run synchronously on this thread.
             applicationContext.getBean(SummaryExportService.class).runAsyncExport(days);
             return true;
         } catch (TaskRejectedException e) {
@@ -208,12 +174,9 @@ public class SummaryExportService {
             List<String> channelIds = channelRegistry.monitoredChannelIds();
             log.info("Exporting summary data for last {} days from channels {}", days, channelIds);
 
-            // A failure for one channel (e.g. the bot is not a member, or a Slack API error) must
-            // not fail the whole export, so each channel is fetched independently and a failing
-            // one is skipped. Only logged, not surfaced to the caller — acceptable while there's
-            // typically just one monitored channel. If multi-channel monitoring becomes common,
-            // we'd need to track skipped channels and expose them (e.g. on ExportStatus) so a
-            // "successful" export can't silently be missing a whole channel's threads.
+            // A failing channel shouldn't fail the whole export, so each is fetched independently
+            // and skipped on error (only logged — fine while there's typically one channel; would
+            // need surfacing to the caller if multi-channel monitoring becomes common).
             List<ThreadService.ThreadData> threads = new ArrayList<>();
             for (String channelId : channelIds) {
                 try {
@@ -243,13 +206,8 @@ public class SummaryExportService {
         }
     }
 
-    /**
-     * Writes each thread as a separate {@code .txt} entry. Genuine duplicates within a single
-     * channel (a thread_ts repeated by a reply_broadcast or a page boundary) are already deduped
-     * at the source in {@link ThreadService}. The remaining collisions are cross-channel: two
-     * genuinely different threads in different channels can share a thread_ts, so disambiguate the
-     * name instead of dropping one and silently losing data.
-     */
+    // Cross-channel thread_ts collisions are disambiguated by suffix rather than dropped, since two
+    // different threads in different channels can legitimately share a thread_ts.
     private static void writeZip(ByteArrayOutputStream out, List<ThreadService.ThreadData> threads) throws IOException {
         Set<String> usedNames = new HashSet<>();
         try (ZipOutputStream zip = new ZipOutputStream(out)) {
@@ -276,12 +234,8 @@ public class SummaryExportService {
         return currentStatus.get();
     }
 
-    /**
-     * The currently servable export, if any — a read-only peek for {@code /status}, does not
-     * consume it. Evicts (clears the pointer) and returns empty if it's past its retention window;
-     * this is a defense-in-depth check alongside the scheduled sweep below, so a request landing
-     * between sweeps never sees or serves stale data.
-     */
+    // Read-only peek for /status — doesn't consume. Also lazily evicts if past retention, as a
+    // defense-in-depth check between scheduled sweeps.
     public Optional<CompletedExport> currentServableExport() {
         CompletedExport export = currentExport.get();
         if (export == null) {
@@ -294,13 +248,8 @@ public class SummaryExportService {
         return Optional.of(export);
     }
 
-    /**
-     * Atomically takes and clears the current export for {@code /download} — the export is
-     * single-consumption: whichever request gets here first claims it, and it's gone for everyone
-     * else from that instant, even before this request finishes streaming it. Simpler than trying to
-     * clear it only after a successful transfer, and it minimizes how long the data is available at
-     * all, which is the point.
-     */
+    // Single-consumption: whichever /download request gets here first claims it, and it's gone
+    // for everyone else from that instant.
     public Optional<CompletedExport> consumeCurrentExport() {
         CompletedExport export = currentExport.getAndSet(null);
         if (export == null || Instant.now().isAfter(export.expiresAt())) {
@@ -309,13 +258,8 @@ public class SummaryExportService {
         return Optional.of(export);
     }
 
-    /**
-     * Backstop sweep: clears the current export once it's past its retention window, regardless of
-     * whether anyone has polled {@code /status} or {@code /download} since it finished. Needed
-     * because eviction elsewhere here is lazy (only checked when something reads the reference) — if
-     * nobody visits the page again after an export completes, lazy eviction alone would never fire,
-     * defeating the point of a time-bounded retention guarantee.
-     */
+    // Active backstop: without this, an export nobody ever polls again would never get evicted,
+    // since eviction elsewhere is lazy (only checked when something reads the reference).
     @Scheduled(fixedRateString = "15m")
     public void expireStaleExport() {
         CompletedExport export = currentExport.get();

@@ -170,9 +170,6 @@ class SummaryExportControllerTest {
 
     @Test
     void download_returns404_onASecondCall_becauseTheFirstAlreadyConsumedIt() {
-        // Mirrors consumeCurrentExport()'s single-consumption contract: the controller doesn't cache
-        // or re-serve anything itself, so a service that's already handed the export out once
-        // correctly yields a 404 on the next call.
         CompletedExport export = completedExport("zip bytes", "downloaded-threads.zip", 3, Instant.now());
         when(exportService.consumeCurrentExport()).thenReturn(Optional.of(export), Optional.empty());
 
