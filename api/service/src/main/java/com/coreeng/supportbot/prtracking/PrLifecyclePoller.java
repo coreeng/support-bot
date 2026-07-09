@@ -136,11 +136,11 @@ public class PrLifecyclePoller {
     }
 
     /**
-     * Sticky-latches {@code codeownerReviewRequested} the first time this poll observes a genuinely
-     * pending code-owner review request ({@code pr.codeOwnerReviewers()} non-empty) — see {@link
-     * #observe} for why this needs to persist across polls rather than being re-derived each time.
-     * A no-op (no write, same record returned) once already set, for a non-codeowner repo, or when
-     * nothing is currently pending.
+     * The first time this poll sees a genuinely pending code-owner review request ({@code
+     * pr.codeOwnerReviewers()} non-empty), permanently marks {@code codeownerReviewRequested} true on
+     * the record so it's remembered on every later poll — see {@link #codeownerApproved} for why this
+     * needs to be remembered rather than re-derived each time. A no-op (no write, same record
+     * returned) once already marked, for a non-codeowner repo, or when nothing is currently pending.
      */
     private PrTrackingRecord withCodeownerReviewRequestedIfNewlySeen(
             PrTrackingRecord record, PrTrackingProps.@Nullable Repository repoConfig, PrMetadata pr) {

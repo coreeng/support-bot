@@ -278,9 +278,9 @@ class PrDetectionServiceTest {
                     .contains("<https://github.com/orgs/my-org/teams/docs-team|my-org/docs-team>")
                     .contains(new String(Character.toChars(0x1F465))
                             + " <https://github.com/orgs/my-org/teams/docs-team");
-            // and the sticky code-owner-request bit is latched at insert time: the pending window can
+            // and the code-owner-request flag is marked at insert time: the pending window can
             // close before the first lifecycle poll ever runs (approved then dismissed overnight or over
-            // a weekend) and never reopens, so detection must not leave the latch to the poller alone.
+            // a weekend) and never reopens, so detection must not leave this to the poller alone.
             verify(prTrackingRepository).markCodeownerReviewRequested(1L);
         }
 
@@ -328,7 +328,7 @@ class PrDetectionServiceTest {
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
             // then — the record is created but no chase message is posted (the emoji reaction still is),
-            // and with no pending code-owner request in sight there is nothing to latch.
+            // and with no pending code-owner request in sight there is nothing to mark.
             verify(prTrackingRepository).insertIfAbsent(any());
             verify(slackClient, never()).postMessage(any());
             verify(prTrackingRepository, never()).markCodeownerReviewRequested(anyLong());
@@ -1025,7 +1025,8 @@ class PrDetectionServiceTest {
                                     null,
                                     null,
                                     null,
-                                    null),
+                                    null,
+                                    false),
                             new PrTrackingRecord(
                                     2L,
                                     1L,
@@ -1041,7 +1042,8 @@ class PrDetectionServiceTest {
                                     null,
                                     null,
                                     null,
-                                    null));
+                                    null,
+                                    false));
 
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
@@ -1181,7 +1183,8 @@ class PrDetectionServiceTest {
                                     null,
                                     null,
                                     null,
-                                    null),
+                                    null,
+                                    false),
                             new PrTrackingRecord(
                                     2L,
                                     1L,
@@ -1197,7 +1200,8 @@ class PrDetectionServiceTest {
                                     null,
                                     null,
                                     null,
-                                    null));
+                                    null,
+                                    false));
 
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
@@ -2982,6 +2986,7 @@ class PrDetectionServiceTest {
                 null,
                 null,
                 null,
-                null);
+                null,
+                false);
     }
 }

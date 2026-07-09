@@ -1,6 +1,6 @@
 -- Sticky per-PR memory of whether a provider has EVER reported a genuinely pending code-owner
--- review request (GitHub reviewRequests asCodeOwner; see PrLifecyclePoller#observe). Provider APIs
--- don't retain this once the request is resolved (approved, dismissed, or invalidated by a later
+-- review request (GitHub reviewRequests asCodeOwner; see PrLifecyclePoller#codeownerApproved).
+-- Provider APIs don't retain this once the request is resolved (approved, dismissed, or invalidated by a later
 -- push) or removed from the pending list, so a repo combining "require code-owner review" with a
 -- separate minimum-approval-count rule reports the exact same signature (reviewDecision
 -- REVIEW_REQUIRED, reviewRequests empty) whether code-owner review was never required for this PR's
@@ -14,6 +14,7 @@ alter table pr_tracking add column if not exists codeowner_review_requested bool
 -- so leaving them false would hand them the "never applied" reading forever — a post-upgrade push
 -- that dismisses a stale approval would then keep the merge clock running instead of returning the
 -- record to OPEN. Marking them true preserves exact pre-upgrade semantics (trust the aggregate
--- decision): pre-V33 these states were only reachable via a genuine approved/inapplicable read, so
--- this can never wrongly hold the gate open.
+-- decision): under the current write paths, pre-V33 these states are only reachable via a genuine
+-- approved/inapplicable read, so this should not wrongly hold the gate open — assuming no row was
+-- ever written into one of these statuses out-of-band (e.g. direct test/manual seeding).
 update pr_tracking set codeowner_review_requested = true where status in ('AWAITING_MERGE', 'MERGE_ESCALATED');

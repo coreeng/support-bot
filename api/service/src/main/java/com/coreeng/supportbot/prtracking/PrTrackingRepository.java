@@ -46,8 +46,10 @@ public interface PrTrackingRepository {
 
     /**
      * Sticky flag: marks that a provider has reported a genuinely pending code-owner review request
-     * for this record at least once (see {@code PrLifecyclePoller#observe}). Never unset — callers
-     * should only invoke this when the flag isn't already {@code true}.
+     * for this record at least once (see {@code PrLifecyclePoller#codeownerApproved}). Never unset.
+     * Calling this when the flag is already {@code true} is harmless and idempotent (just rewrites
+     * the same value) — callers don't need to guard the call, though existing callers do so anyway
+     * to avoid a redundant write.
      */
     PrTrackingRecord markCodeownerReviewRequested(long id);
 

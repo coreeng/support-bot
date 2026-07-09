@@ -504,7 +504,8 @@ class PrLifecyclePollerTest {
                 null,
                 null,
                 null,
-                null));
+                null,
+                false));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
         when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(closedPr(record));
@@ -859,7 +860,8 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
-                    null));
+                    null,
+                    false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPr(record));
@@ -894,7 +896,8 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
-                    null));
+                    null,
+                    false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(ancientNoSlaRecord));
             when(prSourceClient.fetchPullRequest(
                             RepoCoord.github(ancientNoSlaRecord.repo()), ancientNoSlaRecord.prNumber()))
@@ -925,7 +928,8 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
-                    null));
+                    null,
+                    false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
@@ -968,7 +972,8 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
-                    null));
+                    null,
+                    false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
@@ -1772,7 +1777,7 @@ class PrLifecyclePollerTest {
         void failedProviderReadHoldsGateShutInsteadOfAdvancingToAwaitingMerge() {
             // given — the code-owner signal could not be read at all (GitHub GraphQL error, GitLab CE/
             // transport error): codeOwnersApproved=null AND an empty pending list, on a record whose
-            // sticky flag has never latched. Absence of signal is not evidence that code-owner review
+            // flag has never been marked. Absence of signal is not evidence that code-owner review
             // never applied to this PR's paths — both source clients document null as must-fail-closed —
             // so the record must hold in OPEN and retry next poll, not advance and announce approval.
             PrLifecyclePoller poller = createPoller();
@@ -1791,6 +1796,41 @@ class PrLifecyclePollerTest {
             verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
             verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
             verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
+        void failedProviderReadPausesRecordWithPriorApprovalInsteadOfTrustingAggregate() {
+            // given — same failed-read shape as the test above (codeOwnersApproved=null, empty pending
+            // list), but this time on a record whose flag IS already marked (a genuine code-owner request
+            // was seen on an earlier poll) and which has already advanced to AWAITING_MERGE. This exercises
+            // the other half of codeownerApproved()'s branch ordering: the null-check must take priority
+            // over "trust the aggregate" even when the flag is marked, not just when it isn't (covered
+            // above). A record in this shape must pause back to OPEN exactly like a definite revoked
+            // approval (see revokedApprovalInAwaitingMergePausesMergeClockAndReturnsToOpen) — it must NOT
+            // keep the merge clock running just because the aggregate is unreadable rather than a definite
+            // false.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = register(withCodeownerReviewRequested(record(
+                    1L,
+                    100L,
+                    "my-org/repo-a",
+                    11,
+                    PrTrackingStatus.AWAITING_MERGE,
+                    Instant.now().plus(Duration.ofHours(6)))));
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithPendingReview(record, true, null, false, List.of(), List.of()));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+
+            // when
+            poller.poll();
+
+            // then — paused back to OPEN, not left running or merge-escalated.
+            verify(prTrackingRepository).pauseSla(eq(record.id()), eq(PrTrackingStatus.OPEN), any(Duration.class));
+            verify(prTrackingRepository, never())
+                    .updateStatus(anyLong(), eq(PrTrackingStatus.MERGE_ESCALATED), any(), any());
+            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
         }
 
         @Test
@@ -2057,7 +2097,8 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     existingReviewTime,
-                    null));
+                    null,
+                    false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(
@@ -2096,7 +2137,8 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
-                    null));
+                    null,
+                    false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.DISMISSED))));
@@ -2241,7 +2283,8 @@ class PrLifecyclePollerTest {
                 null,
                 null,
                 null,
-                null));
+                null,
+                false));
     }
 
     private PrTrackingRecord pausedRecord(
@@ -2261,7 +2304,8 @@ class PrLifecyclePollerTest {
                 null,
                 slaRemaining,
                 null,
-                null));
+                null,
+                false));
     }
 
     private static PrMetadata openPr(PrTrackingRecord record) {

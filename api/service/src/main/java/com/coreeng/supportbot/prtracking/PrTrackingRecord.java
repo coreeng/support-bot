@@ -47,43 +47,4 @@ public record PrTrackingRecord(
             throw new IllegalArgumentException("slaRemaining must not be negative");
         }
     }
-
-    /**
-     * Convenience constructor for call sites that don't care about the code-owner review-requested
-     * bit (see {@code PrLifecyclePoller#observe}); defaults to {@code false} (not yet observed).
-     */
-    public PrTrackingRecord(
-            long id,
-            long ticketId,
-            Provider provider,
-            String repo,
-            int prNumber,
-            Instant prCreatedAt,
-            @Nullable Instant slaDeadline,
-            String owningTeam,
-            boolean canAutoCloseTicket,
-            PrTrackingStatus status,
-            @Nullable Long escalationId,
-            @Nullable Instant closedAt,
-            @Nullable Duration slaRemaining,
-            @Nullable Instant lastReviewAt,
-            @Nullable Instant lastAuthorActivityAt) {
-        this(
-                id,
-                ticketId,
-                provider,
-                repo,
-                prNumber,
-                prCreatedAt,
-                slaDeadline,
-                owningTeam,
-                canAutoCloseTicket,
-                status,
-                escalationId,
-                closedAt,
-                slaRemaining,
-                lastReviewAt,
-                lastAuthorActivityAt,
-                false);
-    }
 }
