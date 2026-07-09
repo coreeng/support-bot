@@ -64,6 +64,9 @@ public class PrTrackingTestController {
             PrTrackingStatus target = PrTrackingStatus.valueOf(status);
             created = prTrackingRepository.startSla(created.id(), target, request.slaDeadline());
         }
+        if (Boolean.TRUE.equals(request.codeownerReviewRequested())) {
+            created = prTrackingRepository.markCodeownerReviewRequested(created.id());
+        }
         return created;
     }
 
@@ -101,5 +104,6 @@ public class PrTrackingTestController {
             Instant slaDeadline,
             String owningTeam,
             @Nullable Boolean canAutoCloseTicket,
-            @Nullable String status) {}
+            @Nullable String status,
+            @Nullable Boolean codeownerReviewRequested) {}
 }

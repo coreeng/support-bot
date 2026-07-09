@@ -23,7 +23,8 @@ public record PrTrackingRecord(
         @Nullable Instant closedAt,
         @Nullable Duration slaRemaining,
         @Nullable Instant lastReviewAt,
-        @Nullable Instant lastAuthorActivityAt) {
+        @Nullable Instant lastAuthorActivityAt,
+        boolean codeownerReviewRequested) {
     public PrTrackingRecord {
         requireNonNull(provider, "provider must not be null");
         requireNonNull(repo, "repo must not be null");
