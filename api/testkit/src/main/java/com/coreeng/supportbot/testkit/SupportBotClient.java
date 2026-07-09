@@ -554,6 +554,17 @@ public class SupportBotClient {
         @Nullable private Boolean canAutoCloseTicket;
 
         @Nullable private String status;
+
+        /**
+         * Test-only seed for the flag that permanently records "has a provider ever reported a
+         * genuinely pending code-owner review request for this PR" (see {@code
+         * PrLifecyclePoller#codeownerApproved}). Records seeded directly into a non-OPEN status
+         * bypass both of the normal places that set this ({@code PrDetectionService} at insert time,
+         * and the poller on a later poll), so a test simulating a real code-owner requirement that's
+         * since been satisfied/revoked must pass {@code true} explicitly — otherwise the poller can't
+         * tell that scenario apart from "code-owner review never applied to this PR's paths".
+         */
+        @Nullable private Boolean codeownerReviewRequested;
     }
 
     @Builder

@@ -44,6 +44,15 @@ public interface PrTrackingRepository {
     /** Updates activity timestamps on a tracking record. */
     void updateActivityTimestamps(long id, @Nullable Instant lastReviewAt, @Nullable Instant lastAuthorActivityAt);
 
+    /**
+     * Sticky flag: marks that a provider has reported a genuinely pending code-owner review request
+     * for this record at least once (see {@code PrLifecyclePoller#codeownerApproved}). Never unset.
+     * Calling this when the flag is already {@code true} is harmless and idempotent (just rewrites
+     * the same value) — callers don't need to guard the call, though existing callers do so anyway
+     * to avoid a redundant write.
+     */
+    PrTrackingRecord markCodeownerReviewRequested(long id);
+
     boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, Provider provider, String repo, int prNumber);
 
     /** Returns all non-terminal (OPEN, ESCALATED, CHANGES_REQUESTED, APPROVED, AWAITING_MERGE, MERGE_ESCALATED) PR tracking records, optionally filtered by owning team. */

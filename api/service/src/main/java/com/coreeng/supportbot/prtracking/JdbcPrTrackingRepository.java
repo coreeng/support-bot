@@ -189,6 +189,17 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
         }
     }
 
+    @Override
+    public PrTrackingRecord markCodeownerReviewRequested(long id) {
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.update(PR_TRACKING)
+                .set(PR_TRACKING.CODEOWNER_REVIEW_REQUESTED, true)
+                .where(PR_TRACKING.ID.eq(id))
+                .returning()
+                .fetchOptional()
+                .orElseThrow(() -> new IllegalStateException("PR tracking record not found for id " + id));
+        return toRecord(row);
+    }
+
     @Transactional(readOnly = true)
     @Override
     public boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, Provider provider, String repo, int prNumber) {
@@ -484,6 +495,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 row.getClosedAt(),
                 slaRemaining,
                 row.getLastReviewAt(),
-                row.getLastAuthorActivityAt());
+                row.getLastAuthorActivityAt(),
+                checkNotNull(row.getCodeownerReviewRequested()));
     }
 }
