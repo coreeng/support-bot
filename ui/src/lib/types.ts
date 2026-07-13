@@ -2,6 +2,7 @@
 
 // Re-export dashboard types
 export * from "./types/dashboard";
+export * from "./types/elevate";
 
 interface RawEscalation {
   id: number | { id: number };

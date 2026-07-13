@@ -4,6 +4,7 @@
  */
 import type {
   AnalysisData,
+  ElevateStatus,
   EscalationTeam,
   KnowledgeGapsStatus,
   PaginatedEscalations,
@@ -521,5 +522,15 @@ export function useInFlightPrs(team?: string) {
     queryKey: ["tenant-insights", "in-flight-prs", team],
     queryFn: () => apiGet(`/tenant-insights/in-flight-prs${query ? `?${query}` : ""}`),
     staleTime: 60 * 1000,
+  });
+}
+
+// ===== Elevate Hooks =====
+
+export function useElevateStatus() {
+  return useQuery<ElevateStatus>({
+    queryKey: ["elevate", "status"],
+    queryFn: () => apiGet("/elevate/status"),
+    staleTime: 30 * 1000,
   });
 }

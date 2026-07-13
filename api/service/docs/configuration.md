@@ -58,6 +58,16 @@ spring:
       data-source-properties:
         reWriteBatchedInserts: true
 
+elevate:
+  base-url: ${ELEVATE_BASE_URL:}
+  client-id: ${ELEVATE_CLIENT_ID:}
+  client-secret: ${ELEVATE_CLIENT_SECRET:${ELEVATE_API_KEY:}}
+  status-interval: ${ELEVATE_STATUS_INTERVAL:1h}
+  sync-interval: ${ELEVATE_SYNC_INTERVAL:12h}
+  agent-name: ${ELEVATE_AGENT_NAME:Support Bot}
+  support-bot-url: ${SUPPORT_BOT_URL:${UI_ORIGIN:http://localhost:3000}}
+  version: ${SUPPORT_BOT_VERSION:dev}
+
 slack:
   creds: # Credentials of Slack App
     token: ${SLACK_TOKEN} # Token like: xoxb-abc-def
@@ -325,6 +335,30 @@ You will need to register an application with the following parameters:
 
 You will also need
 to create a secret for the registered application so that it can be used for authentication by Support Bot.
+
+## Elevate Agent Connection
+
+Support Bot can authenticate as an Elevate Agent Connection and keep a local copy of the products, journeys, and users it can access. Elevate issues two credential values: a client ID and a one-time client secret. The `ELEVATE_API_KEY` variable is accepted as an alias for the client secret because older Support Bot configuration refers to that credential as an API key.
+
+Set these variables on the **API**:
+
+| Variable | Description |
+|----------|-------------|
+| `ELEVATE_BASE_URL` | Elevate origin, such as `https://elevate.example.com`. Leave this and both credential values blank to disable the optional integration. |
+| `ELEVATE_CLIENT_ID` | Agent Connection client ID issued by Elevate, normally prefixed with `esc_`. |
+| `ELEVATE_CLIENT_SECRET` | One-time Agent Connection secret issued by Elevate. Store it in a Kubernetes Secret or another secret manager. |
+| `ELEVATE_API_KEY` | Backward-compatible alias for `ELEVATE_CLIENT_SECRET`; used only when `ELEVATE_CLIENT_SECRET` is unset. |
+| `ELEVATE_STATUS_INTERVAL` | Delay between authenticated status reports. Defaults to `1h`. |
+| `ELEVATE_SYNC_INTERVAL` | Delay between complete Insights refreshes. Defaults to `12h`. |
+| `ELEVATE_AGENT_NAME` | Name shown for this agent in Elevate. Defaults to `Support Bot`. |
+| `SUPPORT_BOT_URL` | Public Support Bot URL reported to Elevate. Defaults to `UI_ORIGIN`, then `http://localhost:3000`. |
+| `SUPPORT_BOT_VERSION` | Deployed Support Bot version reported to Elevate. Defaults to `dev`. |
+
+`ELEVATE_BASE_URL`, `ELEVATE_CLIENT_ID`, and one secret variable must be set together. Support Bot fails at startup when the configuration is incomplete or a URL or interval is invalid.
+
+Each job gets a fresh OAuth client-credentials token. The status job reports the connection to Elevate. The sync job follows every page of the products, journeys, and users collections, then replaces the local snapshot in one transaction. A successful empty response clears the old snapshot. A failed or partial refresh preserves the last complete snapshot and records the failure for the status page.
+
+Leadership and support-engineer users can inspect the connection, last attempts, last successes, errors, and locally stored collections on the **Elevate** page under **Integrations**.
 
 ## Single Sign-On (SSO)
 

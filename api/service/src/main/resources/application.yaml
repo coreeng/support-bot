@@ -99,6 +99,17 @@ app:
   db:
     schema: ${DB_SCHEMA:public}
 
+elevate:
+  # Leave all three connection values blank to disable the optional Elevate integration.
+  base-url: ${ELEVATE_BASE_URL:}
+  client-id: ${ELEVATE_CLIENT_ID:}
+  client-secret: ${ELEVATE_CLIENT_SECRET:${ELEVATE_API_KEY:}}
+  status-interval: ${ELEVATE_STATUS_INTERVAL:1h}
+  sync-interval: ${ELEVATE_SYNC_INTERVAL:12h}
+  agent-name: ${ELEVATE_AGENT_NAME:Support Bot}
+  support-bot-url: ${SUPPORT_BOT_URL:${UI_ORIGIN:http://localhost:3000}}
+  version: ${SUPPORT_BOT_VERSION:dev}
+
 slack:
   mode: socket # socket or http
   enable-request-verification: true
