@@ -1,14 +1,11 @@
 "use client";
 
-import { ElevateDataTable } from "@/components/elevate/ElevateDataTable";
+import { ElevateRelationshipExplorer } from "@/components/elevate/ElevateRelationshipExplorer";
 import { ElevateStatusCards } from "@/components/elevate/ElevateStatusCards";
-import { journeyColumns, productColumns, userColumns } from "@/components/elevate/elevate-columns";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useElevateStatus } from "@/lib/hooks";
-import { AlertCircle, Package, RefreshCw, Route, Users } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
 
 function ElevateLoading() {
   return (
@@ -71,65 +68,7 @@ export default function ElevatePage() {
 
           <ElevateStatusCards status={data} />
 
-          <Tabs defaultValue="products" className="space-y-4">
-            <TabsList className="grid h-auto w-full grid-cols-3 sm:inline-flex sm:h-9 sm:w-fit">
-              <TabsTrigger value="products" className="min-w-0 cursor-pointer px-1 text-xs sm:px-2 sm:text-sm">
-                <Package className="hidden sm:block" /> Products{" "}
-                <Badge variant="secondary" className="hidden font-mono tabular-nums sm:inline-flex">
-                  {data.products.length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="journeys" className="min-w-0 cursor-pointer px-1 text-xs sm:px-2 sm:text-sm">
-                <Route className="hidden sm:block" /> Journeys{" "}
-                <Badge variant="secondary" className="hidden font-mono tabular-nums sm:inline-flex">
-                  {data.journeys.length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="users" className="min-w-0 cursor-pointer px-1 text-xs sm:px-2 sm:text-sm">
-                <Users className="hidden sm:block" /> Users{" "}
-                <Badge variant="secondary" className="hidden font-mono tabular-nums sm:inline-flex">
-                  {data.users.length}
-                </Badge>
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="products" className="space-y-6">
-              <ElevateDataTable
-                title="Products"
-                description="Products available to this Elevate Agent Connection."
-                caption="Products synchronized from Elevate"
-                items={data.products}
-                columns={productColumns}
-                rowKey={(product) => product.id}
-                emptyTitle="No products synced"
-                emptyDescription="Elevate has not returned any products for this Agent Connection."
-              />
-            </TabsContent>
-            <TabsContent value="journeys" className="space-y-6">
-              <ElevateDataTable
-                title="Journeys"
-                description="Journeys associated with the synchronized products."
-                caption="Journeys synchronized from Elevate"
-                items={data.journeys}
-                columns={journeyColumns}
-                rowKey={(journey) => journey.id}
-                emptyTitle="No journeys synced"
-                emptyDescription="Elevate has not returned any journeys for this Agent Connection."
-              />
-            </TabsContent>
-            <TabsContent value="users" className="space-y-6">
-              <ElevateDataTable
-                title="Users"
-                description="Product users associated with the synchronized products."
-                caption="Users synchronized from Elevate"
-                items={data.users}
-                columns={userColumns}
-                rowKey={(user) => user.id}
-                emptyTitle="No users synced"
-                emptyDescription="Elevate has not returned any users for this Agent Connection."
-              />
-            </TabsContent>
-          </Tabs>
+          <ElevateRelationshipExplorer products={data.products} journeys={data.journeys} users={data.users} />
         </>
       ) : null}
     </div>

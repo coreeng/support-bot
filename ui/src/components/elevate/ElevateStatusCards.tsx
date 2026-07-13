@@ -158,7 +158,7 @@ export function ElevateStatusCards({ status }: { status: ElevateStatus }) {
           {[
             ["Products", status.products.length],
             ["Journeys", status.journeys.length],
-            ["Users", status.users.length],
+            ["Product users", status.users.length],
           ].map(([label, count]) => (
             <div key={label} className="px-2">
               <p className="text-foreground font-mono text-2xl font-semibold tracking-tight tabular-nums">{count}</p>
