@@ -119,7 +119,7 @@ describe("EscalatedToMyTeamTable", () => {
     mockUseTeamFilter.mockReturnValue({
       selectedTeam: "Core-platform",
       setSelectedTeam: jest.fn(),
-      hasFullAccess: false,
+      hasUnrestrictedDataScope: false,
       effectiveTeams: ["Core-platform"],
       allTeams: ["Core-platform"],
       initialized: true,
@@ -143,7 +143,7 @@ describe("EscalatedToMyTeamTable", () => {
       mockUseTeamFilter.mockReturnValue({
         selectedTeam: "Other-team", // Not an escalation team
         setSelectedTeam: jest.fn(),
-        hasFullAccess: false,
+        hasUnrestrictedDataScope: false,
         effectiveTeams: ["Other-team"],
         allTeams: ["Core-platform", "Other-team"],
         initialized: true,

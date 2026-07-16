@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
+import { hasUiCapability, UI_CAPABILITIES } from "@/lib/auth/capabilities";
 import { LogOut, ShieldX } from "lucide-react";
 
 export function AccessDenied() {
@@ -44,7 +45,7 @@ export function AccessDenied() {
 }
 
 export function RequireDashboardAccess({ children }: { children: React.ReactNode }) {
-  const { isLeadership, isSupportEngineer, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -57,7 +58,7 @@ export function RequireDashboardAccess({ children }: { children: React.ReactNode
     );
   }
 
-  if (!isLeadership && !isSupportEngineer) {
+  if (!hasUiCapability(user?.roles, UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS)) {
     return <AccessDenied />;
   }
 

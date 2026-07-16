@@ -16,7 +16,7 @@ const Probe = () => {
     hasNoTeamScope,
     isViewingAllTeams,
     isViewingAsEscalationTeam,
-    hasFullAccess,
+    hasUnrestrictedDataScope,
     allTeams,
     initialized,
   } = useTeamFilter();
@@ -28,7 +28,7 @@ const Probe = () => {
       <div data-testid="has-no-team-scope">{String(hasNoTeamScope)}</div>
       <div data-testid="is-viewing-all-teams">{String(isViewingAllTeams)}</div>
       <div data-testid="is-viewing-as-escalation-team">{String(isViewingAsEscalationTeam)}</div>
-      <div data-testid="has-full-access">{String(hasFullAccess)}</div>
+      <div data-testid="has-unrestricted-data-scope">{String(hasUnrestrictedDataScope)}</div>
       <div data-testid="all-teams">{allTeams.join("|")}</div>
       <div data-testid="initialized">{String(initialized)}</div>
       <button onClick={() => setSelectedTeam("Tenant B")}>select-tenant-b</button>
@@ -119,7 +119,7 @@ describe("TeamFilterContext", () => {
     renderProvider();
 
     await waitFor(() => expect(screen.getByTestId("selected-team")).toHaveTextContent("Support"));
-    expect(screen.getByTestId("has-full-access")).toHaveTextContent("true");
+    expect(screen.getByTestId("has-unrestricted-data-scope")).toHaveTextContent("true");
     expect(screen.getByTestId("team-scope")).toHaveTextContent("all_teams");
     expect(screen.getByTestId("is-viewing-all-teams")).toHaveTextContent("true");
     expect(screen.getByTestId("effective-teams")).toHaveTextContent("");
@@ -156,7 +156,7 @@ describe("TeamFilterContext", () => {
     await waitFor(() => expect(screen.getByTestId("selected-team")).toHaveTextContent("Tenant B"));
     expect(screen.getByTestId("team-scope")).toHaveTextContent("selected_teams");
     expect(screen.getByTestId("effective-teams")).toHaveTextContent("Tenant B");
-    expect(screen.getByTestId("has-full-access")).toHaveTextContent("false");
+    expect(screen.getByTestId("has-unrestricted-data-scope")).toHaveTextContent("false");
   });
 
   it("flags escalation-team viewing when selected team is in escalation set", async () => {
