@@ -1,3 +1,10 @@
 package com.coreeng.supportbot.elevate;
 
-public record ElevateStoredStatus(ElevateSyncState state, ElevateSnapshot snapshot) {}
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
+
+public record ElevateStoredStatus(
+        ElevateSyncState state,
+        @Nullable UUID snapshotVersion,
+        ElevateCounts counts,
+        ElevateIntegrityCounts integrity) {}

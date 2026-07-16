@@ -156,9 +156,9 @@ export function ElevateStatusCards({ status }: { status: ElevateStatus }) {
 
         <div className="mt-4 grid grid-cols-3 divide-x border-t pt-4 text-center">
           {[
-            ["Products", status.products.length],
-            ["Journeys", status.journeys.length],
-            ["Product users", status.users.length],
+            ["Products", status.counts.products],
+            ["Journeys", status.counts.journeys],
+            ["Product users", status.counts.users],
           ].map(([label, count]) => (
             <div key={label} className="px-2">
               <p className="text-foreground font-mono text-2xl font-semibold tracking-tight tabular-nums">{count}</p>

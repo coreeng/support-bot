@@ -1,123 +1,139 @@
 "use client";
 
-import { ElevateRelationshipDetails } from "@/components/elevate/ElevateRelationshipDetails";
-import type { ProductRelationship, RelationshipFocus } from "@/components/elevate/elevate-relationships";
+import { ElevatePagination } from "@/components/elevate/ElevatePagination";
+import { ElevateRelationshipDetails, type RelationshipFocus } from "@/components/elevate/ElevateRelationshipDetails";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SingleSelectFilter } from "@/components/ui/single-select-filter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { isApiError, useElevateProductJourneys, useElevateProductUsers } from "@/lib/hooks";
+import type { ElevateJourney, ElevateProduct, ElevateRelationshipFilter, ElevateRelationshipSort, ElevateUser } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Route, Search, Users } from "lucide-react";
-import { useMemo, useState } from "react";
-
-const PAGE_SIZE = 20;
+import { Route, Search, Users } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 type RelationshipKind = "journey" | "user";
-type RelationshipFilter = "all" | "linked" | "unassigned";
-type RelationshipSort = "name" | "relationships";
+
+const FILTER_OPTIONS = [
+  { value: "linked", label: "With links" },
+  { value: "unassigned", label: "Unassigned" },
+];
+
+const SORT_OPTIONS = [
+  { value: "name", label: "Name" },
+  { value: "relationships", label: "Most linked" },
+];
 
 function countLabel(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function relationshipCount(relationship: ProductRelationship, focus: Exclude<RelationshipFocus, null>) {
-  return focus.kind === "journey"
-    ? (relationship.userIdsByJourneyId.get(focus.id)?.length ?? 0)
-    : (relationship.journeyIdsByUserId.get(focus.id)?.length ?? 0);
-}
-
-export function ElevateRelationshipBrowser({ relationship }: { relationship: ProductRelationship }) {
-  const initialKind: RelationshipKind = relationship.journeys.length > 0 ? "journey" : "user";
+export function ElevateRelationshipBrowser({
+  product,
+  snapshotVersion,
+  onSnapshotChanged,
+}: {
+  product: ElevateProduct;
+  snapshotVersion: string;
+  onSnapshotChanged: () => void;
+}) {
+  const initialKind: RelationshipKind = product.journeyCount > 0 ? "journey" : "user";
   const [kind, setKind] = useState<RelationshipKind>(initialKind);
-  const [selectedIds, setSelectedIds] = useState({
-    journey: relationship.journeys[0]?.id ?? "",
-    user: relationship.users[0]?.id ?? "",
-  });
+  const [selectedIds, setSelectedIds] = useState({ journey: "", user: "" });
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<RelationshipFilter>("all");
-  const [sort, setSort] = useState<RelationshipSort>("name");
+  const deferredQuery = useDebouncedValue(query);
+  const [filter, setFilter] = useState<ElevateRelationshipFilter>("all");
+  const [sort, setSort] = useState<ElevateRelationshipSort>("name");
   const [page, setPage] = useState(0);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [focusRequest, setFocusRequest] = useState(0);
+  const lastListTriggerRef = useRef<HTMLElement | null>(null);
+  const listHeadingRef = useRef<HTMLHeadingElement>(null);
+  const request = {
+    snapshotVersion,
+    page,
+    query: deferredQuery,
+    relationship: filter,
+    sort,
+    direction: sort === "relationships" ? ("desc" as const) : ("asc" as const),
+  };
+  const journeys = useElevateProductJourneys(product.id, request, kind === "journey");
+  const users = useElevateProductUsers(product.id, request, kind === "user");
+  const result = kind === "journey" ? journeys : users;
+  const waitingForSearch = query !== deferredQuery;
+  const showingPlaceholder = waitingForSearch || result.isPlaceholderData;
+  const busy = waitingForSearch || result.isFetching;
+  const items = showingPlaceholder ? undefined : result.data?.content;
+  const selectedId = selectedIds[kind] || (showingPlaceholder ? "" : items?.[0]?.id || "");
+  const focus: RelationshipFocus | null = selectedId ? { kind, id: selectedId } : null;
 
-  const items = kind === "journey" ? relationship.journeys : relationship.users;
-  const filteredItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-    return items
-      .filter((item) => {
-        const focus = { kind, id: item.id } as const;
-        const count = relationshipCount(relationship, focus);
-        const identifier = kind === "journey" ? relationship.journeys.find(({ id }) => id === item.id)?.slug : item.id;
-        const matchesQuery = !normalizedQuery || `${item.name} ${identifier ?? ""}`.toLocaleLowerCase().includes(normalizedQuery);
-        const matchesFilter = filter === "all" || (filter === "linked" ? count > 0 : count === 0);
-        return matchesQuery && matchesFilter;
-      })
-      .sort((left, right) => {
-        if (sort === "relationships") {
-          const difference =
-            relationshipCount(relationship, { kind, id: right.id }) - relationshipCount(relationship, { kind, id: left.id });
-          if (difference !== 0) return difference;
-        }
-        return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
-      });
-  }, [filter, items, kind, query, relationship, sort]);
+  useEffect(() => {
+    if (isApiError(result.error, 409)) onSnapshotChanged();
+  }, [onSnapshotChanged, result.error]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
-  const activePage = Math.min(page, totalPages - 1);
-  const pageItems = filteredItems.slice(activePage * PAGE_SIZE, (activePage + 1) * PAGE_SIZE);
-  const selectedId = selectedIds[kind];
-  const selectedItem = pageItems.find((item) => item.id === selectedId) ?? pageItems[0];
-  const focus: RelationshipFocus = selectedItem ? { kind, id: selectedItem.id } : null;
-  const firstResult = filteredItems.length === 0 ? 0 : activePage * PAGE_SIZE + 1;
-  const lastResult = Math.min((activePage + 1) * PAGE_SIZE, filteredItems.length);
-  const kindLabel = kind === "journey" ? "journey" : "product user";
+  function resetList(nextKind = kind) {
+    setQuery("");
+    setFilter("all");
+    setSort("name");
+    setPage(0);
+    setSelectedIds((current) => ({ ...current, [nextKind]: "" }));
+    setMobileDetailOpen(false);
+  }
 
   function selectKind(nextKind: RelationshipKind) {
     setKind(nextKind);
-    setQuery("");
-    setFilter("all");
-    setPage(0);
+    resetList(nextKind);
   }
 
-  function selectItem(id: string) {
+  function selectItem(id: string, trigger: HTMLElement) {
+    lastListTriggerRef.current = trigger;
     setSelectedIds((current) => ({ ...current, [kind]: id }));
+    setMobileDetailOpen(true);
+    setFocusRequest((current) => current + 1);
   }
 
-  function selectRelated(nextFocus: Exclude<RelationshipFocus, null>) {
-    const nextItems = nextFocus.kind === "journey" ? relationship.journeys : relationship.users;
-    const sortedNextItems = [...nextItems].sort((left, right) => {
-      if (sort === "relationships") {
-        const difference =
-          relationshipCount(relationship, { kind: nextFocus.kind, id: right.id }) -
-          relationshipCount(relationship, { kind: nextFocus.kind, id: left.id });
-        if (difference !== 0) return difference;
-      }
-      return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
-    });
-    const targetIndex = sortedNextItems.findIndex(({ id }) => id === nextFocus.id);
-
+  function selectRelated(nextFocus: RelationshipFocus) {
     setKind(nextFocus.kind);
     setSelectedIds((current) => ({ ...current, [nextFocus.kind]: nextFocus.id }));
-    setQuery("");
+    // A related record may live beyond the first page of its product-level
+    // list. Querying by its ID keeps the destination list contextual and makes
+    // compact-view Back navigation return to a list that contains the record.
+    setQuery(nextFocus.id);
     setFilter("all");
-    setPage(targetIndex < 0 ? 0 : Math.floor(targetIndex / PAGE_SIZE));
+    setSort("name");
+    setPage(0);
+    setMobileDetailOpen(true);
+    setFocusRequest((current) => current + 1);
+  }
+
+  function returnToList() {
+    setMobileDetailOpen(false);
+    requestAnimationFrame(() => {
+      if (lastListTriggerRef.current?.isConnected) lastListTriggerRef.current.focus();
+      // Cross-navigation replaces the originating list, so its named heading is
+      // the stable return point for keyboard users in the new compact view.
+      else listHeadingRef.current?.focus();
+    });
   }
 
   return (
     <Tabs value={kind} onValueChange={(value) => selectKind(value as RelationshipKind)} className="gap-0">
       <div className="flex flex-col gap-4 border-b p-4 sm:p-5 lg:flex-row lg:items-end lg:justify-between">
         <TabsList aria-label="Relationship type">
-          <TabsTrigger value="journey">
+          <TabsTrigger value="journey" className="cursor-pointer">
             <Route /> Journeys
-            <span className="font-mono tabular-nums">{relationship.journeys.length}</span>
+            <span className="font-mono tabular-nums">{product.journeyCount}</span>
           </TabsTrigger>
-          <TabsTrigger value="user">
+          <TabsTrigger value="user" className="cursor-pointer">
             <Users /> Product users
-            <span className="font-mono tabular-nums">{relationship.users.length}</span>
+            <span className="font-mono tabular-nums">{product.userCount}</span>
           </TabsTrigger>
         </TabsList>
 
-        <div className="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_10rem_10rem] lg:w-auto">
-          <div className="relative">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 sm:w-64">
             <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
               type="search"
@@ -128,123 +144,129 @@ export function ElevateRelationshipBrowser({ relationship }: { relationship: Pro
               onChange={(event) => {
                 setQuery(event.target.value);
                 setPage(0);
+                setSelectedIds((current) => ({ ...current, [kind]: "" }));
+                setMobileDetailOpen(false);
               }}
             />
           </div>
-          <Select
-            value={filter}
-            onValueChange={(value) => {
-              setFilter(value as RelationshipFilter);
+          <SingleSelectFilter
+            title="Relationship"
+            value={filter === "all" ? undefined : filter}
+            options={FILTER_OPTIONS}
+            onChange={(value) => {
+              setFilter((value as ElevateRelationshipFilter | undefined) ?? "all");
               setPage(0);
+              setSelectedIds((current) => ({ ...current, [kind]: "" }));
+              setMobileDetailOpen(false);
             }}
-          >
-            <SelectTrigger aria-label="Relationship filter">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="all">All records</SelectItem>
-              <SelectItem value="linked">With links</SelectItem>
-              <SelectItem value="unassigned">Unassigned</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
+          />
+          <SingleSelectFilter
+            title="Sort"
             value={sort}
-            onValueChange={(value) => {
-              setSort(value as RelationshipSort);
+            options={SORT_OPTIONS}
+            showSearch={false}
+            onChange={(value) => {
+              setSort(value === "relationships" ? "relationships" : "name");
               setPage(0);
+              setSelectedIds((current) => ({ ...current, [kind]: "" }));
+              setMobileDetailOpen(false);
             }}
-          >
-            <SelectTrigger aria-label="Sort records">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="relationships">Most linked</SelectItem>
-            </SelectContent>
-          </Select>
+          />
         </div>
       </div>
 
       <TabsContent value={kind} className="lg:grid lg:grid-cols-[minmax(18rem,0.85fr)_minmax(22rem,1.15fr)]">
         <section
-          className="min-w-0 border-b lg:border-r lg:border-b-0"
+          className={cn("min-w-0 border-b lg:block lg:border-r lg:border-b-0", mobileDetailOpen ? "hidden" : "block")}
           aria-label={`${kind === "journey" ? "Journeys" : "Product users"} list`}
+          aria-busy={busy || undefined}
         >
-          {pageItems.length > 0 ? (
+          <h3 ref={listHeadingRef} tabIndex={-1} className="sr-only outline-none">
+            {kind === "journey" ? "Journeys" : "Product users"}
+          </h3>
+          {result.isLoading || showingPlaceholder ? (
+            <p className="text-muted-foreground p-16 text-center text-sm" role="status">
+              {query ? "Searching records…" : "Updating records…"}
+            </p>
+          ) : null}
+          {!result.isLoading && !showingPlaceholder && result.error ? (
+            <p className="text-destructive p-16 text-center text-sm">Unable to load records.</p>
+          ) : null}
+          {!result.isLoading && !showingPlaceholder && !result.error && items && items.length > 0 ? (
             <ul role="list" className="max-h-[34rem] divide-y overflow-y-auto">
-              {pageItems.map((item) => {
-                const itemFocus = { kind, id: item.id } as const;
-                const count = relationshipCount(relationship, itemFocus);
-                const selected = item.id === selectedItem?.id;
-                const identifier = kind === "journey" ? relationship.journeys.find(({ id }) => id === item.id)?.slug : item.id;
+              {items.map((item) => {
+                const isJourney = kind === "journey";
+                const count = isJourney ? (item as ElevateJourney).userCount : (item as ElevateUser).journeyCount;
+                const identifier = isJourney ? (item as ElevateJourney).slug : item.id;
+                const selected = item.id === selectedId;
                 return (
                   <li key={item.id}>
                     <Button
                       type="button"
                       variant="ghost"
+                      size="default"
                       aria-current={selected ? "true" : undefined}
-                      aria-label={`${item.name}, ${countLabel(count, kind === "journey" ? "product user" : "journey")}`}
+                      aria-label={`${item.name}, ${countLabel(count, isJourney ? "product user" : "journey")}`}
                       className={cn(
                         "h-auto w-full justify-start rounded-none p-3 text-left whitespace-normal sm:p-4",
                         selected && "bg-accent text-accent-foreground"
                       )}
-                      onClick={() => selectItem(item.id)}
+                      onClick={(event) => selectItem(item.id, event.currentTarget)}
                     >
                       <span className="min-w-0 flex-1">
                         <span className="text-foreground block truncate text-sm font-medium">{item.name}</span>
                         <span className="text-muted-foreground block truncate font-mono text-xs">{identifier}</span>
                       </span>
                       <Badge variant={count > 0 ? "secondary" : "outline"}>
-                        {count > 0 ? countLabel(count, kind === "journey" ? "user" : "journey") : "Unassigned"}
+                        {count > 0 ? (
+                          <span className="font-mono tabular-nums">{countLabel(count, isJourney ? "user" : "journey")}</span>
+                        ) : (
+                          "Unassigned"
+                        )}
                       </Badge>
                     </Button>
                   </li>
                 );
               })}
             </ul>
-          ) : (
+          ) : null}
+          {!result.isLoading && !showingPlaceholder && !result.error && items?.length === 0 ? (
             <div className="flex min-h-64 items-center justify-center p-6 text-center" role="status">
               <div>
                 <p className="text-foreground text-sm font-medium">No {kind === "journey" ? "journeys" : "product users"} found</p>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  {items.length === 0
-                    ? `This product has no ${kind === "journey" ? "journeys" : "product users"}.`
-                    : "Try changing the search or relationship filter."}
+                  {query || filter !== "all"
+                    ? "Try changing the search or relationship filter."
+                    : `This product has no ${kind === "journey" ? "journeys" : "product users"}.`}
                 </p>
               </div>
             </div>
-          )}
-
-          <footer className="flex flex-wrap items-center justify-end gap-3 border-t p-3 sm:px-4">
-            <p className="text-muted-foreground mr-auto text-sm" aria-live="polite">
-              {firstResult}–{lastResult} of {filteredItems.length} · Page {activePage + 1} of {totalPages}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                aria-label={`Previous ${kindLabel} page`}
-                disabled={activePage === 0}
-                onClick={() => setPage(Math.max(0, activePage - 1))}
-              >
-                <ChevronLeft /> Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                aria-label={`Next ${kindLabel} page`}
-                disabled={activePage >= totalPages - 1}
-                onClick={() => setPage(Math.min(totalPages - 1, activePage + 1))}
-              >
-                Next <ChevronRight />
-              </Button>
-            </div>
-          </footer>
+          ) : null}
+          {result.data ? (
+            <ElevatePagination
+              page={result.data.page}
+              totalPages={result.data.totalPages}
+              busy={busy}
+              onPageChange={(nextPage) => {
+                setPage(nextPage);
+                setSelectedIds((current) => ({ ...current, [kind]: "" }));
+                setMobileDetailOpen(false);
+              }}
+            />
+          ) : null}
         </section>
 
-        <section className="min-w-0" aria-label="Selected relationship details">
+        <section className={cn("min-w-0 lg:block", mobileDetailOpen ? "block" : "hidden")} aria-label="Selected relationship details">
           {focus ? (
-            <ElevateRelationshipDetails relationship={relationship} focus={focus} onSelectRelated={selectRelated} />
+            <ElevateRelationshipDetails
+              key={`${focus.kind}-${focus.id}`}
+              snapshotVersion={snapshotVersion}
+              focus={focus}
+              focusRequest={focusRequest}
+              onSelectRelated={selectRelated}
+              onBack={returnToList}
+              onSnapshotChanged={onSnapshotChanged}
+            />
           ) : (
             <div className="flex min-h-64 items-center justify-center p-6 text-center" role="status">
               <div>

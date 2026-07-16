@@ -4,7 +4,14 @@
  */
 import type {
   AnalysisData,
+  ElevateIntegrityIssue,
+  ElevateIntegrityIssueType,
+  ElevateJourney,
+  ElevatePage,
+  ElevatePageRequest,
+  ElevateProduct,
   ElevateStatus,
+  ElevateUser,
   EscalationTeam,
   KnowledgeGapsStatus,
   PaginatedEscalations,
@@ -19,7 +26,7 @@ import type {
   RepoInsights,
   RequestBreakdown,
 } from "@/lib/types/dashboard";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getCsrfToken, signOut } from "next-auth/react";
 
 // ===== Shared API Helper =====
@@ -51,16 +58,34 @@ async function handle401(): Promise<never> {
   return new Promise(() => {}) as never; // Never resolves, navigation will happen
 }
 
-async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`/api${path}`);
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly reason?: string
+  ) {
+    super(status === 403 ? "Insufficient permissions" : `API error: ${status}`);
+    this.name = "ApiError";
+  }
+}
+
+export function isApiError(error: unknown, status?: number): error is ApiError {
+  return error instanceof ApiError && (status === undefined || error.status === status);
+}
+
+async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(`/api${path}`, { signal });
   if (!res.ok) {
     if (res.status === 401) {
       return handle401();
     }
-    if (res.status === 403) {
-      throw new Error("Insufficient permissions");
+    let reason: string | undefined;
+    try {
+      const body = (await res.json()) as { code?: string; reason?: string };
+      reason = body.code ?? body.reason;
+    } catch {
+      // The status code remains sufficient when a proxy returns no JSON body.
     }
-    throw new Error(`API error: ${res.status}`);
+    throw new ApiError(res.status, reason);
   }
   return res.json();
 }
@@ -530,7 +555,204 @@ export function useInFlightPrs(team?: string) {
 export function useElevateStatus() {
   return useQuery<ElevateStatus>({
     queryKey: ["elevate", "status"],
-    queryFn: () => apiGet("/elevate/status"),
+    queryFn: ({ signal }) => apiGet("/elevate/status", signal),
     staleTime: 30 * 1000,
   });
+}
+
+const ELEVATE_PAGE_SIZE = 20;
+
+function elevatePageParams(request: ElevatePageRequest) {
+  const params = new URLSearchParams({
+    snapshotVersion: request.snapshotVersion,
+    page: String(request.page ?? 0),
+    pageSize: String(request.pageSize ?? ELEVATE_PAGE_SIZE),
+  });
+  if (request.query?.trim()) params.set("query", request.query.trim());
+  if (request.relationship && request.relationship !== "all") params.set("relationship", request.relationship);
+  if (request.sort) params.set("sort", request.sort);
+  if (request.direction) params.set("direction", request.direction);
+  return params.toString();
+}
+
+function elevateQueryOptions<T>(queryKey: readonly unknown[], path: string, enabled: boolean, retainPreviousData = false) {
+  return {
+    queryKey,
+    queryFn: ({ signal }: { signal: AbortSignal }) => apiGet<T>(path, signal),
+    enabled,
+    placeholderData: retainPreviousData ? keepPreviousData : undefined,
+    staleTime: 30 * 1000,
+    retry: shouldRetryElevateQuery,
+  };
+}
+
+export function shouldRetryElevateQuery(failureCount: number, error: Error) {
+  if (failureCount >= 2) return false;
+  if (!isApiError(error)) return true;
+  return error.status === 429 || error.status >= 500;
+}
+
+export function useElevateProducts(request: ElevatePageRequest, enabled = true) {
+  const params = elevatePageParams(request);
+  return useQuery<ElevatePage<ElevateProduct>>(
+    elevateQueryOptions(
+      [
+        "elevate",
+        "products",
+        request.snapshotVersion,
+        request.page ?? 0,
+        request.pageSize ?? ELEVATE_PAGE_SIZE,
+        request.query ?? "",
+        request.relationship ?? "all",
+        request.sort ?? "name",
+        request.direction ?? "asc",
+      ],
+      `/elevate/products?${params}`,
+      enabled && Boolean(request.snapshotVersion),
+      true
+    )
+  );
+}
+
+export function useElevateProduct(productId: string, snapshotVersion: string, enabled = true) {
+  return useQuery<ElevateProduct>(
+    elevateQueryOptions(
+      ["elevate", "product", snapshotVersion, productId],
+      `/elevate/products/${encodeURIComponent(productId)}?snapshotVersion=${encodeURIComponent(snapshotVersion)}`,
+      enabled && Boolean(productId && snapshotVersion)
+    )
+  );
+}
+
+export function useElevateProductJourneys(productId: string, request: ElevatePageRequest, enabled = true) {
+  const params = elevatePageParams(request);
+  return useQuery<ElevatePage<ElevateJourney>>(
+    elevateQueryOptions(
+      [
+        "elevate",
+        "product-journeys",
+        request.snapshotVersion,
+        productId,
+        request.page ?? 0,
+        request.pageSize ?? ELEVATE_PAGE_SIZE,
+        request.query ?? "",
+        request.relationship ?? "all",
+        request.sort ?? "name",
+        request.direction ?? "asc",
+      ],
+      `/elevate/products/${encodeURIComponent(productId)}/journeys?${params}`,
+      enabled && Boolean(productId && request.snapshotVersion),
+      true
+    )
+  );
+}
+
+export function useElevateProductUsers(productId: string, request: ElevatePageRequest, enabled = true) {
+  const params = elevatePageParams(request);
+  return useQuery<ElevatePage<ElevateUser>>(
+    elevateQueryOptions(
+      [
+        "elevate",
+        "product-users",
+        request.snapshotVersion,
+        productId,
+        request.page ?? 0,
+        request.pageSize ?? ELEVATE_PAGE_SIZE,
+        request.query ?? "",
+        request.relationship ?? "all",
+        request.sort ?? "name",
+        request.direction ?? "asc",
+      ],
+      `/elevate/products/${encodeURIComponent(productId)}/users?${params}`,
+      enabled && Boolean(productId && request.snapshotVersion),
+      true
+    )
+  );
+}
+
+export function useElevateJourney(journeyId: string, snapshotVersion: string, enabled = true) {
+  return useQuery<ElevateJourney>(
+    elevateQueryOptions(
+      ["elevate", "journey", snapshotVersion, journeyId],
+      `/elevate/journeys/${encodeURIComponent(journeyId)}?snapshotVersion=${encodeURIComponent(snapshotVersion)}`,
+      enabled && Boolean(journeyId && snapshotVersion)
+    )
+  );
+}
+
+export function useElevateJourneyUsers(journeyId: string, request: ElevatePageRequest, enabled = true) {
+  const params = elevatePageParams(request);
+  return useQuery<ElevatePage<ElevateUser>>(
+    elevateQueryOptions(
+      [
+        "elevate",
+        "journey-users",
+        request.snapshotVersion,
+        journeyId,
+        request.page ?? 0,
+        request.pageSize ?? ELEVATE_PAGE_SIZE,
+        request.query ?? "",
+        request.sort ?? "name",
+        request.direction ?? "asc",
+      ],
+      `/elevate/journeys/${encodeURIComponent(journeyId)}/users?${params}`,
+      enabled && Boolean(journeyId && request.snapshotVersion),
+      true
+    )
+  );
+}
+
+export function useElevateUser(userId: string, snapshotVersion: string, enabled = true) {
+  return useQuery<ElevateUser>(
+    elevateQueryOptions(
+      ["elevate", "user", snapshotVersion, userId],
+      `/elevate/users/${encodeURIComponent(userId)}?snapshotVersion=${encodeURIComponent(snapshotVersion)}`,
+      enabled && Boolean(userId && snapshotVersion)
+    )
+  );
+}
+
+export function useElevateUserJourneys(userId: string, request: ElevatePageRequest, enabled = true) {
+  const params = elevatePageParams(request);
+  return useQuery<ElevatePage<ElevateJourney>>(
+    elevateQueryOptions(
+      [
+        "elevate",
+        "user-journeys",
+        request.snapshotVersion,
+        userId,
+        request.page ?? 0,
+        request.pageSize ?? ELEVATE_PAGE_SIZE,
+        request.query ?? "",
+        request.sort ?? "name",
+        request.direction ?? "asc",
+      ],
+      `/elevate/users/${encodeURIComponent(userId)}/journeys?${params}`,
+      enabled && Boolean(userId && request.snapshotVersion),
+      true
+    )
+  );
+}
+
+export function useElevateIntegrity(request: ElevatePageRequest & { type?: "all" | ElevateIntegrityIssueType }, enabled = true) {
+  const params = new URLSearchParams(elevatePageParams(request));
+  if (request.type && request.type !== "all") params.set("type", request.type);
+  return useQuery<ElevatePage<ElevateIntegrityIssue>>(
+    elevateQueryOptions(
+      [
+        "elevate",
+        "integrity",
+        request.snapshotVersion,
+        request.page ?? 0,
+        request.pageSize ?? ELEVATE_PAGE_SIZE,
+        request.query ?? "",
+        request.type ?? "all",
+        request.sort ?? "name",
+        request.direction ?? "asc",
+      ],
+      `/elevate/integrity?${params}`,
+      enabled && Boolean(request.snapshotVersion),
+      true
+    )
+  );
 }

@@ -18,6 +18,9 @@ class ElevatePropsTest {
         ElevateProps props = bind(Map.of("elevate.base-url", ""));
 
         assertThat(props.configured()).isFalse();
+        assertThat(props.connectTimeout()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(props.readTimeout()).isEqualTo(Duration.ofSeconds(30));
+        assertThat(props.maxServerRetryDelay()).isEqualTo(Duration.ofMinutes(1));
         assertThat(props.statusInterval()).isEqualTo(Duration.ofHours(1));
         assertThat(props.syncInterval()).isEqualTo(Duration.ofHours(12));
         assertThat(props.agentName()).isEqualTo("Support Bot");
@@ -29,6 +32,9 @@ class ElevatePropsTest {
     void bindsCompleteConnectionAndNormalizesTrailingSlash() {
         Map<String, Object> values = connectionValues();
         values.put("elevate.base-url", "https://elevate.example.test/");
+        values.put("elevate.connect-timeout", "750ms");
+        values.put("elevate.read-timeout", "45s");
+        values.put("elevate.max-server-retry-delay", "90s");
 
         ElevateProps props = bind(values);
 
@@ -36,6 +42,9 @@ class ElevatePropsTest {
         assertThat(props.baseUrl()).isEqualTo("https://elevate.example.test");
         assertThat(props.clientId()).isEqualTo("esc_client");
         assertThat(props.clientSecret()).isEqualTo("secret-value");
+        assertThat(props.connectTimeout()).isEqualTo(Duration.ofMillis(750));
+        assertThat(props.readTimeout()).isEqualTo(Duration.ofSeconds(45));
+        assertThat(props.maxServerRetryDelay()).isEqualTo(Duration.ofSeconds(90));
     }
 
     @Test
@@ -104,6 +113,16 @@ class ElevatePropsTest {
         values.put("elevate.status-interval", "0s");
 
         assertThatThrownBy(() -> bind(values)).hasRootCauseMessage("elevate.status-interval must be positive");
+    }
+
+    @Test
+    void rejectsNonPositiveHttpTimeouts() {
+        for (String property : List.of("connect-timeout", "read-timeout", "max-server-retry-delay")) {
+            Map<String, Object> values = connectionValues();
+            values.put("elevate." + property, "0s");
+
+            assertThatThrownBy(() -> bind(values)).hasRootCauseMessage("elevate." + property + " must be positive");
+        }
     }
 
     @Test

@@ -12,28 +12,41 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.coreeng.supportbot.config.ElevateProps;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.SocketTimeoutException;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.json.JsonCompareMode;
+import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 class ElevateClientTest {
     private static final String BASE_URL = "https://elevate.example.test";
+    private static final Instant NOW = Instant.parse("2026-07-16T12:00:00Z");
 
     private MockRestServiceServer server;
     private ElevateClient client;
+    private List<Long> retryDelays;
 
     @BeforeEach
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(builder).build();
         ObjectMapper objectMapper = new JsonMapper().getObjectMapper();
-        client = new ElevateClient(configuredProps(), builder.build(), objectMapper);
+        retryDelays = new ArrayList<>();
+        client = new ElevateClient(
+                configuredProps(), builder.build(), objectMapper, retryDelays::add, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -56,6 +69,14 @@ class ElevateClientTest {
         client.reportStatus();
 
         server.verify();
+    }
+
+    @Test
+    void productionRequestFactoryUsesConfiguredFiniteTimeouts() {
+        var settings = ElevateClient.requestFactorySettings(configuredProps());
+
+        assertThat(settings.connectTimeout()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(settings.readTimeout()).isEqualTo(Duration.ofSeconds(30));
     }
 
     @Test
@@ -150,6 +171,10 @@ class ElevateClientTest {
         ElevateSnapshot snapshot = client.fetchSnapshot();
 
         assertThat(snapshot.products()).extracting(ElevateProduct::id).containsExactly("product-1", "product-2");
+        assertThat(Objects.requireNonNull(snapshot.productPayloads().get("product-1"))
+                        .get("futureField")
+                        .textValue())
+                .isEqualTo("ignored");
         assertThat(snapshot.users()).singleElement().satisfies(user -> {
             assertThat(user.productId()).isEqualTo("product-1");
             assertThat(user.description()).isEqualTo("Runs the platform");
@@ -187,6 +212,100 @@ class ElevateClientTest {
         server.verify();
     }
 
+    @Test
+    void retriesTransientFailuresAtMostThreeTimes() {
+        expectToken("access-token");
+        server.expect(ExpectedCount.times(3), requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage("Elevate returned HTTP 503");
+        assertThat(retryDelays).hasSize(2).allSatisfy(delay -> assertThat(delay).isBetween(0L, 500L));
+        server.verify();
+    }
+
+    @Test
+    void honorsNumericRetryAfterAtTheConfiguredLimit() {
+        expectToken("access-token");
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).header("Retry-After", "60"));
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(emptyPage());
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/users?limit=500"))
+                .andRespond(emptyPage());
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/journeys?limit=500"))
+                .andRespond(emptyPage());
+
+        assertThat(client.fetchSnapshot())
+                .isEqualTo(new ElevateSnapshot(java.util.List.of(), java.util.List.of(), java.util.List.of()));
+        assertThat(retryDelays).containsExactly(60_000L);
+        server.verify();
+    }
+
+    @Test
+    void honorsHttpDateRetryAfter() {
+        expectToken("access-token");
+        String retryAt =
+                DateTimeFormatter.RFC_1123_DATE_TIME.format(NOW.plusSeconds(45).atZone(ZoneOffset.UTC));
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE).header("Retry-After", retryAt));
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(emptyPage());
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/users?limit=500"))
+                .andRespond(emptyPage());
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/journeys?limit=500"))
+                .andRespond(emptyPage());
+
+        assertThat(client.fetchSnapshot())
+                .isEqualTo(new ElevateSnapshot(java.util.List.of(), java.util.List.of(), java.util.List.of()));
+        assertThat(retryDelays).containsExactly(45_000L);
+        server.verify();
+    }
+
+    @Test
+    void doesNotRetryBeforeAnOverBudgetRetryAfter() {
+        expectToken("access-token");
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).header("Retry-After", "61"));
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage("Elevate returned HTTP 429 with Retry-After beyond the configured maximum")
+                .hasMessageNotContaining("61")
+                .hasMessageNotContaining("secret-value");
+        assertThat(retryDelays).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void doesNotRetryRegularClientErrors() {
+        expectToken("access-token");
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage("Elevate returned HTTP 400");
+        assertThat(retryDelays).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void reportsAnActionableSanitizedTransportCauseAfterBoundedRetries() {
+        server.expect(ExpectedCount.times(3), requestTo(BASE_URL + "/api/sync/v1/auth/token"))
+                .andRespond(request -> {
+                    throw new SocketTimeoutException("socket details must not be exposed");
+                });
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage("Elevate request failed: request timed out")
+                .hasMessageNotContaining("socket details");
+        assertThat(retryDelays).hasSize(2);
+        server.verify();
+    }
+
     private void expectToken(String token) {
         server.expect(requestTo(BASE_URL + "/api/sync/v1/auth/token"))
                 .andExpect(method(HttpMethod.POST))
@@ -208,6 +327,9 @@ class ElevateClientTest {
                 BASE_URL,
                 "esc_client",
                 "secret-value",
+                Duration.ofSeconds(5),
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(1),
                 Duration.ofHours(1),
                 Duration.ofHours(12),
                 "Support Bot",

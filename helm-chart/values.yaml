@@ -3,6 +3,9 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
+# Version reported to connected Elevate instances. Defaults to image.tag, then Chart.appVersion.
+supportBotVersion: ""
+
 nameOverride: ""
 fullnameOverride: ""
 

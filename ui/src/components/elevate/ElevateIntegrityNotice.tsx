@@ -1,129 +1,174 @@
-import type { CrossProductAssignment, MissingAssignment, RelationshipIntegrity } from "@/components/elevate/elevate-relationships";
-import { AlertTriangle } from "lucide-react";
-import type { ReactNode } from "react";
+"use client";
+
+import { ElevatePagination } from "@/components/elevate/ElevatePagination";
+import { Input } from "@/components/ui/input";
+import { SingleSelectFilter } from "@/components/ui/single-select-filter";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { isApiError, useElevateIntegrity } from "@/lib/hooks";
+import type { ElevateIntegrityCounts, ElevateIntegrityIssue, ElevateIntegrityIssueType } from "@/lib/types";
+import { AlertTriangle, Search } from "lucide-react";
+import { useEffect, useState } from "react";
+
+const ISSUE_OPTIONS = [
+  { value: "orphanJourney", label: "Journeys without products" },
+  { value: "orphanUser", label: "Product users without products" },
+  { value: "missingAssignment", label: "Missing product users" },
+  { value: "crossProductAssignment", label: "Cross-product assignments" },
+];
+
+const DIRECTION_OPTIONS = [
+  { value: "asc", label: "Name A–Z" },
+  { value: "desc", label: "Name Z–A" },
+];
 
 function countLabel(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function assignmentGroups<T extends MissingAssignment>(assignments: T[]) {
-  const groups = new Map<string, { journeyId: string; journeyName: string; journeyProductId: string; assignments: T[] }>();
-  for (const assignment of assignments) {
-    const group = groups.get(assignment.journeyId) ?? {
-      journeyId: assignment.journeyId,
-      journeyName: assignment.journeyName,
-      journeyProductId: assignment.journeyProductId,
-      assignments: [],
-    };
-    group.assignments.push(assignment);
-    groups.set(assignment.journeyId, group);
+function issueLabel(issue: ElevateIntegrityIssue) {
+  switch (issue.type) {
+    case "orphanJourney":
+      return "Journey without a synced product";
+    case "orphanUser":
+      return "Product user without a synced product";
+    case "missingAssignment":
+      return "Assignment to a missing product user";
+    case "crossProductAssignment":
+      return "Cross-product assignment";
   }
-  return [...groups.values()].sort((left, right) => left.journeyName.localeCompare(right.journeyName));
 }
 
-function IssueSection({ title, children }: { title: string; children: ReactNode }) {
+function IntegrityRecord({ issue }: { issue: ElevateIntegrityIssue }) {
+  const title = issue.journeyName ?? issue.userName ?? issue.journeyId ?? issue.userId ?? "Unknown record";
   return (
-    <section>
-      <h3 className="text-foreground text-sm font-medium">{title}</h3>
-      <ul className="mt-2 space-y-2">{children}</ul>
-    </section>
-  );
-}
-
-function RecordIdentifiers({ id, productId }: { id: string; productId: string }) {
-  return (
-    <span className="text-muted-foreground block font-mono text-xs break-all">
-      ID {id} · product {productId}
-    </span>
+    <li className="p-3 text-sm">
+      <p className="text-foreground font-medium">{title}</p>
+      <p className="text-muted-foreground">{issueLabel(issue)}</p>
+      <p className="text-muted-foreground font-mono text-xs break-all">
+        {[issue.journeyId ? `journey ${issue.journeyId}` : null, issue.userId ? `user ${issue.userId}` : null].filter(Boolean).join(" · ")}
+      </p>
+      {issue.journeyProductId || issue.userProductId ? (
+        <p className="text-muted-foreground font-mono text-xs break-all">
+          {[
+            issue.journeyProductId ? `journey product ${issue.journeyProductId}` : null,
+            issue.userProductId ? `user product ${issue.userProductId}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      ) : null}
+    </li>
   );
 }
 
 export function ElevateIntegrityNotice({
-  orphanJourneys,
-  orphanUsers,
-  missingAssignments,
-  crossProductAssignments,
-}: RelationshipIntegrity) {
-  const issues = [
-    orphanJourneys.length > 0 ? countLabel(orphanJourneys.length, "journey without a synced product") : null,
-    orphanUsers.length > 0 ? countLabel(orphanUsers.length, "product user without a synced product") : null,
-    missingAssignments.length > 0 ? countLabel(missingAssignments.length, "assignment to a missing product user") : null,
-    crossProductAssignments.length > 0 ? countLabel(crossProductAssignments.length, "cross-product assignment") : null,
-  ].filter(Boolean);
+  counts,
+  snapshotVersion,
+  onSnapshotChanged,
+}: {
+  counts: ElevateIntegrityCounts;
+  snapshotVersion: string;
+  onSnapshotChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDebouncedValue(query);
+  const [type, setType] = useState<"all" | ElevateIntegrityIssueType>("all");
+  const [direction, setDirection] = useState<"asc" | "desc">("asc");
+  const issues = useElevateIntegrity({ snapshotVersion, page, query: deferredQuery, type, sort: "name", direction }, open);
+  const waitingForSearch = query !== deferredQuery;
+  const showingPlaceholder = waitingForSearch || issues.isPlaceholderData;
+  const busy = waitingForSearch || issues.isFetching;
+  const totalIssues = counts.orphanJourneys + counts.orphanUsers + counts.missingAssignments + counts.crossProductAssignments;
 
-  if (issues.length === 0) return null;
+  useEffect(() => {
+    if (isApiError(issues.error, 409)) onSnapshotChanged();
+  }, [issues.error, onSnapshotChanged]);
+
+  if (totalIssues === 0) return null;
+
   return (
     <div className="border-warning/30 bg-warning/10 flex items-start gap-3 border-b p-4 sm:p-5" role="alert">
       <AlertTriangle className="text-warning mt-0.5 size-4 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="text-foreground text-sm font-medium">Unmatched synced data</p>
-        <p className="text-muted-foreground text-base text-pretty sm:text-sm">
-          The relationship map excludes {issues.join(", ")}. Reconcile these records in Elevate; Support Bot has retained the complete raw
-          snapshot.
+        <p className="text-muted-foreground text-sm text-pretty">
+          <span className="font-mono tabular-nums">{countLabel(totalIssues, "record")}</span> cannot be linked cleanly. Review the affected
+          records and reconcile them in Elevate.
         </p>
-        <details className="mt-3">
+        <details
+          className="mt-3"
+          open={open}
+          onToggle={(event) => {
+            setOpen(event.currentTarget.open);
+            if (!event.currentTarget.open) setPage(0);
+          }}
+        >
           <summary className="text-foreground focus-visible:ring-ring/50 w-fit cursor-pointer rounded-sm text-sm font-medium outline-none focus-visible:ring-[3px]">
             Review unmatched records
           </summary>
           <div
-            className="bg-background/70 focus-visible:ring-ring/50 mt-3 grid max-h-80 gap-5 overflow-y-auto rounded-md border p-3 outline-none focus-visible:ring-[3px] sm:grid-cols-2"
+            className="bg-background/70 mt-3 overflow-hidden rounded-md border"
             role="region"
             aria-label="Unmatched synced records"
-            tabIndex={0}
+            aria-busy={busy || undefined}
           >
-            {orphanJourneys.length > 0 ? (
-              <IssueSection title="Journeys without products">
-                {orphanJourneys.map((journey) => (
-                  <li key={journey.id} className="text-sm">
-                    <span className="text-foreground font-medium">{journey.name}</span>
-                    <RecordIdentifiers id={journey.id} productId={journey.productId} />
-                  </li>
-                ))}
-              </IssueSection>
+            <div className="flex flex-col gap-2 border-b p-3 sm:flex-row sm:items-center">
+              <div className="relative min-w-0 flex-1">
+                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                <Input
+                  type="search"
+                  value={query}
+                  aria-label="Search unmatched records"
+                  placeholder="Search unmatched records…"
+                  className="pl-9"
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setPage(0);
+                  }}
+                />
+              </div>
+              <SingleSelectFilter
+                title="Issue type"
+                value={type === "all" ? undefined : type}
+                options={ISSUE_OPTIONS}
+                onChange={(value) => {
+                  setType((value as ElevateIntegrityIssueType | undefined) ?? "all");
+                  setPage(0);
+                }}
+              />
+              <SingleSelectFilter
+                title="Sort"
+                value={direction}
+                options={DIRECTION_OPTIONS}
+                showSearch={false}
+                onChange={(value) => {
+                  setDirection(value === "desc" ? "desc" : "asc");
+                  setPage(0);
+                }}
+              />
+            </div>
+            {issues.isLoading || showingPlaceholder ? (
+              <p className="text-muted-foreground p-16 text-center text-sm" role="status">
+                {query ? "Searching unmatched records…" : "Updating unmatched records…"}
+              </p>
             ) : null}
-
-            {orphanUsers.length > 0 ? (
-              <IssueSection title="Product users without products">
-                {orphanUsers.map((user) => (
-                  <li key={user.id} className="text-sm">
-                    <span className="text-foreground font-medium">{user.name}</span>
-                    <RecordIdentifiers id={user.id} productId={user.productId} />
-                  </li>
-                ))}
-              </IssueSection>
+            {!issues.isLoading && !showingPlaceholder && issues.error ? (
+              <p className="text-destructive p-16 text-center text-sm">Unable to load unmatched records.</p>
             ) : null}
-
-            {missingAssignments.length > 0 ? (
-              <IssueSection title="Missing product users">
-                {assignmentGroups(missingAssignments).map((group) => (
-                  <li key={group.journeyId} className="text-sm">
-                    <span className="text-foreground font-medium">{group.journeyName}</span>
-                    <RecordIdentifiers id={group.journeyId} productId={group.journeyProductId} />
-                    <span className="text-muted-foreground block text-xs">
-                      Missing user {group.assignments.map((assignment) => assignment.userId).join(", ")}
-                    </span>
-                  </li>
-                ))}
-              </IssueSection>
+            {!issues.isLoading && !showingPlaceholder && !issues.error && issues.data?.content.length === 0 ? (
+              <p className="text-muted-foreground p-16 text-center text-sm">No unmatched records match these filters.</p>
             ) : null}
-
-            {crossProductAssignments.length > 0 ? (
-              <IssueSection title="Product users assigned across products">
-                {assignmentGroups(crossProductAssignments).map((group) => (
-                  <li key={group.journeyId} className="text-sm">
-                    <span className="text-foreground font-medium">{group.journeyName}</span>
-                    <RecordIdentifiers id={group.journeyId} productId={group.journeyProductId} />
-                    <span className="text-muted-foreground block text-xs">
-                      {group.assignments
-                        .map(
-                          (assignment: CrossProductAssignment) =>
-                            `${assignment.userName} (${assignment.userId}; product ${assignment.userProductId})`
-                        )
-                        .join(", ")}
-                    </span>
-                  </li>
+            {!showingPlaceholder && !issues.error && issues.data?.content.length ? (
+              <ul className="max-h-80 divide-y overflow-y-auto" role="list">
+                {issues.data.content.map((issue, index) => (
+                  <IntegrityRecord key={`${issue.type}-${issue.journeyId ?? ""}-${issue.userId ?? ""}-${index}`} issue={issue} />
                 ))}
-              </IssueSection>
+              </ul>
+            ) : null}
+            {issues.data && !issues.error ? (
+              <ElevatePagination page={issues.data.page} totalPages={issues.data.totalPages} busy={busy} onPageChange={setPage} />
             ) : null}
           </div>
         </details>

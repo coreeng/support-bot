@@ -78,7 +78,7 @@ const INTEGRATION_TABS: SupportTab[] = [
     path: "/elevate",
     title: "Elevate",
     icon: Cable,
-    visibility: { requiresFullAccess: true },
+    visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS },
   },
 ];
 

@@ -258,6 +258,15 @@ fun localPostgresPassword(): String =
         ?: System.getenv("SUPPORTBOT_LOCAL_DB_PASSWORD")
         ?: "postgres"
 
+tasks.withType<Test>().configureEach {
+    if (useHostPostgresForFlywayAndJooq()) {
+        systemProperty("docker", "true")
+        systemProperty("supportbot.localDb.url", localPostgresJdbcUrl())
+        systemProperty("supportbot.localDb.user", localPostgresUser())
+        systemProperty("supportbot.localDb.password", localPostgresPassword())
+    }
+}
+
 flyway {
     locations = arrayOf("filesystem:./src/main/resources/db/migration")
 }

@@ -5,7 +5,9 @@ import { ElevateStatusCards } from "@/components/elevate/ElevateStatusCards";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useElevateStatus } from "@/lib/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, RefreshCw } from "lucide-react";
+import { useCallback, useRef } from "react";
 
 function ElevateLoading() {
   return (
@@ -27,6 +29,21 @@ function ElevateLoading() {
 
 export default function ElevatePage() {
   const { data, isLoading, isFetching, error, refetch } = useElevateStatus();
+  const queryClient = useQueryClient();
+  const recoveringSnapshot = useRef(false);
+  const handleSnapshotChanged = useCallback(async () => {
+    if (recoveringSnapshot.current) return;
+    recoveringSnapshot.current = true;
+    try {
+      await queryClient.cancelQueries({ queryKey: ["elevate"] });
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] === "elevate" && query.queryKey[1] !== "status",
+      });
+      await refetch();
+    } finally {
+      recoveringSnapshot.current = false;
+    }
+  }, [queryClient, refetch]);
 
   return (
     <div className="space-y-6">
@@ -68,7 +85,20 @@ export default function ElevatePage() {
 
           <ElevateStatusCards status={data} />
 
-          <ElevateRelationshipExplorer products={data.products} journeys={data.journeys} users={data.users} />
+          {data.snapshotVersion ? (
+            <ElevateRelationshipExplorer
+              key={data.snapshotVersion}
+              snapshotVersion={data.snapshotVersion}
+              productCount={data.counts.products}
+              integrity={data.integrity}
+              onSnapshotChanged={handleSnapshotChanged}
+            />
+          ) : (
+            <div className="bg-card rounded-xl border p-10 text-center" role="status">
+              <p className="text-foreground text-sm font-medium">No snapshot available</p>
+              <p className="text-muted-foreground mt-1 text-sm">A complete Elevate sync has not been stored yet.</p>
+            </div>
+          )}
         </>
       ) : null}
     </div>

@@ -62,6 +62,9 @@ elevate:
   base-url: ${ELEVATE_BASE_URL:}
   client-id: ${ELEVATE_CLIENT_ID:}
   client-secret: ${ELEVATE_CLIENT_SECRET:${ELEVATE_API_KEY:}}
+  connect-timeout: ${ELEVATE_CONNECT_TIMEOUT:5s}
+  read-timeout: ${ELEVATE_READ_TIMEOUT:30s}
+  max-server-retry-delay: ${ELEVATE_MAX_SERVER_RETRY_DELAY:1m}
   status-interval: ${ELEVATE_STATUS_INTERVAL:1h}
   sync-interval: ${ELEVATE_SYNC_INTERVAL:12h}
   agent-name: ${ELEVATE_AGENT_NAME:Support Bot}
@@ -348,15 +351,20 @@ Set these variables on the **API**:
 | `ELEVATE_CLIENT_ID` | Agent Connection client ID issued by Elevate, normally prefixed with `esc_`. |
 | `ELEVATE_CLIENT_SECRET` | One-time Agent Connection secret issued by Elevate. Store it in a Kubernetes Secret or another secret manager. |
 | `ELEVATE_API_KEY` | Backward-compatible alias for `ELEVATE_CLIENT_SECRET`; used only when `ELEVATE_CLIENT_SECRET` is unset. |
+| `ELEVATE_CONNECT_TIMEOUT` | Maximum time to establish each Elevate HTTP connection. Defaults to `5s`. |
+| `ELEVATE_READ_TIMEOUT` | Maximum time to wait for each Elevate HTTP response. Defaults to `30s`. |
+| `ELEVATE_MAX_SERVER_RETRY_DELAY` | Longest `Retry-After` delay Support Bot will honor. Defaults to `1m`; a response asking it to wait longer fails the current operation instead of retrying early. |
 | `ELEVATE_STATUS_INTERVAL` | Delay between authenticated status reports. Defaults to `1h`. |
 | `ELEVATE_SYNC_INTERVAL` | Delay between complete Insights refreshes. Defaults to `12h`. |
 | `ELEVATE_AGENT_NAME` | Name shown for this agent in Elevate. Defaults to `Support Bot`. |
 | `SUPPORT_BOT_URL` | Public Support Bot URL reported to Elevate. Defaults to `UI_ORIGIN`, then `http://localhost:3000`. |
-| `SUPPORT_BOT_VERSION` | Deployed Support Bot version reported to Elevate. Defaults to `dev`. |
+| `SUPPORT_BOT_VERSION` | Deployed Support Bot version reported to Elevate. Local runs default to `dev`; the Helm chart derives it from `image.tag` and then `Chart.appVersion`, unless `supportBotVersion` or this environment entry is set explicitly. |
 
 `ELEVATE_BASE_URL`, `ELEVATE_CLIENT_ID`, and one secret variable must be set together. Support Bot fails at startup when the configuration is incomplete or a URL or interval is invalid.
 
-Each job gets a fresh OAuth client-credentials token. The status job reports the connection to Elevate. The sync job follows every page of the products, journeys, and users collections, then replaces the local snapshot in one transaction. A successful empty response clears the old snapshot. A failed or partial refresh preserves the last complete snapshot and records the failure for the status page.
+Each job gets a fresh OAuth client-credentials token. The status job reports the connection to Elevate. The sync job follows every page of the products, journeys, and users collections, then replaces the local snapshot in one transaction. Each HTTP attempt has finite connection and response timeouts. Transient transport, rate-limit, and selected server failures are retried up to three attempts. A valid `Retry-After` is honored up to `ELEVATE_MAX_SERVER_RETRY_DELAY`; a longer server-directed delay ends the operation rather than retrying before the requested time. A successful empty response clears the old snapshot. A failed or partial refresh preserves the last complete snapshot and records a sanitised failure for the status page.
+
+The snapshot keeps each source JSON object while also normalising the fields and journey-user links used by the UI. Every successful replacement receives a new snapshot version. Paginated UI reads supply that version, so a refresh that lands between page requests is returned as a conflict instead of mixing two snapshots.
 
 Leadership and support-engineer users can inspect the connection, last attempts, last successes, errors, and locally stored collections on the **Elevate** page under **Integrations**.
 

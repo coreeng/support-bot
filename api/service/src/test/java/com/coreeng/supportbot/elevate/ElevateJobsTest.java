@@ -72,7 +72,17 @@ class ElevateJobsTest {
     @Test
     void unconfiguredJobsSkipWithoutChangingState() {
         ElevateProps disabledProps = new ElevateProps(
-                "", "", "", Duration.ofHours(1), Duration.ofHours(12), "Support Bot", "http://localhost:3000", "dev");
+                "",
+                "",
+                "",
+                Duration.ofSeconds(5),
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(1),
+                Duration.ofHours(1),
+                Duration.ofHours(12),
+                "Support Bot",
+                "http://localhost:3000",
+                "dev");
         ElevateClient disabledClient = mock(ElevateClient.class);
         ElevateRepository disabledRepository = mock(ElevateRepository.class);
         ElevateJobs disabledJobs = new ElevateJobs(
@@ -110,6 +120,9 @@ class ElevateJobsTest {
                 "https://elevate.example.test",
                 "esc_client",
                 "secret-value",
+                Duration.ofSeconds(5),
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(1),
                 Duration.ofHours(1),
                 Duration.ofHours(12),
                 "Support Bot",

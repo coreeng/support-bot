@@ -13,6 +13,9 @@ public record ElevateProps(
         @DefaultValue("") String baseUrl,
         @DefaultValue("") String clientId,
         @DefaultValue("") String clientSecret,
+        @DefaultValue("5s") Duration connectTimeout,
+        @DefaultValue("30s") Duration readTimeout,
+        @DefaultValue("1m") Duration maxServerRetryDelay,
         @DefaultValue("1h") Duration statusInterval,
         @DefaultValue("12h") Duration syncInterval,
         @DefaultValue("Support Bot") String agentName,
@@ -41,6 +44,9 @@ public record ElevateProps(
             requireSecureConnection(baseUri);
         }
         validateHttpUrl("elevate.support-bot-url", supportBotUrl);
+        requirePositive("elevate.connect-timeout", connectTimeout);
+        requirePositive("elevate.read-timeout", readTimeout);
+        requirePositive("elevate.max-server-retry-delay", maxServerRetryDelay);
         requirePositive("elevate.status-interval", statusInterval);
         requirePositive("elevate.sync-interval", syncInterval);
         requireNotBlank("elevate.agent-name", agentName);
@@ -56,8 +62,9 @@ public record ElevateProps(
 
     @Override
     public String toString() {
-        return "ElevateProps[baseUrl=" + baseUrl + ", clientId=<redacted>, clientSecret=<redacted>, statusInterval="
-                + statusInterval + ", syncInterval=" + syncInterval + ", agentName=" + agentName
+        return "ElevateProps[baseUrl=" + baseUrl + ", clientId=<redacted>, clientSecret=<redacted>, connectTimeout="
+                + connectTimeout + ", readTimeout=" + readTimeout + ", maxServerRetryDelay=" + maxServerRetryDelay
+                + ", statusInterval=" + statusInterval + ", syncInterval=" + syncInterval + ", agentName=" + agentName
                 + ", supportBotUrl=" + supportBotUrl + ", version=" + version + "]";
     }
 

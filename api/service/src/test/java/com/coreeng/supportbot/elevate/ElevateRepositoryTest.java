@@ -31,14 +31,19 @@ class ElevateRepositoryTest {
         repository.replaceSnapshot(new ElevateSnapshot(List.of(), List.of(), List.of()), ATTEMPTED_AT, COMPLETED_AT);
 
         InOrder writes = inOrder(jdbcTemplate);
+        writes.verify(jdbcTemplate).update("DELETE FROM elevate_integrity_items");
+        writes.verify(jdbcTemplate).update("DELETE FROM elevate_journey_users");
         writes.verify(jdbcTemplate).update("DELETE FROM elevate_journeys");
         writes.verify(jdbcTemplate).update("DELETE FROM elevate_users");
         writes.verify(jdbcTemplate).update("DELETE FROM elevate_products");
         writes.verify(jdbcTemplate)
+                .update(org.mockito.ArgumentMatchers.contains("INSERT INTO elevate_integrity_items"));
+        writes.verify(jdbcTemplate)
                 .update(
                         org.mockito.ArgumentMatchers.contains("last_sync_succeeded = TRUE"),
                         eq(Timestamp.from(ATTEMPTED_AT)),
-                        eq(Timestamp.from(COMPLETED_AT)));
+                        eq(Timestamp.from(COMPLETED_AT)),
+                        org.mockito.ArgumentMatchers.any(java.util.UUID.class));
         verify(jdbcTemplate, never())
                 .batchUpdate(
                         anyString(),
