@@ -64,21 +64,7 @@ gh skill install coreeng/support-bot doc-categorise \
 | Claude Code | `claude-code` |
 | Augment | `augment` |
 
-**Pre-merge install** (the skill currently lives on the `doc_categorise_skill` branch — use `--pin` to fetch it before it lands on `main`):
-
-```bash
-# Claude Code
-gh skill install coreeng/support-bot doc-categorise \
-  --agent claude-code \
-  --pin doc_categorise_skill
-
-# Augment
-gh skill install coreeng/support-bot doc-categorise \
-  --agent augment \
-  --pin doc_categorise_skill
-```
-
-**Post-merge install** (once `doc_categorise_skill` is merged to `main`, drop `--pin`):
+For the full list of supported agent values see [GitHub documentation](https://cli.github.com/manual/gh_skill_install)
 
 ```bash
 gh skill install coreeng/support-bot doc-categorise --agent claude-code
