@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTeamFilter } from "@/contexts/TeamFilterContext";
 import { useAuth } from "@/hooks/useAuth";
+import { hasUiCapability, UI_CAPABILITIES } from "@/lib/auth/capabilities";
 import { TEAM_SCOPE } from "@/lib/constants";
 import { type DateFilter, getDateRangeFromFilter, PRESET_DAYS } from "@/lib/dateRange";
 import { useAllTickets, useIncomingVsResolvedRate, useRegistry } from "@/lib/hooks";
@@ -222,8 +223,8 @@ export default function StatsPage() {
     selectedTeam,
     isViewingAsEscalationTeam: contextIsViewingAsEscalationTeam,
   } = useTeamFilter();
-  const { user, actualEscalationTeams, isLeadership, isSupportEngineer } = useAuth();
-  const hasDashboardAccess = isLeadership || isSupportEngineer;
+  const { user, actualEscalationTeams } = useAuth();
+  const hasDashboardAccess = hasUiCapability(user?.roles, UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS);
   const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS);
   const isViewingAsEscalationTeam = contextIsViewingAsEscalationTeam ?? (!!selectedTeam && actualEscalationTeams.includes(selectedTeam));
   const chartTeams = useMemo(() => getIncomingResolvedTeamCodes(effectiveTeams, user?.teams ?? []), [effectiveTeams, user?.teams]);

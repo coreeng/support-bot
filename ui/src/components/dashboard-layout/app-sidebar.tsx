@@ -10,13 +10,17 @@ import { NavMain } from "@/components/dashboard-layout/nav-main";
 import {
   Sidebar,
   SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSkeleton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useTeamFilter } from "@/contexts/TeamFilterContext";
+import { useAuth } from "@/hooks/useAuth";
+import { type UiCapability, hasUiCapability, UI_CAPABILITIES } from "@/lib/auth/capabilities";
 import { useKnowledgeGapsEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
 
 type NavItem = {
@@ -28,7 +32,7 @@ type NavItem = {
 };
 
 type TabVisibility = {
-  requiresFullAccess?: boolean;
+  requiredCapability?: UiCapability;
   requiresFeatureFlag?: "knowledgeGaps" | "tenantInsights";
 };
 
@@ -47,32 +51,32 @@ const SUPPORT_TABS: SupportTab[] = [
     path: "/knowledge-gaps",
     title: "Support Area Summary",
     icon: BookOpen,
-    visibility: { requiresFullAccess: true, requiresFeatureFlag: "knowledgeGaps" },
+    visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS, requiresFeatureFlag: "knowledgeGaps" },
   },
   {
     path: "/health",
     title: "Analytics & Operations",
     icon: Activity,
-    visibility: { requiresFullAccess: true },
+    visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS },
   },
   {
     path: "/sla",
     title: "SLA Dashboard",
     icon: GaugeCircle,
-    visibility: { requiresFullAccess: true },
+    visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS },
   },
   {
     path: "/tenant-requests",
     title: "Tenant Requests",
     icon: GitPullRequest,
-    visibility: { requiresFullAccess: true, requiresFeatureFlag: "tenantInsights" },
+    visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS, requiresFeatureFlag: "tenantInsights" },
   },
 ];
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { state } = useSidebar();
-  const { hasFullAccess } = useTeamFilter();
+  const { user, isLoading } = useAuth();
   const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled();
   const { data: isTenantInsightsEnabled } = useTenantInsightsEnabled();
 
@@ -84,7 +88,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const isVisible = (tab: SupportTab) => {
     const v = tab.visibility;
     if (!v) return true;
-    if (v.requiresFullAccess && !hasFullAccess) return false;
+    if (v.requiredCapability && !hasUiCapability(user?.roles, v.requiredCapability)) return false;
     if (v.requiresFeatureFlag && flags[v.requiresFeatureFlag] !== true) return false;
     return true;
   };
@@ -118,8 +122,21 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
-        <NavMain groups={navGroups} />
+      <SidebarContent aria-busy={isLoading || undefined}>
+        {isLoading ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Support</SidebarGroupLabel>
+            <SidebarMenu>
+              {Array.from({ length: 7 }, (_, index) => (
+                <SidebarMenuItem key={index}>
+                  <SidebarMenuSkeleton showIcon />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : (
+          <NavMain groups={navGroups} />
+        )}
       </SidebarContent>
     </Sidebar>
   );

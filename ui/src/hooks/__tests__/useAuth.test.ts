@@ -123,6 +123,17 @@ describe("useAuth", () => {
       expect(result.current.isEscalationTeam).toBe(false);
     });
 
+    it("fails closed when session roles are not an array", () => {
+      const user = createTestUser({ roles: "LEADERSHIP,SUPPORT_ENGINEER" as unknown as string[] });
+      mockUseSession.mockReturnValue(mockAuthenticatedSession(user));
+
+      const { result } = renderHook(() => useAuth());
+
+      expect(result.current.isLeadership).toBe(false);
+      expect(result.current.isSupportEngineer).toBe(false);
+      expect(result.current.isEscalationTeam).toBe(false);
+    });
+
     it("sets all role flags to false when user is null", () => {
       mockUseSession.mockReturnValue(mockUnauthenticatedSession());
 
