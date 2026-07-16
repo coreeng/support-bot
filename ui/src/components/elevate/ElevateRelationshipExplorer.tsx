@@ -1,49 +1,12 @@
 "use client";
 
 import { ElevateIntegrityNotice } from "@/components/elevate/ElevateIntegrityNotice";
-import { ElevateRelationshipMap } from "@/components/elevate/ElevateRelationshipMap";
+import { ElevateProductPicker } from "@/components/elevate/ElevateProductPicker";
+import { ElevateRelationshipBrowser } from "@/components/elevate/ElevateRelationshipBrowser";
 import { formatTimestamp } from "@/components/elevate/ElevateStatusCards";
 import { buildRelationshipModel, type ProductRelationship } from "@/components/elevate/elevate-relationships";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ElevateJourney, ElevateProduct, ElevateUser } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
-
-function countLabel(count: number, singular: string, plural = `${singular}s`) {
-  return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function ProductButton({
-  relationship,
-  selected,
-  onSelect,
-}: {
-  relationship: ProductRelationship;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const { product, journeys, users } = relationship;
-  return (
-    <li>
-      <button
-        type="button"
-        aria-pressed={selected}
-        aria-label={`${product.name}, ${countLabel(journeys.length, "journey")}, ${countLabel(users.length, "product user")}`}
-        className={cn(
-          "focus-visible:ring-ring/50 hover:bg-accent/50 w-full cursor-pointer rounded-md px-3 py-2.5 text-left outline-none focus-visible:ring-[3px]",
-          selected && "bg-accent text-accent-foreground"
-        )}
-        onClick={onSelect}
-      >
-        <span className="text-foreground block truncate text-sm font-medium">{product.name}</span>
-        <span className="text-muted-foreground block truncate font-mono text-sm">{product.slug}</span>
-        <span className="text-muted-foreground block text-sm">
-          {countLabel(journeys.length, "journey")} · {countLabel(users.length, "product user")}
-        </span>
-      </button>
-    </li>
-  );
-}
 
 function ProductOverview({ relationship }: { relationship: ProductRelationship }) {
   const assignments = [...relationship.userIdsByJourneyId.values()].reduce((total, userIds) => total + userIds.length, 0);
@@ -99,62 +62,37 @@ export function ElevateRelationshipExplorer({
           Synced relationships
         </h2>
         <p className="text-muted-foreground max-w-[75ch] text-base text-pretty sm:text-sm">
-          Explore how each product connects its journeys and product users in the last complete local snapshot.
+          Browse products, journeys, and product users from the last complete local snapshot.
         </p>
       </header>
 
       <ElevateIntegrityNotice {...model.integrity} />
 
       {selectedRelationship ? (
-        <div className="xl:grid xl:grid-cols-[17rem_minmax(0,1fr)]">
-          <aside className="hidden border-r p-3 xl:block" aria-label="Synced products">
-            <div className="px-3 py-2">
-              <h3 className="text-foreground text-sm font-medium">Products</h3>
-              <p className="text-muted-foreground text-sm">Choose a product to inspect its map.</p>
-            </div>
-            <ul role="list" className="max-h-[42rem] space-y-1 overflow-y-auto">
-              {model.products.map((relationship) => (
-                <ProductButton
-                  key={relationship.product.id}
-                  relationship={relationship}
-                  selected={relationship.product.id === selectedRelationship.product.id}
-                  onSelect={() => setSelectedProductId(relationship.product.id)}
-                />
-              ))}
-            </ul>
-          </aside>
-
-          <div className="min-w-0">
-            <div className="border-b p-4 sm:p-5 xl:hidden">
-              <label id="product-selector-label" className="text-foreground text-sm font-medium">
+        <>
+          <div className="bg-muted/20 border-b p-4 sm:p-5">
+            <div className="flex flex-wrap items-end justify-between gap-2 sm:max-w-xl">
+              <label className="text-foreground text-sm font-medium" htmlFor="elevate-product-picker">
                 Product
               </label>
-              <Select value={selectedRelationship.product.id} onValueChange={setSelectedProductId}>
-                <SelectTrigger className="mt-2 w-full" aria-labelledby="product-selector-label">
-                  <SelectValue>{selectedRelationship.product.name}</SelectValue>
-                </SelectTrigger>
-                <SelectContent align="start">
-                  {model.products.map((relationship) => (
-                    <SelectItem key={relationship.product.id} value={relationship.product.id}>
-                      {relationship.product.name} · {countLabel(relationship.journeys.length, "journey")} ·{" "}
-                      {countLabel(relationship.users.length, "product user")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <span className="text-muted-foreground text-sm">{model.products.length} available</span>
             </div>
-
-            <ProductOverview relationship={selectedRelationship} />
-            <div className="p-4 sm:p-5">
-              <ElevateRelationshipMap key={selectedRelationship.product.id} relationship={selectedRelationship} />
+            <div className="mt-2">
+              <ElevateProductPicker
+                relationships={model.products}
+                selectedProductId={selectedRelationship.product.id}
+                onSelect={setSelectedProductId}
+              />
             </div>
           </div>
-        </div>
+          <ProductOverview relationship={selectedRelationship} />
+          <ElevateRelationshipBrowser key={selectedRelationship.product.id} relationship={selectedRelationship} />
+        </>
       ) : (
         <div className="p-10 text-center" role="status">
           <p className="text-foreground text-sm font-medium">No products synced</p>
           <p className="text-muted-foreground mt-1 text-base text-pretty sm:text-sm">
-            The last complete Elevate snapshot did not contain any products to map.
+            The last complete Elevate snapshot did not contain any products to browse.
           </p>
         </div>
       )}

@@ -118,7 +118,7 @@ function mockQuery(overrides: Partial<UseQueryResult<ElevateStatus, Error>>) {
 }
 
 describe("ElevatePage", () => {
-  it("traces focused journeys to product users and product users back to journeys", async () => {
+  it("shows direct relationships and follows them in either direction", async () => {
     const user = userEvent.setup();
     mockQuery({ data: connectedStatus });
     render(<ElevatePage />);
@@ -128,114 +128,80 @@ describe("ElevatePage", () => {
     expect(screen.getByRole("heading", { name: "Platform" })).toBeInTheDocument();
     expect(screen.getByText("1h")).toBeInTheDocument();
 
-    const firstDeployment = screen.getByRole("button", { name: "First deployment, 2 linked product users" });
-    const applicationTeam = screen.getByRole("button", { name: "Application team, 1 linked journey" });
-    const platformOperator = screen.getByRole("button", { name: "Platform operator, 2 linked journeys" });
-    const connectors = screen.getByTestId("relationship-connectors");
+    const firstDeployment = screen.getByRole("button", { name: "First deployment, 2 product users" });
+    expect(firstDeployment).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("heading", { name: "Direct relationships" })).toBeInTheDocument();
 
-    expect(firstDeployment).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("First deployment is linked to 2 of 2 product users.")).toBeInTheDocument();
-    expect(connectors.querySelectorAll("path")).toHaveLength(2);
-    expect(screen.getByText("Application team, Platform operator")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "View Application team, 1 journey" }));
 
-    await user.click(applicationTeam);
+    expect(screen.getByRole("tab", { name: /Product users/ })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("button", { name: "Application team, 1 journey" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByText("Engineers shipping workloads.")).toBeInTheDocument();
 
-    expect(applicationTeam).toHaveAttribute("aria-pressed", "true");
-    expect(firstDeployment).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByText("Application team participates in 1 of 2 journeys.")).toBeInTheDocument();
-    expect(connectors.querySelectorAll("path")).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "View First deployment, 2 product users" }));
 
-    await user.click(platformOperator);
-
-    expect(platformOperator).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("Platform operator participates in 2 of 2 journeys.")).toBeInTheDocument();
-    expect(connectors.querySelectorAll("path")).toHaveLength(2);
-    expect(screen.getByText("First deployment, Operate service")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Journeys/ })).toHaveAttribute("data-state", "active");
+    expect(firstDeployment).toHaveAttribute("aria-current", "true");
   });
 
-  it("switches the relationship map between products", async () => {
+  it("searches and switches products without scanning a long rail", async () => {
     const user = userEvent.setup();
     mockQuery({ data: connectedStatus });
     render(<ElevatePage />);
 
-    await user.click(screen.getByRole("button", { name: "Runtime, 1 journey, 1 product user" }));
+    await user.click(screen.getByRole("combobox", { name: "Product" }));
+    await user.type(screen.getByPlaceholderText("Search products…"), "runtime");
+    await user.click(screen.getByRole("option", { name: /Runtime/ }));
 
     expect(screen.getByRole("heading", { name: "Runtime" })).toBeInTheDocument();
-    expect(screen.getByText("Incident response is linked to 1 of 1 product user.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Incident response, 1 linked product user" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("relationship-connectors").querySelectorAll("path")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Incident response, 1 product user" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "View Runtime responder, 1 journey" })).toBeInTheDocument();
   });
 
-  it("uses one tab stop per desktop lane and activates the next journey with the keyboard", async () => {
+  it("searches records and filters by whether they have relationships", async () => {
     const user = userEvent.setup();
     mockQuery({ data: connectedStatus });
     render(<ElevatePage />);
 
-    const journeyLane = document.querySelector<HTMLElement>('ul[aria-describedby="journey-lane-keyboard-help"]');
-    const productUserLane = document.querySelector<HTMLElement>('ul[aria-describedby="product-user-lane-keyboard-help"]');
-    if (!journeyLane || !productUserLane) throw new Error("Expected both desktop relationship lanes");
+    await user.type(screen.getByRole("searchbox", { name: "Search journeys" }), "operate");
+    expect(screen.getByRole("button", { name: "Operate service, 1 product user" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "First deployment, 2 product users" })).not.toBeInTheDocument();
+    expect(screen.getByText("1–1 of 1 · Page 1 of 1")).toBeInTheDocument();
 
-    const journeyCards = within(journeyLane).getAllByRole("button");
-    const productUserCards = within(productUserLane).getAllByRole("button");
-    expect(journeyCards.filter((card) => card.tabIndex === 0)).toHaveLength(1);
-    expect(productUserCards.filter((card) => card.tabIndex === 0)).toHaveLength(1);
+    await user.clear(screen.getByRole("searchbox", { name: "Search journeys" }));
+    await user.click(screen.getByRole("combobox", { name: "Relationship filter" }));
+    await user.click(screen.getByRole("option", { name: "Unassigned" }));
 
-    const firstDeployment = within(journeyLane).getByRole("button", { name: "First deployment, 2 linked product users" });
-    const operateService = within(journeyLane).getByRole("button", { name: "Operate service, 1 linked product user" });
-    firstDeployment.focus();
-
-    await user.keyboard("{ArrowDown}");
-    expect(operateService).toHaveFocus();
-    expect(journeyCards.filter((card) => card.tabIndex === 0)).toEqual([operateService]);
-
-    await user.tab();
-    expect(productUserCards[0]).toHaveFocus();
-    await user.tab({ shift: true });
-    expect(operateService).toHaveFocus();
-
-    await user.keyboard("{Enter}");
-    expect(operateService).toHaveAttribute("aria-pressed", "true");
-    expect(firstDeployment).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByText("Operate service is linked to 1 of 2 product users.")).toBeInTheDocument();
-    expect(journeyCards.filter((card) => card.tabIndex === 0)).toEqual([operateService]);
+    expect(screen.getByText("No journeys found")).toBeInTheDocument();
+    expect(screen.getByText("Try changing the search or relationship filter.")).toBeInTheDocument();
   });
 
-  it("provides compact controls for tracing from either relationship side", async () => {
+  it("paginates large journey sets and resets to the first page when searching", async () => {
     const user = userEvent.setup();
-    mockQuery({ data: connectedStatus });
+    const additionalJourneys = Array.from({ length: 21 }, (_, index) => ({
+      ...connectedStatus.journeys[0],
+      id: `journey-extra-${index + 1}`,
+      slug: `journey-extra-${index + 1}`,
+      name: `Journey ${String(index + 1).padStart(2, "0")}`,
+      userIds: [],
+    }));
+    mockQuery({ data: { ...connectedStatus, journeys: [...connectedStatus.journeys, ...additionalJourneys] } });
     render(<ElevatePage />);
 
-    const traceGroup = screen.getByRole("group", { name: "Choose which relationship side to trace from" });
-    const journeyToggle = within(traceGroup).getByRole("button", { name: "Journey" });
-    const productUserToggle = within(traceGroup).getByRole("button", { name: "Product user" });
-    expect(journeyToggle).toHaveAttribute("aria-pressed", "true");
-    expect(productUserToggle).toHaveAttribute("aria-pressed", "false");
+    const previous = screen.getByRole("button", { name: "Previous journey page" });
+    const next = screen.getByRole("button", { name: "Next journey page" });
+    expect(screen.getByText("1–20 of 23 · Page 1 of 2")).toBeInTheDocument();
+    expect(previous).toBeDisabled();
+    expect(next).toBeEnabled();
 
-    const linkedProductUserSection = screen.getByRole("heading", { name: "Linked product users" }).closest("section");
-    if (!linkedProductUserSection) throw new Error("Expected the compact linked-product-user section");
-    const linkedProductUserList = within(linkedProductUserSection).getByRole("list");
-    const linkedProductUserButtons = within(linkedProductUserList).getAllByRole("button");
-    expect(linkedProductUserList).toHaveClass("max-h-72", "overflow-y-auto");
-    expect(linkedProductUserButtons.filter((button) => button.tabIndex === 0)).toHaveLength(1);
-    linkedProductUserButtons[0].focus();
-    await user.keyboard("{ArrowDown}");
-    expect(linkedProductUserButtons[1]).toHaveFocus();
-    expect(linkedProductUserButtons.filter((button) => button.tabIndex === 0)).toEqual([linkedProductUserButtons[1]]);
+    await user.click(next);
+    expect(screen.getByText("21–23 of 23 · Page 2 of 2")).toBeInTheDocument();
+    expect(previous).toBeEnabled();
+    expect(next).toBeDisabled();
 
-    await user.click(productUserToggle);
-
-    expect(productUserToggle).toHaveAttribute("aria-pressed", "true");
-    expect(journeyToggle).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("combobox", { name: "Product user" })).toHaveTextContent("Application team");
-    expect(screen.getByRole("heading", { name: "Linked journeys" })).toBeInTheDocument();
-    expect(screen.getByText("Application team participates in 1 of 2 journeys.")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "First deployment, trace 2 product users" }));
-
-    expect(journeyToggle).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("heading", { name: "Linked product users" })).toBeInTheDocument();
-    expect(screen.getByText("First deployment is linked to 2 of 2 product users.")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Journey" })).toHaveFocus();
+    await user.type(screen.getByRole("searchbox", { name: "Search journeys" }), "Journey 21");
+    expect(screen.getByText("1–1 of 1 · Page 1 of 1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Journey 21, 0 product users" })).toHaveAttribute("aria-current", "true");
   });
 
   it("identifies unmatched records and cross-product assignments", async () => {
