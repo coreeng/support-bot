@@ -17,7 +17,7 @@ type TeamFilterContextType = {
   hasNoTeamScope: boolean; // True when the user has no data teams and no role-wide access scope
   isViewingAllTeams: boolean; // True when effective scope is all teams (unfiltered)
   isViewingAsEscalationTeam: boolean; // True when sidebar scope is one of user's escalation teams
-  hasFullAccess: boolean; // true if should see all features (Leadership viewing All Teams)
+  hasUnrestrictedDataScope: boolean; // True when the selected scope permits data from every team
   allTeams: string[]; // Data teams available for selection (excludes role teams)
   initialized: boolean; // Whether the context has finished initializing
 };
@@ -77,11 +77,11 @@ export const TeamFilterProvider = ({ children }: { children: ReactNode }) => {
     return [];
   }, [teamScope]);
 
-  // Full access rules:
+  // Unrestricted data-scope rules:
   // - True if selected team is a role team (leadership/support) OR no team selected (all) AND user is leadership/support
   // - False if selected team is escalation
   // - False when selecting non-role tenant teams (even if user has leadership/support roles)
-  const hasFullAccess = useMemo(() => {
+  const hasUnrestrictedDataScope = useMemo(() => {
     const selected = user?.teams.find((t) => t.name === selectedTeam) || null;
     const selectedTypes = selected?.types || [];
     const selectedIsRole = selectedTypes.some((type) => /leadership/i.test(type) || /support/i.test(type));
@@ -121,7 +121,7 @@ export const TeamFilterProvider = ({ children }: { children: ReactNode }) => {
         hasNoTeamScope,
         isViewingAllTeams,
         isViewingAsEscalationTeam,
-        hasFullAccess,
+        hasUnrestrictedDataScope,
         allTeams,
         initialized,
       }}

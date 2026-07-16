@@ -64,7 +64,15 @@ describe("AccessDenied", () => {
 
 describe("RequireDashboardAccess", () => {
   it("renders children for support engineers", () => {
-    mockAuth({ isSupportEngineer: true });
+    mockAuth({
+      user: {
+        id: "support-1",
+        email: "support@example.com",
+        name: "Support Engineer",
+        teams: [],
+        roles: ["SUPPORT_ENGINEER"],
+      },
+    });
     render(
       <RequireDashboardAccess>
         <div data-testid="protected-content">Dashboard</div>
@@ -76,7 +84,15 @@ describe("RequireDashboardAccess", () => {
   });
 
   it("renders children for leadership", () => {
-    mockAuth({ isLeadership: true });
+    mockAuth({
+      user: {
+        id: "leader-1",
+        email: "leader@example.com",
+        name: "Leader",
+        teams: [],
+        roles: ["LEADERSHIP"],
+      },
+    });
     render(
       <RequireDashboardAccess>
         <div data-testid="protected-content">Dashboard</div>
@@ -86,8 +102,17 @@ describe("RequireDashboardAccess", () => {
     expect(screen.getByTestId("protected-content")).toBeInTheDocument();
   });
 
-  it("shows access denied for users without required roles", () => {
-    mockAuth({ isLeadership: false, isSupportEngineer: false });
+  it("shows access denied for users without the required backend-issued role", () => {
+    mockAuth({
+      user: {
+        id: "escalation-1",
+        email: "escalation@example.com",
+        name: "Escalation User",
+        teams: [],
+        roles: ["USER", "ESCALATION"],
+      },
+      isEscalationTeam: true,
+    });
     render(
       <RequireDashboardAccess>
         <div data-testid="protected-content">Dashboard</div>

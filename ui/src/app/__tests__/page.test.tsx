@@ -1,6 +1,6 @@
 import { useTeamFilter } from "@/contexts/TeamFilterContext";
 import { useAuth } from "@/hooks/useAuth";
-import { useKnowledgeGapsEnabled } from "@/lib/hooks";
+import { useKnowledgeGapsEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
 import { render, screen, waitFor } from "@testing-library/react";
 import { useRouter } from "next/navigation";
 import DashboardLayoutComponent from "../(dashboard)/layout";
@@ -22,7 +22,7 @@ jest.mock("../../contexts/TeamFilterContext", () => ({
 
 jest.mock("../../lib/hooks", () => ({
   useKnowledgeGapsEnabled: jest.fn(),
-  useTenantInsightsEnabled: jest.fn(() => ({ data: false, isLoading: false, error: null })),
+  useTenantInsightsEnabled: jest.fn(),
 }));
 
 // Mock all the page components
@@ -76,6 +76,7 @@ const mockRouter = {
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseTeamFilter = useTeamFilter as jest.MockedFunction<typeof useTeamFilter>;
 const mockUseKnowledgeGapsEnabled = useKnowledgeGapsEnabled as jest.MockedFunction<typeof useKnowledgeGapsEnabled>;
+const mockUseTenantInsightsEnabled = useTenantInsightsEnabled as jest.MockedFunction<typeof useTenantInsightsEnabled>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 
 // Helper to render Dashboard with Layout (simulating the route group structure)
@@ -91,8 +92,9 @@ describe("Dashboard - Support Area Summary visibility", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseRouter.mockReturnValue(mockRouter as any);
+    mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTeamFilter.mockReturnValue({
-      hasFullAccess: true,
+      hasUnrestrictedDataScope: true,
       selectedTeam: null,
       setSelectedTeam: jest.fn(),
       effectiveTeams: [],
@@ -105,7 +107,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
     });
   });
 
-  describe("when feature is enabled and hasFullAccess is true", () => {
+  describe("when feature and role capability are enabled", () => {
     beforeEach(() => {
       mockUseKnowledgeGapsEnabled.mockReturnValue({
         data: true,
@@ -113,7 +115,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
         error: null,
       } as any);
       mockUseTeamFilter.mockReturnValue({
-        hasFullAccess: true,
+        hasUnrestrictedDataScope: true,
         selectedTeam: null,
         setSelectedTeam: jest.fn(),
         effectiveTeams: [],
@@ -132,7 +134,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
           id: "user@example.com",
           name: "User",
           email: "user@example.com",
-          roles: ["supportEngineer"],
+          roles: ["SUPPORT_ENGINEER"],
           teams: [],
         },
         isLoading: false,
@@ -152,7 +154,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
     });
   });
 
-  describe("when feature is enabled but hasFullAccess is false", () => {
+  describe("when feature is enabled and a narrower data scope is selected", () => {
     beforeEach(() => {
       mockUseKnowledgeGapsEnabled.mockReturnValue({
         data: true,
@@ -160,7 +162,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
         error: null,
       } as any);
       mockUseTeamFilter.mockReturnValue({
-        hasFullAccess: false,
+        hasUnrestrictedDataScope: false,
         selectedTeam: "tenant-team",
         setSelectedTeam: jest.fn(),
         effectiveTeams: ["tenant-team"],
@@ -173,13 +175,13 @@ describe("Dashboard - Support Area Summary visibility", () => {
       });
     });
 
-    it("does NOT show Support Area Summary when tenant team is selected", async () => {
+    it("keeps Support Area Summary visible for a support engineer viewing a tenant team", async () => {
       mockUseAuth.mockReturnValue({
         user: {
           id: "support@example.com",
           name: "Support User",
           email: "support@example.com",
-          roles: ["supportEngineer"],
+          roles: ["SUPPORT_ENGINEER"],
           teams: [],
         },
         isLoading: false,
@@ -194,32 +196,44 @@ describe("Dashboard - Support Area Summary visibility", () => {
       renderDashboard();
 
       await waitFor(() => {
-        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
+        expect(screen.getByText("Support Area Summary")).toBeInTheDocument();
       });
     });
 
-    it("does NOT show Support Area Summary when escalation team is selected", async () => {
+    it("keeps Support Area Summary visible for leadership viewing an escalation team", async () => {
+      mockUseTeamFilter.mockReturnValue({
+        hasUnrestrictedDataScope: false,
+        selectedTeam: "escalation-team",
+        setSelectedTeam: jest.fn(),
+        effectiveTeams: ["escalation-team"],
+        allTeams: ["tenant-team"],
+        initialized: true,
+        teamScope: { mode: "selected_teams" as const, teams: ["escalation-team"] },
+        hasNoTeamScope: false,
+        isViewingAllTeams: false,
+        isViewingAsEscalationTeam: true,
+      });
       mockUseAuth.mockReturnValue({
         user: {
           id: "leader@example.com",
           name: "Leadership User",
           email: "leader@example.com",
-          roles: ["leadership"],
+          roles: ["LEADERSHIP", "ESCALATION"],
           teams: [],
         },
         isLoading: false,
         isAuthenticated: true,
         logout: jest.fn(),
         isLeadership: true,
-        isEscalationTeam: false,
+        isEscalationTeam: true,
         isSupportEngineer: false,
-        actualEscalationTeams: [],
+        actualEscalationTeams: ["escalation-team"],
       });
 
       renderDashboard();
 
       await waitFor(() => {
-        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
+        expect(screen.getByText("Support Area Summary")).toBeInTheDocument();
       });
 
       // Verify basic tabs are still visible
@@ -236,7 +250,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
         error: null,
       } as any);
       mockUseTeamFilter.mockReturnValue({
-        hasFullAccess: true,
+        hasUnrestrictedDataScope: true,
         selectedTeam: null,
         setSelectedTeam: jest.fn(),
         effectiveTeams: [],
@@ -249,13 +263,13 @@ describe("Dashboard - Support Area Summary visibility", () => {
       });
     });
 
-    it("does NOT show Support Area Summary even with full access when feature is disabled", async () => {
+    it("does NOT show Support Area Summary even with the role capability when feature is disabled", async () => {
       mockUseAuth.mockReturnValue({
         user: {
           id: "user@example.com",
           name: "User",
           email: "user@example.com",
-          roles: ["supportEngineer"],
+          roles: ["SUPPORT_ENGINEER"],
           teams: [],
         },
         isLoading: false,
@@ -283,7 +297,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
         error: null,
       } as any);
       mockUseTeamFilter.mockReturnValue({
-        hasFullAccess: true,
+        hasUnrestrictedDataScope: true,
         selectedTeam: null,
         setSelectedTeam: jest.fn(),
         effectiveTeams: [],
@@ -296,13 +310,13 @@ describe("Dashboard - Support Area Summary visibility", () => {
       });
     });
 
-    it("does NOT show Support Area Summary while loading even with full access", async () => {
+    it("does NOT show Support Area Summary while its feature flag is loading", async () => {
       mockUseAuth.mockReturnValue({
         user: {
           id: "user@example.com",
           name: "User",
           email: "user@example.com",
-          roles: ["supportEngineer"],
+          roles: ["SUPPORT_ENGINEER"],
           teams: [],
         },
         isLoading: false,
@@ -329,19 +343,20 @@ describe("Dashboard - Support Area Summary visibility", () => {
         isLoading: false,
         error: null,
       } as any);
+      mockUseTenantInsightsEnabled.mockReturnValue({ data: true, isLoading: false, error: null } as any);
     });
 
-    it("hides all restricted tabs (Analytics, SLA, Support Area Summary) when hasFullAccess is false", async () => {
+    it("hides every restricted tab when the backend roles provide no capability", async () => {
       mockUseTeamFilter.mockReturnValue({
-        hasFullAccess: false,
-        selectedTeam: "tenant-team",
+        hasUnrestrictedDataScope: true,
+        selectedTeam: null,
         setSelectedTeam: jest.fn(),
-        effectiveTeams: ["tenant-team"],
+        effectiveTeams: [],
         allTeams: ["tenant-team"],
         initialized: true,
-        teamScope: { mode: "selected_teams" as const, teams: ["tenant-team"] },
+        teamScope: { mode: "all_teams" as const },
         hasNoTeamScope: false,
-        isViewingAllTeams: false,
+        isViewingAllTeams: true,
         isViewingAsEscalationTeam: false,
       });
 
@@ -350,7 +365,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
           id: "user@example.com",
           name: "User",
           email: "user@example.com",
-          roles: ["user"],
+          roles: ["USER"],
           teams: [],
         },
         isLoading: false,
@@ -368,24 +383,26 @@ describe("Dashboard - Support Area Summary visibility", () => {
         expect(screen.queryByText("Analytics & Operations")).not.toBeInTheDocument();
         expect(screen.queryByText("SLA Dashboard")).not.toBeInTheDocument();
         expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
+        expect(screen.queryByText("Tenant Requests")).not.toBeInTheDocument();
       });
     });
 
-    it("shows all restricted tabs (except Support Area Summary) when hasFullAccess is true and feature disabled", async () => {
+    it("keeps feature flags independent from the role capability", async () => {
       mockUseKnowledgeGapsEnabled.mockReturnValue({
         data: false,
         isLoading: false,
         error: null,
       } as any);
+      mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
 
       mockUseTeamFilter.mockReturnValue({
-        hasFullAccess: true,
-        selectedTeam: null,
+        hasUnrestrictedDataScope: false,
+        selectedTeam: "tenant-team",
         setSelectedTeam: jest.fn(),
-        effectiveTeams: [],
-        allTeams: [],
+        effectiveTeams: ["tenant-team"],
+        allTeams: ["tenant-team"],
         initialized: true,
-        teamScope: { mode: "uninitialized" as const },
+        teamScope: { mode: "selected_teams" as const, teams: ["tenant-team"] },
         hasNoTeamScope: false,
         isViewingAllTeams: false,
         isViewingAsEscalationTeam: false,
@@ -396,7 +413,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
           id: "user@example.com",
           name: "User",
           email: "user@example.com",
-          roles: ["supportEngineer"],
+          roles: ["SUPPORT_ENGINEER"],
           teams: [],
         },
         isLoading: false,
@@ -414,12 +431,54 @@ describe("Dashboard - Support Area Summary visibility", () => {
         expect(screen.getByText("Analytics & Operations")).toBeInTheDocument();
         expect(screen.getByText("SLA Dashboard")).toBeInTheDocument();
         expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
+        expect(screen.queryByText("Tenant Requests")).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows each feature-enabled restricted tab while viewing a selected team", async () => {
+      mockUseTenantInsightsEnabled.mockReturnValue({ data: true, isLoading: false, error: null } as any);
+      mockUseTeamFilter.mockReturnValue({
+        hasUnrestrictedDataScope: false,
+        selectedTeam: "tenant-team",
+        setSelectedTeam: jest.fn(),
+        effectiveTeams: ["tenant-team"],
+        allTeams: ["tenant-team"],
+        initialized: true,
+        teamScope: { mode: "selected_teams" as const, teams: ["tenant-team"] },
+        hasNoTeamScope: false,
+        isViewingAllTeams: false,
+        isViewingAsEscalationTeam: false,
+      });
+      mockUseAuth.mockReturnValue({
+        user: {
+          id: "leader@example.com",
+          name: "Leader",
+          email: "leader@example.com",
+          roles: ["LEADERSHIP"],
+          teams: [],
+        },
+        isLoading: false,
+        isAuthenticated: true,
+        logout: jest.fn(),
+        isLeadership: true,
+        isEscalationTeam: false,
+        isSupportEngineer: false,
+        actualEscalationTeams: [],
+      });
+
+      renderDashboard();
+
+      await waitFor(() => {
+        expect(screen.getByText("Analytics & Operations")).toBeInTheDocument();
+        expect(screen.getByText("SLA Dashboard")).toBeInTheDocument();
+        expect(screen.getByText("Support Area Summary")).toBeInTheDocument();
+        expect(screen.getByText("Tenant Requests")).toBeInTheDocument();
       });
     });
 
     it("shows all basic tabs for any authenticated user", async () => {
       mockUseTeamFilter.mockReturnValue({
-        hasFullAccess: false,
+        hasUnrestrictedDataScope: false,
         selectedTeam: "tenant-team",
         setSelectedTeam: jest.fn(),
         effectiveTeams: ["tenant-team"],
@@ -436,7 +495,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
           id: "user@example.com",
           name: "User",
           email: "user@example.com",
-          roles: ["user"],
+          roles: ["USER"],
           teams: [],
         },
         isLoading: false,

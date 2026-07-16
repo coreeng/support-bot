@@ -3,7 +3,7 @@
  *
  * Tests the Home dashboard rendering and behavior:
  * - Role-based view (escalation team split view vs regular view)
- * - Team filtering (hasFullAccess vs restricted)
+ * - Team filtering (unrestricted vs selected data scope)
  * - Metrics calculations (total, open, resolved, escalated tickets)
  * - Loading and error states
  */
@@ -71,7 +71,7 @@ function makeTeamFilter(
     hasNoTeamScope: false,
     isViewingAllTeams: false,
     isViewingAsEscalationTeam: false,
-    hasFullAccess: false,
+    hasUnrestrictedDataScope: false,
     allTeams: [],
     initialized: false,
     ...overrides,
@@ -420,14 +420,14 @@ describe("StatsPage (Home Dashboard)", () => {
   });
 
   describe("Team Filtering", () => {
-    it("should render dashboard when hasFullAccess is true", () => {
+    it("should render dashboard when data scope is unrestricted", () => {
       mockUseTeamFilter.mockReturnValue(
         makeTeamFilter({
           selectedTeam: "Leadership",
           teamScope: { mode: "all_teams" },
           effectiveTeams: ["Team A", "Team B"],
           isViewingAllTeams: true,
-          hasFullAccess: true,
+          hasUnrestrictedDataScope: true,
           allTeams: ["Team A", "Team B"],
           initialized: true,
         })

@@ -15,7 +15,7 @@ jest.mock("../../../hooks/useAuth", () => ({
 
 jest.mock("../../../contexts/TeamFilterContext", () => ({
   useTeamFilter: () => ({
-    hasFullAccess: true,
+    hasUnrestrictedDataScope: true,
   }),
 }));
 
