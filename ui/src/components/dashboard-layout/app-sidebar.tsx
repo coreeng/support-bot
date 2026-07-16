@@ -10,10 +10,13 @@ import { NavMain } from "@/components/dashboard-layout/nav-main";
 import {
   Sidebar,
   SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSkeleton,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
@@ -73,7 +76,7 @@ const SUPPORT_TABS: SupportTab[] = [
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { state } = useSidebar();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled();
   const { data: isTenantInsightsEnabled } = useTenantInsightsEnabled();
 
@@ -119,8 +122,21 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
-        <NavMain groups={navGroups} />
+      <SidebarContent aria-busy={isLoading || undefined}>
+        {isLoading ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Support</SidebarGroupLabel>
+            <SidebarMenu>
+              {Array.from({ length: 7 }, (_, index) => (
+                <SidebarMenuItem key={index}>
+                  <SidebarMenuSkeleton showIcon />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : (
+          <NavMain groups={navGroups} />
+        )}
       </SidebarContent>
     </Sidebar>
   );

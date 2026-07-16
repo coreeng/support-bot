@@ -1,7 +1,7 @@
 "use client";
 
 import type { AuthTeam, AuthUser } from "@/auth.config";
-import { BACKEND_ROLES } from "@/lib/auth/capabilities";
+import { BACKEND_ROLES, normalizeBackendRoles } from "@/lib/auth/capabilities";
 import { signOut, useSession } from "next-auth/react";
 import { useMemo } from "react";
 
@@ -22,10 +22,11 @@ export function useAuth(): UseAuthReturn {
   const isLoading = status === "loading";
   const isAuthenticated = status === "authenticated" && !!session?.user;
   const user = session?.user ?? null;
+  const roles = normalizeBackendRoles(user?.roles);
 
-  const isLeadership = user?.roles?.includes(BACKEND_ROLES.LEADERSHIP) ?? false;
-  const isSupportEngineer = user?.roles?.includes(BACKEND_ROLES.SUPPORT_ENGINEER) ?? false;
-  const isEscalationTeam = user?.roles?.includes(BACKEND_ROLES.ESCALATION) ?? false;
+  const isLeadership = roles.includes(BACKEND_ROLES.LEADERSHIP);
+  const isSupportEngineer = roles.includes(BACKEND_ROLES.SUPPORT_ENGINEER);
+  const isEscalationTeam = roles.includes(BACKEND_ROLES.ESCALATION);
 
   const actualEscalationTeams = useMemo(() => {
     if (!user || !isEscalationTeam) return [];

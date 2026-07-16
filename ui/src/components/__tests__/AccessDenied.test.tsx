@@ -123,6 +123,30 @@ describe("RequireDashboardAccess", () => {
     expect(screen.getByText(/Access Restricted/i)).toBeInTheDocument();
   });
 
+  it.each([
+    ["the user is absent", null],
+    [
+      "the roles array is empty",
+      {
+        id: "user-1",
+        email: "user@example.com",
+        name: "User",
+        teams: [],
+        roles: [],
+      },
+    ],
+  ])("shows access denied when %s", (_description, user) => {
+    mockAuth({ user });
+    render(
+      <RequireDashboardAccess>
+        <div data-testid="protected-content">Dashboard</div>
+      </RequireDashboardAccess>
+    );
+
+    expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
+    expect(screen.getByText(/Access Restricted/i)).toBeInTheDocument();
+  });
+
   it("shows loading spinner while auth is loading", () => {
     mockAuth({ isLoading: true });
     render(

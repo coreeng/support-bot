@@ -346,7 +346,11 @@ describe("Dashboard - Support Area Summary visibility", () => {
       mockUseTenantInsightsEnabled.mockReturnValue({ data: true, isLoading: false, error: null } as any);
     });
 
-    it("hides every restricted tab when the backend roles provide no capability", async () => {
+    it.each([
+      { description: "USER", roles: ["USER"] },
+      { description: "ESCALATION", roles: ["ESCALATION"] },
+      { description: "USER and ESCALATION", roles: ["USER", "ESCALATION"] },
+    ])("hides every restricted tab for $description roles", async ({ roles }) => {
       mockUseTeamFilter.mockReturnValue({
         hasUnrestrictedDataScope: true,
         selectedTeam: null,
@@ -365,7 +369,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
           id: "user@example.com",
           name: "User",
           email: "user@example.com",
-          roles: ["USER"],
+          roles,
           teams: [],
         },
         isLoading: false,
@@ -384,6 +388,54 @@ describe("Dashboard - Support Area Summary visibility", () => {
         expect(screen.queryByText("SLA Dashboard")).not.toBeInTheDocument();
         expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
         expect(screen.queryByText("Tenant Requests")).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows sidebar placeholders until an authorized session has loaded", async () => {
+      mockUseAuth.mockReturnValue({
+        user: null,
+        isLoading: true,
+        isAuthenticated: false,
+        logout: jest.fn(),
+        isLeadership: false,
+        isEscalationTeam: false,
+        isSupportEngineer: false,
+        actualEscalationTeams: [],
+      });
+
+      const view = renderDashboard();
+
+      expect(view.container.querySelector('[data-sidebar="menu-skeleton"]')).toBeInTheDocument();
+      expect(screen.queryByText("Home")).not.toBeInTheDocument();
+      expect(screen.queryByText("Analytics & Operations")).not.toBeInTheDocument();
+
+      mockUseAuth.mockReturnValue({
+        user: {
+          id: "support@example.com",
+          name: "Support Engineer",
+          email: "support@example.com",
+          roles: ["SUPPORT_ENGINEER"],
+          teams: [],
+        },
+        isLoading: false,
+        isAuthenticated: true,
+        logout: jest.fn(),
+        isLeadership: false,
+        isEscalationTeam: false,
+        isSupportEngineer: true,
+        actualEscalationTeams: [],
+      });
+
+      view.rerender(
+        <DashboardLayoutComponent>
+          <Dashboard />
+        </DashboardLayoutComponent>
+      );
+
+      await waitFor(() => {
+        expect(view.container.querySelector('[data-sidebar="menu-skeleton"]')).not.toBeInTheDocument();
+        expect(screen.getByText("Home")).toBeInTheDocument();
+        expect(screen.getByText("Analytics & Operations")).toBeInTheDocument();
       });
     });
 
