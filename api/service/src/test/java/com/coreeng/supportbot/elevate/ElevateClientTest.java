@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -37,16 +38,19 @@ class ElevateClientTest {
 
     private MockRestServiceServer server;
     private ElevateClient client;
+    private RestClient restClient;
+    private ObjectMapper objectMapper;
     private List<Long> retryDelays;
 
     @BeforeEach
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(builder).build();
-        ObjectMapper objectMapper = new JsonMapper().getObjectMapper();
+        objectMapper = new JsonMapper().getObjectMapper();
+        restClient = builder.build();
         retryDelays = new ArrayList<>();
         client = new ElevateClient(
-                configuredProps(), builder.build(), objectMapper, retryDelays::add, Clock.fixed(NOW, ZoneOffset.UTC));
+                configuredProps(), restClient, objectMapper, retryDelays::add, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -187,6 +191,135 @@ class ElevateClientTest {
     }
 
     @Test
+    void rejectsCursorCyclesBeforeReplacingTheStoredSnapshot() {
+        useProps(configuredProps(10, 20_000, 100_000));
+        expectToken("access-token");
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(page("[]", "\"cursor-a\""));
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500&cursor=cursor-a"))
+                .andRespond(page("[]", "\"cursor-a\""));
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage("Elevate returned a cyclic products cursor");
+        server.verify();
+    }
+
+    @Test
+    void rejectsUniqueCursorRunawayAtTheConfiguredPageLimit() {
+        useProps(configuredProps(2, 20_000, 100_000));
+        expectToken("access-token");
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(page("[]", "\"cursor-a\""));
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500&cursor=cursor-a"))
+                .andRespond(page("[]", "\"cursor-b\""));
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage("Elevate products pagination exceeded the configured limit of 2 pages");
+        server.verify();
+    }
+
+    @Test
+    void rejectsSnapshotsBeyondTheConfiguredEntityLimit() {
+        useProps(configuredProps(10, 1, 100_000));
+        expectToken("access-token");
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(page("[" + productJson("product-1") + "," + productJson("product-2") + "]", "null"));
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage("Elevate snapshot exceeded the configured total entity limit while fetching products");
+        server.verify();
+    }
+
+    @Test
+    void rejectsPagesBeyondTheRequestedLimitBeforeConvertingItems() {
+        expectToken("access-token");
+        String invalidItems = String.join(",", java.util.Collections.nCopies(501, "0"));
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(page("[" + invalidItems + "]", "null"));
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage("Elevate returned a products page exceeding the requested 500 items");
+        server.verify();
+    }
+
+    @Test
+    void rejectsAnOversizedInsightsPageDespiteAMisleadingContentLength() {
+        ElevateProps props = configuredProps(100, 20_000, 100_000, 256);
+        RestClient.Builder limitedBuilder = RestClient.builder()
+                .baseUrl(BASE_URL)
+                .requestInterceptor(
+                        ElevateClient.insightsResponseSizeInterceptor(props.maxInsightsPageResponseBytes()));
+        MockRestServiceServer limitedServer =
+                MockRestServiceServer.bindTo(limitedBuilder).build();
+        ElevateClient limitedClient = new ElevateClient(
+                props, limitedBuilder.build(), objectMapper, ignored -> {}, Clock.fixed(NOW, ZoneOffset.UTC));
+        expectToken(limitedServer, "access-token");
+        String response = "{\"items\":[],\"padding\":\"" + "x".repeat(512) + "\",\"nextCursor\":null}";
+        limitedServer
+                .expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(withSuccess(response, MediaType.APPLICATION_JSON).header(HttpHeaders.CONTENT_LENGTH, "1"));
+
+        assertThatThrownBy(limitedClient::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage("Elevate insights page exceeded the configured response size limit of 256 bytes")
+                .hasMessageNotContaining("padding");
+        limitedServer.verify();
+    }
+
+    @Test
+    void rejectsSnapshotsBeyondTheConfiguredMaterializedRelationshipLimit() {
+        useProps(configuredProps(10, 20_000, 1));
+        expectToken("access-token");
+        expectCollection("products", "[" + productJson("product-1") + "]");
+        expectCollection("users", "[]");
+        expectCollection(
+                "journeys",
+                "["
+                        + journeyJson(
+                                "product-1",
+                                "[\"11111111-1111-1111-1111-111111111111\",\"22222222-2222-2222-2222-222222222222\"]")
+                        + "]");
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage(
+                        "Elevate snapshot exceeded the configured materialized relationship limit while fetching journeys");
+        server.verify();
+    }
+
+    @Test
+    void rejectsAJourneyWhoseProductIsAbsent() {
+        expectToken("access-token");
+        expectCollection("products", "[" + productJson("product-1") + "]");
+        expectCollection("users", "[]");
+        expectCollection("journeys", "[" + journeyJson("missing-product", "[]") + "]");
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage("Elevate returned a journey whose product was absent from the fetched snapshot");
+        server.verify();
+    }
+
+    @Test
+    void retainsAJourneyUserRelationshipWhenTheUserIsAbsent() {
+        expectToken("access-token");
+        expectCollection("products", "[" + productJson("product-1") + "]");
+        expectCollection("users", "[]");
+        expectCollection(
+                "journeys", "[" + journeyJson("product-1", "[\"33333333-3333-3333-3333-333333333333\"]") + "]");
+
+        ElevateSnapshot snapshot = client.fetchSnapshot();
+
+        assertThat(snapshot.journeys().getFirst().userIds())
+                .containsExactly(java.util.UUID.fromString("33333333-3333-3333-3333-333333333333"));
+        server.verify();
+    }
+
+    @Test
     void retriesEachUnauthorizedPageOnceSoLongSyncsCanCrossMultipleTokenExpiries() {
         expectToken("expired-token");
         server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
@@ -307,7 +440,11 @@ class ElevateClientTest {
     }
 
     private void expectToken(String token) {
-        server.expect(requestTo(BASE_URL + "/api/sync/v1/auth/token"))
+        expectToken(server, token);
+    }
+
+    private static void expectToken(MockRestServiceServer target, String token) {
+        target.expect(requestTo(BASE_URL + "/api/sync/v1/auth/token"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(content()
@@ -318,20 +455,81 @@ class ElevateClientTest {
                         MediaType.APPLICATION_JSON));
     }
 
+    private void expectCollection(String resource, String items) {
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/" + resource + "?limit=500"))
+                .andRespond(page(items, "null"));
+    }
+
+    private static org.springframework.test.web.client.response.DefaultResponseCreator page(
+            String items, String nextCursor) {
+        return withSuccess("{\"items\":" + items + ",\"nextCursor\":" + nextCursor + "}", MediaType.APPLICATION_JSON);
+    }
+
+    private static String productJson(String id) {
+        return """
+                {
+                  "id": "%s",
+                  "slug": "%s-slug",
+                  "name": "%s name",
+                  "customer": null,
+                  "createdAt": "2026-01-02T03:04:05",
+                  "lastUpdatedAt": "2026-02-03T04:05:06"
+                }
+                """.formatted(id, id, id);
+    }
+
+    private static String journeyJson(String productId, String userIds) {
+        return """
+                {
+                  "id": "journey-1",
+                  "slug": "journey-1-slug",
+                  "name": "Journey 1",
+                  "productId": "%s",
+                  "productSlug": "%s-slug",
+                  "userDescription": null,
+                  "primaryProblems": null,
+                  "userIds": %s,
+                  "createdAt": "2026-01-02T03:04:05",
+                  "lastUpdatedAt": "2026-02-03T04:05:06"
+                }
+                """.formatted(productId, productId, userIds);
+    }
+
+    private void useProps(ElevateProps props) {
+        retryDelays = new ArrayList<>();
+        client = new ElevateClient(props, restClient, objectMapper, retryDelays::add, Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
     private static org.springframework.test.web.client.response.DefaultResponseCreator emptyPage() {
         return withSuccess("{\"items\":[],\"nextCursor\":null}", MediaType.APPLICATION_JSON);
     }
 
     private static ElevateProps configuredProps() {
+        return configuredProps(100, 20_000, 100_000);
+    }
+
+    private static ElevateProps configuredProps(int maxPages, long maxEntities, long maxRelationships) {
+        return configuredProps(maxPages, maxEntities, maxRelationships, 16_777_216);
+    }
+
+    private static ElevateProps configuredProps(
+            int maxPages, long maxEntities, long maxRelationships, long maxResponseBytes) {
         return new ElevateProps(
                 BASE_URL,
                 "esc_client",
                 "secret-value",
                 Duration.ofSeconds(5),
                 Duration.ofSeconds(30),
+                maxResponseBytes,
                 Duration.ofMinutes(1),
                 Duration.ofHours(1),
                 Duration.ofHours(12),
+                maxPages,
+                maxEntities,
+                maxRelationships,
+                3,
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(5),
                 "Support Bot",
                 "https://support.example.test",
                 "1.2.3");

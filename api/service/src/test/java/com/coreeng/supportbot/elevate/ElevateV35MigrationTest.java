@@ -2,8 +2,6 @@ package com.coreeng.supportbot.elevate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -11,7 +9,6 @@ import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
@@ -44,14 +41,6 @@ class ElevateV35MigrationTest {
                             "SELECT snapshot_version FROM " + schema + ".elevate_sync_state WHERE singleton = TRUE",
                             UUID.class))
                     .isNotNull();
-            assertThat(database.queryForObject("""
-                            SELECT namespace.nspname
-                              FROM pg_extension extension
-                              JOIN pg_namespace namespace ON namespace.oid = extension.extnamespace
-                             WHERE extension.extname = 'pg_trgm'
-                            """, String.class)).isEqualTo("public");
-            assertTrigramSearchIndexes(database, schema);
-            assertIntegritySearchUsesTrigramIndex(database, schema);
         } finally {
             database.execute("DROP SCHEMA " + schema + " CASCADE");
         }
@@ -210,51 +199,6 @@ class ElevateV35MigrationTest {
                 .containsEntry("user_id", MISSING_USER_ID);
         assertThat(Objects.requireNonNull(item.get("search_text")).toString())
                 .contains("journey one", "journey-1", MISSING_USER_ID.toString());
-    }
-
-    private static void assertTrigramSearchIndexes(JdbcTemplate database, String schema) {
-        List<String> definitions = database.queryForList("""
-                SELECT indexdef
-                  FROM pg_indexes
-                 WHERE schemaname = ?
-                   AND indexname IN (
-                       'elevate_products_name_trgm_idx',
-                       'elevate_products_slug_trgm_idx',
-                       'elevate_products_resource_id_trgm_idx',
-                       'elevate_products_customer_trgm_idx',
-                       'elevate_journeys_name_trgm_idx',
-                       'elevate_journeys_slug_trgm_idx',
-                       'elevate_journeys_resource_id_trgm_idx',
-                       'elevate_users_name_trgm_idx',
-                       'elevate_users_resource_id_trgm_idx',
-                       'elevate_integrity_items_search_trgm_idx'
-                   )
-                """, String.class, schema);
-        assertThat(definitions).hasSize(10).allSatisfy(definition -> assertThat(definition)
-                .contains("USING gin", "gin_trgm_ops"));
-    }
-
-    private static void assertIntegritySearchUsesTrigramIndex(JdbcTemplate database, String schema) {
-        List<String> plan = Objects.requireNonNull(database.execute((ConnectionCallback<List<String>>) connection -> {
-            List<String> lines = new ArrayList<>();
-            try (var statement = connection.createStatement()) {
-                statement.execute("SET enable_seqscan = off");
-                try (var resultSet = statement.executeQuery("""
-                        EXPLAIN (COSTS OFF)
-                        SELECT *
-                          FROM %s.elevate_integrity_items
-                         WHERE search_text LIKE '%%22222222%%' ESCAPE '!'
-                        """.formatted(schema))) {
-                    while (resultSet.next()) {
-                        lines.add(resultSet.getString(1));
-                    }
-                } finally {
-                    statement.execute("RESET enable_seqscan");
-                }
-            }
-            return lines;
-        }));
-        assertThat(plan).anySatisfy(line -> assertThat(line).contains("elevate_integrity_items_search_trgm_idx"));
     }
 
     private static DataSource dataSource() {

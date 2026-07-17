@@ -5,6 +5,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
@@ -23,10 +26,12 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+import java.util.function.ToLongFunction;
 import javax.net.ssl.SSLException;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -36,6 +41,8 @@ import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -85,11 +92,21 @@ public final class ElevateClient {
     private static RestClient createRestClient(ElevateProps props, RestClient.Builder restClientBuilder) {
         RestClient.Builder builder = restClientBuilder
                 .clone()
-                .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(requestFactorySettings(props)));
+                .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(requestFactorySettings(props)))
+                .requestInterceptor(insightsResponseSizeInterceptor(props.maxInsightsPageResponseBytes()));
         if (props.configured()) {
             builder.baseUrl(props.baseUrl());
         }
         return builder.build();
+    }
+
+    static ClientHttpRequestInterceptor insightsResponseSizeInterceptor(long maximumBytes) {
+        return (request, body, execution) -> {
+            ClientHttpResponse response = execution.execute(request, body);
+            return request.getURI().getPath().contains(INSIGHTS_PATH + "/")
+                    ? new SizeLimitedClientHttpResponse(response, maximumBytes)
+                    : response;
+        };
     }
 
     public void reportStatus() {
@@ -121,9 +138,13 @@ public final class ElevateClient {
         requireConfigured();
         try {
             TokenSession session = new TokenSession(authenticate());
-            Resources<ElevateProduct> products = fetchAll("products", ElevateProduct.class, session);
-            Resources<ElevateUser> users = fetchAll("users", ElevateUser.class, session);
-            Resources<ElevateJourney> journeys = fetchAll("journeys", ElevateJourney.class, session);
+            FetchBudget budget = new FetchBudget(props.maxTotalEntities(), props.maxMaterializedRelationships());
+            Resources<ElevateProduct> products =
+                    fetchAll("products", ElevateProduct.class, session, budget, ignored -> 0);
+            Resources<ElevateUser> users = fetchAll("users", ElevateUser.class, session, budget, ignored -> 0);
+            Resources<ElevateJourney> journeys = fetchAll(
+                    "journeys", ElevateJourney.class, session, budget, ElevateClient::distinctJourneyUserCount);
+            validateJourneyProducts(products.items(), journeys.items());
             return new ElevateSnapshot(
                     products.items(),
                     users.items(),
@@ -167,38 +188,85 @@ public final class ElevateClient {
         return response.accessToken();
     }
 
-    private <T> Resources<T> fetchAll(String resource, Class<T> itemType, TokenSession session) {
+    private <T> Resources<T> fetchAll(
+            String resource,
+            Class<T> itemType,
+            TokenSession session,
+            FetchBudget budget,
+            ToLongFunction<JsonNode> relationshipCount) {
         List<T> result = new ArrayList<>();
         List<JsonNode> payloads = new ArrayList<>();
         Set<String> seenCursors = new HashSet<>();
         @Nullable String cursor = null;
+        int pagesFetched = 0;
         do {
-            Page<T> page = fetchPageWithRetry(resource, cursor, itemType, session);
+            pagesFetched++;
+            Page<T> page = fetchPageWithRetry(resource, cursor, itemType, session, budget, relationshipCount);
             result.addAll(page.items());
             payloads.addAll(page.payloads());
             cursor = page.nextCursor();
             if (cursor != null && !seenCursors.add(cursor)) {
-                throw new ElevateApiException("Elevate returned a repeated " + resource + " cursor");
+                throw new ElevateApiException("Elevate returned a cyclic " + resource + " cursor");
+            }
+            if (cursor != null && pagesFetched >= props.maxPagesPerResource()) {
+                throw new ElevateApiException("Elevate " + resource + " pagination exceeded the configured limit of "
+                        + props.maxPagesPerResource() + " pages");
             }
         } while (cursor != null);
         return new Resources<>(List.copyOf(result), List.copyOf(payloads));
     }
 
+    private static long distinctJourneyUserCount(JsonNode journey) {
+        JsonNode userIds = journey.get("userIds");
+        if (userIds == null || !userIds.isArray()) {
+            return 0;
+        }
+        Set<JsonNode> distinctUserIds = new HashSet<>();
+        userIds.forEach(distinctUserIds::add);
+        return distinctUserIds.size();
+    }
+
+    private static void validateJourneyProducts(List<ElevateProduct> products, List<ElevateJourney> journeys) {
+        Set<String> productIds = new HashSet<>();
+        for (ElevateProduct product : products) {
+            productIds.add(product.id());
+        }
+        for (ElevateJourney journey : journeys) {
+            if (!productIds.contains(journey.productId())) {
+                throw new ElevateApiException(
+                        "Elevate returned a journey whose product was absent from the fetched snapshot");
+            }
+        }
+    }
+
     private <T> Page<T> fetchPageWithRetry(
-            String resource, @Nullable String cursor, Class<T> itemType, TokenSession session) {
+            String resource,
+            @Nullable String cursor,
+            Class<T> itemType,
+            TokenSession session,
+            FetchBudget budget,
+            ToLongFunction<JsonNode> relationshipCount) {
         try {
-            return withTransientRetries(() -> fetchPage(resource, cursor, itemType, session.token));
+            return withTransientRetries(
+                    () -> fetchPage(resource, cursor, itemType, session.token, budget, relationshipCount));
         } catch (RestClientResponseException e) {
             if (e.getStatusCode().value() != HttpStatus.UNAUTHORIZED.value()) {
                 throw e;
             }
             log.info("Elevate access token was rejected during sync; refreshing it once");
             session.token = authenticate();
-            return withTransientRetries(() -> fetchPage(resource, cursor, itemType, session.token));
+            return withTransientRetries(
+                    () -> fetchPage(resource, cursor, itemType, session.token, budget, relationshipCount));
         }
     }
 
-    private <T> Page<T> fetchPage(String resource, @Nullable String cursor, Class<T> itemType, String token) {
+    private <T> Page<T> fetchPage(
+            String resource,
+            @Nullable String cursor,
+            Class<T> itemType,
+            String token,
+            FetchBudget budget,
+            ToLongFunction<JsonNode> relationshipCount) {
         JsonNode response = restClient
                 .get()
                 .uri(pageUri(resource, cursor))
@@ -211,6 +279,14 @@ public final class ElevateClient {
         JsonNode itemsNode = response.get("items");
         if (itemsNode == null || !itemsNode.isArray()) {
             throw new ElevateApiException("Elevate returned a " + resource + " page without an items array");
+        }
+        if (itemsNode.size() > PAGE_LIMIT) {
+            throw new ElevateApiException(
+                    "Elevate returned a " + resource + " page exceeding the requested " + PAGE_LIMIT + " items");
+        }
+        budget.addEntities(resource, itemsNode.size());
+        for (JsonNode itemNode : itemsNode) {
+            budget.addRelationships(resource, relationshipCount.applyAsLong(itemNode));
         }
         List<T> items = new ArrayList<>();
         List<JsonNode> payloads = new ArrayList<>();
@@ -270,7 +346,7 @@ public final class ElevateClient {
                 }
                 waitBeforeRetry(attempt, serverRetryDelay == null ? null : serverRetryDelay.delay());
             } catch (RestClientException failure) {
-                if (attempt >= MAX_ATTEMPTS) {
+                if (hasCause(failure, InsightsResponseSizeExceededException.class) || attempt >= MAX_ATTEMPTS) {
                     throw failure;
                 }
                 waitBeforeRetry(attempt, null);
@@ -342,7 +418,13 @@ public final class ElevateClient {
                 "Elevate returned HTTP " + failure.getStatusCode().value(), failure);
     }
 
-    private static ElevateApiException transportFailure(RestClientException failure) {
+    private ElevateApiException transportFailure(RestClientException failure) {
+        if (hasCause(failure, InsightsResponseSizeExceededException.class)) {
+            return new ElevateApiException(
+                    "Elevate insights page exceeded the configured response size limit of "
+                            + props.maxInsightsPageResponseBytes() + " bytes",
+                    failure);
+        }
         if (hasCause(failure, UnknownHostException.class)) {
             return new ElevateApiException("Elevate request failed: DNS lookup failed", failure);
         }
@@ -383,6 +465,154 @@ public final class ElevateClient {
             @Nullable String nextCursor) {}
 
     private record Resources<T>(List<T> items, List<JsonNode> payloads) {}
+
+    private static final class SizeLimitedClientHttpResponse implements ClientHttpResponse {
+        private final ClientHttpResponse delegate;
+        private final long maximumBytes;
+        private @Nullable InputStream body;
+
+        private SizeLimitedClientHttpResponse(ClientHttpResponse delegate, long maximumBytes) {
+            this.delegate = delegate;
+            this.maximumBytes = maximumBytes;
+        }
+
+        @Override
+        public org.springframework.http.HttpStatusCode getStatusCode() throws IOException {
+            return delegate.getStatusCode();
+        }
+
+        @Override
+        public String getStatusText() throws IOException {
+            return delegate.getStatusText();
+        }
+
+        @Override
+        public HttpHeaders getHeaders() {
+            return delegate.getHeaders();
+        }
+
+        @Override
+        public InputStream getBody() throws IOException {
+            InputStream current = body;
+            if (current == null) {
+                current = new SizeLimitedInputStream(delegate.getBody(), maximumBytes);
+                body = current;
+            }
+            return current;
+        }
+
+        @Override
+        public void close() {
+            delegate.close();
+        }
+    }
+
+    private static final class SizeLimitedInputStream extends FilterInputStream {
+        private final long maximumBytes;
+        private long bytesRead;
+
+        private SizeLimitedInputStream(InputStream delegate, long maximumBytes) {
+            super(delegate);
+            this.maximumBytes = maximumBytes;
+        }
+
+        @Override
+        public int read() throws IOException {
+            int value = super.read();
+            if (value != -1) {
+                recordBytes(1);
+            }
+            return value;
+        }
+
+        @Override
+        public int read(byte[] bytes, int offset, int length) throws IOException {
+            Objects.checkFromIndexSize(offset, length, bytes.length);
+            if (length == 0) {
+                return 0;
+            }
+            long remaining = maximumBytes - bytesRead;
+            long maximumRead = remaining == Long.MAX_VALUE ? Long.MAX_VALUE : remaining + 1;
+            int boundedLength = (int) Math.min(length, maximumRead);
+            int count = super.read(bytes, offset, boundedLength);
+            if (count > 0) {
+                recordBytes(count);
+            }
+            return count;
+        }
+
+        @Override
+        public long skip(long count) throws IOException {
+            if (count <= 0) {
+                return 0;
+            }
+            long remaining = maximumBytes - bytesRead;
+            long maximumSkip = remaining == Long.MAX_VALUE ? Long.MAX_VALUE : remaining + 1;
+            long skipped = super.skip(Math.min(count, maximumSkip));
+            if (skipped > 0) {
+                recordBytes(skipped);
+            }
+            return skipped;
+        }
+
+        @Override
+        public boolean markSupported() {
+            return false;
+        }
+
+        @Override
+        public synchronized void mark(int readLimit) {}
+
+        @Override
+        public synchronized void reset() throws IOException {
+            throw new IOException("mark/reset is not supported");
+        }
+
+        private void recordBytes(long count) throws InsightsResponseSizeExceededException {
+            if (bytesRead > maximumBytes - count) {
+                throw new InsightsResponseSizeExceededException();
+            }
+            bytesRead += count;
+        }
+    }
+
+    private static final class InsightsResponseSizeExceededException extends IOException {}
+
+    private static final class FetchBudget {
+        private final long maxEntities;
+        private final long maxRelationships;
+        private long entities;
+        private long relationships;
+
+        private FetchBudget(long maxEntities, long maxRelationships) {
+            this.maxEntities = maxEntities;
+            this.maxRelationships = maxRelationships;
+        }
+
+        private void addEntities(String resource, long count) {
+            entities = addWithinLimit(
+                    entities,
+                    count,
+                    maxEntities,
+                    "Elevate snapshot exceeded the configured total entity limit while fetching " + resource);
+        }
+
+        private void addRelationships(String resource, long count) {
+            relationships = addWithinLimit(
+                    relationships,
+                    count,
+                    maxRelationships,
+                    "Elevate snapshot exceeded the configured materialized relationship limit while fetching "
+                            + resource);
+        }
+
+        private static long addWithinLimit(long current, long increment, long limit, String message) {
+            if (increment < 0 || current > limit - increment) {
+                throw new ElevateApiException(message);
+            }
+            return current + increment;
+        }
+    }
 
     private record ServerRetryDelay(Duration delay, boolean exceedsMaximum) {
         private static ServerRetryDelay withinMaximum(Duration delay) {

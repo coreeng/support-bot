@@ -1,5 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
-
 ALTER TABLE elevate_products
     ADD COLUMN slug TEXT,
     ADD COLUMN name TEXT,
@@ -190,24 +188,3 @@ CREATE INDEX elevate_integrity_items_type_sort_idx
     ON elevate_integrity_items (type, sort_name, sort_id);
 CREATE INDEX elevate_integrity_items_name_sort_idx
     ON elevate_integrity_items (sort_name, sort_id, type);
-
-CREATE INDEX elevate_products_name_trgm_idx
-    ON elevate_products USING GIN (LOWER(name) public.gin_trgm_ops);
-CREATE INDEX elevate_products_slug_trgm_idx
-    ON elevate_products USING GIN (LOWER(slug) public.gin_trgm_ops);
-CREATE INDEX elevate_products_resource_id_trgm_idx
-    ON elevate_products USING GIN (LOWER(resource_id) public.gin_trgm_ops);
-CREATE INDEX elevate_products_customer_trgm_idx
-    ON elevate_products USING GIN (LOWER(COALESCE(customer, '')) public.gin_trgm_ops);
-CREATE INDEX elevate_journeys_name_trgm_idx
-    ON elevate_journeys USING GIN (LOWER(name) public.gin_trgm_ops);
-CREATE INDEX elevate_journeys_slug_trgm_idx
-    ON elevate_journeys USING GIN (LOWER(slug) public.gin_trgm_ops);
-CREATE INDEX elevate_journeys_resource_id_trgm_idx
-    ON elevate_journeys USING GIN (LOWER(resource_id) public.gin_trgm_ops);
-CREATE INDEX elevate_users_name_trgm_idx
-    ON elevate_users USING GIN (LOWER(name) public.gin_trgm_ops);
-CREATE INDEX elevate_users_resource_id_trgm_idx
-    ON elevate_users USING GIN (LOWER(resource_id::TEXT) public.gin_trgm_ops);
-CREATE INDEX elevate_integrity_items_search_trgm_idx
-    ON elevate_integrity_items USING GIN (search_text public.gin_trgm_ops);

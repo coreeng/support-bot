@@ -20,9 +20,16 @@ class ElevatePropsTest {
         assertThat(props.configured()).isFalse();
         assertThat(props.connectTimeout()).isEqualTo(Duration.ofSeconds(5));
         assertThat(props.readTimeout()).isEqualTo(Duration.ofSeconds(30));
+        assertThat(props.maxInsightsPageResponseBytes()).isEqualTo(16_777_216);
         assertThat(props.maxServerRetryDelay()).isEqualTo(Duration.ofMinutes(1));
         assertThat(props.statusInterval()).isEqualTo(Duration.ofHours(1));
         assertThat(props.syncInterval()).isEqualTo(Duration.ofHours(12));
+        assertThat(props.maxPagesPerResource()).isEqualTo(100);
+        assertThat(props.maxTotalEntities()).isEqualTo(20_000);
+        assertThat(props.maxMaterializedRelationships()).isEqualTo(100_000);
+        assertThat(props.syncRetryBurstAttempts()).isEqualTo(3);
+        assertThat(props.syncRetryInitialDelay()).isEqualTo(Duration.ofSeconds(30));
+        assertThat(props.syncRetryMaxDelay()).isEqualTo(Duration.ofMinutes(5));
         assertThat(props.agentName()).isEqualTo("Support Bot");
         assertThat(props.supportBotUrl()).isEqualTo("http://localhost:3000");
         assertThat(props.version()).isEqualTo("dev");
@@ -123,6 +130,34 @@ class ElevatePropsTest {
 
             assertThatThrownBy(() -> bind(values)).hasRootCauseMessage("elevate." + property + " must be positive");
         }
+    }
+
+    @Test
+    void rejectsInvalidFetchSafetyLimits() {
+        for (String property : List.of(
+                "max-insights-page-response-bytes",
+                "max-pages-per-resource",
+                "max-total-entities",
+                "max-materialized-relationships")) {
+            Map<String, Object> values = connectionValues();
+            values.put("elevate." + property, "0");
+
+            assertThatThrownBy(() -> bind(values)).hasRootCauseMessage("elevate." + property + " must be positive");
+        }
+    }
+
+    @Test
+    void rejectsInvalidSyncRetryCadence() {
+        Map<String, Object> attempts = connectionValues();
+        attempts.put("elevate.sync-retry-burst-attempts", "11");
+        assertThatThrownBy(() -> bind(attempts))
+                .hasRootCauseMessage("elevate.sync-retry-burst-attempts must be between 1 and 10");
+
+        Map<String, Object> delays = connectionValues();
+        delays.put("elevate.sync-retry-initial-delay", "6m");
+        delays.put("elevate.sync-retry-max-delay", "5m");
+        assertThatThrownBy(() -> bind(delays))
+                .hasRootCauseMessage("elevate.sync-retry-initial-delay must not exceed elevate.sync-retry-max-delay");
     }
 
     @Test

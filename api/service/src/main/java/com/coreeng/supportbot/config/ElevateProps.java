@@ -15,9 +15,16 @@ public record ElevateProps(
         @DefaultValue("") String clientSecret,
         @DefaultValue("5s") Duration connectTimeout,
         @DefaultValue("30s") Duration readTimeout,
+        @DefaultValue("16777216") long maxInsightsPageResponseBytes,
         @DefaultValue("1m") Duration maxServerRetryDelay,
         @DefaultValue("1h") Duration statusInterval,
         @DefaultValue("12h") Duration syncInterval,
+        @DefaultValue("100") int maxPagesPerResource,
+        @DefaultValue("20000") long maxTotalEntities,
+        @DefaultValue("100000") long maxMaterializedRelationships,
+        @DefaultValue("3") int syncRetryBurstAttempts,
+        @DefaultValue("30s") Duration syncRetryInitialDelay,
+        @DefaultValue("5m") Duration syncRetryMaxDelay,
         @DefaultValue("Support Bot") String agentName,
         @DefaultValue("http://localhost:3000") String supportBotUrl,
         @DefaultValue("dev") String version) {
@@ -46,9 +53,20 @@ public record ElevateProps(
         validateHttpUrl("elevate.support-bot-url", supportBotUrl);
         requirePositive("elevate.connect-timeout", connectTimeout);
         requirePositive("elevate.read-timeout", readTimeout);
+        requirePositive("elevate.max-insights-page-response-bytes", maxInsightsPageResponseBytes);
         requirePositive("elevate.max-server-retry-delay", maxServerRetryDelay);
         requirePositive("elevate.status-interval", statusInterval);
         requirePositive("elevate.sync-interval", syncInterval);
+        requirePositive("elevate.max-pages-per-resource", maxPagesPerResource);
+        requirePositive("elevate.max-total-entities", maxTotalEntities);
+        requirePositive("elevate.max-materialized-relationships", maxMaterializedRelationships);
+        requireRange("elevate.sync-retry-burst-attempts", syncRetryBurstAttempts, 1, 10);
+        requirePositive("elevate.sync-retry-initial-delay", syncRetryInitialDelay);
+        requirePositive("elevate.sync-retry-max-delay", syncRetryMaxDelay);
+        if (syncRetryInitialDelay.compareTo(syncRetryMaxDelay) > 0) {
+            throw new IllegalArgumentException(
+                    "elevate.sync-retry-initial-delay must not exceed elevate.sync-retry-max-delay");
+        }
         requireNotBlank("elevate.agent-name", agentName);
         requireNotBlank("elevate.version", version);
         requireMaximumLength("elevate.agent-name", agentName, 120);
@@ -63,9 +81,13 @@ public record ElevateProps(
     @Override
     public String toString() {
         return "ElevateProps[baseUrl=" + baseUrl + ", clientId=<redacted>, clientSecret=<redacted>, connectTimeout="
-                + connectTimeout + ", readTimeout=" + readTimeout + ", maxServerRetryDelay=" + maxServerRetryDelay
-                + ", statusInterval=" + statusInterval + ", syncInterval=" + syncInterval + ", agentName=" + agentName
-                + ", supportBotUrl=" + supportBotUrl + ", version=" + version + "]";
+                + connectTimeout + ", readTimeout=" + readTimeout + ", maxInsightsPageResponseBytes="
+                + maxInsightsPageResponseBytes + ", maxServerRetryDelay=" + maxServerRetryDelay + ", statusInterval="
+                + statusInterval + ", syncInterval=" + syncInterval + ", maxPagesPerResource="
+                + maxPagesPerResource + ", maxTotalEntities=" + maxTotalEntities + ", maxMaterializedRelationships="
+                + maxMaterializedRelationships + ", syncRetryBurstAttempts=" + syncRetryBurstAttempts
+                + ", syncRetryInitialDelay=" + syncRetryInitialDelay + ", syncRetryMaxDelay=" + syncRetryMaxDelay
+                + ", agentName=" + agentName + ", supportBotUrl=" + supportBotUrl + ", version=" + version + "]";
     }
 
     private static String normalizeBaseUrl(String value) {
@@ -137,6 +159,18 @@ public record ElevateProps(
     private static void requirePositive(String propertyName, Duration duration) {
         if (duration.isZero() || duration.isNegative()) {
             throw new IllegalArgumentException(propertyName + " must be positive");
+        }
+    }
+
+    private static void requirePositive(String propertyName, long value) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(propertyName + " must be positive");
+        }
+    }
+
+    private static void requireRange(String propertyName, int value, int minimum, int maximum) {
+        if (value < minimum || value > maximum) {
+            throw new IllegalArgumentException(propertyName + " must be between " + minimum + " and " + maximum);
         }
     }
 

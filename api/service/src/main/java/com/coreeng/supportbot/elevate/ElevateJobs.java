@@ -41,14 +41,10 @@ public class ElevateJobs {
         }
     }
 
-    @Scheduled(
-            fixedDelayString = "${elevate.sync-interval:12h}",
-            initialDelayString = "0",
-            scheduler = "elevateSyncScheduler")
-    public void syncInsights() {
+    public boolean syncInsights() {
         if (!props.configured()) {
             log.debug("Skipping Elevate insights sync because Elevate is not configured");
-            return;
+            return true;
         }
 
         Instant attemptedAt = clock.instant();
@@ -61,10 +57,12 @@ public class ElevateJobs {
                     snapshot.products().size(),
                     snapshot.users().size(),
                     snapshot.journeys().size());
+            return true;
         } catch (RuntimeException failure) {
             String error = errorSanitizer.sanitize(failure);
             repository.recordSyncFailure(attemptedAt, error);
             log.warn("Elevate insights sync failed: {}", error);
+            return false;
         }
     }
 }

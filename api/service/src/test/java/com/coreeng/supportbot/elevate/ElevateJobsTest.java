@@ -34,7 +34,7 @@ class ElevateJobsTest {
         ElevateSnapshot snapshot = new ElevateSnapshot(List.of(), List.of(), List.of());
         when(client.fetchSnapshot()).thenReturn(snapshot);
 
-        jobs.syncInsights();
+        assertThat(jobs.syncInsights()).isTrue();
 
         verify(repository).replaceSnapshot(snapshot, NOW, NOW);
         verify(repository, never())
@@ -47,7 +47,7 @@ class ElevateJobsTest {
                 .when(client)
                 .fetchSnapshot();
 
-        jobs.syncInsights();
+        assertThat(jobs.syncInsights()).isFalse();
 
         verify(repository, never())
                 .replaceSnapshot(
@@ -59,6 +59,21 @@ class ElevateJobsTest {
         assertThat(error.getValue())
                 .doesNotContain("token-value", "secret-value", "esc_client")
                 .contains("<redacted>");
+    }
+
+    @Test
+    void oversizedPageUsesTheNormalSanitizedFailurePath() {
+        String failure = "Elevate insights page exceeded the configured response size limit of 16777216 bytes";
+        doThrow(new ElevateApiException(failure)).when(client).fetchSnapshot();
+
+        assertThat(jobs.syncInsights()).isFalse();
+
+        verify(repository, never())
+                .replaceSnapshot(
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any());
+        verify(repository).recordSyncFailure(NOW, failure);
     }
 
     @Test
@@ -77,9 +92,16 @@ class ElevateJobsTest {
                 "",
                 Duration.ofSeconds(5),
                 Duration.ofSeconds(30),
+                16_777_216,
                 Duration.ofMinutes(1),
                 Duration.ofHours(1),
                 Duration.ofHours(12),
+                100,
+                20_000,
+                100_000,
+                3,
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(5),
                 "Support Bot",
                 "http://localhost:3000",
                 "dev");
@@ -93,25 +115,19 @@ class ElevateJobsTest {
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         disabledJobs.reportStatus();
-        disabledJobs.syncInsights();
+        assertThat(disabledJobs.syncInsights()).isTrue();
 
         verifyNoInteractions(disabledClient, disabledRepository);
     }
 
     @Test
-    void schedulesBothJobsImmediatelyAtConfiguredFixedDelays() throws ReflectiveOperationException {
+    void schedulesStatusImmediatelyAtTheConfiguredFixedDelay() throws ReflectiveOperationException {
         Method ping = ElevateJobs.class.getMethod("reportStatus");
-        Method sync = ElevateJobs.class.getMethod("syncInsights");
 
         assertThat(ping.getAnnotation(Scheduled.class)).satisfies(schedule -> {
             assertThat(schedule.fixedDelayString()).isEqualTo("${elevate.status-interval:1h}");
             assertThat(schedule.initialDelayString()).isEqualTo("0");
             assertThat(schedule.scheduler()).isEqualTo("elevateStatusScheduler");
-        });
-        assertThat(sync.getAnnotation(Scheduled.class)).satisfies(schedule -> {
-            assertThat(schedule.fixedDelayString()).isEqualTo("${elevate.sync-interval:12h}");
-            assertThat(schedule.initialDelayString()).isEqualTo("0");
-            assertThat(schedule.scheduler()).isEqualTo("elevateSyncScheduler");
         });
     }
 
@@ -122,9 +138,16 @@ class ElevateJobsTest {
                 "secret-value",
                 Duration.ofSeconds(5),
                 Duration.ofSeconds(30),
+                16_777_216,
                 Duration.ofMinutes(1),
                 Duration.ofHours(1),
                 Duration.ofHours(12),
+                100,
+                20_000,
+                100_000,
+                3,
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(5),
                 "Support Bot",
                 "https://support.example.test",
                 "1.2.3");

@@ -515,13 +515,22 @@ public class ElevateRepository {
     }
 
     private void insertJourneyUsers(List<ElevateJourney> journeys) {
-        List<JourneyUser> relationships = journeys.stream()
-                .flatMap(journey -> new LinkedHashSet<>(journey.userIds())
-                        .stream().map(userId -> new JourneyUser(journey.id(), userId)))
-                .toList();
-        if (relationships.isEmpty()) {
-            return;
+        List<JourneyUser> batch = new ArrayList<>(INSERT_BATCH_SIZE);
+        for (ElevateJourney journey : journeys) {
+            for (UUID userId : new LinkedHashSet<>(journey.userIds())) {
+                batch.add(new JourneyUser(journey.id(), userId));
+                if (batch.size() == INSERT_BATCH_SIZE) {
+                    insertJourneyUserBatch(batch);
+                    batch = new ArrayList<>(INSERT_BATCH_SIZE);
+                }
+            }
         }
+        if (!batch.isEmpty()) {
+            insertJourneyUserBatch(batch);
+        }
+    }
+
+    private void insertJourneyUserBatch(List<JourneyUser> relationships) {
         jdbcTemplate.batchUpdate(
                 "INSERT INTO elevate_journey_users (journey_id, user_id) VALUES (?, ?)",
                 relationships,
