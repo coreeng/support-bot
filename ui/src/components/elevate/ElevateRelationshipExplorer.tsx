@@ -84,11 +84,15 @@ export function ElevateRelationshipExplorer({
       {products.isLoading || products.isPlaceholderData || (effectiveProductId && (product.isLoading || product.isPlaceholderData)) ? (
         <p className="text-muted-foreground p-16 text-center text-sm">Loading synced products…</p>
       ) : null}
-      {products.error && !isApiError(products.error, 409) ? (
-        <p className="text-destructive p-16 text-center text-sm">Unable to load synced products.</p>
+      {products.error && !currentProducts && !isApiError(products.error, 409) ? (
+        <p className="text-destructive p-16 text-center text-sm" role="alert">
+          Unable to load synced products.
+        </p>
       ) : null}
-      {product.error && !isApiError(product.error, 404) && !isApiError(product.error, 409) ? (
-        <p className="text-destructive p-16 text-center text-sm">Unable to load the selected product.</p>
+      {product.error && !selectedProduct && !isApiError(product.error, 409) ? (
+        <p className="text-destructive p-16 text-center text-sm" role="alert">
+          Unable to load the selected product.
+        </p>
       ) : null}
 
       {selectedProduct ? (
@@ -121,7 +125,7 @@ export function ElevateRelationshipExplorer({
         </>
       ) : null}
 
-      {!products.isLoading && !products.isPlaceholderData && !products.error && currentProducts?.totalElements === 0 ? (
+      {!products.isLoading && !products.isPlaceholderData && currentProducts?.totalElements === 0 ? (
         <div className="p-10 text-center" role="status">
           <p className="text-foreground text-sm font-medium">No products synced</p>
           <p className="text-muted-foreground mt-1 text-sm text-pretty">

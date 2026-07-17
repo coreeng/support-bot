@@ -18,7 +18,7 @@ type RelationshipKind = "journey" | "user";
 
 const FILTER_OPTIONS = [
   { value: "linked", label: "With links" },
-  { value: "unassigned", label: "Unassigned" },
+  { value: "unassigned", label: "No valid links" },
 ];
 
 const SORT_OPTIONS = [
@@ -189,16 +189,20 @@ export function ElevateRelationshipBrowser({
               {query ? "Searching records…" : "Updating records…"}
             </p>
           ) : null}
-          {!result.isLoading && !showingPlaceholder && result.error ? (
-            <p className="text-destructive p-16 text-center text-sm">Unable to load records.</p>
+          {!result.isLoading && !showingPlaceholder && result.error && !result.data ? (
+            <p className="text-destructive p-16 text-center text-sm" role="alert">
+              Unable to load records.
+            </p>
           ) : null}
-          {!result.isLoading && !showingPlaceholder && !result.error && items && items.length > 0 ? (
+          {!result.isLoading && !showingPlaceholder && items && items.length > 0 ? (
             <ul role="list" className="max-h-[34rem] divide-y overflow-y-auto">
               {items.map((item) => {
                 const isJourney = kind === "journey";
                 const count = isJourney ? (item as ElevateJourney).userCount : (item as ElevateUser).journeyCount;
                 const identifier = isJourney ? (item as ElevateJourney).slug : item.id;
                 const selected = item.id === selectedId;
+                const relationshipLabel =
+                  count > 0 ? countLabel(count, isJourney ? "product user" : "journey") : "no valid same-product links";
                 return (
                   <li key={item.id}>
                     <Button
@@ -206,7 +210,7 @@ export function ElevateRelationshipBrowser({
                       variant="ghost"
                       size="default"
                       aria-current={selected ? "true" : undefined}
-                      aria-label={`${item.name}, ${countLabel(count, isJourney ? "product user" : "journey")}`}
+                      aria-label={`${item.name}, ${relationshipLabel}`}
                       className={cn(
                         "h-auto w-full justify-start rounded-none p-3 text-left whitespace-normal sm:p-4",
                         selected && "bg-accent text-accent-foreground"
@@ -221,7 +225,7 @@ export function ElevateRelationshipBrowser({
                         {count > 0 ? (
                           <span className="font-mono tabular-nums">{countLabel(count, isJourney ? "user" : "journey")}</span>
                         ) : (
-                          "Unassigned"
+                          "No valid links"
                         )}
                       </Badge>
                     </Button>
@@ -230,7 +234,7 @@ export function ElevateRelationshipBrowser({
               })}
             </ul>
           ) : null}
-          {!result.isLoading && !showingPlaceholder && !result.error && items?.length === 0 ? (
+          {!result.isLoading && !showingPlaceholder && items?.length === 0 ? (
             <div className="flex min-h-64 items-center justify-center p-6 text-center" role="status">
               <div>
                 <p className="text-foreground text-sm font-medium">No {kind === "journey" ? "journeys" : "product users"} found</p>

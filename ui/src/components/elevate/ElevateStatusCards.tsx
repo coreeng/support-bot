@@ -1,6 +1,9 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
+import { useNow } from "@/hooks/useNow";
 import type { ElevateStatus } from "@/lib/types";
-import { AlertCircle, CheckCircle2, CircleDashed, Database, ExternalLink, PlugZap } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, CircleDashed, Database, ExternalLink, PlugZap } from "lucide-react";
 import { ReactNode } from "react";
 
 function formatTimestamp(value: string | null): string {
@@ -17,6 +20,20 @@ function formatSchedule(value: string): string {
   if (match[1]) parts.push(`${match[1]}h`);
   if (match[2]) parts.push(`${match[2]}m`);
   return parts.join(" ") || value;
+}
+
+function durationMilliseconds(value: string): number | null {
+  const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/i.exec(value);
+  if (!match || !match.slice(1).some(Boolean)) return null;
+  const duration = (Number(match[1] ?? 0) * 60 * 60 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0)) * 1000;
+  return Number.isFinite(duration) && duration > 0 ? duration : null;
+}
+
+function isSyncOverdue(lastSyncSuccessAt: string | null, syncInterval: string, now: number): boolean {
+  if (!lastSyncSuccessAt) return false;
+  const lastSuccess = Date.parse(lastSyncSuccessAt);
+  const interval = durationMilliseconds(syncInterval);
+  return Number.isFinite(lastSuccess) && interval !== null && now - lastSuccess > interval;
 }
 
 function StatusRow({ label, children }: { label: string; children: ReactNode }) {
@@ -69,6 +86,9 @@ function FailureMessage({ message }: { message: string | null }) {
 }
 
 export function ElevateStatusCards({ status }: { status: ElevateStatus }) {
+  const now = useNow();
+  const syncOverdue = isSyncOverdue(status.lastSyncSuccessAt, status.syncInterval, now);
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="bg-card rounded-xl border p-6">
@@ -145,9 +165,21 @@ export function ElevateStatusCards({ status }: { status: ElevateStatus }) {
             </time>
           </StatusRow>
           <StatusRow label="Last successful">
-            <time className="font-mono tabular-nums" dateTime={status.lastSyncSuccessAt ?? undefined}>
-              {formatTimestamp(status.lastSyncSuccessAt)}
-            </time>
+            <span className="inline-flex items-center gap-1.5">
+              <time className="font-mono tabular-nums" dateTime={status.lastSyncSuccessAt ?? undefined}>
+                {formatTimestamp(status.lastSyncSuccessAt)}
+              </time>
+              {syncOverdue ? (
+                <span
+                  className="text-warning inline-flex"
+                  role="img"
+                  aria-label="Last successful sync is overdue"
+                  title="Last successful sync is overdue"
+                >
+                  <AlertTriangle className="size-4" aria-hidden="true" />
+                </span>
+              ) : null}
+            </span>
           </StatusRow>
           <StatusRow label="Sync schedule">
             Every <span className="font-mono tabular-nums">{formatSchedule(status.syncInterval)}</span>
@@ -172,4 +204,4 @@ export function ElevateStatusCards({ status }: { status: ElevateStatus }) {
   );
 }
 
-export { formatSchedule, formatTimestamp };
+export { formatSchedule, formatTimestamp, isSyncOverdue };

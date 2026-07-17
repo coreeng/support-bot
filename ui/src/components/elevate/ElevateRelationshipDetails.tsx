@@ -190,8 +190,12 @@ export function ElevateRelationshipDetails({
     return <p className="text-muted-foreground p-16 text-center text-sm">Loading record details…</p>;
   }
 
-  if (detail.error || !detail.data) {
-    return <p className="text-destructive p-16 text-center text-sm">Unable to load record details.</p>;
+  if (!detail.data) {
+    return (
+      <p className="text-destructive p-16 text-center text-sm" role="alert">
+        Unable to load record details.
+      </p>
+    );
   }
 
   const isJourney = focus.kind === "journey";
@@ -231,10 +235,12 @@ export function ElevateRelationshipDetails({
       {related.isLoading && !related.data ? (
         <p className="text-muted-foreground mt-5 p-6 text-center text-sm">Loading direct relationships…</p>
       ) : null}
-      {!showingRelatedPlaceholder && related.error ? (
-        <p className="text-destructive mt-5 p-6 text-center text-sm">Unable to load direct relationships.</p>
+      {!showingRelatedPlaceholder && related.error && !related.data ? (
+        <p className="text-destructive mt-5 p-6 text-center text-sm" role="alert">
+          Unable to load direct relationships.
+        </p>
       ) : null}
-      {!related.error && related.data ? (
+      {related.data ? (
         <RelatedRecords
           records={showingRelatedPlaceholder ? [] : relatedRecords}
           totalElements={related.data.totalElements}
@@ -245,7 +251,9 @@ export function ElevateRelationshipDetails({
           query={query}
           sort={sort}
           recordLabel={isJourney ? "product users" : "journeys"}
-          emptyMessage={isJourney ? "This journey has no assigned product users." : "This product user is not assigned to a journey."}
+          emptyMessage={
+            isJourney ? "This journey has no valid same-product user links." : "This product user has no valid same-product journey links."
+          }
           onQueryChange={(value) => {
             setQuery(value);
             setPage(0);

@@ -74,10 +74,7 @@ export default function ElevatePage() {
       {data ? (
         <>
           {error ? (
-            <div
-              className="border-warning/30 bg-warning/10 text-foreground flex items-center gap-2 rounded-md border p-3 text-sm"
-              role="alert"
-            >
+            <div className="border-warning/30 bg-warning/10 text-foreground flex items-center gap-2 rounded-md border p-3 text-sm">
               <AlertCircle className="text-warning h-4 w-4 shrink-0" />
               Could not refresh Elevate status. Showing the most recently loaded local data.
             </div>

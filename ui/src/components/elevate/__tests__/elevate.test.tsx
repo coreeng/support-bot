@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import * as hooks from "../../../lib/hooks";
 import type { ElevateIntegrityIssue, ElevateJourney, ElevatePage, ElevateProduct, ElevateStatus, ElevateUser } from "../../../lib/types";
+import { isSyncOverdue } from "../ElevateStatusCards";
 import ElevatePageView from "../elevate";
 
 jest.mock("../../../lib/hooks", () => ({
@@ -381,7 +382,7 @@ describe("ElevatePage", () => {
 
     const primaryControls = screen.getByRole("tablist", { name: "Relationship type" }).parentElement!;
     await user.click(within(primaryControls).getByRole("button", { name: /^Relationship/ }));
-    await user.click(screen.getByRole("option", { name: "Unassigned" }));
+    await user.click(screen.getByRole("option", { name: "No valid links" }));
     expect(mockUseElevateProductJourneys).toHaveBeenLastCalledWith(
       "product-1",
       expect.objectContaining({ relationship: "unassigned" }),
@@ -454,6 +455,41 @@ describe("ElevatePage", () => {
     expect(within(details).queryByRole("button", { name: "View Application team, 1 journey" })).not.toBeInTheDocument();
   });
 
+  it("keeps cached snapshot records visible when background refreshes fail", async () => {
+    const refreshError = new Error("background refresh failed");
+    mockUseElevateProducts.mockReturnValue(query(page(products), refreshError));
+    mockUseElevateProduct.mockReturnValue(query(products[0], refreshError));
+    mockUseElevateProductJourneys.mockReturnValue(query(page(journeys.slice(0, 2)), refreshError));
+    mockUseElevateJourney.mockReturnValue(query(journeys[0], refreshError));
+    mockUseElevateJourneyUsers.mockReturnValue(query(page(users.slice(0, 2)), refreshError));
+
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "Platform" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "First deployment, 2 product users" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View Application team, 1 journey" })).toBeInTheDocument();
+    expect(screen.queryByText(/Unable to load/)).not.toBeInTheDocument();
+  });
+
+  it("shows a cached empty product snapshot when its background refresh fails", () => {
+    mockUseElevateStatus.mockReturnValue(query({ ...connectedStatus, counts: { ...connectedStatus.counts, products: 0 } }));
+    mockUseElevateProducts.mockReturnValue(query(page<ElevateProduct>([]), new Error("background refresh failed")));
+
+    renderPage();
+
+    expect(screen.getByText("No products synced")).toBeInTheDocument();
+    expect(screen.queryByText("Unable to load synced products.")).not.toBeInTheDocument();
+  });
+
+  it("announces a child-query error when there is no data to preserve", async () => {
+    mockUseElevateProductJourneys.mockReturnValue(query(undefined, new Error("initial request failed")));
+
+    renderPage();
+
+    expect(await screen.findByRole("alert", { name: "" })).toHaveTextContent("Unable to load records.");
+    expect(screen.queryByRole("button", { name: "First deployment, 2 product users" })).not.toBeInTheDocument();
+  });
+
   it("loads unmatched records in a paginated, searchable disclosure", async () => {
     const user = userEvent.setup();
     mockUseElevateStatus.mockReturnValue(
@@ -479,11 +515,48 @@ describe("ElevatePage", () => {
     );
     renderPage();
 
+    expect(screen.getByText(/Apparent snapshot inconsistencies are retried automatically/)).toHaveTextContent(
+      "21 records cannot be linked cleanly. Apparent snapshot inconsistencies are retried automatically. Invalid journey-to-product-user links can be reviewed in Elevate."
+    );
     await user.click(screen.getByText("Review unmatched records"));
     expect(await screen.findByText("Assignment to a missing product user")).toBeInTheDocument();
     const region = screen.getByRole("region", { name: "Unmatched synced records" });
     await user.click(within(region).getByRole("button", { name: "Next" }));
     expect(mockUseElevateIntegrity).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }), true);
+  });
+
+  it("renders both sides and product contexts of a cross-product assignment", async () => {
+    const user = userEvent.setup();
+    mockUseElevateStatus.mockReturnValue(
+      query({ ...connectedStatus, integrity: { ...connectedStatus.integrity, crossProductAssignments: 1 } })
+    );
+    mockUseElevateIntegrity.mockReturnValue(
+      query(
+        page([
+          {
+            type: "crossProductAssignment",
+            journeyId: "journey-1",
+            journeyName: "First deployment",
+            journeyProductId: "platform-product",
+            userId: "11111111-1111-1111-1111-111111111111",
+            userName: "Runtime responder",
+            userProductId: "runtime-product",
+          },
+        ]),
+        new Error("background refresh failed")
+      )
+    );
+    renderPage();
+
+    await user.click(screen.getByText("Review unmatched records"));
+    const integrityRegion = screen.getByRole("region", { name: "Unmatched synced records" });
+
+    expect(within(integrityRegion).getByText("First deployment")).toBeInTheDocument();
+    expect(within(integrityRegion).getByText("Runtime responder")).toBeInTheDocument();
+    expect(
+      within(integrityRegion).getByText("journey product platform-product · product user product runtime-product")
+    ).toBeInTheDocument();
+    expect(within(integrityRegion).queryByText("Unable to load unmatched records.")).not.toBeInTheDocument();
   });
 
   it("does not expose stale integrity records or pagination while replacements load", async () => {
@@ -547,6 +620,24 @@ describe("ElevatePage", () => {
     expect(screen.getByText("Not set")).toBeInTheDocument();
   });
 
+  it("keeps the last successful sync visible and warns only after the sync interval is exceeded", () => {
+    const lastSuccess = connectedStatus.lastSyncSuccessAt!;
+    const intervalMilliseconds = 12 * 60 * 60 * 1000;
+    const now = jest.spyOn(Date, "now").mockReturnValue(Date.parse(lastSuccess) + intervalMilliseconds);
+
+    const { rerender } = renderPage();
+    const lastSuccessfulTime = document.querySelector(`time[datetime="${lastSuccess}"]`);
+    expect(lastSuccessfulTime).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Last successful sync is overdue" })).not.toBeInTheDocument();
+
+    now.mockReturnValue(Date.parse(lastSuccess) + intervalMilliseconds + 1);
+    rerender(<ElevatePageView />);
+
+    expect(lastSuccessfulTime).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Last successful sync is overdue" })).toBeInTheDocument();
+    now.mockRestore();
+  });
+
   it("renders loading, initial error, and stale-data error states", () => {
     mockUseElevateStatus.mockReturnValue(query(undefined, null, { isLoading: true, isFetching: true }));
     const { rerender } = renderPage();
@@ -562,5 +653,12 @@ describe("ElevatePage", () => {
     rerender(<ElevatePageView />);
     expect(screen.getByText("Could not refresh Elevate status. Showing the most recently loaded local data.")).toBeInTheDocument();
     expect(screen.getByText("Connected")).toBeInTheDocument();
+  });
+});
+
+describe("isSyncOverdue", () => {
+  it("fails closed for missing timestamps and unsupported durations", () => {
+    expect(isSyncOverdue(null, "PT12H", Date.now())).toBe(false);
+    expect(isSyncOverdue("2026-07-13T08:00:00Z", "tomorrow", Date.now())).toBe(false);
   });
 });

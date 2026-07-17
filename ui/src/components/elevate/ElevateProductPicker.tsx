@@ -78,6 +78,7 @@ export function ElevateProductPicker({
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="Search products…"
+            aria-label="Search products"
             value={query}
             onValueChange={(value) => {
               setQuery(value);
@@ -90,15 +91,15 @@ export function ElevateProductPicker({
                 <LoaderCircle className="size-4 animate-spin" /> {query ? "Searching products" : "Loading products"}
               </div>
             ) : null}
-            {!products.isLoading && !showingPlaceholder && products.error ? (
+            {!products.isLoading && !showingPlaceholder && products.error && !products.data ? (
               <p className="text-destructive p-6 text-center text-sm" role="alert">
                 Unable to load products.
               </p>
             ) : null}
-            {!products.isLoading && !showingPlaceholder && !products.error && products.data?.content.length === 0 ? (
+            {!products.isLoading && !showingPlaceholder && products.data?.content.length === 0 ? (
               <CommandEmpty>No products found.</CommandEmpty>
             ) : null}
-            {!showingPlaceholder && !products.error && products.data?.content.length ? (
+            {!showingPlaceholder && products.data?.content.length ? (
               <CommandGroup>
                 {products.data.content.map((product) => {
                   const selectedItem = product.id === selectedProduct.id;
@@ -128,7 +129,7 @@ export function ElevateProductPicker({
             ) : null}
           </CommandList>
         </Command>
-        {products.data && !products.error ? (
+        {products.data ? (
           <ElevatePagination page={products.data.page} totalPages={products.data.totalPages} busy={busy} onPageChange={setPage} />
         ) : null}
       </PopoverContent>

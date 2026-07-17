@@ -6,7 +6,7 @@ import { SingleSelectFilter } from "@/components/ui/single-select-filter";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { isApiError, useElevateIntegrity } from "@/lib/hooks";
 import type { ElevateIntegrityCounts, ElevateIntegrityIssue, ElevateIntegrityIssueType } from "@/lib/types";
-import { AlertTriangle, Search } from "lucide-react";
+import { AlertTriangle, ArrowRight, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const ISSUE_OPTIONS = [
@@ -39,6 +39,28 @@ function issueLabel(issue: ElevateIntegrityIssue) {
 }
 
 function IntegrityRecord({ issue }: { issue: ElevateIntegrityIssue }) {
+  if (issue.type === "crossProductAssignment") {
+    const journey = issue.journeyName ?? issue.journeyId ?? "Unknown journey";
+    const user = issue.userName ?? issue.userId ?? "Unknown product user";
+    return (
+      <li className="p-3 text-sm">
+        <p className="text-foreground flex flex-wrap items-center gap-2 font-medium">
+          <span>{journey}</span>
+          <ArrowRight className="text-muted-foreground size-4" aria-hidden="true" />
+          <span className="sr-only">to product user</span>
+          <span>{user}</span>
+        </p>
+        <p className="text-muted-foreground">Cross-product assignment</p>
+        <p className="text-muted-foreground font-mono text-xs break-all">
+          journey {issue.journeyId ?? "unknown"} · user {issue.userId ?? "unknown"}
+        </p>
+        <p className="text-muted-foreground font-mono text-xs break-all">
+          journey product {issue.journeyProductId ?? "unknown"} · product user product {issue.userProductId ?? "unknown"}
+        </p>
+      </li>
+    );
+  }
+
   const title = issue.journeyName ?? issue.userName ?? issue.journeyId ?? issue.userId ?? "Unknown record";
   return (
     <li className="p-3 text-sm">
@@ -94,8 +116,8 @@ export function ElevateIntegrityNotice({
       <div className="min-w-0 flex-1">
         <p className="text-foreground text-sm font-medium">Unmatched synced data</p>
         <p className="text-muted-foreground text-sm text-pretty">
-          <span className="font-mono tabular-nums">{countLabel(totalIssues, "record")}</span> cannot be linked cleanly. Review the affected
-          records and reconcile them in Elevate.
+          <span className="font-mono tabular-nums">{countLabel(totalIssues, "record")}</span> cannot be linked cleanly. Apparent snapshot
+          inconsistencies are retried automatically. Invalid journey-to-product-user links can be reviewed in Elevate.
         </p>
         <details
           className="mt-3"
@@ -154,20 +176,22 @@ export function ElevateIntegrityNotice({
                 {query ? "Searching unmatched records…" : "Updating unmatched records…"}
               </p>
             ) : null}
-            {!issues.isLoading && !showingPlaceholder && issues.error ? (
-              <p className="text-destructive p-16 text-center text-sm">Unable to load unmatched records.</p>
+            {!issues.isLoading && !showingPlaceholder && issues.error && !issues.data ? (
+              <p className="text-destructive p-16 text-center text-sm" role="alert">
+                Unable to load unmatched records.
+              </p>
             ) : null}
-            {!issues.isLoading && !showingPlaceholder && !issues.error && issues.data?.content.length === 0 ? (
+            {!issues.isLoading && !showingPlaceholder && issues.data?.content.length === 0 ? (
               <p className="text-muted-foreground p-16 text-center text-sm">No unmatched records match these filters.</p>
             ) : null}
-            {!showingPlaceholder && !issues.error && issues.data?.content.length ? (
+            {!showingPlaceholder && issues.data?.content.length ? (
               <ul className="max-h-80 divide-y overflow-y-auto" role="list">
                 {issues.data.content.map((issue, index) => (
                   <IntegrityRecord key={`${issue.type}-${issue.journeyId ?? ""}-${issue.userId ?? ""}-${index}`} issue={issue} />
                 ))}
               </ul>
             ) : null}
-            {issues.data && !issues.error ? (
+            {issues.data ? (
               <ElevatePagination page={issues.data.page} totalPages={issues.data.totalPages} busy={busy} onPageChange={setPage} />
             ) : null}
           </div>

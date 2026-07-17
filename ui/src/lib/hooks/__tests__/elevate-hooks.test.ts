@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { ApiError, shouldRetryElevateQuery, useElevateProducts } from "../index";
+import { ApiError, shouldRetryElevateQuery, useElevateJourneyUsers, useElevateProducts, useElevateUserJourneys } from "../index";
 
 const originalFetch = global.fetch;
 
@@ -55,5 +55,34 @@ describe("Elevate query cancellation", () => {
     });
 
     expect(requestSignal?.aborted).toBe(true);
+  });
+});
+
+describe("Elevate relationship query keys", () => {
+  it("separates direct-relationship caches by relationship filter", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
+    const request = {
+      snapshotVersion: "11111111-1111-1111-1111-111111111111",
+      page: 0,
+    } as const;
+
+    renderHook(() => useElevateJourneyUsers("journey-1", { ...request, relationship: "linked" }, false), { wrapper });
+    renderHook(() => useElevateJourneyUsers("journey-1", { ...request, relationship: "unassigned" }, false), { wrapper });
+    renderHook(() => useElevateUserJourneys("user-1", { ...request, relationship: "linked" }, false), { wrapper });
+    renderHook(() => useElevateUserJourneys("user-1", { ...request, relationship: "unassigned" }, false), { wrapper });
+
+    const keys = queryClient
+      .getQueryCache()
+      .getAll()
+      .map(({ queryKey }) => queryKey);
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        ["elevate", "journey-users", request.snapshotVersion, "journey-1", 0, 20, "", "linked", "name", "asc"],
+        ["elevate", "journey-users", request.snapshotVersion, "journey-1", 0, 20, "", "unassigned", "name", "asc"],
+        ["elevate", "user-journeys", request.snapshotVersion, "user-1", 0, 20, "", "linked", "name", "asc"],
+        ["elevate", "user-journeys", request.snapshotVersion, "user-1", 0, 20, "", "unassigned", "name", "asc"],
+      ])
+    );
   });
 });
