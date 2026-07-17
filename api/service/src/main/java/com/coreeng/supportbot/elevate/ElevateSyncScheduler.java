@@ -28,7 +28,7 @@ public final class ElevateSyncScheduler {
     public ElevateSyncScheduler(
             ElevateProps props,
             ElevateJobs jobs,
-            @Qualifier("elevateSyncScheduler") TaskScheduler scheduler,
+            @Qualifier("elevateSyncTaskScheduler") TaskScheduler scheduler,
             Clock clock) {
         this.props = props;
         this.jobs = jobs;

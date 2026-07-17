@@ -24,8 +24,8 @@ public class ElevateConfig {
         return elevateScheduler(builder, "elevate-status-");
     }
 
-    @Bean("elevateSyncScheduler")
-    public ThreadPoolTaskScheduler elevateSyncScheduler(ThreadPoolTaskSchedulerBuilder builder) {
+    @Bean("elevateSyncTaskScheduler")
+    public ThreadPoolTaskScheduler elevateSyncTaskScheduler(ThreadPoolTaskSchedulerBuilder builder) {
         return elevateScheduler(builder, "elevate-sync-");
     }
 
