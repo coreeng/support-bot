@@ -18,7 +18,7 @@ COPY service service
 COPY config config
 COPY build.gradle.kts .
 
-ARG P2P_VERSION
+ARG P2P_VERSION=dev
 
 # hadolint ignore=DL3001
 RUN service postgresql start && sleep 6 && \
@@ -33,6 +33,8 @@ RUN service postgresql start && sleep 6 && \
 
 ## Final stage
 FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
+ARG P2P_VERSION=dev
+ENV SUPPORT_BOT_VERSION=${P2P_VERSION}
 WORKDIR /app
 COPY --from=build /build/service/build/libs/service.jar /app/service.jar
 COPY service/analysis analysis

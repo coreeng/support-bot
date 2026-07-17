@@ -2,7 +2,7 @@ package com.coreeng.supportbot.dashboard;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.coreeng.supportbot.dashboard.DashboardRepository.IncomingVsResolvedGranularity;
+import com.coreeng.supportbot.dashboard.DashboardData.IncomingVsResolvedGranularity;
 import com.coreeng.supportbot.dashboard.JdbcDashboardRepository.IncomingVsResolvedBucketing;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
