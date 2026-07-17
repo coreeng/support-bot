@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider, type UseQueryResult } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import * as hooks from "../../../lib/hooks";
@@ -220,6 +220,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   installDefaultMocks();
 });
+
+afterEach(() => jest.useRealTimers());
 
 describe("ElevatePage", () => {
   it("follows direct relationships, moves focus to the new detail view, and re-queries the current DOM", async () => {
@@ -620,22 +622,20 @@ describe("ElevatePage", () => {
     expect(screen.getByText("Not set")).toBeInTheDocument();
   });
 
-  it("keeps the last successful sync visible and warns only after the sync interval is exceeded", () => {
+  it("keeps the last successful sync visible and warns when an open page crosses the sync interval", () => {
     const lastSuccess = connectedStatus.lastSyncSuccessAt!;
     const intervalMilliseconds = 12 * 60 * 60 * 1000;
-    const now = jest.spyOn(Date, "now").mockReturnValue(Date.parse(lastSuccess) + intervalMilliseconds);
+    jest.useFakeTimers().setSystemTime(Date.parse(lastSuccess) + intervalMilliseconds);
 
-    const { rerender } = renderPage();
+    renderPage();
     const lastSuccessfulTime = document.querySelector(`time[datetime="${lastSuccess}"]`);
     expect(lastSuccessfulTime).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Last successful sync is overdue" })).not.toBeInTheDocument();
 
-    now.mockReturnValue(Date.parse(lastSuccess) + intervalMilliseconds + 1);
-    rerender(<ElevatePageView />);
+    act(() => jest.advanceTimersByTime(1));
 
     expect(lastSuccessfulTime).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Last successful sync is overdue" })).toBeInTheDocument();
-    now.mockRestore();
   });
 
   it("renders loading, initial error, and stale-data error states", () => {
@@ -651,7 +651,7 @@ describe("ElevatePage", () => {
 
     mockUseElevateStatus.mockReturnValue(query(connectedStatus, new Error("refresh failed")));
     rerender(<ElevatePageView />);
-    expect(screen.getByText("Could not refresh Elevate status. Showing the most recently loaded local data.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not refresh Elevate status. Showing the most recently loaded local data.");
     expect(screen.getByText("Connected")).toBeInTheDocument();
   });
 });

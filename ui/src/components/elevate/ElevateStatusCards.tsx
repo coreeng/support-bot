@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { useNow } from "@/hooks/useNow";
 import type { ElevateStatus } from "@/lib/types";
 import { AlertCircle, AlertTriangle, CheckCircle2, CircleDashed, Database, ExternalLink, PlugZap } from "lucide-react";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
+
+const MAX_TIMEOUT_MILLISECONDS = 2_147_483_647;
 
 function formatTimestamp(value: string | null): string {
   if (!value) return "Never";
@@ -34,6 +36,25 @@ function isSyncOverdue(lastSyncSuccessAt: string | null, syncInterval: string, n
   const lastSuccess = Date.parse(lastSyncSuccessAt);
   const interval = durationMilliseconds(syncInterval);
   return Number.isFinite(lastSuccess) && interval !== null && now - lastSuccess > interval;
+}
+
+function useSyncOverdue(lastSyncSuccessAt: string | null, syncInterval: string): boolean {
+  const now = useNow();
+  const [timerRevision, setTimerRevision] = useState(0);
+
+  useEffect(() => {
+    if (!lastSyncSuccessAt) return;
+    const lastSuccess = Date.parse(lastSyncSuccessAt);
+    const interval = durationMilliseconds(syncInterval);
+    if (!Number.isFinite(lastSuccess) || interval === null) return;
+
+    const remaining = lastSuccess + interval - Date.now();
+    if (remaining < 0) return;
+    const timer = window.setTimeout(() => setTimerRevision((current) => current + 1), Math.min(remaining + 1, MAX_TIMEOUT_MILLISECONDS));
+    return () => window.clearTimeout(timer);
+  }, [lastSyncSuccessAt, syncInterval, timerRevision]);
+
+  return isSyncOverdue(lastSyncSuccessAt, syncInterval, now);
 }
 
 function StatusRow({ label, children }: { label: string; children: ReactNode }) {
@@ -86,8 +107,7 @@ function FailureMessage({ message }: { message: string | null }) {
 }
 
 export function ElevateStatusCards({ status }: { status: ElevateStatus }) {
-  const now = useNow();
-  const syncOverdue = isSyncOverdue(status.lastSyncSuccessAt, status.syncInterval, now);
+  const syncOverdue = useSyncOverdue(status.lastSyncSuccessAt, status.syncInterval);
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
