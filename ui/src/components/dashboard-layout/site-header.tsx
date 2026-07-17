@@ -25,6 +25,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   health: "Analytics & Operations",
   sla: "SLA",
   "tenant-requests": "Tenant Requests",
+  elevate: "Elevate",
 };
 
 function kebabToTitleCase(segment: string): string {

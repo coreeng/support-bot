@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.analysis.rest;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository.DimensionSummary;
+import com.coreeng.supportbot.analysis.DimensionSummary;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;

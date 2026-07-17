@@ -54,6 +54,7 @@ export function SingleSelectFilter({ title, value, onChange, options, showSearch
                 return (
                   <CommandItem
                     key={option.value}
+                    className="cursor-pointer"
                     onSelect={() => {
                       onChange(isSelected ? undefined : option.value);
                     }}
@@ -76,7 +77,7 @@ export function SingleSelectFilter({ title, value, onChange, options, showSearch
               <>
                 <CommandSeparator />
                 <CommandGroup>
-                  <CommandItem onSelect={() => onChange(undefined)} className="justify-center text-center">
+                  <CommandItem onSelect={() => onChange(undefined)} className="cursor-pointer justify-center text-center">
                     Clear filter
                   </CommandItem>
                 </CommandGroup>

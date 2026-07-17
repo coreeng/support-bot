@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository.AnalysisRecord;
 import com.coreeng.supportbot.analysis.AnalysisService.AnalysisStatus;
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
 import com.coreeng.supportbot.analysis.llm.LlmAnalysisService;

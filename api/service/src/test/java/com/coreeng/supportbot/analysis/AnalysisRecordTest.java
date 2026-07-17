@@ -2,7 +2,6 @@ package com.coreeng.supportbot.analysis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository.AnalysisRecord;
 import org.junit.jupiter.api.Test;
 
 class AnalysisRecordTest {

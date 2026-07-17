@@ -131,6 +131,7 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     compileOnly("org.projectlombok:lombok:${lombokVersion}")
@@ -257,6 +258,15 @@ fun localPostgresPassword(): String =
     System.getProperty("supportbot.localDb.password")
         ?: System.getenv("SUPPORTBOT_LOCAL_DB_PASSWORD")
         ?: "postgres"
+
+tasks.withType<Test>().configureEach {
+    if (useHostPostgresForFlywayAndJooq()) {
+        systemProperty("docker", "true")
+        systemProperty("supportbot.localDb.url", localPostgresJdbcUrl())
+        systemProperty("supportbot.localDb.user", localPostgresUser())
+        systemProperty("supportbot.localDb.password", localPostgresPassword())
+    }
+}
 
 flyway {
     locations = arrayOf("filesystem:./src/main/resources/db/migration")

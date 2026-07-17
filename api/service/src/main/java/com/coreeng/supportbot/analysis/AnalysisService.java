@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.analysis;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository.AnalysisRecord;
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
 import com.coreeng.supportbot.analysis.llm.LlmAnalysisService;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;

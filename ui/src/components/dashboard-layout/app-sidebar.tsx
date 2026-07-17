@@ -1,6 +1,6 @@
 "use client";
 
-import { type LucideIcon, Activity, AlertCircle, BookOpen, GaugeCircle, GitPullRequest, Home, Ticket } from "lucide-react";
+import { type LucideIcon, Activity, AlertCircle, BookOpen, Cable, GaugeCircle, GitPullRequest, Home, Ticket } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -73,6 +73,15 @@ const SUPPORT_TABS: SupportTab[] = [
   },
 ];
 
+const INTEGRATION_TABS: SupportTab[] = [
+  {
+    path: "/elevate",
+    title: "Elevate",
+    icon: Cable,
+    visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS },
+  },
+];
+
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { state } = useSidebar();
@@ -93,14 +102,18 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     return true;
   };
 
-  const items: NavItem[] = SUPPORT_TABS.filter(isVisible).map((tab) => ({
-    title: tab.title,
-    url: tab.path,
-    icon: tab.icon,
-    isActive: pathname === tab.path,
-  }));
+  const mapTabs = (tabs: SupportTab[]): NavItem[] =>
+    tabs.filter(isVisible).map((tab) => ({
+      title: tab.title,
+      url: tab.path,
+      icon: tab.icon,
+      isActive: pathname === tab.path,
+    }));
 
-  const navGroups = [{ label: "Support", items }];
+  const navGroups = [
+    { label: "Support", items: mapTabs(SUPPORT_TABS) },
+    { label: "Integrations", items: mapTabs(INTEGRATION_TABS) },
+  ].filter((group) => group.items.length > 0);
 
   return (
     <Sidebar collapsible="icon" variant="inset" {...props}>

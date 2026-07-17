@@ -29,7 +29,7 @@ public class AnalysisResultsService {
      *
      * @return List of dimension summaries ordered by count (descending)
      */
-    public List<AnalysisRepository.DimensionSummary> getKnowledgeGapCategoriesWithSummaries() {
+    public List<DimensionSummary> getKnowledgeGapCategoriesWithSummaries() {
         return analysisRepository.getKnowledgeGapCategoriesWithSummaries();
     }
 
@@ -38,7 +38,7 @@ public class AnalysisResultsService {
      *
      * @return List of dimension summaries ordered by count (descending)
      */
-    public List<AnalysisRepository.DimensionSummary> getDriversWithSummaries() {
+    public List<DimensionSummary> getDriversWithSummaries() {
         return analysisRepository.getDriversWithSummaries();
     }
 
@@ -53,7 +53,7 @@ public class AnalysisResultsService {
      * @return Number of records affected
      */
     @Transactional
-    public int importAnalysisData(List<AnalysisRepository.AnalysisRecord> records) {
+    public int importAnalysisData(List<AnalysisRecord> records) {
         log.info("Starting analysis data import with {} records", records.size());
 
         int affectedCount = analysisRepository.upsert(records);

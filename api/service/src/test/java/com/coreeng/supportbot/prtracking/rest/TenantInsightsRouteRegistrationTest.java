@@ -10,6 +10,7 @@ import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.prtracking.PrTrackingRepository;
 import com.coreeng.supportbot.prtracking.RequestBreakdown;
+import com.coreeng.supportbot.prtracking.TenantInsightsService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -91,7 +92,7 @@ class TenantInsightsRouteRegistrationTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties(PrTrackingProps.class)
-    @Import({TenantInsightsEnabledController.class, TenantInsightsController.class})
+    @Import({TenantInsightsEnabledController.class, TenantInsightsController.class, TenantInsightsService.class})
     static class TenantInsightsTestConfig {
 
         @Bean

@@ -3,7 +3,7 @@ package com.coreeng.supportbot.summarydata.rest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository;
+import com.coreeng.supportbot.analysis.AnalysisRecord;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.AnalysisProps;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -74,10 +74,10 @@ class SummaryDataControllerTest {
         assertThat(response.getBody().message()).isEqualTo("Import successful");
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<AnalysisRepository.AnalysisRecord>> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<AnalysisRecord>> captor = ArgumentCaptor.forClass(List.class);
         verify(analysisResultsService).importAnalysisData(captor.capture());
 
-        List<AnalysisRepository.AnalysisRecord> records = captor.getValue();
+        List<AnalysisRecord> records = captor.getValue();
         assertThat(records).hasSize(2);
         assertThat(records.get(0).ticketId()).isEqualTo(1);
         assertThat(records.get(0).driver()).isEqualTo("Bug");
@@ -104,10 +104,10 @@ class SummaryDataControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<AnalysisRepository.AnalysisRecord>> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<AnalysisRecord>> captor = ArgumentCaptor.forClass(List.class);
         verify(analysisResultsService).importAnalysisData(captor.capture());
 
-        List<AnalysisRepository.AnalysisRecord> records = captor.getValue();
+        List<AnalysisRecord> records = captor.getValue();
         assertThat(records).hasSize(2);
         assertThat(records.get(0).ticketId()).isEqualTo(1);
         assertThat(records.get(1).ticketId()).isEqualTo(3);

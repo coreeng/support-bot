@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository.AnalysisRecord;
+import com.coreeng.supportbot.analysis.AnalysisRecord;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import org.junit.jupiter.api.BeforeEach;

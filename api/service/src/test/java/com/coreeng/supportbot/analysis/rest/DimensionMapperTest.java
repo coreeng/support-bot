@@ -3,7 +3,7 @@ package com.coreeng.supportbot.analysis.rest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository.DimensionSummary;
+import com.coreeng.supportbot.analysis.DimensionSummary;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import java.time.Instant;

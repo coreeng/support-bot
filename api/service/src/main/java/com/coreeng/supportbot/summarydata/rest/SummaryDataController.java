@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.summarydata.rest;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository;
+import com.coreeng.supportbot.analysis.AnalysisRecord;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.AnalysisProps;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -156,7 +156,7 @@ public class SummaryDataController {
 
         try {
             // Parse JSONL file
-            List<AnalysisRepository.AnalysisRecord> records = new ArrayList<>();
+            List<AnalysisRecord> records = new ArrayList<>();
             int totalLines = parseJsonlFile(file, records);
 
             if (records.isEmpty()) {
@@ -190,7 +190,7 @@ public class SummaryDataController {
      * @return total number of lines parsed
      * @throws IOException if reading the file fails
      */
-    private int parseJsonlFile(MultipartFile file, List<AnalysisRepository.AnalysisRecord> records) throws IOException {
+    private int parseJsonlFile(MultipartFile file, List<AnalysisRecord> records) throws IOException {
         int totalLines = 0;
         try (BufferedReader reader =
                 new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
@@ -199,8 +199,7 @@ public class SummaryDataController {
             while ((line = reader.readLine()) != null) {
                 try {
                     ++totalLines;
-                    AnalysisRepository.AnalysisRecord record =
-                            objectMapper.readValue(line, AnalysisRepository.AnalysisRecord.class);
+                    AnalysisRecord record = objectMapper.readValue(line, AnalysisRecord.class);
                     if (!record.isValid()) {
                         log.warn("Skipping line - missing or empty fields: {}", line);
                         continue;

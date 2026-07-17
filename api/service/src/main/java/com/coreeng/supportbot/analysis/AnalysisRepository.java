@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.analysis;
 
-import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -68,47 +67,4 @@ public interface AnalysisRepository {
      * @param record Analysis record to upsert
      */
     void upsert(AnalysisRecord record);
-
-    /**
-     * DTO for a dimension (driver or category) with its count and example summaries.
-     *
-     * @param dimension The dimension value (e.g., "Knowledge Gap" or "Monitoring & Troubleshooting")
-     * @param queryCount Total number of tickets with this dimension
-     * @param summary One example summary for this dimension
-     * @param ticketId ID of the related support ticket
-     * @param queryTs Original Slack message timestamp
-     */
-    record DimensionSummary(String dimension, long queryCount, String summary, TicketId ticketId, MessageTs queryTs) {}
-
-    /**
-     * DTO for an analysis record.
-     *
-     * @param ticketId The ticket ID (primary key)
-     * @param driver The primary driver (e.g., "Knowledge Gap")
-     * @param category The category (e.g., "Monitoring & Troubleshooting")
-     * @param feature The platform feature (e.g., "workload compute")
-     * @param summary Human-readable explanation of the ticket
-     * @param promptId The prompt ID used to generate this analysis (for versioning)
-     */
-    record AnalysisRecord(
-            int ticketId,
-            @Nullable String driver,
-            @Nullable String category,
-            @Nullable String feature,
-            @Nullable String summary,
-            @Nullable String promptId) {
-
-        /**
-         * Checks if this record has all required fields populated.
-         *
-         * @return true if ticketId is positive and all analysis fields are non-blank
-         */
-        public boolean isValid() {
-            return ticketId > 0 && isValid(driver) && isValid(category) && isValid(feature) && isValid(summary);
-        }
-
-        private boolean isValid(@Nullable String s) {
-            return s != null && !s.isBlank();
-        }
-    }
 }

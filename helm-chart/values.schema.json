@@ -164,6 +164,7 @@
         "pullPolicy": { "type": "string" }
       }
     },
+    "supportBotVersion": { "type": "string" },
     "imagePullSecrets": {
       "type": "array",
       "items": {

@@ -45,9 +45,16 @@ export async function proxyFetch(tag: string, path: string, url: string, options
 
 /**
  * Authenticated fetch to backend API.
+ * Uses a query-free path in logs by default; callers with dynamic path segments
+ * should provide a route template as logPath.
  * Returns null if user is not authenticated (caller should handle 401).
  */
-export async function backendFetch(request: Request | NextRequest, path: string, options: RequestInit = {}): Promise<Response | null> {
+export async function backendFetch(
+  request: Request | NextRequest,
+  path: string,
+  options: RequestInit = {},
+  logPath = path.split("?", 1)[0]
+): Promise<Response | null> {
   const accessToken = await backendAccessToken(request);
 
   if (!accessToken) {
@@ -60,7 +67,7 @@ export async function backendFetch(request: Request | NextRequest, path: string,
   headers.set("Authorization", `Bearer ${accessToken}`);
 
   const url = path.startsWith("http") ? path : `${BACKEND_URL}${path}`;
-  return proxyFetch("proxy", path, url, { ...options, headers });
+  return proxyFetch("proxy", logPath, url, { ...options, headers });
 }
 
 /**
