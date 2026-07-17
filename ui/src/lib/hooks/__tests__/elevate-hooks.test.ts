@@ -1,7 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { ApiError, shouldRetryElevateQuery, useElevateJourneyUsers, useElevateProducts, useElevateUserJourneys } from "../index";
+import {
+  ApiError,
+  shouldRetryElevateQuery,
+  useElevateJourneyUsers,
+  useElevateProducts,
+  useElevateProductUsers,
+  useElevateUserJourneys,
+} from "../index";
 
 const originalFetch = global.fetch;
 
@@ -78,10 +85,33 @@ describe("Elevate relationship query keys", () => {
       .map(({ queryKey }) => queryKey);
     expect(keys).toEqual(
       expect.arrayContaining([
-        ["elevate", "journey-users", request.snapshotVersion, "journey-1", 0, 20, "", "linked", "name", "asc"],
-        ["elevate", "journey-users", request.snapshotVersion, "journey-1", 0, 20, "", "unassigned", "name", "asc"],
-        ["elevate", "user-journeys", request.snapshotVersion, "user-1", 0, 20, "", "linked", "name", "asc"],
-        ["elevate", "user-journeys", request.snapshotVersion, "user-1", 0, 20, "", "unassigned", "name", "asc"],
+        ["elevate", "journey-users", request.snapshotVersion, "journey-1", 0, 20, "", "", "linked", "name", "asc"],
+        ["elevate", "journey-users", request.snapshotVersion, "journey-1", 0, 20, "", "", "unassigned", "name", "asc"],
+        ["elevate", "user-journeys", request.snapshotVersion, "user-1", 0, 20, "", "", "linked", "name", "asc"],
+        ["elevate", "user-journeys", request.snapshotVersion, "user-1", 0, 20, "", "", "unassigned", "name", "asc"],
+      ])
+    );
+  });
+
+  it("separates exact-ID lookups from free-text searches", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
+    const request = {
+      snapshotVersion: "11111111-1111-1111-1111-111111111111",
+      page: 0,
+    } as const;
+
+    renderHook(() => useElevateProductUsers("product-1", { ...request, exactId: "user-21" }, false), { wrapper });
+    renderHook(() => useElevateProductUsers("product-1", { ...request, query: "user-21" }, false), { wrapper });
+
+    const keys = queryClient
+      .getQueryCache()
+      .getAll()
+      .map(({ queryKey }) => queryKey);
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        ["elevate", "product-users", request.snapshotVersion, "product-1", 0, 20, "", "user-21", "all", "name", "asc"],
+        ["elevate", "product-users", request.snapshotVersion, "product-1", 0, 20, "user-21", "", "all", "name", "asc"],
       ])
     );
   });

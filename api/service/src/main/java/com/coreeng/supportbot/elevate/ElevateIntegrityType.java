@@ -2,7 +2,6 @@ package com.coreeng.supportbot.elevate;
 
 public enum ElevateIntegrityType {
     ALL(""),
-    ORPHAN_JOURNEY("ORPHAN_JOURNEY"),
     ORPHAN_USER("ORPHAN_USER"),
     MISSING_ASSIGNMENT("MISSING_ASSIGNMENT"),
     CROSS_PRODUCT_ASSIGNMENT("CROSS_PRODUCT_ASSIGNMENT");

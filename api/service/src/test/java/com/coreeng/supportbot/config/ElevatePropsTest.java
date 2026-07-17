@@ -21,9 +21,11 @@ class ElevatePropsTest {
         assertThat(props.connectTimeout()).isEqualTo(Duration.ofSeconds(5));
         assertThat(props.readTimeout()).isEqualTo(Duration.ofSeconds(30));
         assertThat(props.maxInsightsPageResponseBytes()).isEqualTo(16_777_216);
+        assertThat(props.maxInsightsSnapshotResponseBytes()).isEqualTo(67_108_864);
         assertThat(props.maxServerRetryDelay()).isEqualTo(Duration.ofMinutes(1));
         assertThat(props.statusInterval()).isEqualTo(Duration.ofHours(1));
         assertThat(props.syncInterval()).isEqualTo(Duration.ofHours(12));
+        assertThat(props.syncTimeout()).isEqualTo(Duration.ofMinutes(10));
         assertThat(props.maxPagesPerResource()).isEqualTo(100);
         assertThat(props.maxTotalEntities()).isEqualTo(20_000);
         assertThat(props.maxMaterializedRelationships()).isEqualTo(100_000);
@@ -48,7 +50,7 @@ class ElevatePropsTest {
         assertThat(props.configured()).isTrue();
         assertThat(props.baseUrl()).isEqualTo("https://elevate.example.test");
         assertThat(props.clientId()).isEqualTo("esc_client");
-        assertThat(props.clientSecret()).isEqualTo("secret-value");
+        assertThat(props.clientSecret()).isEqualTo("placeholder");
         assertThat(props.connectTimeout()).isEqualTo(Duration.ofMillis(750));
         assertThat(props.readTimeout()).isEqualTo(Duration.ofSeconds(45));
         assertThat(props.maxServerRetryDelay()).isEqualTo(Duration.ofSeconds(90));
@@ -83,7 +85,7 @@ class ElevatePropsTest {
                 .hasRootCauseMessage("elevate.base-url must be an absolute HTTP(S) URL");
 
         Map<String, Object> query = connectionValues();
-        query.put("elevate.base-url", "https://elevate.example.test?apiKey=secret");
+        query.put("elevate.base-url", "https://elevate.example.test?test=value");
         assertThatThrownBy(() -> bind(query))
                 .hasRootCauseMessage("elevate.base-url must not contain a query or fragment");
 
@@ -124,7 +126,7 @@ class ElevatePropsTest {
 
     @Test
     void rejectsNonPositiveHttpTimeouts() {
-        for (String property : List.of("connect-timeout", "read-timeout", "max-server-retry-delay")) {
+        for (String property : List.of("connect-timeout", "read-timeout", "max-server-retry-delay", "sync-timeout")) {
             Map<String, Object> values = connectionValues();
             values.put("elevate." + property, "0s");
 
@@ -136,6 +138,7 @@ class ElevatePropsTest {
     void rejectsInvalidFetchSafetyLimits() {
         for (String property : List.of(
                 "max-insights-page-response-bytes",
+                "max-insights-snapshot-response-bytes",
                 "max-pages-per-resource",
                 "max-total-entities",
                 "max-materialized-relationships")) {
@@ -144,6 +147,17 @@ class ElevatePropsTest {
 
             assertThatThrownBy(() -> bind(values)).hasRootCauseMessage("elevate." + property + " must be positive");
         }
+    }
+
+    @Test
+    void rejectsSnapshotResponseLimitBelowThePageLimit() {
+        Map<String, Object> values = connectionValues();
+        values.put("elevate.max-insights-page-response-bytes", "1024");
+        values.put("elevate.max-insights-snapshot-response-bytes", "512");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage(
+                        "elevate.max-insights-snapshot-response-bytes must not be less than elevate.max-insights-page-response-bytes");
     }
 
     @Test
@@ -165,7 +179,7 @@ class ElevatePropsTest {
         ElevateProps props = bind(connectionValues());
 
         assertThat(props.toString())
-                .doesNotContain("esc_client", "secret-value")
+                .doesNotContain("esc_client", "placeholder")
                 .contains("clientId=<redacted>", "clientSecret=<redacted>");
     }
 
@@ -179,7 +193,7 @@ class ElevatePropsTest {
         Map<String, Object> values = new HashMap<>();
         values.put("elevate.base-url", "https://elevate.example.test");
         values.put("elevate.client-id", "esc_client");
-        values.put("elevate.client-secret", "secret-value");
+        values.put("elevate.client-secret", "placeholder");
         return values;
     }
 }

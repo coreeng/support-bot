@@ -13,7 +13,6 @@ public record ElevateIntegrityItem(
         @Nullable String userName,
         @Nullable String userProductId) {
     public enum Type {
-        ORPHAN_JOURNEY("orphanJourney"),
         ORPHAN_USER("orphanUser"),
         MISSING_ASSIGNMENT("missingAssignment"),
         CROSS_PRODUCT_ASSIGNMENT("crossProductAssignment");

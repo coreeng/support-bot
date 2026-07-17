@@ -569,6 +569,7 @@ function elevatePageParams(request: ElevatePageRequest) {
     pageSize: String(request.pageSize ?? ELEVATE_PAGE_SIZE),
   });
   if (request.query?.trim()) params.set("query", request.query.trim());
+  if (request.exactId?.trim()) params.set("exactId", request.exactId.trim());
   if (request.relationship && request.relationship !== "all") params.set("relationship", request.relationship);
   if (request.sort) params.set("sort", request.sort);
   if (request.direction) params.set("direction", request.direction);
@@ -603,6 +604,7 @@ export function useElevateProducts(request: ElevatePageRequest, enabled = true) 
         request.page ?? 0,
         request.pageSize ?? ELEVATE_PAGE_SIZE,
         request.query ?? "",
+        request.exactId ?? "",
         request.relationship ?? "all",
         request.sort ?? "name",
         request.direction ?? "asc",
@@ -636,6 +638,7 @@ export function useElevateProductJourneys(productId: string, request: ElevatePag
         request.page ?? 0,
         request.pageSize ?? ELEVATE_PAGE_SIZE,
         request.query ?? "",
+        request.exactId ?? "",
         request.relationship ?? "all",
         request.sort ?? "name",
         request.direction ?? "asc",
@@ -659,6 +662,7 @@ export function useElevateProductUsers(productId: string, request: ElevatePageRe
         request.page ?? 0,
         request.pageSize ?? ELEVATE_PAGE_SIZE,
         request.query ?? "",
+        request.exactId ?? "",
         request.relationship ?? "all",
         request.sort ?? "name",
         request.direction ?? "asc",
@@ -692,6 +696,7 @@ export function useElevateJourneyUsers(journeyId: string, request: ElevatePageRe
         request.page ?? 0,
         request.pageSize ?? ELEVATE_PAGE_SIZE,
         request.query ?? "",
+        request.exactId ?? "",
         request.relationship ?? "all",
         request.sort ?? "name",
         request.direction ?? "asc",
@@ -725,6 +730,7 @@ export function useElevateUserJourneys(userId: string, request: ElevatePageReque
         request.page ?? 0,
         request.pageSize ?? ELEVATE_PAGE_SIZE,
         request.query ?? "",
+        request.exactId ?? "",
         request.relationship ?? "all",
         request.sort ?? "name",
         request.direction ?? "asc",

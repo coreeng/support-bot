@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.elevate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
 import java.util.Objects;
@@ -37,6 +38,7 @@ class ElevateV35MigrationTest {
             assertRawPayloadRetained(database, schema);
             assertRelationshipsPreserved(database, schema);
             assertIntegrityBackfill(database, schema);
+            assertJourneyProductInvariant(database, schema);
             assertThat(database.queryForObject(
                             "SELECT snapshot_version FROM " + schema + ".elevate_sync_state WHERE singleton = TRUE",
                             UUID.class))
@@ -199,6 +201,13 @@ class ElevateV35MigrationTest {
                 .containsEntry("user_id", MISSING_USER_ID);
         assertThat(Objects.requireNonNull(item.get("search_text")).toString())
                 .contains("journey one", "journey-1", MISSING_USER_ID.toString());
+    }
+
+    private static void assertJourneyProductInvariant(JdbcTemplate database, String schema) {
+        assertThatThrownBy(() -> database.update("INSERT INTO " + schema
+                        + ".elevate_journeys (resource_id, payload, slug, name, product_id, product_slug, created_at, last_updated_at) "
+                        + "VALUES ('invalid', '{}'::JSONB, 'invalid', 'Invalid', 'missing', 'missing', NOW(), NOW())"))
+                .hasMessageContaining("elevate_journeys_product_id_fkey");
     }
 
     private static DataSource dataSource() {

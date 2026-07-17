@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.elevate;
 
-import com.coreeng.supportbot.config.ElevateProps;
 import com.coreeng.supportbot.util.Page;
 import java.util.Locale;
 import java.util.UUID;
@@ -21,29 +20,11 @@ public class ElevateStatusController {
     private static final int MAX_PAGE_SIZE = 100;
     private static final int MAX_QUERY_LENGTH = 200;
 
-    private final ElevateProps props;
-    private final ElevateRepository repository;
+    private final ElevateQueryService elevateQueryService;
 
     @GetMapping("/elevate/status")
     public ElevateStatusResponse status() {
-        ElevateStoredStatus storedStatus = repository.getStoredStatus();
-        ElevateSyncState state = storedStatus.state();
-        return new ElevateStatusResponse(
-                props.configured(),
-                props.configured() ? props.baseUrl() : null,
-                props.statusInterval().toString(),
-                props.syncInterval().toString(),
-                state.lastPingAttemptAt(),
-                state.lastPingSuccessAt(),
-                state.lastPingSucceeded(),
-                state.lastPingError(),
-                state.lastSyncAttemptAt(),
-                state.lastSyncSuccessAt(),
-                state.lastSyncSucceeded(),
-                state.lastSyncError(),
-                storedStatus.snapshotVersion(),
-                storedStatus.counts(),
-                storedStatus.integrity());
+        return elevateQueryService.status();
     }
 
     @GetMapping("/elevate/products")
@@ -52,16 +33,17 @@ public class ElevateStatusController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "") String exactId,
             @RequestParam(defaultValue = "all") String relationship,
             @RequestParam(defaultValue = "name") String sort,
             @RequestParam(defaultValue = "asc") String direction) {
-        return repository.findProducts(
-                snapshotVersion, readQuery(page, pageSize, query, relationship, sort, direction));
+        return elevateQueryService.products(
+                snapshotVersion, readQuery(page, pageSize, query, exactId, relationship, sort, direction));
     }
 
     @GetMapping("/elevate/products/{productId}")
     public ElevateProductSummary product(@RequestParam UUID snapshotVersion, @PathVariable String productId) {
-        return repository.findProduct(snapshotVersion, productId).orElseThrow(() -> notFound("product"));
+        return elevateQueryService.product(snapshotVersion, productId).orElseThrow(() -> notFound("product"));
     }
 
     @GetMapping("/elevate/products/{productId}/journeys")
@@ -71,11 +53,12 @@ public class ElevateStatusController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "") String exactId,
             @RequestParam(defaultValue = "all") String relationship,
             @RequestParam(defaultValue = "name") String sort,
             @RequestParam(defaultValue = "asc") String direction) {
-        return repository.findProductJourneys(
-                snapshotVersion, productId, readQuery(page, pageSize, query, relationship, sort, direction));
+        return elevateQueryService.productJourneys(
+                snapshotVersion, productId, readQuery(page, pageSize, query, exactId, relationship, sort, direction));
     }
 
     @GetMapping("/elevate/products/{productId}/users")
@@ -85,16 +68,17 @@ public class ElevateStatusController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "") String exactId,
             @RequestParam(defaultValue = "all") String relationship,
             @RequestParam(defaultValue = "name") String sort,
             @RequestParam(defaultValue = "asc") String direction) {
-        return repository.findProductUsers(
-                snapshotVersion, productId, readQuery(page, pageSize, query, relationship, sort, direction));
+        return elevateQueryService.productUsers(
+                snapshotVersion, productId, readQuery(page, pageSize, query, exactId, relationship, sort, direction));
     }
 
     @GetMapping("/elevate/journeys/{journeyId}")
     public ElevateJourneySummary journey(@RequestParam UUID snapshotVersion, @PathVariable String journeyId) {
-        return repository.findJourney(snapshotVersion, journeyId).orElseThrow(() -> notFound("journey"));
+        return elevateQueryService.journey(snapshotVersion, journeyId).orElseThrow(() -> notFound("journey"));
     }
 
     @GetMapping("/elevate/journeys/{journeyId}/users")
@@ -104,16 +88,17 @@ public class ElevateStatusController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "") String exactId,
             @RequestParam(defaultValue = "all") String relationship,
             @RequestParam(defaultValue = "name") String sort,
             @RequestParam(defaultValue = "asc") String direction) {
-        return repository.findJourneyUsers(
-                snapshotVersion, journeyId, readQuery(page, pageSize, query, relationship, sort, direction));
+        return elevateQueryService.journeyUsers(
+                snapshotVersion, journeyId, readQuery(page, pageSize, query, exactId, relationship, sort, direction));
     }
 
     @GetMapping("/elevate/users/{userId}")
     public ElevateUserSummary user(@RequestParam UUID snapshotVersion, @PathVariable UUID userId) {
-        return repository.findUser(snapshotVersion, userId).orElseThrow(() -> notFound("user"));
+        return elevateQueryService.user(snapshotVersion, userId).orElseThrow(() -> notFound("user"));
     }
 
     @GetMapping("/elevate/users/{userId}/journeys")
@@ -123,11 +108,12 @@ public class ElevateStatusController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "") String exactId,
             @RequestParam(defaultValue = "all") String relationship,
             @RequestParam(defaultValue = "name") String sort,
             @RequestParam(defaultValue = "asc") String direction) {
-        return repository.findUserJourneys(
-                snapshotVersion, userId, readQuery(page, pageSize, query, relationship, sort, direction));
+        return elevateQueryService.userJourneys(
+                snapshotVersion, userId, readQuery(page, pageSize, query, exactId, relationship, sort, direction));
     }
 
     @GetMapping("/elevate/integrity")
@@ -139,12 +125,12 @@ public class ElevateStatusController {
             @RequestParam(defaultValue = "") String query,
             @RequestParam(defaultValue = "name") String sort,
             @RequestParam(defaultValue = "asc") String direction) {
-        ElevateReadQuery readQuery = readQuery(page, pageSize, query, "all", sort, direction);
-        return repository.findIntegrity(snapshotVersion, parseIntegrityType(type), readQuery);
+        ElevateReadQuery readQuery = readQuery(page, pageSize, query, "", "all", sort, direction);
+        return elevateQueryService.integrity(snapshotVersion, parseIntegrityType(type), readQuery);
     }
 
     private static ElevateReadQuery readQuery(
-            int page, int pageSize, String query, String relationship, String sort, String direction) {
+            int page, int pageSize, String query, String exactId, String relationship, String sort, String direction) {
         if (page < 0) {
             throw badRequest("page must be zero or greater");
         }
@@ -159,6 +145,7 @@ public class ElevateStatusController {
                 page,
                 pageSize,
                 normalizedQuery,
+                exactId,
                 parseRelationship(relationship),
                 parseSort(sort),
                 parseDirection(direction));
@@ -192,13 +179,10 @@ public class ElevateStatusController {
     private static ElevateIntegrityType parseIntegrityType(String value) {
         return switch (normalized(value)) {
             case "all" -> ElevateIntegrityType.ALL;
-            case "orphanjourney" -> ElevateIntegrityType.ORPHAN_JOURNEY;
             case "orphanuser" -> ElevateIntegrityType.ORPHAN_USER;
             case "missingassignment" -> ElevateIntegrityType.MISSING_ASSIGNMENT;
             case "crossproductassignment" -> ElevateIntegrityType.CROSS_PRODUCT_ASSIGNMENT;
-            default ->
-                throw badRequest(
-                        "type must be all, orphanJourney, orphanUser, missingAssignment, or crossProductAssignment");
+            default -> throw badRequest("type must be all, orphanUser, missingAssignment, or crossProductAssignment");
         };
     }
 

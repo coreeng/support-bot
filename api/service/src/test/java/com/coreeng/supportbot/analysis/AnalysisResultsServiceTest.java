@@ -3,8 +3,6 @@ package com.coreeng.supportbot.analysis;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository.AnalysisRecord;
-import com.coreeng.supportbot.analysis.AnalysisRepository.DimensionSummary;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import java.util.List;

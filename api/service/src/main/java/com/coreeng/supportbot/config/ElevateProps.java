@@ -16,9 +16,11 @@ public record ElevateProps(
         @DefaultValue("5s") Duration connectTimeout,
         @DefaultValue("30s") Duration readTimeout,
         @DefaultValue("16777216") long maxInsightsPageResponseBytes,
+        @DefaultValue("67108864") long maxInsightsSnapshotResponseBytes,
         @DefaultValue("1m") Duration maxServerRetryDelay,
         @DefaultValue("1h") Duration statusInterval,
         @DefaultValue("12h") Duration syncInterval,
+        @DefaultValue("10m") Duration syncTimeout,
         @DefaultValue("100") int maxPagesPerResource,
         @DefaultValue("20000") long maxTotalEntities,
         @DefaultValue("100000") long maxMaterializedRelationships,
@@ -54,9 +56,15 @@ public record ElevateProps(
         requirePositive("elevate.connect-timeout", connectTimeout);
         requirePositive("elevate.read-timeout", readTimeout);
         requirePositive("elevate.max-insights-page-response-bytes", maxInsightsPageResponseBytes);
+        requirePositive("elevate.max-insights-snapshot-response-bytes", maxInsightsSnapshotResponseBytes);
+        if (maxInsightsSnapshotResponseBytes < maxInsightsPageResponseBytes) {
+            throw new IllegalArgumentException(
+                    "elevate.max-insights-snapshot-response-bytes must not be less than elevate.max-insights-page-response-bytes");
+        }
         requirePositive("elevate.max-server-retry-delay", maxServerRetryDelay);
         requirePositive("elevate.status-interval", statusInterval);
         requirePositive("elevate.sync-interval", syncInterval);
+        requirePositive("elevate.sync-timeout", syncTimeout);
         requirePositive("elevate.max-pages-per-resource", maxPagesPerResource);
         requirePositive("elevate.max-total-entities", maxTotalEntities);
         requirePositive("elevate.max-materialized-relationships", maxMaterializedRelationships);
@@ -82,12 +90,14 @@ public record ElevateProps(
     public String toString() {
         return "ElevateProps[baseUrl=" + baseUrl + ", clientId=<redacted>, clientSecret=<redacted>, connectTimeout="
                 + connectTimeout + ", readTimeout=" + readTimeout + ", maxInsightsPageResponseBytes="
-                + maxInsightsPageResponseBytes + ", maxServerRetryDelay=" + maxServerRetryDelay + ", statusInterval="
-                + statusInterval + ", syncInterval=" + syncInterval + ", maxPagesPerResource="
-                + maxPagesPerResource + ", maxTotalEntities=" + maxTotalEntities + ", maxMaterializedRelationships="
-                + maxMaterializedRelationships + ", syncRetryBurstAttempts=" + syncRetryBurstAttempts
-                + ", syncRetryInitialDelay=" + syncRetryInitialDelay + ", syncRetryMaxDelay=" + syncRetryMaxDelay
-                + ", agentName=" + agentName + ", supportBotUrl=" + supportBotUrl + ", version=" + version + "]";
+                + maxInsightsPageResponseBytes + ", maxInsightsSnapshotResponseBytes="
+                + maxInsightsSnapshotResponseBytes + ", maxServerRetryDelay=" + maxServerRetryDelay
+                + ", statusInterval=" + statusInterval + ", syncInterval=" + syncInterval + ", syncTimeout="
+                + syncTimeout + ", maxPagesPerResource=" + maxPagesPerResource + ", maxTotalEntities="
+                + maxTotalEntities + ", maxMaterializedRelationships=" + maxMaterializedRelationships
+                + ", syncRetryBurstAttempts=" + syncRetryBurstAttempts + ", syncRetryInitialDelay="
+                + syncRetryInitialDelay + ", syncRetryMaxDelay=" + syncRetryMaxDelay + ", agentName=" + agentName
+                + ", supportBotUrl=" + supportBotUrl + ", version=" + version + "]";
     }
 
     private static String normalizeBaseUrl(String value) {

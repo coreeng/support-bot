@@ -23,7 +23,7 @@ export function ElevateProductPicker({
 }: {
   snapshotVersion: string;
   selectedProduct: ElevateProduct;
-  onSelect: (productId: string) => void;
+  onSelect: (product: ElevateProduct) => void;
   onSnapshotChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -109,7 +109,7 @@ export function ElevateProductPicker({
                       value={product.id}
                       className="cursor-pointer items-start py-2"
                       onSelect={() => {
-                        onSelect(product.id);
+                        onSelect(product);
                         closePicker();
                       }}
                     >

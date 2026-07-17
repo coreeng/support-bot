@@ -38,19 +38,18 @@ class ElevateClientTest {
 
     private MockRestServiceServer server;
     private ElevateClient client;
-    private RestClient restClient;
+    private RestClient.Builder restClientBuilder;
     private ObjectMapper objectMapper;
     private List<Long> retryDelays;
 
     @BeforeEach
     void setUp() {
-        RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
-        server = MockRestServiceServer.bindTo(builder).build();
+        restClientBuilder = RestClient.builder().baseUrl(BASE_URL);
+        server = MockRestServiceServer.bindTo(restClientBuilder).build();
         objectMapper = new JsonMapper().getObjectMapper();
-        restClient = builder.build();
         retryDelays = new ArrayList<>();
         client = new ElevateClient(
-                configuredProps(), restClient, objectMapper, retryDelays::add, Clock.fixed(NOW, ZoneOffset.UTC));
+                configuredProps(), restClientBuilder, objectMapper, retryDelays::add, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -249,14 +248,11 @@ class ElevateClientTest {
     @Test
     void rejectsAnOversizedInsightsPageDespiteAMisleadingContentLength() {
         ElevateProps props = configuredProps(100, 20_000, 100_000, 256);
-        RestClient.Builder limitedBuilder = RestClient.builder()
-                .baseUrl(BASE_URL)
-                .requestInterceptor(
-                        ElevateClient.insightsResponseSizeInterceptor(props.maxInsightsPageResponseBytes()));
+        RestClient.Builder limitedBuilder = RestClient.builder().baseUrl(BASE_URL);
         MockRestServiceServer limitedServer =
                 MockRestServiceServer.bindTo(limitedBuilder).build();
-        ElevateClient limitedClient = new ElevateClient(
-                props, limitedBuilder.build(), objectMapper, ignored -> {}, Clock.fixed(NOW, ZoneOffset.UTC));
+        ElevateClient limitedClient =
+                new ElevateClient(props, limitedBuilder, objectMapper, ignored -> {}, Clock.fixed(NOW, ZoneOffset.UTC));
         expectToken(limitedServer, "access-token");
         String response = "{\"items\":[],\"padding\":\"" + "x".repeat(512) + "\",\"nextCursor\":null}";
         limitedServer
@@ -268,6 +264,43 @@ class ElevateClientTest {
                 .hasMessage("Elevate insights page exceeded the configured response size limit of 256 bytes")
                 .hasMessageNotContaining("padding");
         limitedServer.verify();
+    }
+
+    @Test
+    void rejectsIndividuallyValidPagesBeyondTheCumulativeSnapshotResponseLimit() {
+        ElevateProps props = configuredProps(100, 20_000, 100_000, 512, 600, Duration.ofMinutes(10));
+        useProps(props);
+        expectToken("access-token");
+        String padding = "x".repeat(300);
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(withSuccess(
+                        "{\"items\":[],\"padding\":\"" + padding + "\",\"nextCursor\":\"next\"}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500&cursor=next"))
+                .andRespond(withSuccess(
+                        "{\"items\":[],\"padding\":\"" + padding + "\",\"nextCursor\":null}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage(
+                        "Elevate insights snapshot exceeded the configured cumulative response size limit of 600 bytes")
+                .hasMessageNotContaining(padding);
+        server.verify();
+    }
+
+    @Test
+    void refusesARetryDelayThatWouldExceedTheWholeSyncTimeout() {
+        useProps(configuredProps(100, 20_000, 100_000, 16_777_216, 67_108_864, Duration.ofSeconds(10)));
+        expectToken("access-token");
+        server.expect(requestTo(BASE_URL + "/api/sync/v1/insights/products?limit=500"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE).header("Retry-After", "11"));
+
+        assertThatThrownBy(client::fetchSnapshot)
+                .isInstanceOf(ElevateApiException.class)
+                .hasMessage("Elevate insights sync exceeded the configured time limit");
+        assertThat(retryDelays).isEmpty();
+        server.verify();
     }
 
     @Test
@@ -497,7 +530,8 @@ class ElevateClientTest {
 
     private void useProps(ElevateProps props) {
         retryDelays = new ArrayList<>();
-        client = new ElevateClient(props, restClient, objectMapper, retryDelays::add, Clock.fixed(NOW, ZoneOffset.UTC));
+        client = new ElevateClient(
+                props, restClientBuilder, objectMapper, retryDelays::add, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static org.springframework.test.web.client.response.DefaultResponseCreator emptyPage() {
@@ -514,6 +548,17 @@ class ElevateClientTest {
 
     private static ElevateProps configuredProps(
             int maxPages, long maxEntities, long maxRelationships, long maxResponseBytes) {
+        return configuredProps(
+                maxPages, maxEntities, maxRelationships, maxResponseBytes, 67_108_864, Duration.ofMinutes(10));
+    }
+
+    private static ElevateProps configuredProps(
+            int maxPages,
+            long maxEntities,
+            long maxRelationships,
+            long maxResponseBytes,
+            long maxSnapshotResponseBytes,
+            Duration syncTimeout) {
         return new ElevateProps(
                 BASE_URL,
                 "esc_client",
@@ -521,9 +566,11 @@ class ElevateClientTest {
                 Duration.ofSeconds(5),
                 Duration.ofSeconds(30),
                 maxResponseBytes,
+                maxSnapshotResponseBytes,
                 Duration.ofMinutes(1),
                 Duration.ofHours(1),
                 Duration.ofHours(12),
+                syncTimeout,
                 maxPages,
                 maxEntities,
                 maxRelationships,

@@ -1,7 +1,9 @@
 package com.coreeng.supportbot.elevate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,6 +19,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.scheduling.annotation.Scheduled;
 
 class ElevateJobsTest {
@@ -36,7 +39,10 @@ class ElevateJobsTest {
 
         assertThat(jobs.syncInsights()).isTrue();
 
-        verify(repository).replaceSnapshot(snapshot, NOW, NOW);
+        InOrder sync = inOrder(repository, client);
+        sync.verify(repository).recordSyncAttempt(NOW);
+        sync.verify(client).fetchSnapshot();
+        sync.verify(repository).replaceSnapshot(snapshot, NOW, NOW);
         verify(repository, never())
                 .recordSyncFailure(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
@@ -49,6 +55,7 @@ class ElevateJobsTest {
 
         assertThat(jobs.syncInsights()).isFalse();
 
+        verify(repository).recordSyncAttempt(NOW);
         verify(repository, never())
                 .replaceSnapshot(
                         org.mockito.ArgumentMatchers.any(),
@@ -77,11 +84,25 @@ class ElevateJobsTest {
     }
 
     @Test
+    void doesNotFetchWhenTheAttemptCannotBePersisted() {
+        doThrow(new IllegalStateException("database unavailable"))
+                .when(repository)
+                .recordSyncAttempt(NOW);
+
+        assertThatThrownBy(jobs::syncInsights)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("database unavailable");
+
+        verify(client, never()).fetchSnapshot();
+    }
+
+    @Test
     void pingStoresAttemptAndSeparateSuccessTime() {
         jobs.reportStatus();
 
         verify(client).reportStatus();
         verify(repository).recordPingSuccess(NOW, NOW);
+        verify(repository, never()).recordSyncAttempt(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -93,9 +114,11 @@ class ElevateJobsTest {
                 Duration.ofSeconds(5),
                 Duration.ofSeconds(30),
                 16_777_216,
+                67_108_864,
                 Duration.ofMinutes(1),
                 Duration.ofHours(1),
                 Duration.ofHours(12),
+                Duration.ofMinutes(10),
                 100,
                 20_000,
                 100_000,
@@ -139,9 +162,11 @@ class ElevateJobsTest {
                 Duration.ofSeconds(5),
                 Duration.ofSeconds(30),
                 16_777_216,
+                67_108_864,
                 Duration.ofMinutes(1),
                 Duration.ofHours(1),
                 Duration.ofHours(12),
+                Duration.ofMinutes(10),
                 100,
                 20_000,
                 100_000,

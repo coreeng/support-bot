@@ -51,7 +51,7 @@ class ElevateStatusControllerTest {
                         new ElevateSyncState(PING_ATTEMPT, PING_SUCCESS, true, null, null, null, null, null),
                         SNAPSHOT_VERSION,
                         new ElevateCounts(1, 2, 3, 4),
-                        new ElevateIntegrityCounts(5, 6, 7, 8)));
+                        new ElevateIntegrityCounts(5, 6, 7)));
     }
 
     @AfterEach
@@ -81,7 +81,7 @@ class ElevateStatusControllerTest {
         assertThat(response.lastPingSuccessAt()).isEqualTo(PING_SUCCESS);
         assertThat(response.snapshotVersion()).isEqualTo(SNAPSHOT_VERSION);
         assertThat(response.counts()).isEqualTo(new ElevateCounts(1, 2, 3, 4));
-        assertThat(response.integrity()).isEqualTo(new ElevateIntegrityCounts(5, 6, 7, 8));
+        assertThat(response.integrity()).isEqualTo(new ElevateIntegrityCounts(5, 6, 7));
     }
 
     @Test
@@ -100,7 +100,7 @@ class ElevateStatusControllerTest {
     void parsesTheLowerCamelWireQueryUsedByTheUi() {
         authenticateAs("SUPPORT_ENGINEER");
 
-        controller.products(SNAPSHOT_VERSION, 2, 50, "  Product  ", "linked", "relationships", "desc");
+        controller.products(SNAPSHOT_VERSION, 2, 50, "  Product  ", "", "linked", "relationships", "desc");
         controller.integrity(SNAPSHOT_VERSION, "crossProductAssignment", 0, 20, "", "name", "asc");
 
         ArgumentCaptor<ElevateReadQuery> query = ArgumentCaptor.forClass(ElevateReadQuery.class);
@@ -110,6 +110,7 @@ class ElevateStatusControllerTest {
                         2,
                         50,
                         "Product",
+                        null,
                         ElevateRelationshipFilter.LINKED,
                         ElevateSort.RELATIONSHIPS,
                         ElevateDirection.DESC));
@@ -118,14 +119,20 @@ class ElevateStatusControllerTest {
                         SNAPSHOT_VERSION,
                         ElevateIntegrityType.CROSS_PRODUCT_ASSIGNMENT,
                         new ElevateReadQuery(
-                                0, 20, "", ElevateRelationshipFilter.ALL, ElevateSort.NAME, ElevateDirection.ASC));
+                                0,
+                                20,
+                                "",
+                                null,
+                                ElevateRelationshipFilter.ALL,
+                                ElevateSort.NAME,
+                                ElevateDirection.ASC));
     }
 
     @Test
     void rejectsInvalidPaginationBeforeQueryingTheRepository() {
         authenticateAs("SUPPORT_ENGINEER");
 
-        assertThatThrownBy(() -> controller.products(SNAPSHOT_VERSION, 0, 101, "", "all", "name", "asc"))
+        assertThatThrownBy(() -> controller.products(SNAPSHOT_VERSION, 0, 101, "", "", "all", "name", "asc"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("pageSize must be between 1 and 100");
     }
@@ -162,9 +169,11 @@ class ElevateStatusControllerTest {
                     Duration.ofSeconds(5),
                     Duration.ofSeconds(30),
                     16_777_216,
+                    67_108_864,
                     Duration.ofMinutes(1),
                     Duration.ofHours(1),
                     Duration.ofHours(12),
+                    Duration.ofMinutes(10),
                     100,
                     20_000,
                     100_000,
@@ -182,8 +191,13 @@ class ElevateStatusControllerTest {
         }
 
         @Bean
-        ElevateStatusController elevateStatusController(ElevateProps props, ElevateRepository repository) {
-            return new ElevateStatusController(props, repository);
+        ElevateQueryService elevateQueryService(ElevateProps props, ElevateRepository repository) {
+            return new ElevateQueryService(props, repository);
+        }
+
+        @Bean
+        ElevateStatusController elevateStatusController(ElevateQueryService queryService) {
+            return new ElevateStatusController(queryService);
         }
     }
 }

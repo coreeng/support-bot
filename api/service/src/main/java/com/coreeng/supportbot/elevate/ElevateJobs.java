@@ -48,6 +48,7 @@ public class ElevateJobs {
         }
 
         Instant attemptedAt = clock.instant();
+        repository.recordSyncAttempt(attemptedAt);
         try {
             ElevateSnapshot snapshot = client.fetchSnapshot();
             Instant completedAt = clock.instant();

@@ -10,7 +10,6 @@ import { AlertTriangle, ArrowRight, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const ISSUE_OPTIONS = [
-  { value: "orphanJourney", label: "Journeys without products" },
   { value: "orphanUser", label: "Product users without products" },
   { value: "missingAssignment", label: "Missing product users" },
   { value: "crossProductAssignment", label: "Cross-product assignments" },
@@ -27,8 +26,6 @@ function countLabel(count: number, singular: string, plural = `${singular}s`) {
 
 function issueLabel(issue: ElevateIntegrityIssue) {
   switch (issue.type) {
-    case "orphanJourney":
-      return "Journey without a synced product";
     case "orphanUser":
       return "Product user without a synced product";
     case "missingAssignment":
@@ -102,7 +99,7 @@ export function ElevateIntegrityNotice({
   const waitingForSearch = query !== deferredQuery;
   const showingPlaceholder = waitingForSearch || issues.isPlaceholderData;
   const busy = waitingForSearch || issues.isFetching;
-  const totalIssues = counts.orphanJourneys + counts.orphanUsers + counts.missingAssignments + counts.crossProductAssignments;
+  const totalIssues = counts.orphanUsers + counts.missingAssignments + counts.crossProductAssignments;
 
   useEffect(() => {
     if (isApiError(issues.error, 409)) onSnapshotChanged();

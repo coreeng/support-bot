@@ -4,6 +4,7 @@ import { ElevateIntegrityNotice } from "@/components/elevate/ElevateIntegrityNot
 import { ElevateProductPicker } from "@/components/elevate/ElevateProductPicker";
 import { ElevateRelationshipBrowser } from "@/components/elevate/ElevateRelationshipBrowser";
 import { formatTimestamp } from "@/components/elevate/ElevateStatusCards";
+import { Button } from "@/components/ui/button";
 import { isApiError, useElevateProduct, useElevateProducts } from "@/lib/hooks";
 import type { ElevateIntegrityCounts, ElevateProduct } from "@/lib/types";
 import { useEffect, useState } from "react";
@@ -53,11 +54,13 @@ export function ElevateRelationshipExplorer({
   onSnapshotChanged: () => void;
 }) {
   const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedProductSummary, setSelectedProductSummary] = useState<ElevateProduct | null>(null);
   const products = useElevateProducts({ snapshotVersion, page: 0, pageSize: 20, sort: "name", direction: "asc" });
   const currentProducts = products.isPlaceholderData ? undefined : products.data;
   const effectiveProductId = selectedProductId || currentProducts?.content[0]?.id || "";
   const product = useElevateProduct(effectiveProductId, snapshotVersion, Boolean(effectiveProductId));
-  const selectedProduct = product.isPlaceholderData ? undefined : product.data;
+  const productSummary = selectedProductId ? selectedProductSummary : currentProducts?.content[0];
+  const selectedProduct = !product.isPlaceholderData && product.data?.id === effectiveProductId ? product.data : undefined;
   const busy = products.isFetching || product.isFetching;
 
   useEffect(() => {
@@ -81,7 +84,7 @@ export function ElevateRelationshipExplorer({
 
       <ElevateIntegrityNotice counts={integrity} snapshotVersion={snapshotVersion} onSnapshotChanged={onSnapshotChanged} />
 
-      {products.isLoading || products.isPlaceholderData || (effectiveProductId && (product.isLoading || product.isPlaceholderData)) ? (
+      {products.isLoading || products.isPlaceholderData ? (
         <p className="text-muted-foreground p-16 text-center text-sm">Loading synced products…</p>
       ) : null}
       {products.error && !currentProducts && !isApiError(products.error, 409) ? (
@@ -89,13 +92,7 @@ export function ElevateRelationshipExplorer({
           Unable to load synced products.
         </p>
       ) : null}
-      {product.error && !selectedProduct && !isApiError(product.error, 409) ? (
-        <p className="text-destructive p-16 text-center text-sm" role="alert">
-          Unable to load the selected product.
-        </p>
-      ) : null}
-
-      {selectedProduct ? (
+      {productSummary ? (
         <>
           <div className="bg-muted/20 border-b p-4 sm:p-5">
             <div className="flex flex-wrap items-end justify-between gap-2 sm:max-w-xl">
@@ -109,19 +106,39 @@ export function ElevateRelationshipExplorer({
             <div className="mt-2">
               <ElevateProductPicker
                 snapshotVersion={snapshotVersion}
-                selectedProduct={selectedProduct}
-                onSelect={setSelectedProductId}
+                selectedProduct={productSummary}
+                onSelect={(nextProduct) => {
+                  setSelectedProductId(nextProduct.id);
+                  setSelectedProductSummary(nextProduct);
+                }}
                 onSnapshotChanged={onSnapshotChanged}
               />
             </div>
           </div>
-          <ProductOverview product={selectedProduct} />
-          <ElevateRelationshipBrowser
-            key={selectedProduct.id}
-            product={selectedProduct}
-            snapshotVersion={snapshotVersion}
-            onSnapshotChanged={onSnapshotChanged}
-          />
+          {product.isLoading || product.isPlaceholderData ? (
+            <p className="text-muted-foreground p-16 text-center text-sm" role="status">
+              Loading selected product…
+            </p>
+          ) : null}
+          {product.error && !selectedProduct && !isApiError(product.error, 409) ? (
+            <div className="p-10 text-center" role="alert">
+              <p className="text-destructive text-sm">Unable to load the selected product.</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => product.refetch()}>
+                Retry selected product
+              </Button>
+            </div>
+          ) : null}
+          {selectedProduct ? (
+            <>
+              <ProductOverview product={selectedProduct} />
+              <ElevateRelationshipBrowser
+                key={selectedProduct.id}
+                product={selectedProduct}
+                snapshotVersion={snapshotVersion}
+                onSnapshotChanged={onSnapshotChanged}
+              />
+            </>
+          ) : null}
         </>
       ) : null}
 

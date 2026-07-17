@@ -43,6 +43,7 @@ export function ElevateRelationshipBrowser({
   const [kind, setKind] = useState<RelationshipKind>(initialKind);
   const [selectedIds, setSelectedIds] = useState({ journey: "", user: "" });
   const [query, setQuery] = useState("");
+  const [exactId, setExactId] = useState("");
   const deferredQuery = useDebouncedValue(query);
   const [filter, setFilter] = useState<ElevateRelationshipFilter>("all");
   const [sort, setSort] = useState<ElevateRelationshipSort>("name");
@@ -54,7 +55,8 @@ export function ElevateRelationshipBrowser({
   const request = {
     snapshotVersion,
     page,
-    query: deferredQuery,
+    query: exactId ? "" : deferredQuery,
+    exactId,
     relationship: filter,
     sort,
     direction: sort === "relationships" ? ("desc" as const) : ("asc" as const),
@@ -62,7 +64,7 @@ export function ElevateRelationshipBrowser({
   const journeys = useElevateProductJourneys(product.id, request, kind === "journey");
   const users = useElevateProductUsers(product.id, request, kind === "user");
   const result = kind === "journey" ? journeys : users;
-  const waitingForSearch = query !== deferredQuery;
+  const waitingForSearch = !exactId && query !== deferredQuery;
   const showingPlaceholder = waitingForSearch || result.isPlaceholderData;
   const busy = waitingForSearch || result.isFetching;
   const items = showingPlaceholder ? undefined : result.data?.content;
@@ -75,6 +77,7 @@ export function ElevateRelationshipBrowser({
 
   function resetList(nextKind = kind) {
     setQuery("");
+    setExactId("");
     setFilter("all");
     setSort("name");
     setPage(0);
@@ -98,9 +101,10 @@ export function ElevateRelationshipBrowser({
     setKind(nextFocus.kind);
     setSelectedIds((current) => ({ ...current, [nextFocus.kind]: nextFocus.id }));
     // A related record may live beyond the first page of its product-level
-    // list. Querying by its ID keeps the destination list contextual and makes
+    // list. Exact-ID lookup avoids collisions with names and slugs while making
     // compact-view Back navigation return to a list that contains the record.
-    setQuery(nextFocus.id);
+    setQuery("");
+    setExactId(nextFocus.id);
     setFilter("all");
     setSort("name");
     setPage(0);
@@ -143,6 +147,7 @@ export function ElevateRelationshipBrowser({
               className="pl-9"
               onChange={(event) => {
                 setQuery(event.target.value);
+                setExactId("");
                 setPage(0);
                 setSelectedIds((current) => ({ ...current, [kind]: "" }));
                 setMobileDetailOpen(false);
@@ -155,6 +160,7 @@ export function ElevateRelationshipBrowser({
             options={FILTER_OPTIONS}
             onChange={(value) => {
               setFilter((value as ElevateRelationshipFilter | undefined) ?? "all");
+              setExactId("");
               setPage(0);
               setSelectedIds((current) => ({ ...current, [kind]: "" }));
               setMobileDetailOpen(false);
@@ -167,6 +173,7 @@ export function ElevateRelationshipBrowser({
             showSearch={false}
             onChange={(value) => {
               setSort(value === "relationships" ? "relationships" : "name");
+              setExactId("");
               setPage(0);
               setSelectedIds((current) => ({ ...current, [kind]: "" }));
               setMobileDetailOpen(false);
@@ -253,6 +260,7 @@ export function ElevateRelationshipBrowser({
               busy={busy}
               onPageChange={(nextPage) => {
                 setPage(nextPage);
+                setExactId("");
                 setSelectedIds((current) => ({ ...current, [kind]: "" }));
                 setMobileDetailOpen(false);
               }}

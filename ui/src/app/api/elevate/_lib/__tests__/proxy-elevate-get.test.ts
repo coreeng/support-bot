@@ -44,15 +44,30 @@ describe("proxyElevateGet", () => {
   it("forwards only the explicitly supported query parameters", async () => {
     mockBackendFetch.mockResolvedValue(Response.json({ content: [] }));
     const nextRequest = request(
-      "http://localhost/api/elevate/products?snapshotVersion=snapshot-1&page=2&pageSize=50&query=runtime&relationship=linked&sort=relationships&direction=desc&admin=true"
+      "http://localhost/api/elevate/products?snapshotVersion=snapshot-1&page=2&pageSize=50&query=runtime&exactId=product-21&relationship=linked&sort=relationships&direction=desc&admin=true"
     );
 
     await proxyElevateGet(nextRequest, "/elevate/products", PAGE_PARAMS);
 
     expect(mockBackendFetch).toHaveBeenCalledWith(
       nextRequest,
-      "/elevate/products?snapshotVersion=snapshot-1&page=2&pageSize=50&query=runtime&relationship=linked&sort=relationships&direction=desc",
-      { signal: nextRequest.signal }
+      "/elevate/products?snapshotVersion=snapshot-1&page=2&pageSize=50&query=runtime&exactId=product-21&relationship=linked&sort=relationships&direction=desc",
+      { signal: nextRequest.signal },
+      "/elevate/products"
+    );
+  });
+
+  it("uses a route template for logs while retaining dynamic IDs in the backend URL", async () => {
+    mockBackendFetch.mockResolvedValue(Response.json({ content: [] }));
+    const nextRequest = request("http://localhost/api/elevate/products/product-secret/users?snapshotVersion=snapshot-1&query=user-secret");
+
+    await proxyElevateGet(nextRequest, "/elevate/products/product-secret/users", PAGE_PARAMS, "/elevate/products/:id/users");
+
+    expect(mockBackendFetch).toHaveBeenCalledWith(
+      nextRequest,
+      "/elevate/products/product-secret/users?snapshotVersion=snapshot-1&query=user-secret",
+      { signal: nextRequest.signal },
+      "/elevate/products/:id/users"
     );
   });
 
@@ -63,7 +78,7 @@ describe("proxyElevateGet", () => {
 
     await proxyElevateGet(nextRequest, "/elevate/status");
 
-    expect(mockBackendFetch).toHaveBeenCalledWith(nextRequest, "/elevate/status", { signal: controller.signal });
+    expect(mockBackendFetch).toHaveBeenCalledWith(nextRequest, "/elevate/status", { signal: controller.signal }, "/elevate/status");
   });
 
   it.each([403, 409])("preserves backend %s responses", async (status) => {

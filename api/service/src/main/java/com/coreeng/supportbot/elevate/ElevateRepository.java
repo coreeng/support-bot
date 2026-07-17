@@ -1,27 +1,45 @@
 package com.coreeng.supportbot.elevate;
 
+import static com.coreeng.supportbot.dbschema.Tables.ELEVATE_INTEGRITY_ITEMS;
+import static com.coreeng.supportbot.dbschema.Tables.ELEVATE_INTEGRITY_ITEM_SOURCE;
+import static com.coreeng.supportbot.dbschema.Tables.ELEVATE_JOURNEYS;
+import static com.coreeng.supportbot.dbschema.Tables.ELEVATE_JOURNEY_USERS;
+import static com.coreeng.supportbot.dbschema.Tables.ELEVATE_PRODUCTS;
+import static com.coreeng.supportbot.dbschema.Tables.ELEVATE_SYNC_STATE;
+import static com.coreeng.supportbot.dbschema.Tables.ELEVATE_USERS;
+import static org.jooq.impl.DSL.falseCondition;
+import static org.jooq.impl.DSL.field;
+import static org.jooq.impl.DSL.lower;
+import static org.jooq.impl.DSL.noCondition;
+import static org.jooq.impl.DSL.selectCount;
+
+import com.coreeng.supportbot.dbschema.tables.ElevateJourneys;
+import com.coreeng.supportbot.dbschema.tables.ElevateProducts;
+import com.coreeng.supportbot.dbschema.tables.ElevateUsers;
 import com.coreeng.supportbot.util.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jooq.Condition;
+import org.jooq.DSLContext;
+import org.jooq.Field;
+import org.jooq.JSONB;
+import org.jooq.Query;
+import org.jooq.Record;
+import org.jooq.Record1;
+import org.jooq.Select;
+import org.jooq.SortField;
+import org.jooq.Table;
 import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,89 +48,16 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ElevateRepository {
     private static final int INSERT_BATCH_SIZE = 500;
-    private static final String SELECT_STATE = """
-            SELECT last_ping_attempt_at,
-                   last_ping_success_at,
-                   last_ping_succeeded,
-                   last_ping_error,
-                   last_sync_attempt_at,
-                   last_sync_success_at,
-                   last_sync_succeeded,
-                   last_sync_error
-              FROM elevate_sync_state
-             WHERE singleton = TRUE
-            """;
-    private static final String PRODUCT_SUMMARY = """
-            SELECT p.resource_id,
-                   p.slug,
-                   p.name,
-                   p.customer,
-                   p.created_at,
-                   p.last_updated_at,
-                   (SELECT COUNT(*) FROM elevate_journeys j WHERE j.product_id = p.resource_id) AS journey_count,
-                   (SELECT COUNT(*) FROM elevate_users u WHERE u.product_id = p.resource_id) AS user_count,
-                   (SELECT COUNT(*)
-                      FROM elevate_journeys j
-                      JOIN elevate_journey_users ju ON ju.journey_id = j.resource_id
-                      JOIN elevate_users u ON u.resource_id = ju.user_id AND u.product_id = j.product_id
-                     WHERE j.product_id = p.resource_id) AS assignment_count
-              FROM elevate_products p
-            """;
-    private static final String JOURNEY_SUMMARY = """
-            SELECT j.resource_id,
-                   j.slug,
-                   j.name,
-                   j.product_id,
-                   j.product_slug,
-                   j.user_description,
-                   j.primary_problems,
-                   j.created_at,
-                   j.last_updated_at,
-                   (SELECT COUNT(*)
-                      FROM elevate_journey_users ju
-                      JOIN elevate_users u ON u.resource_id = ju.user_id AND u.product_id = j.product_id
-                     WHERE ju.journey_id = j.resource_id) AS user_count,
-                   (SELECT COUNT(*)
-                      FROM elevate_journey_users ju
-                      LEFT JOIN elevate_users u ON u.resource_id = ju.user_id
-                     WHERE ju.journey_id = j.resource_id
-                       AND u.resource_id IS NULL) AS missing_user_count,
-                   (SELECT COUNT(*)
-                      FROM elevate_journey_users ju
-                      JOIN elevate_users u ON u.resource_id = ju.user_id
-                     WHERE ju.journey_id = j.resource_id
-                       AND u.product_id <> j.product_id) AS cross_product_user_count
-              FROM elevate_journeys j
-            """;
-    private static final String USER_SUMMARY = """
-            SELECT u.resource_id,
-                   u.product_id,
-                   u.name,
-                   u.description,
-                   u.created_at,
-                   u.last_updated_at,
-                   (SELECT COUNT(*)
-                      FROM elevate_journey_users ju
-                      JOIN elevate_journeys j ON j.resource_id = ju.journey_id AND j.product_id = u.product_id
-                     WHERE ju.user_id = u.resource_id) AS journey_count
-              FROM elevate_users u
-            """;
-    private static final String REFRESH_INTEGRITY_ITEMS = """
-            INSERT INTO elevate_integrity_items
-                   (type, journey_id, journey_name, journey_product_id, user_id, user_name, user_product_id,
-                    sort_name, sort_id, search_text)
-            SELECT type, journey_id, journey_name, journey_product_id, user_id, user_name, user_product_id,
-                   sort_name, sort_id, search_text
-              FROM elevate_integrity_item_source
-            """;
 
-    private final JdbcTemplate jdbcTemplate;
+    private final DSLContext dsl;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ElevateStoredStatus getStoredStatus() {
-        @Nullable UUID snapshotVersion = jdbcTemplate.queryForObject(
-                "SELECT snapshot_version FROM elevate_sync_state WHERE singleton = TRUE", UUID.class);
+        @Nullable UUID snapshotVersion = dsl.select(ELEVATE_SYNC_STATE.SNAPSHOT_VERSION)
+                .from(ELEVATE_SYNC_STATE)
+                .where(ELEVATE_SYNC_STATE.SINGLETON.isTrue())
+                .fetchOne(ELEVATE_SYNC_STATE.SNAPSHOT_VERSION);
         return new ElevateStoredStatus(readState(), snapshotVersion, readCounts(), readIntegrityCounts());
     }
 
@@ -129,416 +74,723 @@ public class ElevateRepository {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page<ElevateProductSummary> findProducts(UUID snapshotVersion, ElevateReadQuery query) {
         requireSnapshotVersion(snapshotVersion);
-        String base = "SELECT resource.*, (journey_count + user_count) AS relationship_count FROM (" + PRODUCT_SUMMARY
-                + ") resource";
-        return pageSummaries(base, productSearch(query.query()), query, PRODUCT_MAPPER);
+        ElevateProducts product = ELEVATE_PRODUCTS.as("product");
+        ProductCounts counts = productCounts(product);
+        Field<Long> relationships = counts.journeys().add(counts.users());
+        Condition condition = productSearch(product, query).and(relationshipFilter(relationships, query));
+        long total = count(product, condition);
+        List<ElevateProductSummary> content = dsl.select(
+                        product.RESOURCE_ID,
+                        product.SLUG,
+                        product.NAME,
+                        product.CUSTOMER,
+                        product.CREATED_AT,
+                        product.LAST_UPDATED_AT,
+                        counts.journeys(),
+                        counts.users(),
+                        counts.assignments())
+                .from(product)
+                .where(condition)
+                .orderBy(summaryOrder(product.NAME, product.RESOURCE_ID, relationships, query))
+                .limit(query.pageSize())
+                .offset(offset(query))
+                .fetch(record -> productSummary(record, product, counts));
+        return page(content, total, query);
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Optional<ElevateProductSummary> findProduct(UUID snapshotVersion, String productId) {
         requireSnapshotVersion(snapshotVersion);
-        return jdbcTemplate
-                .query(
-                        "SELECT resource.*, (journey_count + user_count) AS relationship_count FROM (" + PRODUCT_SUMMARY
-                                + ") resource WHERE resource_id = ?",
-                        PRODUCT_MAPPER,
-                        productId)
-                .stream()
-                .findFirst();
+        ElevateProducts product = ELEVATE_PRODUCTS.as("product");
+        ProductCounts counts = productCounts(product);
+        return dsl.select(
+                        product.RESOURCE_ID,
+                        product.SLUG,
+                        product.NAME,
+                        product.CUSTOMER,
+                        product.CREATED_AT,
+                        product.LAST_UPDATED_AT,
+                        counts.journeys(),
+                        counts.users(),
+                        counts.assignments())
+                .from(product)
+                .where(product.RESOURCE_ID.eq(productId))
+                .fetchOptional(record -> productSummary(record, product, counts));
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page<ElevateJourneySummary> findProductJourneys(
             UUID snapshotVersion, String productId, ElevateReadQuery query) {
         requireSnapshotVersion(snapshotVersion);
-        requireResource("elevate_products", productId, "product");
-        String base = "SELECT resource.*, user_count AS relationship_count FROM (" + JOURNEY_SUMMARY
-                + ") resource WHERE product_id = ?";
-        return pageSummaries(base, List.of(productId), journeySearch(query.query()), query, JOURNEY_MAPPER);
+        requireProduct(productId);
+        ElevateJourneys journey = ELEVATE_JOURNEYS.as("journey");
+        JourneyCounts counts = journeyCounts(journey);
+        Condition condition = journey.PRODUCT_ID
+                .eq(productId)
+                .and(journeySearch(journey, query))
+                .and(relationshipFilter(counts.users(), query));
+        long total = count(journey, condition);
+        List<ElevateJourneySummary> content = journeySummaries(journey, counts, condition, query);
+        return page(content, total, query);
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page<ElevateUserSummary> findProductUsers(UUID snapshotVersion, String productId, ElevateReadQuery query) {
         requireSnapshotVersion(snapshotVersion);
-        requireResource("elevate_products", productId, "product");
-        String base = "SELECT resource.*, journey_count AS relationship_count FROM (" + USER_SUMMARY
-                + ") resource WHERE product_id = ?";
-        return pageSummaries(base, List.of(productId), userSearch(query.query()), query, USER_MAPPER);
+        requireProduct(productId);
+        ElevateUsers user = ELEVATE_USERS.as("product_user");
+        Field<Long> journeyCount = userJourneyCount(user);
+        Condition condition =
+                user.PRODUCT_ID.eq(productId).and(userSearch(user, query)).and(relationshipFilter(journeyCount, query));
+        long total = count(user, condition);
+        List<ElevateUserSummary> content = userSummaries(user, journeyCount, condition, query);
+        return page(content, total, query);
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Optional<ElevateJourneySummary> findJourney(UUID snapshotVersion, String journeyId) {
         requireSnapshotVersion(snapshotVersion);
-        return jdbcTemplate
-                .query(
-                        "SELECT resource.*, user_count AS relationship_count FROM (" + JOURNEY_SUMMARY
-                                + ") resource WHERE resource_id = ?",
-                        JOURNEY_MAPPER,
-                        journeyId)
-                .stream()
-                .findFirst();
+        ElevateJourneys journey = ELEVATE_JOURNEYS.as("journey");
+        JourneyCounts counts = journeyCounts(journey);
+        return dsl.select(
+                        journey.RESOURCE_ID,
+                        journey.SLUG,
+                        journey.NAME,
+                        journey.PRODUCT_ID,
+                        journey.PRODUCT_SLUG,
+                        journey.USER_DESCRIPTION,
+                        journey.PRIMARY_PROBLEMS,
+                        journey.CREATED_AT,
+                        journey.LAST_UPDATED_AT,
+                        counts.users(),
+                        counts.missingUsers(),
+                        counts.crossProductUsers())
+                .from(journey)
+                .where(journey.RESOURCE_ID.eq(journeyId))
+                .fetchOptional(record -> journeySummary(record, journey, counts));
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page<ElevateUserSummary> findJourneyUsers(UUID snapshotVersion, String journeyId, ElevateReadQuery query) {
         requireSnapshotVersion(snapshotVersion);
-        requireResource("elevate_journeys", journeyId, "journey");
-        String base = "SELECT resource.*, journey_count AS relationship_count FROM (" + USER_SUMMARY
-                + ") resource JOIN elevate_journey_users relation ON relation.user_id = resource.resource_id"
-                + " JOIN elevate_journeys parent ON parent.resource_id = relation.journey_id"
-                + " WHERE relation.journey_id = ? AND resource.product_id = parent.product_id";
-        return pageSummaries(base, List.of(journeyId), userSearch(query.query()), query, USER_MAPPER);
+        requireJourney(journeyId);
+        ElevateUsers user = ELEVATE_USERS.as("journey_user");
+        var relation = ELEVATE_JOURNEY_USERS.as("journey_relation");
+        ElevateJourneys parent = ELEVATE_JOURNEYS.as("parent_journey");
+        Field<Long> journeyCount = userJourneyCount(user);
+        Condition condition = relation.JOURNEY_ID
+                .eq(journeyId)
+                .and(user.PRODUCT_ID.eq(parent.PRODUCT_ID))
+                .and(userSearch(user, query))
+                .and(relationshipFilter(journeyCount, query));
+        Table<?> source = user.join(relation)
+                .on(relation.USER_ID.eq(user.RESOURCE_ID))
+                .join(parent)
+                .on(parent.RESOURCE_ID.eq(relation.JOURNEY_ID));
+        long total = count(source, condition);
+        List<ElevateUserSummary> content = userSummaries(user, journeyCount, source, condition, query);
+        return page(content, total, query);
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Optional<ElevateUserSummary> findUser(UUID snapshotVersion, UUID userId) {
         requireSnapshotVersion(snapshotVersion);
-        return jdbcTemplate
-                .query(
-                        "SELECT resource.*, journey_count AS relationship_count FROM (" + USER_SUMMARY
-                                + ") resource WHERE resource_id = ?",
-                        USER_MAPPER,
-                        userId)
-                .stream()
-                .findFirst();
+        ElevateUsers user = ELEVATE_USERS.as("product_user");
+        Field<Long> journeyCount = userJourneyCount(user);
+        return dsl.select(
+                        user.RESOURCE_ID,
+                        user.PRODUCT_ID,
+                        user.NAME,
+                        user.DESCRIPTION,
+                        user.CREATED_AT,
+                        user.LAST_UPDATED_AT,
+                        journeyCount)
+                .from(user)
+                .where(user.RESOURCE_ID.eq(userId))
+                .fetchOptional(record -> userSummary(record, user, journeyCount));
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page<ElevateJourneySummary> findUserJourneys(UUID snapshotVersion, UUID userId, ElevateReadQuery query) {
         requireSnapshotVersion(snapshotVersion);
-        requireResource("elevate_users", userId, "user");
-        String base = "SELECT resource.*, user_count AS relationship_count FROM (" + JOURNEY_SUMMARY
-                + ") resource JOIN elevate_journey_users relation ON relation.journey_id = resource.resource_id"
-                + " JOIN elevate_users parent ON parent.resource_id = relation.user_id"
-                + " WHERE relation.user_id = ? AND resource.product_id = parent.product_id";
-        return pageSummaries(base, List.of(userId), journeySearch(query.query()), query, JOURNEY_MAPPER);
+        requireUser(userId);
+        ElevateJourneys journey = ELEVATE_JOURNEYS.as("user_journey");
+        var relation = ELEVATE_JOURNEY_USERS.as("user_relation");
+        ElevateUsers parent = ELEVATE_USERS.as("parent_user");
+        JourneyCounts counts = journeyCounts(journey);
+        Condition condition = relation.USER_ID
+                .eq(userId)
+                .and(journey.PRODUCT_ID.eq(parent.PRODUCT_ID))
+                .and(journeySearch(journey, query))
+                .and(relationshipFilter(counts.users(), query));
+        Table<?> source = journey.join(relation)
+                .on(relation.JOURNEY_ID.eq(journey.RESOURCE_ID))
+                .join(parent)
+                .on(parent.RESOURCE_ID.eq(relation.USER_ID));
+        long total = count(source, condition);
+        List<ElevateJourneySummary> content = journeySummaries(journey, counts, source, condition, query);
+        return page(content, total, query);
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page<ElevateIntegrityItem> findIntegrity(
             UUID snapshotVersion, ElevateIntegrityType type, ElevateReadQuery query) {
         requireSnapshotVersion(snapshotVersion);
-        String base = "SELECT integrity.*, 0 AS relationship_count FROM elevate_integrity_items integrity";
-        List<Object> parameters = new ArrayList<>();
-        List<String> conditions = new ArrayList<>();
+        var integrity = ELEVATE_INTEGRITY_ITEMS.as("integrity");
+        Condition condition = noCondition();
         if (type != ElevateIntegrityType.ALL) {
-            conditions.add("type = ?");
-            parameters.add(type.databaseValue());
+            condition = condition.and(integrity.TYPE.eq(type.databaseValue()));
         }
         if (!query.query().isBlank()) {
-            conditions.add("search_text LIKE ? ESCAPE '!'");
-            parameters.add(searchPattern(query.query()));
+            condition = condition.and(integrity.SEARCH_TEXT.containsIgnoreCase(query.query()));
         }
-        String where = conditions.isEmpty() ? "" : " WHERE " + String.join(" AND ", conditions);
-        String order = query.sort() == ElevateSort.RELATIONSHIPS
-                ? " ORDER BY type " + query.direction().sql() + ", sort_name ASC, sort_id ASC"
-                : " ORDER BY sort_name " + query.direction().sql() + ", sort_id "
-                        + query.direction().sql() + ", type ASC";
-        return page(base + where, parameters, order, query, INTEGRITY_MAPPER);
-    }
-
-    private ElevateSnapshot readSnapshot() {
-        List<ElevateProduct> products = readResources("elevate_products", ElevateProduct.class);
-        List<ElevateUser> users = readResources("elevate_users", ElevateUser.class);
-        List<ElevateJourney> journeys = readResources("elevate_journeys", ElevateJourney.class);
-        return new ElevateSnapshot(products, users, journeys);
-    }
-
-    private ElevateSyncState readState() {
-        List<ElevateSyncState> states = jdbcTemplate.query(
-                SELECT_STATE,
-                (resultSet, rowNumber) -> new ElevateSyncState(
-                        toInstant(resultSet.getTimestamp("last_ping_attempt_at")),
-                        toInstant(resultSet.getTimestamp("last_ping_success_at")),
-                        resultSet.getObject("last_ping_succeeded", Boolean.class),
-                        resultSet.getString("last_ping_error"),
-                        toInstant(resultSet.getTimestamp("last_sync_attempt_at")),
-                        toInstant(resultSet.getTimestamp("last_sync_success_at")),
-                        resultSet.getObject("last_sync_succeeded", Boolean.class),
-                        resultSet.getString("last_sync_error")));
-        return states.isEmpty() ? ElevateSyncState.empty() : states.getFirst();
-    }
-
-    private ElevateCounts readCounts() {
-        return Objects.requireNonNull(
-                jdbcTemplate.queryForObject(
-                        """
-                SELECT (SELECT COUNT(*) FROM elevate_products) AS products,
-                       (SELECT COUNT(*) FROM elevate_journeys) AS journeys,
-                       (SELECT COUNT(*) FROM elevate_users) AS users,
-                       (SELECT COUNT(*) FROM elevate_journey_users) AS assignments
-                """,
-                        (resultSet, rowNumber) -> new ElevateCounts(
-                                resultSet.getLong("products"),
-                                resultSet.getLong("journeys"),
-                                resultSet.getLong("users"),
-                                resultSet.getLong("assignments"))),
-                "Elevate counts query returned no row");
-    }
-
-    private ElevateIntegrityCounts readIntegrityCounts() {
-        return Objects.requireNonNull(
-                jdbcTemplate.queryForObject(
-                        """
-                SELECT COUNT(*) FILTER (WHERE type = 'ORPHAN_JOURNEY') AS orphan_journeys,
-                       COUNT(*) FILTER (WHERE type = 'ORPHAN_USER') AS orphan_users,
-                       COUNT(*) FILTER (WHERE type = 'MISSING_ASSIGNMENT') AS missing_assignments,
-                       COUNT(*) FILTER (WHERE type = 'CROSS_PRODUCT_ASSIGNMENT') AS cross_product_assignments
-                  FROM elevate_integrity_items
-                """,
-                        (resultSet, rowNumber) -> new ElevateIntegrityCounts(
-                                resultSet.getLong("orphan_journeys"),
-                                resultSet.getLong("orphan_users"),
-                                resultSet.getLong("missing_assignments"),
-                                resultSet.getLong("cross_product_assignments"))),
-                "Elevate integrity counts query returned no row");
+        long total = count(integrity, condition);
+        List<SortField<?>> order = query.sort() == ElevateSort.RELATIONSHIPS
+                ? List.of(
+                        ordered(integrity.TYPE, query.direction()), integrity.SORT_NAME.asc(), integrity.SORT_ID.asc())
+                : List.of(
+                        ordered(integrity.SORT_NAME, query.direction()),
+                        ordered(integrity.SORT_ID, query.direction()),
+                        integrity.TYPE.asc());
+        List<ElevateIntegrityItem> content = dsl.select(
+                        integrity.TYPE,
+                        integrity.JOURNEY_ID,
+                        integrity.JOURNEY_NAME,
+                        integrity.JOURNEY_PRODUCT_ID,
+                        integrity.USER_ID,
+                        integrity.USER_NAME,
+                        integrity.USER_PRODUCT_ID)
+                .from(integrity)
+                .where(condition)
+                .orderBy(order)
+                .limit(query.pageSize())
+                .offset(offset(query))
+                .fetch(record -> new ElevateIntegrityItem(
+                        ElevateIntegrityItem.Type.valueOf(record.get(integrity.TYPE)),
+                        record.get(integrity.JOURNEY_ID),
+                        record.get(integrity.JOURNEY_NAME),
+                        record.get(integrity.JOURNEY_PRODUCT_ID),
+                        record.get(integrity.USER_ID),
+                        record.get(integrity.USER_NAME),
+                        record.get(integrity.USER_PRODUCT_ID)));
+        return page(content, total, query);
     }
 
     @Transactional
     public void replaceSnapshot(ElevateSnapshot snapshot, Instant attemptedAt, Instant completedAt) {
         UUID snapshotVersion = UUID.randomUUID();
-        jdbcTemplate.update("DELETE FROM elevate_integrity_items");
-        jdbcTemplate.update("DELETE FROM elevate_journey_users");
-        jdbcTemplate.update("DELETE FROM elevate_journeys");
-        jdbcTemplate.update("DELETE FROM elevate_users");
-        jdbcTemplate.update("DELETE FROM elevate_products");
+        dsl.deleteFrom(ELEVATE_INTEGRITY_ITEMS).execute();
+        dsl.deleteFrom(ELEVATE_JOURNEY_USERS).execute();
+        dsl.deleteFrom(ELEVATE_JOURNEYS).execute();
+        dsl.deleteFrom(ELEVATE_USERS).execute();
+        dsl.deleteFrom(ELEVATE_PRODUCTS).execute();
 
         insertProducts(snapshot.products(), snapshot.productPayloads());
         insertUsers(snapshot.users(), snapshot.userPayloads());
         insertJourneys(snapshot.journeys(), snapshot.journeyPayloads());
         insertJourneyUsers(snapshot.journeys());
-        jdbcTemplate.update(REFRESH_INTEGRITY_ITEMS);
+        refreshIntegrityItems();
 
-        jdbcTemplate.update("""
-                UPDATE elevate_sync_state
-                   SET last_sync_attempt_at = ?,
-                       last_sync_success_at = ?,
-                       last_sync_succeeded = TRUE,
-                       last_sync_error = NULL,
-                       snapshot_version = ?
-                 WHERE singleton = TRUE
-                """, Timestamp.from(attemptedAt), Timestamp.from(completedAt), snapshotVersion);
+        dsl.update(ELEVATE_SYNC_STATE)
+                .set(ELEVATE_SYNC_STATE.LAST_SYNC_ATTEMPT_AT, attemptedAt)
+                .set(ELEVATE_SYNC_STATE.LAST_SYNC_SUCCESS_AT, completedAt)
+                .set(ELEVATE_SYNC_STATE.LAST_SYNC_SUCCEEDED, true)
+                .setNull(ELEVATE_SYNC_STATE.LAST_SYNC_ERROR)
+                .set(ELEVATE_SYNC_STATE.SNAPSHOT_VERSION, snapshotVersion)
+                .where(ELEVATE_SYNC_STATE.SINGLETON.isTrue())
+                .execute();
+    }
+
+    public void recordSyncAttempt(Instant attemptedAt) {
+        dsl.update(ELEVATE_SYNC_STATE)
+                .set(ELEVATE_SYNC_STATE.LAST_SYNC_ATTEMPT_AT, attemptedAt)
+                .setNull(ELEVATE_SYNC_STATE.LAST_SYNC_SUCCEEDED)
+                .setNull(ELEVATE_SYNC_STATE.LAST_SYNC_ERROR)
+                .where(ELEVATE_SYNC_STATE.SINGLETON.isTrue())
+                .execute();
     }
 
     public void recordSyncFailure(Instant attemptedAt, String error) {
-        jdbcTemplate.update("""
-                UPDATE elevate_sync_state
-                   SET last_sync_attempt_at = ?,
-                       last_sync_succeeded = FALSE,
-                       last_sync_error = ?
-                 WHERE singleton = TRUE
-                """, Timestamp.from(attemptedAt), error);
+        dsl.update(ELEVATE_SYNC_STATE)
+                .set(ELEVATE_SYNC_STATE.LAST_SYNC_ATTEMPT_AT, attemptedAt)
+                .set(ELEVATE_SYNC_STATE.LAST_SYNC_SUCCEEDED, false)
+                .set(ELEVATE_SYNC_STATE.LAST_SYNC_ERROR, error)
+                .where(ELEVATE_SYNC_STATE.SINGLETON.isTrue())
+                .execute();
     }
 
     public void recordPingSuccess(Instant attemptedAt, Instant completedAt) {
-        jdbcTemplate.update("""
-                UPDATE elevate_sync_state
-                   SET last_ping_attempt_at = ?,
-                       last_ping_success_at = ?,
-                       last_ping_succeeded = TRUE,
-                       last_ping_error = NULL
-                 WHERE singleton = TRUE
-                """, Timestamp.from(attemptedAt), Timestamp.from(completedAt));
+        dsl.update(ELEVATE_SYNC_STATE)
+                .set(ELEVATE_SYNC_STATE.LAST_PING_ATTEMPT_AT, attemptedAt)
+                .set(ELEVATE_SYNC_STATE.LAST_PING_SUCCESS_AT, completedAt)
+                .set(ELEVATE_SYNC_STATE.LAST_PING_SUCCEEDED, true)
+                .setNull(ELEVATE_SYNC_STATE.LAST_PING_ERROR)
+                .where(ELEVATE_SYNC_STATE.SINGLETON.isTrue())
+                .execute();
     }
 
     public void recordPingFailure(Instant attemptedAt, String error) {
-        jdbcTemplate.update("""
-                UPDATE elevate_sync_state
-                   SET last_ping_attempt_at = ?,
-                       last_ping_succeeded = FALSE,
-                       last_ping_error = ?
-                 WHERE singleton = TRUE
-                """, Timestamp.from(attemptedAt), error);
+        dsl.update(ELEVATE_SYNC_STATE)
+                .set(ELEVATE_SYNC_STATE.LAST_PING_ATTEMPT_AT, attemptedAt)
+                .set(ELEVATE_SYNC_STATE.LAST_PING_SUCCEEDED, false)
+                .set(ELEVATE_SYNC_STATE.LAST_PING_ERROR, error)
+                .where(ELEVATE_SYNC_STATE.SINGLETON.isTrue())
+                .execute();
     }
 
-    private <T> Page<T> pageSummaries(
-            String base,
-            List<Object> baseParameters,
-            SearchClause search,
-            ElevateReadQuery query,
-            RowMapper<T> mapper) {
-        List<Object> parameters = new ArrayList<>(baseParameters);
-        String pageableBase = "SELECT pageable.* FROM (" + base + ") pageable";
-        StringBuilder where = new StringBuilder(" WHERE ");
-        where.append(search.sql());
-        parameters.addAll(search.parameters());
-        switch (query.relationship()) {
-            case LINKED -> where.append(" AND relationship_count > 0");
-            case UNASSIGNED -> where.append(" AND relationship_count = 0");
-            case ALL -> {
-                // No relationship predicate.
-            }
+    private ElevateSnapshot readSnapshot() {
+        List<ElevateProduct> products = readProducts();
+        List<ElevateUser> users = readUsers();
+        List<ElevateJourney> journeys = readJourneys();
+        return new ElevateSnapshot(products, users, journeys);
+    }
+
+    private List<ElevateProduct> readProducts() {
+        return dsl.select(ELEVATE_PRODUCTS.PAYLOAD)
+                .from(ELEVATE_PRODUCTS)
+                .orderBy(ELEVATE_PRODUCTS.RESOURCE_ID)
+                .fetch(record -> fromJson(record.get(ELEVATE_PRODUCTS.PAYLOAD).data(), ElevateProduct.class));
+    }
+
+    private List<ElevateUser> readUsers() {
+        return dsl.select(ELEVATE_USERS.PAYLOAD)
+                .from(ELEVATE_USERS)
+                .orderBy(ELEVATE_USERS.RESOURCE_ID)
+                .fetch(record -> fromJson(record.get(ELEVATE_USERS.PAYLOAD).data(), ElevateUser.class));
+    }
+
+    private List<ElevateJourney> readJourneys() {
+        return dsl.select(ELEVATE_JOURNEYS.PAYLOAD)
+                .from(ELEVATE_JOURNEYS)
+                .orderBy(ELEVATE_JOURNEYS.RESOURCE_ID)
+                .fetch(record -> fromJson(record.get(ELEVATE_JOURNEYS.PAYLOAD).data(), ElevateJourney.class));
+    }
+
+    private ElevateSyncState readState() {
+        return dsl.select(
+                        ELEVATE_SYNC_STATE.LAST_PING_ATTEMPT_AT,
+                        ELEVATE_SYNC_STATE.LAST_PING_SUCCESS_AT,
+                        ELEVATE_SYNC_STATE.LAST_PING_SUCCEEDED,
+                        ELEVATE_SYNC_STATE.LAST_PING_ERROR,
+                        ELEVATE_SYNC_STATE.LAST_SYNC_ATTEMPT_AT,
+                        ELEVATE_SYNC_STATE.LAST_SYNC_SUCCESS_AT,
+                        ELEVATE_SYNC_STATE.LAST_SYNC_SUCCEEDED,
+                        ELEVATE_SYNC_STATE.LAST_SYNC_ERROR)
+                .from(ELEVATE_SYNC_STATE)
+                .where(ELEVATE_SYNC_STATE.SINGLETON.isTrue())
+                .fetchOptional(record -> new ElevateSyncState(
+                        record.get(ELEVATE_SYNC_STATE.LAST_PING_ATTEMPT_AT),
+                        record.get(ELEVATE_SYNC_STATE.LAST_PING_SUCCESS_AT),
+                        record.get(ELEVATE_SYNC_STATE.LAST_PING_SUCCEEDED),
+                        record.get(ELEVATE_SYNC_STATE.LAST_PING_ERROR),
+                        record.get(ELEVATE_SYNC_STATE.LAST_SYNC_ATTEMPT_AT),
+                        record.get(ELEVATE_SYNC_STATE.LAST_SYNC_SUCCESS_AT),
+                        record.get(ELEVATE_SYNC_STATE.LAST_SYNC_SUCCEEDED),
+                        record.get(ELEVATE_SYNC_STATE.LAST_SYNC_ERROR)))
+                .orElseGet(ElevateSyncState::empty);
+    }
+
+    private ElevateCounts readCounts() {
+        return new ElevateCounts(
+                dsl.fetchCount(ELEVATE_PRODUCTS),
+                dsl.fetchCount(ELEVATE_JOURNEYS),
+                dsl.fetchCount(ELEVATE_USERS),
+                dsl.fetchCount(ELEVATE_JOURNEY_USERS));
+    }
+
+    private ElevateIntegrityCounts readIntegrityCounts() {
+        return new ElevateIntegrityCounts(
+                count(ELEVATE_INTEGRITY_ITEMS, ELEVATE_INTEGRITY_ITEMS.TYPE.eq("ORPHAN_USER")),
+                count(ELEVATE_INTEGRITY_ITEMS, ELEVATE_INTEGRITY_ITEMS.TYPE.eq("MISSING_ASSIGNMENT")),
+                count(ELEVATE_INTEGRITY_ITEMS, ELEVATE_INTEGRITY_ITEMS.TYPE.eq("CROSS_PRODUCT_ASSIGNMENT")));
+    }
+
+    private List<ElevateJourneySummary> journeySummaries(
+            ElevateJourneys journey, JourneyCounts counts, Condition condition, ElevateReadQuery query) {
+        return journeySummaries(journey, counts, journey, condition, query);
+    }
+
+    private List<ElevateJourneySummary> journeySummaries(
+            ElevateJourneys journey,
+            JourneyCounts counts,
+            Table<?> source,
+            Condition condition,
+            ElevateReadQuery query) {
+        return dsl.select(
+                        journey.RESOURCE_ID,
+                        journey.SLUG,
+                        journey.NAME,
+                        journey.PRODUCT_ID,
+                        journey.PRODUCT_SLUG,
+                        journey.USER_DESCRIPTION,
+                        journey.PRIMARY_PROBLEMS,
+                        journey.CREATED_AT,
+                        journey.LAST_UPDATED_AT,
+                        counts.users(),
+                        counts.missingUsers(),
+                        counts.crossProductUsers())
+                .from(source)
+                .where(condition)
+                .orderBy(summaryOrder(journey.NAME, journey.RESOURCE_ID, counts.users(), query))
+                .limit(query.pageSize())
+                .offset(offset(query))
+                .fetch(record -> journeySummary(record, journey, counts));
+    }
+
+    private List<ElevateUserSummary> userSummaries(
+            ElevateUsers user, Field<Long> journeyCount, Condition condition, ElevateReadQuery query) {
+        return userSummaries(user, journeyCount, user, condition, query);
+    }
+
+    private List<ElevateUserSummary> userSummaries(
+            ElevateUsers user, Field<Long> journeyCount, Table<?> source, Condition condition, ElevateReadQuery query) {
+        return dsl.select(
+                        user.RESOURCE_ID,
+                        user.PRODUCT_ID,
+                        user.NAME,
+                        user.DESCRIPTION,
+                        user.CREATED_AT,
+                        user.LAST_UPDATED_AT,
+                        journeyCount)
+                .from(source)
+                .where(condition)
+                .orderBy(summaryOrder(user.NAME, user.RESOURCE_ID, journeyCount, query))
+                .limit(query.pageSize())
+                .offset(offset(query))
+                .fetch(record -> userSummary(record, user, journeyCount));
+    }
+
+    private static ElevateProductSummary productSummary(Record record, ElevateProducts product, ProductCounts counts) {
+        return new ElevateProductSummary(
+                record.get(product.RESOURCE_ID),
+                record.get(product.SLUG),
+                record.get(product.NAME),
+                record.get(product.CUSTOMER),
+                record.get(product.CREATED_AT),
+                record.get(product.LAST_UPDATED_AT),
+                record.get(counts.journeys()),
+                record.get(counts.users()),
+                record.get(counts.assignments()));
+    }
+
+    private static ElevateJourneySummary journeySummary(Record record, ElevateJourneys journey, JourneyCounts counts) {
+        return new ElevateJourneySummary(
+                record.get(journey.RESOURCE_ID),
+                record.get(journey.SLUG),
+                record.get(journey.NAME),
+                record.get(journey.PRODUCT_ID),
+                record.get(journey.PRODUCT_SLUG),
+                record.get(journey.USER_DESCRIPTION),
+                record.get(journey.PRIMARY_PROBLEMS),
+                record.get(journey.CREATED_AT),
+                record.get(journey.LAST_UPDATED_AT),
+                record.get(counts.users()),
+                record.get(counts.missingUsers()),
+                record.get(counts.crossProductUsers()));
+    }
+
+    private static ElevateUserSummary userSummary(Record record, ElevateUsers user, Field<Long> journeyCount) {
+        return new ElevateUserSummary(
+                record.get(user.RESOURCE_ID),
+                record.get(user.PRODUCT_ID),
+                record.get(user.NAME),
+                record.get(user.DESCRIPTION),
+                record.get(user.CREATED_AT),
+                record.get(user.LAST_UPDATED_AT),
+                record.get(journeyCount));
+    }
+
+    private static ProductCounts productCounts(ElevateProducts product) {
+        ElevateJourneys journey = ELEVATE_JOURNEYS.as("product_count_journey");
+        ElevateUsers user = ELEVATE_USERS.as("product_count_user");
+        ElevateJourneys assignmentJourney = ELEVATE_JOURNEYS.as("product_assignment_journey");
+        var relation = ELEVATE_JOURNEY_USERS.as("product_assignment_relation");
+        ElevateUsers assignmentUser = ELEVATE_USERS.as("product_assignment_user");
+        Field<Long> journeys =
+                countField(selectCount().from(journey).where(journey.PRODUCT_ID.eq(product.RESOURCE_ID)));
+        Field<Long> users = countField(selectCount().from(user).where(user.PRODUCT_ID.eq(product.RESOURCE_ID)));
+        Field<Long> assignments = countField(selectCount()
+                .from(assignmentJourney)
+                .join(relation)
+                .on(relation.JOURNEY_ID.eq(assignmentJourney.RESOURCE_ID))
+                .join(assignmentUser)
+                .on(assignmentUser
+                        .RESOURCE_ID
+                        .eq(relation.USER_ID)
+                        .and(assignmentUser.PRODUCT_ID.eq(assignmentJourney.PRODUCT_ID)))
+                .where(assignmentJourney.PRODUCT_ID.eq(product.RESOURCE_ID)));
+        return new ProductCounts(journeys, users, assignments);
+    }
+
+    private static JourneyCounts journeyCounts(ElevateJourneys journey) {
+        var validRelation = ELEVATE_JOURNEY_USERS.as("valid_journey_relation");
+        ElevateUsers validUser = ELEVATE_USERS.as("valid_journey_user");
+        var missingRelation = ELEVATE_JOURNEY_USERS.as("missing_journey_relation");
+        ElevateUsers missingUser = ELEVATE_USERS.as("missing_journey_user");
+        var crossRelation = ELEVATE_JOURNEY_USERS.as("cross_journey_relation");
+        ElevateUsers crossUser = ELEVATE_USERS.as("cross_journey_user");
+        Field<Long> users = countField(selectCount()
+                .from(validRelation)
+                .join(validUser)
+                .on(validUser.RESOURCE_ID.eq(validRelation.USER_ID).and(validUser.PRODUCT_ID.eq(journey.PRODUCT_ID)))
+                .where(validRelation.JOURNEY_ID.eq(journey.RESOURCE_ID)));
+        Field<Long> missingUsers = countField(selectCount()
+                .from(missingRelation)
+                .leftJoin(missingUser)
+                .on(missingUser.RESOURCE_ID.eq(missingRelation.USER_ID))
+                .where(missingRelation.JOURNEY_ID.eq(journey.RESOURCE_ID).and(missingUser.RESOURCE_ID.isNull())));
+        Field<Long> crossProductUsers = countField(selectCount()
+                .from(crossRelation)
+                .join(crossUser)
+                .on(crossUser.RESOURCE_ID.eq(crossRelation.USER_ID))
+                .where(crossRelation
+                        .JOURNEY_ID
+                        .eq(journey.RESOURCE_ID)
+                        .and(crossUser.PRODUCT_ID.ne(journey.PRODUCT_ID))));
+        return new JourneyCounts(users, missingUsers, crossProductUsers);
+    }
+
+    private static Field<Long> userJourneyCount(ElevateUsers user) {
+        var relation = ELEVATE_JOURNEY_USERS.as("user_journey_count_relation");
+        ElevateJourneys journey = ELEVATE_JOURNEYS.as("user_journey_count_journey");
+        return countField(selectCount()
+                .from(relation)
+                .join(journey)
+                .on(journey.RESOURCE_ID.eq(relation.JOURNEY_ID).and(journey.PRODUCT_ID.eq(user.PRODUCT_ID)))
+                .where(relation.USER_ID.eq(user.RESOURCE_ID)));
+    }
+
+    private static Field<Long> countField(Select<? extends Record1<Integer>> query) {
+        return field(query).cast(Long.class);
+    }
+
+    private static Condition productSearch(ElevateProducts product, ElevateReadQuery query) {
+        Condition condition = exactStringId(product.RESOURCE_ID, query.exactId());
+        if (query.query().isBlank()) {
+            return condition;
         }
-        String direction = query.direction().sql();
-        String order = query.sort() == ElevateSort.RELATIONSHIPS
-                ? " ORDER BY relationship_count " + direction + ", LOWER(name) ASC, resource_id ASC"
-                : " ORDER BY LOWER(name) " + direction + ", resource_id " + direction;
-        return page(pageableBase + where, parameters, order, query, mapper);
+        return condition.and(product.NAME
+                .containsIgnoreCase(query.query())
+                .or(product.SLUG.containsIgnoreCase(query.query()))
+                .or(product.RESOURCE_ID.containsIgnoreCase(query.query()))
+                .or(product.CUSTOMER.containsIgnoreCase(query.query())));
     }
 
-    private <T> Page<T> pageSummaries(String base, SearchClause search, ElevateReadQuery query, RowMapper<T> mapper) {
-        return pageSummaries(base, List.of(), search, query, mapper);
+    private static Condition journeySearch(ElevateJourneys journey, ElevateReadQuery query) {
+        Condition condition = exactStringId(journey.RESOURCE_ID, query.exactId());
+        if (query.query().isBlank()) {
+            return condition;
+        }
+        return condition.and(journey.NAME
+                .containsIgnoreCase(query.query())
+                .or(journey.SLUG.containsIgnoreCase(query.query()))
+                .or(journey.RESOURCE_ID.containsIgnoreCase(query.query())));
     }
 
-    private <T> Page<T> page(
-            String filteredSql, List<Object> parameters, String order, ElevateReadQuery query, RowMapper<T> mapper) {
-        Long total = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM (" + filteredSql + ") filtered", Long.class, parameters.toArray());
-        long totalElements = total == null ? 0 : total;
-        List<Object> pageParameters = new ArrayList<>(parameters);
-        pageParameters.add(query.pageSize());
-        pageParameters.add((long) query.page() * query.pageSize());
-        List<T> content =
-                jdbcTemplate.query(filteredSql + order + " LIMIT ? OFFSET ?", mapper, pageParameters.toArray());
+    private static Condition userSearch(ElevateUsers user, ElevateReadQuery query) {
+        Condition condition = exactUuidId(user.RESOURCE_ID, query.exactId());
+        if (query.query().isBlank()) {
+            return condition;
+        }
+        return condition.and(user.NAME
+                .containsIgnoreCase(query.query())
+                .or(user.RESOURCE_ID.cast(String.class).containsIgnoreCase(query.query())));
+    }
+
+    private static Condition exactStringId(Field<String> id, @Nullable String exactId) {
+        return exactId == null ? noCondition() : id.eq(exactId);
+    }
+
+    private static Condition exactUuidId(Field<UUID> id, @Nullable String exactId) {
+        if (exactId == null) {
+            return noCondition();
+        }
+        try {
+            return id.eq(UUID.fromString(exactId));
+        } catch (IllegalArgumentException ignored) {
+            return falseCondition();
+        }
+    }
+
+    private static Condition relationshipFilter(Field<Long> relationships, ElevateReadQuery query) {
+        return switch (query.relationship()) {
+            case ALL -> noCondition();
+            case LINKED -> relationships.gt(0L);
+            case UNASSIGNED -> relationships.eq(0L);
+        };
+    }
+
+    private static List<SortField<?>> summaryOrder(
+            Field<String> name, Field<?> id, Field<Long> relationships, ElevateReadQuery query) {
+        if (query.sort() == ElevateSort.RELATIONSHIPS) {
+            return List.of(
+                    ordered(relationships, query.direction()), lower(name).asc(), id.asc());
+        }
+        return List.of(ordered(lower(name), query.direction()), ordered(id, query.direction()));
+    }
+
+    private static SortField<?> ordered(Field<?> field, ElevateDirection direction) {
+        return direction == ElevateDirection.ASC ? field.asc() : field.desc();
+    }
+
+    private long count(org.jooq.TableLike<?> table, Condition condition) {
+        return dsl.fetchCount(dsl.selectOne().from(table).where(condition));
+    }
+
+    private static long offset(ElevateReadQuery query) {
+        return (long) query.page() * query.pageSize();
+    }
+
+    private static <T> Page<T> page(List<T> content, long totalElements, ElevateReadQuery query) {
         long totalPages = totalElements == 0 ? 0 : (totalElements + query.pageSize() - 1) / query.pageSize();
         return new Page<>(ImmutableList.copyOf(content), query.page(), totalPages, totalElements);
     }
 
     private void requireSnapshotVersion(UUID expected) {
-        @Nullable UUID current = jdbcTemplate.queryForObject(
-                "SELECT snapshot_version FROM elevate_sync_state WHERE singleton = TRUE", UUID.class);
+        @Nullable UUID current = dsl.select(ELEVATE_SYNC_STATE.SNAPSHOT_VERSION)
+                .from(ELEVATE_SYNC_STATE)
+                .where(ELEVATE_SYNC_STATE.SINGLETON.isTrue())
+                .fetchOne(ELEVATE_SYNC_STATE.SNAPSHOT_VERSION);
         if (!expected.equals(current)) {
             throw new ElevateSnapshotChangedException();
         }
     }
 
-    private void requireResource(String table, Object resourceId, String resourceType) {
-        Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM " + table + " WHERE resource_id = ?", Long.class, resourceId);
-        if (count == null || count == 0) {
-            throw new ElevateResourceNotFoundException(resourceType);
+    private void requireProduct(String productId) {
+        if (!dsl.fetchExists(ELEVATE_PRODUCTS, ELEVATE_PRODUCTS.RESOURCE_ID.eq(productId))) {
+            throw new ElevateResourceNotFoundException("product");
         }
     }
 
-    private static SearchClause productSearch(String query) {
-        if (query.isBlank()) {
-            return SearchClause.none();
+    private void requireJourney(String journeyId) {
+        if (!dsl.fetchExists(ELEVATE_JOURNEYS, ELEVATE_JOURNEYS.RESOURCE_ID.eq(journeyId))) {
+            throw new ElevateResourceNotFoundException("journey");
         }
-        String sql = "(LOWER(name) LIKE ? ESCAPE '!' OR LOWER(slug) LIKE ? ESCAPE '!'"
-                + " OR LOWER(resource_id) LIKE ? ESCAPE '!' OR LOWER(COALESCE(customer, '')) LIKE ? ESCAPE '!')";
-        return SearchClause.repeated(sql, searchPattern(query), 4);
     }
 
-    private static SearchClause journeySearch(String query) {
-        if (query.isBlank()) {
-            return SearchClause.none();
+    private void requireUser(UUID userId) {
+        if (!dsl.fetchExists(ELEVATE_USERS, ELEVATE_USERS.RESOURCE_ID.eq(userId))) {
+            throw new ElevateResourceNotFoundException("user");
         }
-        String sql = "(LOWER(name) LIKE ? ESCAPE '!' OR LOWER(slug) LIKE ? ESCAPE '!'"
-                + " OR LOWER(resource_id) LIKE ? ESCAPE '!')";
-        return SearchClause.repeated(sql, searchPattern(query), 3);
-    }
-
-    private static SearchClause userSearch(String query) {
-        if (query.isBlank()) {
-            return SearchClause.none();
-        }
-        String sql = "(LOWER(name) LIKE ? ESCAPE '!' OR LOWER(resource_id::TEXT) LIKE ? ESCAPE '!')";
-        return SearchClause.repeated(sql, searchPattern(query), 2);
-    }
-
-    private static String searchPattern(String query) {
-        String escaped = query.trim()
-                .toLowerCase(Locale.ROOT)
-                .replace("!", "!!")
-                .replace("%", "!%")
-                .replace("_", "!_");
-        return "%" + escaped + "%";
-    }
-
-    private <T> List<T> readResources(String table, Class<T> type) {
-        String sql = "SELECT payload::text FROM " + table + " ORDER BY resource_id";
-        return jdbcTemplate.query(sql, (resultSet, rowNumber) -> fromJson(resultSet.getString(1), type));
     }
 
     private void insertProducts(List<ElevateProduct> products, Map<String, JsonNode> payloads) {
-        if (products.isEmpty()) {
-            return;
+        List<Query> inserts = new ArrayList<>(Math.min(products.size(), INSERT_BATCH_SIZE));
+        for (ElevateProduct product : products) {
+            addToBatch(
+                    inserts,
+                    dsl.insertInto(ELEVATE_PRODUCTS)
+                            .set(ELEVATE_PRODUCTS.RESOURCE_ID, product.id())
+                            .set(ELEVATE_PRODUCTS.SLUG, product.slug())
+                            .set(ELEVATE_PRODUCTS.NAME, product.name())
+                            .set(ELEVATE_PRODUCTS.CUSTOMER, product.customer())
+                            .set(ELEVATE_PRODUCTS.CREATED_AT, product.createdAt())
+                            .set(ELEVATE_PRODUCTS.LAST_UPDATED_AT, product.lastUpdatedAt())
+                            .set(ELEVATE_PRODUCTS.PAYLOAD, jsonb(payloadOrFallback(payloads, product.id(), product))));
         }
-        String sql = """
-                INSERT INTO elevate_products
-                       (resource_id, slug, name, customer, created_at, last_updated_at, payload)
-                VALUES (?, ?, ?, ?, ?, ?, CAST(? AS JSONB))
-                """;
-        jdbcTemplate.batchUpdate(sql, products, INSERT_BATCH_SIZE, (statement, product) -> {
-            statement.setString(1, product.id());
-            statement.setString(2, product.slug());
-            statement.setString(3, product.name());
-            statement.setString(4, product.customer());
-            statement.setObject(5, product.createdAt());
-            statement.setObject(6, product.lastUpdatedAt());
-            statement.setString(7, toJson(payloads.getOrDefault(product.id(), objectMapper.valueToTree(product))));
-        });
+        executeBatch(inserts);
     }
 
     private void insertUsers(List<ElevateUser> users, Map<UUID, JsonNode> payloads) {
-        if (users.isEmpty()) {
-            return;
+        List<Query> inserts = new ArrayList<>(Math.min(users.size(), INSERT_BATCH_SIZE));
+        for (ElevateUser user : users) {
+            addToBatch(
+                    inserts,
+                    dsl.insertInto(ELEVATE_USERS)
+                            .set(ELEVATE_USERS.RESOURCE_ID, user.id())
+                            .set(ELEVATE_USERS.PRODUCT_ID, user.productId())
+                            .set(ELEVATE_USERS.NAME, user.name())
+                            .set(ELEVATE_USERS.DESCRIPTION, user.description())
+                            .set(ELEVATE_USERS.CREATED_AT, user.createdAt())
+                            .set(ELEVATE_USERS.LAST_UPDATED_AT, user.lastUpdatedAt())
+                            .set(ELEVATE_USERS.PAYLOAD, jsonb(payloadOrFallback(payloads, user.id(), user))));
         }
-        String sql = """
-                INSERT INTO elevate_users
-                       (resource_id, product_id, name, description, created_at, last_updated_at, payload)
-                VALUES (?, ?, ?, ?, ?, ?, CAST(? AS JSONB))
-                """;
-        jdbcTemplate.batchUpdate(sql, users, INSERT_BATCH_SIZE, (statement, user) -> {
-            statement.setObject(1, user.id());
-            statement.setString(2, user.productId());
-            statement.setString(3, user.name());
-            statement.setString(4, user.description());
-            statement.setObject(5, user.createdAt());
-            statement.setObject(6, user.lastUpdatedAt());
-            statement.setString(7, toJson(payloads.getOrDefault(user.id(), objectMapper.valueToTree(user))));
-        });
+        executeBatch(inserts);
     }
 
     private void insertJourneys(List<ElevateJourney> journeys, Map<String, JsonNode> payloads) {
-        if (journeys.isEmpty()) {
-            return;
+        List<Query> inserts = new ArrayList<>(Math.min(journeys.size(), INSERT_BATCH_SIZE));
+        for (ElevateJourney journey : journeys) {
+            addToBatch(
+                    inserts,
+                    dsl.insertInto(ELEVATE_JOURNEYS)
+                            .set(ELEVATE_JOURNEYS.RESOURCE_ID, journey.id())
+                            .set(ELEVATE_JOURNEYS.SLUG, journey.slug())
+                            .set(ELEVATE_JOURNEYS.NAME, journey.name())
+                            .set(ELEVATE_JOURNEYS.PRODUCT_ID, journey.productId())
+                            .set(ELEVATE_JOURNEYS.PRODUCT_SLUG, journey.productSlug())
+                            .set(ELEVATE_JOURNEYS.USER_DESCRIPTION, journey.userDescription())
+                            .set(ELEVATE_JOURNEYS.PRIMARY_PROBLEMS, journey.primaryProblems())
+                            .set(ELEVATE_JOURNEYS.CREATED_AT, journey.createdAt())
+                            .set(ELEVATE_JOURNEYS.LAST_UPDATED_AT, journey.lastUpdatedAt())
+                            .set(ELEVATE_JOURNEYS.PAYLOAD, jsonb(payloadOrFallback(payloads, journey.id(), journey))));
         }
-        String sql = """
-                INSERT INTO elevate_journeys
-                       (resource_id, slug, name, product_id, product_slug, user_description, primary_problems,
-                        created_at, last_updated_at, payload)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS JSONB))
-                """;
-        jdbcTemplate.batchUpdate(sql, journeys, INSERT_BATCH_SIZE, (statement, journey) -> {
-            statement.setString(1, journey.id());
-            statement.setString(2, journey.slug());
-            statement.setString(3, journey.name());
-            statement.setString(4, journey.productId());
-            statement.setString(5, journey.productSlug());
-            statement.setString(6, journey.userDescription());
-            statement.setString(7, journey.primaryProblems());
-            statement.setObject(8, journey.createdAt());
-            statement.setObject(9, journey.lastUpdatedAt());
-            statement.setString(10, toJson(payloads.getOrDefault(journey.id(), objectMapper.valueToTree(journey))));
-        });
+        executeBatch(inserts);
     }
 
     private void insertJourneyUsers(List<ElevateJourney> journeys) {
-        List<JourneyUser> batch = new ArrayList<>(INSERT_BATCH_SIZE);
+        List<Query> inserts = new ArrayList<>(INSERT_BATCH_SIZE);
         for (ElevateJourney journey : journeys) {
             for (UUID userId : new LinkedHashSet<>(journey.userIds())) {
-                batch.add(new JourneyUser(journey.id(), userId));
-                if (batch.size() == INSERT_BATCH_SIZE) {
-                    insertJourneyUserBatch(batch);
-                    batch = new ArrayList<>(INSERT_BATCH_SIZE);
-                }
+                addToBatch(
+                        inserts,
+                        dsl.insertInto(ELEVATE_JOURNEY_USERS)
+                                .set(ELEVATE_JOURNEY_USERS.JOURNEY_ID, journey.id())
+                                .set(ELEVATE_JOURNEY_USERS.USER_ID, userId));
             }
         }
-        if (!batch.isEmpty()) {
-            insertJourneyUserBatch(batch);
+        executeBatch(inserts);
+    }
+
+    private void refreshIntegrityItems() {
+        dsl.insertInto(
+                        ELEVATE_INTEGRITY_ITEMS,
+                        ELEVATE_INTEGRITY_ITEMS.TYPE,
+                        ELEVATE_INTEGRITY_ITEMS.JOURNEY_ID,
+                        ELEVATE_INTEGRITY_ITEMS.JOURNEY_NAME,
+                        ELEVATE_INTEGRITY_ITEMS.JOURNEY_PRODUCT_ID,
+                        ELEVATE_INTEGRITY_ITEMS.USER_ID,
+                        ELEVATE_INTEGRITY_ITEMS.USER_NAME,
+                        ELEVATE_INTEGRITY_ITEMS.USER_PRODUCT_ID,
+                        ELEVATE_INTEGRITY_ITEMS.SORT_NAME,
+                        ELEVATE_INTEGRITY_ITEMS.SORT_ID,
+                        ELEVATE_INTEGRITY_ITEMS.SEARCH_TEXT)
+                .select(dsl.select(
+                                ELEVATE_INTEGRITY_ITEM_SOURCE.TYPE,
+                                ELEVATE_INTEGRITY_ITEM_SOURCE.JOURNEY_ID,
+                                ELEVATE_INTEGRITY_ITEM_SOURCE.JOURNEY_NAME,
+                                ELEVATE_INTEGRITY_ITEM_SOURCE.JOURNEY_PRODUCT_ID,
+                                ELEVATE_INTEGRITY_ITEM_SOURCE.USER_ID,
+                                ELEVATE_INTEGRITY_ITEM_SOURCE.USER_NAME,
+                                ELEVATE_INTEGRITY_ITEM_SOURCE.USER_PRODUCT_ID,
+                                ELEVATE_INTEGRITY_ITEM_SOURCE.SORT_NAME,
+                                ELEVATE_INTEGRITY_ITEM_SOURCE.SORT_ID,
+                                ELEVATE_INTEGRITY_ITEM_SOURCE.SEARCH_TEXT)
+                        .from(ELEVATE_INTEGRITY_ITEM_SOURCE))
+                .execute();
+    }
+
+    private void addToBatch(List<Query> batch, Query query) {
+        batch.add(query);
+        if (batch.size() == INSERT_BATCH_SIZE) {
+            executeBatch(batch);
         }
     }
 
-    private void insertJourneyUserBatch(List<JourneyUser> relationships) {
-        jdbcTemplate.batchUpdate(
-                "INSERT INTO elevate_journey_users (journey_id, user_id) VALUES (?, ?)",
-                relationships,
-                INSERT_BATCH_SIZE,
-                (statement, relationship) -> {
-                    statement.setString(1, relationship.journeyId());
-                    statement.setObject(2, relationship.userId());
-                });
+    private void executeBatch(List<Query> batch) {
+        if (!batch.isEmpty()) {
+            dsl.batch(batch).execute();
+            batch.clear();
+        }
+    }
+
+    private static <K> Object payloadOrFallback(Map<K, JsonNode> payloads, K id, Object fallback) {
+        @Nullable JsonNode payload = payloads.get(id);
+        return payload == null ? fallback : payload;
+    }
+
+    private JSONB jsonb(Object value) {
+        return JSONB.valueOf(toJson(value));
     }
 
     private String toJson(Object value) {
@@ -557,73 +809,7 @@ public class ElevateRepository {
         }
     }
 
-    private static @Nullable Instant toInstant(@Nullable Timestamp timestamp) {
-        return timestamp == null ? null : timestamp.toInstant();
-    }
+    private record ProductCounts(Field<Long> journeys, Field<Long> users, Field<Long> assignments) {}
 
-    private static LocalDateTime localDateTime(ResultSet resultSet, String column) throws SQLException {
-        return resultSet.getTimestamp(column).toLocalDateTime();
-    }
-
-    private static final RowMapper<ElevateProductSummary> PRODUCT_MAPPER =
-            (resultSet, rowNumber) -> new ElevateProductSummary(
-                    resultSet.getString("resource_id"),
-                    resultSet.getString("slug"),
-                    resultSet.getString("name"),
-                    resultSet.getString("customer"),
-                    localDateTime(resultSet, "created_at"),
-                    localDateTime(resultSet, "last_updated_at"),
-                    resultSet.getLong("journey_count"),
-                    resultSet.getLong("user_count"),
-                    resultSet.getLong("assignment_count"));
-
-    private static final RowMapper<ElevateJourneySummary> JOURNEY_MAPPER =
-            (resultSet, rowNumber) -> new ElevateJourneySummary(
-                    resultSet.getString("resource_id"),
-                    resultSet.getString("slug"),
-                    resultSet.getString("name"),
-                    resultSet.getString("product_id"),
-                    resultSet.getString("product_slug"),
-                    resultSet.getString("user_description"),
-                    resultSet.getString("primary_problems"),
-                    localDateTime(resultSet, "created_at"),
-                    localDateTime(resultSet, "last_updated_at"),
-                    resultSet.getLong("user_count"),
-                    resultSet.getLong("missing_user_count"),
-                    resultSet.getLong("cross_product_user_count"));
-
-    private static final RowMapper<ElevateUserSummary> USER_MAPPER = (resultSet, rowNumber) -> new ElevateUserSummary(
-            resultSet.getObject("resource_id", UUID.class),
-            resultSet.getString("product_id"),
-            resultSet.getString("name"),
-            resultSet.getString("description"),
-            localDateTime(resultSet, "created_at"),
-            localDateTime(resultSet, "last_updated_at"),
-            resultSet.getLong("journey_count"));
-
-    private static final RowMapper<ElevateIntegrityItem> INTEGRITY_MAPPER =
-            (resultSet, rowNumber) -> new ElevateIntegrityItem(
-                    ElevateIntegrityItem.Type.valueOf(resultSet.getString("type")),
-                    resultSet.getString("journey_id"),
-                    resultSet.getString("journey_name"),
-                    resultSet.getString("journey_product_id"),
-                    resultSet.getObject("user_id", UUID.class),
-                    resultSet.getString("user_name"),
-                    resultSet.getString("user_product_id"));
-
-    private record JourneyUser(String journeyId, UUID userId) {}
-
-    private record SearchClause(String sql, List<Object> parameters) {
-        private static SearchClause none() {
-            return new SearchClause("TRUE", List.of());
-        }
-
-        private static SearchClause repeated(String sql, String pattern, int count) {
-            List<Object> parameters = new ArrayList<>(count);
-            for (int index = 0; index < count; index++) {
-                parameters.add(pattern);
-            }
-            return new SearchClause(sql, List.copyOf(parameters));
-        }
-    }
+    private record JourneyCounts(Field<Long> users, Field<Long> missingUsers, Field<Long> crossProductUsers) {}
 }

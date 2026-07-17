@@ -66,6 +66,12 @@ ALTER TABLE elevate_journeys
     ALTER COLUMN created_at SET NOT NULL,
     ALTER COLUMN last_updated_at SET NOT NULL;
 
+-- Existing V34 snapshot rows are retained during migration, while every newly written
+-- snapshot must preserve Elevate's journey-to-product invariant.
+ALTER TABLE elevate_journeys
+    ADD CONSTRAINT elevate_journeys_product_id_fkey
+    FOREIGN KEY (product_id) REFERENCES elevate_products(resource_id) NOT VALID;
+
 CREATE TABLE elevate_journey_users (
     journey_id TEXT NOT NULL REFERENCES elevate_journeys(resource_id) ON DELETE CASCADE,
     user_id UUID NOT NULL,
@@ -74,7 +80,6 @@ CREATE TABLE elevate_journey_users (
 
 CREATE TABLE elevate_integrity_items (
     type TEXT NOT NULL CHECK (type IN (
-        'ORPHAN_JOURNEY',
         'ORPHAN_USER',
         'MISSING_ASSIGNMENT',
         'CROSS_PRODUCT_ASSIGNMENT'
@@ -114,17 +119,6 @@ SELECT integrity.type,
            integrity.user_name,
            integrity.user_id::TEXT)) AS search_text
   FROM (
-        SELECT 'ORPHAN_JOURNEY' AS type,
-               j.resource_id AS journey_id,
-               j.name AS journey_name,
-               j.product_id AS journey_product_id,
-               NULL::UUID AS user_id,
-               NULL::TEXT AS user_name,
-               NULL::TEXT AS user_product_id
-          FROM elevate_journeys j
-          LEFT JOIN elevate_products p ON p.resource_id = j.product_id
-         WHERE p.resource_id IS NULL
-        UNION ALL
         SELECT 'ORPHAN_USER' AS type,
                NULL::TEXT AS journey_id,
                NULL::TEXT AS journey_name,

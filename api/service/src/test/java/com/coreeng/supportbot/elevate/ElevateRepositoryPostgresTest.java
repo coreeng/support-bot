@@ -13,6 +13,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.jooq.DSLContext;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
@@ -21,6 +24,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -85,13 +89,25 @@ class ElevateRepositoryPostgresTest {
     }
 
     @Test
+    void recordsAnAttemptBeforeItsOutcomeWithoutDiscardingTheLastSnapshot() {
+        ElevateProduct product = product("retained");
+        repository.replaceSnapshot(snapshot(product), ATTEMPTED_AT.minusSeconds(10), ATTEMPTED_AT.minusSeconds(5));
+
+        repository.recordSyncAttempt(ATTEMPTED_AT);
+
+        ElevateStoredStatus status = repository.getStoredStatus();
+        assertThat(status.state().lastSyncAttemptAt()).isEqualTo(ATTEMPTED_AT);
+        assertThat(status.state().lastSyncSucceeded()).isNull();
+        assertThat(status.state().lastSyncError()).isNull();
+        assertThat(status.state().lastSyncSuccessAt()).isEqualTo(ATTEMPTED_AT.minusSeconds(5));
+        assertThat(repository.getSnapshot().products()).containsExactly(product);
+    }
+
+    @Test
     void rollsBackWholeReplacementAndRetainsLastGoodSnapshotOnInsertFailure() {
         ElevateProduct oldProduct = product("old");
-        ElevateJourney orphanJourney = journey("orphan", "missing-product", List.of());
         repository.replaceSnapshot(
-                new ElevateSnapshot(List.of(oldProduct), List.of(), List.of(orphanJourney)),
-                ATTEMPTED_AT,
-                COMPLETED_AT);
+                new ElevateSnapshot(List.of(oldProduct), List.of(), List.of()), ATTEMPTED_AT, COMPLETED_AT);
         UUID lastGoodVersion =
                 Objects.requireNonNull(repository.getStoredStatus().snapshotVersion());
         ElevateProduct duplicate = product("duplicate");
@@ -105,8 +121,7 @@ class ElevateRepositoryPostgresTest {
         assertThat(repository
                         .findIntegrity(lastGoodVersion, ElevateIntegrityType.ALL, defaultQuery())
                         .content())
-                .extracting(ElevateIntegrityItem::type)
-                .containsExactly(ElevateIntegrityItem.Type.ORPHAN_JOURNEY);
+                .isEmpty();
     }
 
     @Test
@@ -114,20 +129,22 @@ class ElevateRepositoryPostgresTest {
         UUID linkedUserId = UUID.fromString("11111111-1111-1111-1111-111111111111");
         UUID crossProductUserId = UUID.fromString("22222222-2222-2222-2222-222222222222");
         UUID missingUserId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+        UUID orphanUserId = UUID.fromString("44444444-4444-4444-4444-444444444444");
         ElevateProduct product = product("product-1");
+        ElevateProduct otherProduct = product("product-2");
         ElevateUser linkedUser = user(linkedUserId, "product-1", "Linked user");
-        ElevateUser crossProductUser = user(crossProductUserId, "missing-product", "Cross-product user");
+        ElevateUser crossProductUser = user(crossProductUserId, "product-2", "Cross-product user");
+        ElevateUser orphanUser = user(orphanUserId, "missing-product", "Orphan user");
         ElevateJourney journey = journey(
                 "journey-1", "product-1", List.of(linkedUserId, linkedUserId, crossProductUserId, missingUserId));
-        ElevateJourney orphanJourney = journey("orphan-journey", "orphan-product", List.of());
 
         ObjectNode rawJourney = new JsonMapper().getObjectMapper().valueToTree(journey);
         rawJourney.put("futureField", "retained");
         repository.replaceSnapshot(
                 new ElevateSnapshot(
-                        List.of(product),
-                        List.of(linkedUser, crossProductUser),
-                        List.of(journey, orphanJourney),
+                        List.of(product, otherProduct),
+                        List.of(linkedUser, crossProductUser, orphanUser),
+                        List.of(journey),
                         Map.of(),
                         Map.of(),
                         Map.of(journey.id(), rawJourney)),
@@ -135,8 +152,8 @@ class ElevateRepositoryPostgresTest {
                 COMPLETED_AT);
 
         ElevateStoredStatus status = repository.getStoredStatus();
-        assertThat(status.counts()).isEqualTo(new ElevateCounts(1, 2, 2, 3));
-        assertThat(status.integrity()).isEqualTo(new ElevateIntegrityCounts(1, 1, 1, 1));
+        assertThat(status.counts()).isEqualTo(new ElevateCounts(2, 1, 3, 3));
+        assertThat(status.integrity()).isEqualTo(new ElevateIntegrityCounts(1, 1, 1));
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT jsonb_array_length(payload -> 'userIds') FROM elevate_journeys WHERE resource_id = ?",
                         Integer.class,
@@ -170,7 +187,6 @@ class ElevateRepositoryPostgresTest {
                 .containsExactlyInAnyOrder(
                         ElevateIntegrityItem.Type.CROSS_PRODUCT_ASSIGNMENT,
                         ElevateIntegrityItem.Type.MISSING_ASSIGNMENT,
-                        ElevateIntegrityItem.Type.ORPHAN_JOURNEY,
                         ElevateIntegrityItem.Type.ORPHAN_USER);
         assertThat(repository
                         .findIntegrity(
@@ -180,6 +196,7 @@ class ElevateRepositoryPostgresTest {
                                         0,
                                         20,
                                         "33333333",
+                                        null,
                                         ElevateRelationshipFilter.ALL,
                                         ElevateSort.NAME,
                                         ElevateDirection.ASC))
@@ -207,7 +224,8 @@ class ElevateRepositoryPostgresTest {
 
         var firstPage = repository.findProducts(
                 version,
-                new ElevateReadQuery(0, 1, "", ElevateRelationshipFilter.ALL, ElevateSort.NAME, ElevateDirection.ASC));
+                new ElevateReadQuery(
+                        0, 1, "", null, ElevateRelationshipFilter.ALL, ElevateSort.NAME, ElevateDirection.ASC));
         assertThat(firstPage.content()).extracting(ElevateProductSummary::id).containsExactly("alpha");
         assertThat(firstPage.totalElements()).isEqualTo(3);
         assertThat(firstPage.totalPages()).isEqualTo(3);
@@ -218,6 +236,7 @@ class ElevateRepositoryPostgresTest {
                         0,
                         20,
                         "BETA",
+                        null,
                         ElevateRelationshipFilter.LINKED,
                         ElevateSort.RELATIONSHIPS,
                         ElevateDirection.DESC));
@@ -226,10 +245,61 @@ class ElevateRepositoryPostgresTest {
         var escapedSearch = repository.findProducts(
                 version,
                 new ElevateReadQuery(
-                        0, 20, "!%_", ElevateRelationshipFilter.ALL, ElevateSort.NAME, ElevateDirection.ASC));
+                        0, 20, "!%_", null, ElevateRelationshipFilter.ALL, ElevateSort.NAME, ElevateDirection.ASC));
         assertThat(escapedSearch.content())
                 .extracting(ElevateProductSummary::id)
                 .containsExactly("special!%_");
+    }
+
+    @Test
+    void exactIdFiltersIgnoreSearchCollisionsAndPaginationOrder() {
+        UUID targetUserId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        UUID collisionUserId = UUID.fromString("22222222-2222-2222-2222-222222222222");
+        ElevateProduct targetProduct = product("z-target-product");
+        ElevateProduct collisionProduct = new ElevateProduct(
+                "a-collision-product",
+                "z-target-product",
+                "z-target-product",
+                null,
+                targetProduct.createdAt(),
+                targetProduct.lastUpdatedAt());
+        ElevateJourney targetJourney = journey("z-target-journey", targetProduct.id(), List.of());
+        ElevateJourney collisionJourney = new ElevateJourney(
+                "a-collision-journey",
+                "z-target-journey",
+                "z-target-journey",
+                targetProduct.id(),
+                targetProduct.slug(),
+                null,
+                null,
+                List.of(),
+                targetProduct.createdAt(),
+                targetProduct.lastUpdatedAt());
+        ElevateUser targetUser = user(targetUserId, targetProduct.id(), "Z target user");
+        ElevateUser collisionUser = user(collisionUserId, targetProduct.id(), targetUserId.toString());
+        repository.replaceSnapshot(
+                new ElevateSnapshot(
+                        List.of(collisionProduct, targetProduct),
+                        List.of(collisionUser, targetUser),
+                        List.of(collisionJourney, targetJourney)),
+                ATTEMPTED_AT,
+                COMPLETED_AT);
+        UUID version = Objects.requireNonNull(repository.getStoredStatus().snapshotVersion());
+
+        assertThat(repository
+                        .findProducts(version, exactQuery(targetProduct.id()))
+                        .content())
+                .extracting(ElevateProductSummary::id)
+                .containsExactly(targetProduct.id());
+        assertThat(repository
+                        .findProductJourneys(version, targetProduct.id(), exactQuery(targetJourney.id()))
+                        .content())
+                .extracting(ElevateJourneySummary::id)
+                .containsExactly(targetJourney.id());
+        var userPage = repository.findProductUsers(version, targetProduct.id(), exactQuery(targetUserId.toString()));
+        assertThat(userPage.content()).extracting(ElevateUserSummary::id).containsExactly(targetUserId);
+        assertThat(userPage.totalElements()).isOne();
+        assertThat(userPage.totalPages()).isOne();
     }
 
     @Test
@@ -262,6 +332,7 @@ class ElevateRepositoryPostgresTest {
                                         0,
                                         20,
                                         "",
+                                        null,
                                         ElevateRelationshipFilter.UNASSIGNED,
                                         ElevateSort.NAME,
                                         ElevateDirection.ASC))
@@ -335,7 +406,13 @@ class ElevateRepositoryPostgresTest {
     }
 
     private static ElevateReadQuery defaultQuery() {
-        return new ElevateReadQuery(0, 20, "", ElevateRelationshipFilter.ALL, ElevateSort.NAME, ElevateDirection.ASC);
+        return new ElevateReadQuery(
+                0, 20, "", null, ElevateRelationshipFilter.ALL, ElevateSort.NAME, ElevateDirection.ASC);
+    }
+
+    private static ElevateReadQuery exactQuery(String exactId) {
+        return new ElevateReadQuery(
+                0, 1, exactId, exactId, ElevateRelationshipFilter.ALL, ElevateSort.NAME, ElevateDirection.ASC);
     }
 
     @Configuration(proxyBeanMethods = false)
@@ -360,8 +437,13 @@ class ElevateRepositoryPostgresTest {
         }
 
         @Bean
-        ElevateRepository elevateRepository(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
-            return new ElevateRepository(jdbcTemplate, objectMapper);
+        DSLContext dslContext(DataSource dataSource) {
+            return DSL.using(new TransactionAwareDataSourceProxy(dataSource), SQLDialect.POSTGRES);
+        }
+
+        @Bean
+        ElevateRepository elevateRepository(DSLContext dslContext, ObjectMapper objectMapper) {
+            return new ElevateRepository(dslContext, objectMapper);
         }
 
         @Bean

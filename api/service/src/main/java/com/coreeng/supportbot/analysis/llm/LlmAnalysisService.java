@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.analysis.llm;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository.AnalysisRecord;
+import com.coreeng.supportbot.analysis.AnalysisRecord;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import lombok.RequiredArgsConstructor;

@@ -63,48 +63,61 @@ public final class ElevateClient {
     private final ObjectMapper objectMapper;
     private final Sleeper sleeper;
     private final Clock clock;
+    private final InsightsResponseBudgetContext responseBudgetContext;
 
     @Autowired
     public ElevateClient(ElevateProps props, RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
-        this(props, createRestClient(props, restClientBuilder), objectMapper, Thread::sleep, Clock.systemUTC());
-    }
-
-    ElevateClient(ElevateProps props, RestClient restClient, ObjectMapper objectMapper) {
-        this(props, restClient, objectMapper, Thread::sleep, Clock.systemUTC());
-    }
-
-    ElevateClient(ElevateProps props, RestClient restClient, ObjectMapper objectMapper, Sleeper sleeper) {
-        this(props, restClient, objectMapper, sleeper, Clock.systemUTC());
-    }
-
-    ElevateClient(ElevateProps props, RestClient restClient, ObjectMapper objectMapper, Sleeper sleeper, Clock clock) {
         this.props = props;
-        this.restClient = restClient;
+        this.objectMapper = objectMapper;
+        this.sleeper = Thread::sleep;
+        this.clock = Clock.systemUTC();
+        this.responseBudgetContext = new InsightsResponseBudgetContext();
+        this.restClient = createRestClient(props, restClientBuilder, responseBudgetContext);
+    }
+
+    ElevateClient(
+            ElevateProps props,
+            RestClient.Builder restClientBuilder,
+            ObjectMapper objectMapper,
+            Sleeper sleeper,
+            Clock clock) {
+        this.props = props;
         this.objectMapper = objectMapper;
         this.sleeper = sleeper;
         this.clock = clock;
+        this.responseBudgetContext = new InsightsResponseBudgetContext();
+        this.restClient = restClientBuilder
+                .clone()
+                .requestInterceptor(
+                        insightsResponseSizeInterceptor(props.maxInsightsPageResponseBytes(), responseBudgetContext))
+                .build();
     }
 
     static ClientHttpRequestFactorySettings requestFactorySettings(ElevateProps props) {
         return ClientHttpRequestFactorySettings.defaults().withTimeouts(props.connectTimeout(), props.readTimeout());
     }
 
-    private static RestClient createRestClient(ElevateProps props, RestClient.Builder restClientBuilder) {
+    private static RestClient createRestClient(
+            ElevateProps props,
+            RestClient.Builder restClientBuilder,
+            InsightsResponseBudgetContext responseBudgetContext) {
         RestClient.Builder builder = restClientBuilder
                 .clone()
                 .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(requestFactorySettings(props)))
-                .requestInterceptor(insightsResponseSizeInterceptor(props.maxInsightsPageResponseBytes()));
+                .requestInterceptor(
+                        insightsResponseSizeInterceptor(props.maxInsightsPageResponseBytes(), responseBudgetContext));
         if (props.configured()) {
             builder.baseUrl(props.baseUrl());
         }
         return builder.build();
     }
 
-    static ClientHttpRequestInterceptor insightsResponseSizeInterceptor(long maximumBytes) {
+    private static ClientHttpRequestInterceptor insightsResponseSizeInterceptor(
+            long maximumBytes, InsightsResponseBudgetContext responseBudgetContext) {
         return (request, body, execution) -> {
             ClientHttpResponse response = execution.execute(request, body);
             return request.getURI().getPath().contains(INSIGHTS_PATH + "/")
-                    ? new SizeLimitedClientHttpResponse(response, maximumBytes)
+                    ? new SizeLimitedClientHttpResponse(response, maximumBytes, responseBudgetContext)
                     : response;
         };
     }
@@ -112,7 +125,7 @@ public final class ElevateClient {
     public void reportStatus() {
         requireConfigured();
         try {
-            String token = authenticate();
+            String token = authenticate(null);
             var response = withTransientRetries(() -> restClient
                     .post()
                     .uri("/api/sync/v1/status")
@@ -134,24 +147,34 @@ public final class ElevateClient {
         }
     }
 
-    public ElevateSnapshot fetchSnapshot() {
+    public synchronized ElevateSnapshot fetchSnapshot() {
         requireConfigured();
+        FetchDeadline deadline = new FetchDeadline(clock.instant(), props.syncTimeout());
+        responseBudgetContext.begin(props.maxInsightsSnapshotResponseBytes());
         try {
-            TokenSession session = new TokenSession(authenticate());
+            TokenSession session = new TokenSession(authenticate(deadline));
             FetchBudget budget = new FetchBudget(props.maxTotalEntities(), props.maxMaterializedRelationships());
             Resources<ElevateProduct> products =
-                    fetchAll("products", ElevateProduct.class, session, budget, ignored -> 0);
-            Resources<ElevateUser> users = fetchAll("users", ElevateUser.class, session, budget, ignored -> 0);
+                    fetchAll("products", ElevateProduct.class, session, budget, deadline, ignored -> 0);
+            Resources<ElevateUser> users =
+                    fetchAll("users", ElevateUser.class, session, budget, deadline, ignored -> 0);
             Resources<ElevateJourney> journeys = fetchAll(
-                    "journeys", ElevateJourney.class, session, budget, ElevateClient::distinctJourneyUserCount);
+                    "journeys",
+                    ElevateJourney.class,
+                    session,
+                    budget,
+                    deadline,
+                    ElevateClient::distinctJourneyUserCount);
             validateJourneyProducts(products.items(), journeys.items());
-            return new ElevateSnapshot(
+            ElevateSnapshot snapshot = new ElevateSnapshot(
                     products.items(),
                     users.items(),
                     journeys.items(),
                     payloadsById(products, ElevateProduct::id),
                     payloadsById(users, ElevateUser::id),
                     payloadsById(journeys, ElevateJourney::id));
+            deadline.requireWithinLimit(clock);
+            return snapshot;
         } catch (ElevateApiException e) {
             throw e;
         } catch (RestClientResponseException e) {
@@ -160,28 +183,32 @@ public final class ElevateClient {
             throw transportFailure(e);
         } catch (IllegalArgumentException e) {
             throw new ElevateApiException("Elevate returned an invalid insights response", e);
+        } finally {
+            responseBudgetContext.clear();
         }
     }
 
-    private String authenticate() {
+    private String authenticate(@Nullable FetchDeadline deadline) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "client_credentials");
         form.add("client_id", props.clientId());
         form.add("client_secret", props.clientSecret());
 
-        OAuthTokenResponse response = withTransientRetries(() -> {
-            @Nullable OAuthTokenResponse tokenResponse = restClient
-                    .post()
-                    .uri("/api/sync/v1/auth/token")
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(form)
-                    .retrieve()
-                    .body(OAuthTokenResponse.class);
-            if (tokenResponse == null) {
-                throw new ElevateApiException("Elevate token endpoint returned no access token");
-            }
-            return tokenResponse;
-        });
+        OAuthTokenResponse response = withTransientRetries(
+                () -> {
+                    @Nullable OAuthTokenResponse tokenResponse = restClient
+                            .post()
+                            .uri("/api/sync/v1/auth/token")
+                            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                            .body(form)
+                            .retrieve()
+                            .body(OAuthTokenResponse.class);
+                    if (tokenResponse == null) {
+                        throw new ElevateApiException("Elevate token endpoint returned no access token");
+                    }
+                    return tokenResponse;
+                },
+                deadline);
         if (response.accessToken() == null || response.accessToken().isBlank()) {
             throw new ElevateApiException("Elevate token endpoint returned no access token");
         }
@@ -193,6 +220,7 @@ public final class ElevateClient {
             Class<T> itemType,
             TokenSession session,
             FetchBudget budget,
+            FetchDeadline deadline,
             ToLongFunction<JsonNode> relationshipCount) {
         List<T> result = new ArrayList<>();
         List<JsonNode> payloads = new ArrayList<>();
@@ -201,7 +229,7 @@ public final class ElevateClient {
         int pagesFetched = 0;
         do {
             pagesFetched++;
-            Page<T> page = fetchPageWithRetry(resource, cursor, itemType, session, budget, relationshipCount);
+            Page<T> page = fetchPageWithRetry(resource, cursor, itemType, session, budget, deadline, relationshipCount);
             result.addAll(page.items());
             payloads.addAll(page.payloads());
             cursor = page.nextCursor();
@@ -245,18 +273,19 @@ public final class ElevateClient {
             Class<T> itemType,
             TokenSession session,
             FetchBudget budget,
+            FetchDeadline deadline,
             ToLongFunction<JsonNode> relationshipCount) {
         try {
             return withTransientRetries(
-                    () -> fetchPage(resource, cursor, itemType, session.token, budget, relationshipCount));
+                    () -> fetchPage(resource, cursor, itemType, session.token, budget, relationshipCount), deadline);
         } catch (RestClientResponseException e) {
             if (e.getStatusCode().value() != HttpStatus.UNAUTHORIZED.value()) {
                 throw e;
             }
             log.info("Elevate access token was rejected during sync; refreshing it once");
-            session.token = authenticate();
+            session.token = authenticate(deadline);
             return withTransientRetries(
-                    () -> fetchPage(resource, cursor, itemType, session.token, budget, relationshipCount));
+                    () -> fetchPage(resource, cursor, itemType, session.token, budget, relationshipCount), deadline);
         }
     }
 
@@ -292,7 +321,7 @@ public final class ElevateClient {
         List<JsonNode> payloads = new ArrayList<>();
         for (JsonNode itemNode : itemsNode) {
             items.add(objectMapper.convertValue(itemNode, itemType));
-            payloads.add(itemNode.deepCopy());
+            payloads.add(itemNode);
         }
 
         JsonNode cursorNode = response.get("nextCursor");
@@ -329,9 +358,16 @@ public final class ElevateClient {
     }
 
     private <T> T withTransientRetries(Request<T> request) {
+        return withTransientRetries(request, null);
+    }
+
+    private <T> T withTransientRetries(Request<T> request, @Nullable FetchDeadline deadline) {
         for (int attempt = 1; ; attempt++) {
+            requireWithinLimit(deadline);
             try {
-                return request.execute();
+                T response = request.execute();
+                requireWithinLimit(deadline);
+                return response;
             } catch (RestClientResponseException failure) {
                 if (attempt >= MAX_ATTEMPTS
                         || !isRetryable(failure.getStatusCode().value())) {
@@ -344,26 +380,38 @@ public final class ElevateClient {
                                     + " with Retry-After beyond the configured maximum",
                             failure);
                 }
-                waitBeforeRetry(attempt, serverRetryDelay == null ? null : serverRetryDelay.delay());
+                waitBeforeRetry(attempt, serverRetryDelay == null ? null : serverRetryDelay.delay(), deadline);
             } catch (RestClientException failure) {
-                if (hasCause(failure, InsightsResponseSizeExceededException.class) || attempt >= MAX_ATTEMPTS) {
+                if (hasCause(failure, InsightsResponseSizeExceededException.class)
+                        || hasCause(failure, InsightsSnapshotResponseSizeExceededException.class)
+                        || attempt >= MAX_ATTEMPTS) {
                     throw failure;
                 }
-                waitBeforeRetry(attempt, null);
+                waitBeforeRetry(attempt, null, deadline);
             }
         }
     }
 
-    private void waitBeforeRetry(int failedAttempt, @Nullable Duration serverRetryDelay) {
+    private void waitBeforeRetry(
+            int failedAttempt, @Nullable Duration serverRetryDelay, @Nullable FetchDeadline deadline) {
         long exponentialCap = BASE_RETRY_DELAY_MILLIS << (failedAttempt - 1);
         long delay = serverRetryDelay == null
                 ? ThreadLocalRandom.current().nextLong(exponentialCap + 1)
                 : serverRetryDelay.toMillis();
+        if (deadline != null) {
+            deadline.requireCanWait(clock, Duration.ofMillis(delay));
+        }
         try {
             sleeper.sleep(delay);
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             throw new ElevateApiException("Elevate retry was interrupted", failure);
+        }
+    }
+
+    private void requireWithinLimit(@Nullable FetchDeadline deadline) {
+        if (deadline != null) {
+            deadline.requireWithinLimit(clock);
         }
     }
 
@@ -419,6 +467,12 @@ public final class ElevateClient {
     }
 
     private ElevateApiException transportFailure(RestClientException failure) {
+        if (hasCause(failure, InsightsSnapshotResponseSizeExceededException.class)) {
+            return new ElevateApiException(
+                    "Elevate insights snapshot exceeded the configured cumulative response size limit of "
+                            + props.maxInsightsSnapshotResponseBytes() + " bytes",
+                    failure);
+        }
         if (hasCause(failure, InsightsResponseSizeExceededException.class)) {
             return new ElevateApiException(
                     "Elevate insights page exceeded the configured response size limit of "
@@ -469,11 +523,14 @@ public final class ElevateClient {
     private static final class SizeLimitedClientHttpResponse implements ClientHttpResponse {
         private final ClientHttpResponse delegate;
         private final long maximumBytes;
+        private final InsightsResponseBudgetContext responseBudgetContext;
         private @Nullable InputStream body;
 
-        private SizeLimitedClientHttpResponse(ClientHttpResponse delegate, long maximumBytes) {
+        private SizeLimitedClientHttpResponse(
+                ClientHttpResponse delegate, long maximumBytes, InsightsResponseBudgetContext responseBudgetContext) {
             this.delegate = delegate;
             this.maximumBytes = maximumBytes;
+            this.responseBudgetContext = responseBudgetContext;
         }
 
         @Override
@@ -495,7 +552,7 @@ public final class ElevateClient {
         public InputStream getBody() throws IOException {
             InputStream current = body;
             if (current == null) {
-                current = new SizeLimitedInputStream(delegate.getBody(), maximumBytes);
+                current = new SizeLimitedInputStream(delegate.getBody(), maximumBytes, responseBudgetContext);
                 body = current;
             }
             return current;
@@ -509,11 +566,14 @@ public final class ElevateClient {
 
     private static final class SizeLimitedInputStream extends FilterInputStream {
         private final long maximumBytes;
+        private final InsightsResponseBudgetContext responseBudgetContext;
         private long bytesRead;
 
-        private SizeLimitedInputStream(InputStream delegate, long maximumBytes) {
+        private SizeLimitedInputStream(
+                InputStream delegate, long maximumBytes, InsightsResponseBudgetContext responseBudgetContext) {
             super(delegate);
             this.maximumBytes = maximumBytes;
+            this.responseBudgetContext = responseBudgetContext;
         }
 
         @Override
@@ -568,15 +628,76 @@ public final class ElevateClient {
             throw new IOException("mark/reset is not supported");
         }
 
-        private void recordBytes(long count) throws InsightsResponseSizeExceededException {
+        private void recordBytes(long count) throws IOException {
             if (bytesRead > maximumBytes - count) {
                 throw new InsightsResponseSizeExceededException();
+            }
+            bytesRead += count;
+            responseBudgetContext.recordBytes(count);
+        }
+    }
+
+    private static final class InsightsResponseSizeExceededException extends IOException {}
+
+    private static final class InsightsSnapshotResponseSizeExceededException extends IOException {}
+
+    private static final class InsightsResponseBudgetContext {
+        private @Nullable InsightsResponseBudget current;
+
+        private synchronized void begin(long maximumBytes) {
+            if (current != null) {
+                throw new IllegalStateException("An Elevate insights fetch is already active");
+            }
+            current = new InsightsResponseBudget(maximumBytes);
+        }
+
+        private synchronized void recordBytes(long count) throws InsightsSnapshotResponseSizeExceededException {
+            @Nullable InsightsResponseBudget budget = current;
+            if (budget != null) {
+                budget.recordBytes(count);
+            }
+        }
+
+        private synchronized void clear() {
+            current = null;
+        }
+    }
+
+    private static final class InsightsResponseBudget {
+        private final long maximumBytes;
+        private long bytesRead;
+
+        private InsightsResponseBudget(long maximumBytes) {
+            this.maximumBytes = maximumBytes;
+        }
+
+        private void recordBytes(long count) throws InsightsSnapshotResponseSizeExceededException {
+            if (bytesRead > maximumBytes - count) {
+                throw new InsightsSnapshotResponseSizeExceededException();
             }
             bytesRead += count;
         }
     }
 
-    private static final class InsightsResponseSizeExceededException extends IOException {}
+    private record FetchDeadline(Instant startedAt, Duration timeout) {
+        private void requireWithinLimit(Clock clock) {
+            if (!clock.instant().isBefore(startedAt.plus(timeout))) {
+                throw exceeded();
+            }
+        }
+
+        private void requireCanWait(Clock clock, Duration delay) {
+            Instant now = clock.instant();
+            Instant deadline = startedAt.plus(timeout);
+            if (!now.isBefore(deadline) || delay.compareTo(Duration.between(now, deadline)) >= 0) {
+                throw exceeded();
+            }
+        }
+
+        private static ElevateApiException exceeded() {
+            return new ElevateApiException("Elevate insights sync exceeded the configured time limit");
+        }
+    }
 
     private static final class FetchBudget {
         private final long maxEntities;

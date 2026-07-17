@@ -44,6 +44,24 @@ tests:
             name: SUPPORT_BOT_VERSION
             value: "operator-version"
 
+  - it: keeps the chart-managed version when envFrom is configured
+    set:
+      image.tag: "v0.0.220"
+      envFrom:
+        - secretRef:
+            name: runtime-environment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SUPPORT_BOT_VERSION
+            value: "v0.0.220"
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: runtime-environment
+
   - it: appends UI_ORIGIN when publicWebOrigin is set
     set:
       publicWebOrigin: "https://support-bot.example"

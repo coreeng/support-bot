@@ -37,7 +37,8 @@ class TicketTestControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new TicketTestController(repository, queryService, mapper, ticketProcessingService);
+        controller = new TicketTestController(
+                new TicketTestService(repository, queryService, mapper, ticketProcessingService));
     }
 
     @Test

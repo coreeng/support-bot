@@ -4,6 +4,8 @@ image:
   pullPolicy: IfNotPresent
 
 # Version reported to connected Elevate instances. Defaults to image.tag, then Chart.appVersion.
+# Override this with supportBotVersion or an explicit SUPPORT_BOT_VERSION entry in env. Kubernetes
+# explicit env entries take precedence over envFrom, so envFrom is not a supported version override.
 supportBotVersion: ""
 
 nameOverride: ""

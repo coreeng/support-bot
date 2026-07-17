@@ -147,7 +147,7 @@ const connectedStatus: ElevateStatus = {
   lastSyncError: null,
   snapshotVersion: "11111111-1111-1111-1111-111111111111",
   counts: { products: 2, journeys: 3, users: 3, assignments: 3 },
-  integrity: { orphanJourneys: 0, orphanUsers: 0, missingAssignments: 0, crossProductAssignments: 0 },
+  integrity: { orphanUsers: 0, missingAssignments: 0, crossProductAssignments: 0 },
 };
 
 function page<T>(content: T[], pageNumber = 0, totalPages = 1, totalElements = content.length): ElevatePage<T> {
@@ -185,7 +185,9 @@ function installDefaultMocks() {
   mockUseElevateProduct.mockImplementation((id) => query(products.find((product) => product.id === id)));
   mockUseElevateProductJourneys.mockImplementation((productId, request) => {
     let filtered = journeys.filter((journey) => journey.productId === productId);
-    if (request.query) {
+    if (request.exactId) {
+      filtered = filtered.filter((journey) => journey.id === request.exactId);
+    } else if (request.query) {
       filtered = filtered.filter((journey) => `${journey.id} ${journey.name}`.toLowerCase().includes(request.query!.toLowerCase()));
     }
     if (request.relationship === "linked") filtered = filtered.filter((journey) => journey.userCount > 0);
@@ -194,7 +196,9 @@ function installDefaultMocks() {
   });
   mockUseElevateProductUsers.mockImplementation((productId, request) => {
     let filtered = users.filter((user) => user.productId === productId);
-    if (request.query) {
+    if (request.exactId) {
+      filtered = filtered.filter((user) => user.id === request.exactId);
+    } else if (request.query) {
       filtered = filtered.filter((user) => `${user.id} ${user.name}`.toLowerCase().includes(request.query!.toLowerCase()));
     }
     return query(page(filtered));
@@ -247,7 +251,7 @@ describe("ElevatePage", () => {
     expect(await screen.findByRole("button", { name: "First deployment, 2 product users" })).toHaveAttribute("aria-current", "true");
   });
 
-  it("server-filters the destination list when a related record is beyond its first page", async () => {
+  it("uses exact-ID navigation when a related record is beyond the first page and its ID collides with searchable text", async () => {
     const user = userEvent.setup();
     const firstPageUsers = Array.from({ length: 20 }, (_, index) => ({
       ...users[0],
@@ -259,20 +263,33 @@ describe("ElevatePage", () => {
       id: "user-21",
       name: "Twenty-first team",
     };
+    const searchCollision = {
+      ...users[0],
+      id: "unrelated-user",
+      name: "Team mentioning user-21",
+    };
     mockUseElevateProductUsers.mockImplementation((_productId, request) =>
-      request.query === relatedUser.id ? query(page([relatedUser])) : query(page(firstPageUsers, 0, 2, 21))
+      request.exactId === relatedUser.id
+        ? query(page([relatedUser]))
+        : request.query === relatedUser.id
+          ? query(page([searchCollision]))
+          : query(page(firstPageUsers, 0, 2, 21))
     );
     mockUseElevateJourneyUsers.mockReturnValue(query(page([relatedUser])));
     mockUseElevateUser.mockImplementation((id) => query(id === relatedUser.id ? relatedUser : users.find((item) => item.id === id)));
     renderPage();
 
+    await user.type(screen.getByRole("searchbox", { name: "Search journeys" }), "deploy");
+    await waitFor(() =>
+      expect(mockUseElevateProductJourneys).toHaveBeenCalledWith("product-1", expect.objectContaining({ query: "deploy" }), true)
+    );
     await user.click(await screen.findByRole("button", { name: "First deployment, 2 product users" }));
     await user.click(screen.getByRole("button", { name: "View Twenty-first team, 1 journey" }));
 
     await waitFor(() =>
       expect(mockUseElevateProductUsers).toHaveBeenCalledWith(
         "product-1",
-        expect.objectContaining({ page: 0, query: relatedUser.id }),
+        expect.objectContaining({ page: 0, query: "", exactId: relatedUser.id }),
         true
       )
     );
@@ -280,7 +297,8 @@ describe("ElevatePage", () => {
     const relatedUserButton = await within(destinationList).findByRole("button", { name: "Twenty-first team, 1 journey" });
     expect(relatedUserButton).toHaveAttribute("aria-current", "true");
     expect(within(destinationList).queryByRole("button", { name: "Page user 1, 1 journey" })).not.toBeInTheDocument();
-    expect(screen.getByRole("searchbox", { name: "Search product users" })).toHaveValue(relatedUser.id);
+    expect(within(destinationList).queryByRole("button", { name: "Team mentioning user-21, 1 journey" })).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search product users" })).toHaveValue("");
 
     await user.click(screen.getByRole("button", { name: "Back to product users" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Product users" })).toHaveFocus());
@@ -320,6 +338,33 @@ describe("ElevatePage", () => {
     await user.click(screen.getByRole("combobox", { name: "Product" }));
     expect(screen.getByPlaceholderText("Search products…")).toHaveValue("");
     expect(mockUseElevateProducts).toHaveBeenLastCalledWith(expect.objectContaining({ page: 0, query: "" }), true);
+  });
+
+  it("keeps product selection and retry controls available when selected product details fail", async () => {
+    const user = userEvent.setup();
+    const retry = jest.fn();
+    mockUseElevateProduct.mockImplementation((id) =>
+      id === "product-2"
+        ? query(undefined, new Error("detail failed"), { refetch: retry })
+        : query(products.find((product) => product.id === id))
+    );
+    renderPage();
+
+    await user.click(await screen.findByRole("combobox", { name: "Product" }));
+    await user.click(screen.getByRole("option", { name: /Runtime/ }));
+
+    const picker = screen.getByRole("combobox", { name: "Product" });
+    expect(picker).toHaveTextContent("Runtime");
+    expect(screen.getByRole("alert")).toHaveTextContent("Unable to load the selected product.");
+    expect(screen.queryByRole("heading", { name: "Platform" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Runtime" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Retry selected product" }));
+    expect(retry).toHaveBeenCalledTimes(1);
+
+    await user.click(picker);
+    await user.click(screen.getByRole("option", { name: /Platform/ }));
+    expect(await screen.findByRole("heading", { name: "Platform" })).toBeInTheDocument();
   });
 
   it("hides and disables stale product-picker results while the replacement page loads", async () => {

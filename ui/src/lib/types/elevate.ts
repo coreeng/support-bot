@@ -43,7 +43,6 @@ export interface ElevateEntityCounts {
 }
 
 export interface ElevateIntegrityCounts {
-  orphanJourneys: number;
   orphanUsers: number;
   missingAssignments: number;
   crossProductAssignments: number;
@@ -82,12 +81,13 @@ export interface ElevatePageRequest {
   page?: number;
   pageSize?: number;
   query?: string;
+  exactId?: string;
   relationship?: ElevateRelationshipFilter;
   sort?: ElevateRelationshipSort;
   direction?: "asc" | "desc";
 }
 
-export type ElevateIntegrityIssueType = "orphanJourney" | "orphanUser" | "missingAssignment" | "crossProductAssignment";
+export type ElevateIntegrityIssueType = "orphanUser" | "missingAssignment" | "crossProductAssignment";
 
 export interface ElevateIntegrityIssue {
   type: ElevateIntegrityIssueType;
