@@ -2,7 +2,7 @@
  * Health Dashboard Unit Tests
  *
  * Tests the Health dashboard rendering, tabs, and filtering:
- * - Tab navigation (Activity Trends, Ratings, Ticket Workbench)
+ * - Tab navigation (Activity Trends, Ratings, Ticket Workbench, Products View)
  * - Status, Rated, and Assignee filters in Ticket Workbench tab
  * - Loading and error states
  */
@@ -143,12 +143,13 @@ describe("HealthPage", () => {
       } as unknown as ReturnType<typeof hooks.useTickets>);
     });
 
-    it("renders all three tabs", () => {
+    it("renders all four tabs", () => {
       render(<HealthPage />, { wrapper: Wrapper });
 
       expect(screen.getByText("Activity Trends")).toBeInTheDocument();
       expect(screen.getByText("Ratings")).toBeInTheDocument();
       expect(screen.getByText("Ticket Workbench")).toBeInTheDocument();
+      expect(screen.getByText("Products View")).toBeInTheDocument();
     });
 
     it("defaults to Activity Trends tab", () => {
