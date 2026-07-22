@@ -105,7 +105,7 @@ const mockUseTeamFilter = jest.requireMock("../../../contexts/TeamFilterContext"
     hasNoTeamScope: boolean;
     isViewingAllTeams: boolean;
     isViewingAsEscalationTeam: boolean;
-    hasFullAccess: boolean;
+    hasUnrestrictedDataScope: boolean;
     allTeams?: string[];
     initialized?: boolean;
   }
@@ -131,7 +131,7 @@ describe("Tickets Component", () => {
       hasNoTeamScope: false,
       isViewingAllTeams: true,
       isViewingAsEscalationTeam: false,
-      hasFullAccess: true,
+      hasUnrestrictedDataScope: true,
       allTeams: ["Team A", "Team B"],
       initialized: true,
     });

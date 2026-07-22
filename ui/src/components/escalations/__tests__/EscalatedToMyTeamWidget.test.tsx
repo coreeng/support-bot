@@ -107,7 +107,7 @@ describe("EscalatedToMyTeamWidget", () => {
       mockUseTeamFilter.mockReturnValue({
         selectedTeam: "Core-platform",
         setSelectedTeam: jest.fn(),
-        hasFullAccess: false,
+        hasUnrestrictedDataScope: false,
         effectiveTeams: ["Core-platform"],
         allTeams: ["Core-platform"],
         initialized: true,
@@ -140,7 +140,7 @@ describe("EscalatedToMyTeamWidget", () => {
       mockUseTeamFilter.mockReturnValue({
         selectedTeam: "Other-team", // Not an escalation team
         setSelectedTeam: jest.fn(),
-        hasFullAccess: false,
+        hasUnrestrictedDataScope: false,
         effectiveTeams: ["Other-team"],
         allTeams: ["Core-platform", "Other-team"],
         initialized: true,
@@ -173,7 +173,7 @@ describe("EscalatedToMyTeamWidget", () => {
       mockUseTeamFilter.mockReturnValue({
         selectedTeam: "Core-platform",
         setSelectedTeam: jest.fn(),
-        hasFullAccess: false,
+        hasUnrestrictedDataScope: false,
         effectiveTeams: ["Core-platform"],
         allTeams: ["Core-platform"],
         initialized: true,
@@ -206,7 +206,7 @@ describe("EscalatedToMyTeamWidget", () => {
       mockUseTeamFilter.mockReturnValue({
         selectedTeam: null, // No team selected
         setSelectedTeam: jest.fn(),
-        hasFullAccess: false,
+        hasUnrestrictedDataScope: false,
         effectiveTeams: [],
         allTeams: ["Core-platform"],
         initialized: true,
@@ -241,7 +241,7 @@ describe("EscalatedToMyTeamWidget", () => {
       mockUseTeamFilter.mockReturnValue({
         selectedTeam: "Core-platform",
         setSelectedTeam: jest.fn(),
-        hasFullAccess: false,
+        hasUnrestrictedDataScope: false,
         effectiveTeams: ["Core-platform"],
         allTeams: ["Core-platform"],
         initialized: true,
@@ -320,7 +320,7 @@ describe("EscalatedToMyTeamWidget", () => {
       mockUseTeamFilter.mockReturnValue({
         selectedTeam: "Core-platform",
         setSelectedTeam: jest.fn(),
-        hasFullAccess: false,
+        hasUnrestrictedDataScope: false,
         effectiveTeams: ["Core-platform"],
         allTeams: ["Core-platform"],
         initialized: true,

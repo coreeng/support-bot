@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { backendFetch, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
 
 const FORWARDED_QUERY_PARAMS = ["dateFrom", "dateTo", "allTime", "granularity"] as const;

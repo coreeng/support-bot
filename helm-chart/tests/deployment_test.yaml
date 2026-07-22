@@ -2,6 +2,66 @@ suite: api deployment
 templates:
   - templates/deployment.yaml
 tests:
+  - it: reports the chart app version when the image tag is empty
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SUPPORT_BOT_VERSION
+            value: "1.0.0"
+
+  - it: reports the deployed image tag to Elevate by default
+    set:
+      image.tag: "v0.0.220"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SUPPORT_BOT_VERSION
+            value: "v0.0.220"
+
+  - it: permits an explicit reported version override
+    set:
+      image.tag: "sha-abc123"
+      supportBotVersion: "v0.0.220"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SUPPORT_BOT_VERSION
+            value: "v0.0.220"
+
+  - it: preserves an explicit SUPPORT_BOT_VERSION environment entry
+    set:
+      image.tag: "sha-abc123"
+      env:
+        - name: SUPPORT_BOT_VERSION
+          value: "operator-version"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SUPPORT_BOT_VERSION
+            value: "operator-version"
+
+  - it: keeps the chart-managed version when envFrom is configured
+    set:
+      image.tag: "v0.0.220"
+      envFrom:
+        - secretRef:
+            name: runtime-environment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SUPPORT_BOT_VERSION
+            value: "v0.0.220"
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: runtime-environment
+
   - it: appends UI_ORIGIN when publicWebOrigin is set
     set:
       publicWebOrigin: "https://support-bot.example"

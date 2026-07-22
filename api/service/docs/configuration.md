@@ -58,6 +58,28 @@ spring:
       data-source-properties:
         reWriteBatchedInserts: true
 
+elevate:
+  base-url: ${ELEVATE_BASE_URL:}
+  client-id: ${ELEVATE_CLIENT_ID:}
+  client-secret: ${ELEVATE_CLIENT_SECRET:${ELEVATE_API_KEY:}}
+  connect-timeout: ${ELEVATE_CONNECT_TIMEOUT:5s}
+  read-timeout: ${ELEVATE_READ_TIMEOUT:30s}
+  max-insights-page-response-bytes: ${ELEVATE_MAX_INSIGHTS_PAGE_RESPONSE_BYTES:16777216}
+  max-insights-snapshot-response-bytes: ${ELEVATE_MAX_INSIGHTS_SNAPSHOT_RESPONSE_BYTES:67108864}
+  max-server-retry-delay: ${ELEVATE_MAX_SERVER_RETRY_DELAY:1m}
+  status-interval: ${ELEVATE_STATUS_INTERVAL:1h}
+  sync-interval: ${ELEVATE_SYNC_INTERVAL:12h}
+  sync-timeout: ${ELEVATE_SYNC_TIMEOUT:10m}
+  max-pages-per-resource: ${ELEVATE_MAX_PAGES_PER_RESOURCE:100}
+  max-total-entities: ${ELEVATE_MAX_TOTAL_ENTITIES:20000}
+  max-materialized-relationships: ${ELEVATE_MAX_MATERIALIZED_RELATIONSHIPS:100000}
+  sync-retry-burst-attempts: ${ELEVATE_SYNC_RETRY_BURST_ATTEMPTS:3}
+  sync-retry-initial-delay: ${ELEVATE_SYNC_RETRY_INITIAL_DELAY:30s}
+  sync-retry-max-delay: ${ELEVATE_SYNC_RETRY_MAX_DELAY:5m}
+  agent-name: ${ELEVATE_AGENT_NAME:Support Bot}
+  support-bot-url: ${SUPPORT_BOT_URL:${UI_ORIGIN:http://localhost:3000}}
+  version: ${SUPPORT_BOT_VERSION:dev}
+
 slack:
   creds: # Credentials of Slack App
     token: ${SLACK_TOKEN} # Token like: xoxb-abc-def
@@ -325,6 +347,46 @@ You will need to register an application with the following parameters:
 
 You will also need
 to create a secret for the registered application so that it can be used for authentication by Support Bot.
+
+## Elevate Agent Connection
+
+Support Bot can authenticate as an Elevate Agent Connection and keep a local copy of the products, journeys, and users it can access. Elevate issues two credential values: a client ID and a one-time client secret. The `ELEVATE_API_KEY` variable is accepted as an alias for the client secret because older Support Bot configuration refers to that credential as an API key.
+
+Set these variables on the **API**:
+
+| Variable | Description |
+|----------|-------------|
+| `ELEVATE_BASE_URL` | Elevate origin, such as `https://elevate.example.com`. Leave this and both credential values blank to disable the optional integration. |
+| `ELEVATE_CLIENT_ID` | Agent Connection client ID issued by Elevate, normally prefixed with `esc_`. |
+| `ELEVATE_CLIENT_SECRET` | One-time Agent Connection secret issued by Elevate. Store it in a Kubernetes Secret or another secret manager. |
+| `ELEVATE_API_KEY` | Backward-compatible alias for `ELEVATE_CLIENT_SECRET`; used only when `ELEVATE_CLIENT_SECRET` is unset. |
+| `ELEVATE_CONNECT_TIMEOUT` | Maximum time to establish each Elevate HTTP connection. Defaults to `5s`. |
+| `ELEVATE_READ_TIMEOUT` | Maximum time to wait for each Elevate HTTP response. Defaults to `30s`. |
+| `ELEVATE_MAX_INSIGHTS_PAGE_RESPONSE_BYTES` | Maximum streamed response size accepted for one Insights page. Defaults to 16 MiB (`16777216` bytes) and does not rely on `Content-Length`. |
+| `ELEVATE_MAX_INSIGHTS_SNAPSHOT_RESPONSE_BYTES` | Maximum response bytes accepted cumulatively across all Insights pages and resources in one refresh. Defaults to 64 MiB (`67108864` bytes). |
+| `ELEVATE_MAX_SERVER_RETRY_DELAY` | Longest `Retry-After` delay Support Bot will honor. Defaults to `1m`; a response asking it to wait longer fails the current operation instead of retrying early. |
+| `ELEVATE_STATUS_INTERVAL` | Delay between authenticated status reports. Defaults to `1h`. |
+| `ELEVATE_SYNC_INTERVAL` | Delay between complete Insights refreshes. Defaults to `12h`. |
+| `ELEVATE_SYNC_TIMEOUT` | Maximum elapsed time allowed for one complete Insights fetch, including authentication, page requests, and retry delays. Defaults to `10m`. |
+| `ELEVATE_MAX_PAGES_PER_RESOURCE` | Maximum pages accepted from each Insights collection during one sync. Defaults to `100` (up to 50,000 entities at Elevate's 500-item page limit). |
+| `ELEVATE_MAX_TOTAL_ENTITIES` | Maximum products, journeys, and users held by one fetched snapshot in total. Defaults to `20000`. |
+| `ELEVATE_MAX_MATERIALIZED_RELATIONSHIPS` | Maximum distinct journey-user links materialized by one snapshot. Defaults to `100000`. |
+| `ELEVATE_SYNC_RETRY_BURST_ATTEMPTS` | Number of exponentially delayed failure retries before settling on the capped retry cadence. Defaults to `3` and is capped at `10`. |
+| `ELEVATE_SYNC_RETRY_INITIAL_DELAY` | Delay before retrying a failed complete sync. Defaults to `30s` and doubles after each failure. |
+| `ELEVATE_SYNC_RETRY_MAX_DELAY` | Maximum delay between complete sync attempts. Defaults to `5m`. |
+| `ELEVATE_AGENT_NAME` | Name shown for this agent in Elevate. Defaults to `Support Bot`. |
+| `SUPPORT_BOT_URL` | Public Support Bot URL reported to Elevate. Defaults to `UI_ORIGIN`, then `http://localhost:3000`. |
+| `SUPPORT_BOT_VERSION` | Deployed Support Bot version reported to Elevate. The final API image defaults it from the build-time `P2P_VERSION`; a runtime environment value overrides that image default. Local runs default to `dev`. The Helm chart derives an explicit environment entry from `image.tag` and then `Chart.appVersion`; override it with `supportBotVersion` or a `SUPPORT_BOT_VERSION` entry in `.Values.env`. Kubernetes explicit environment entries take precedence over `envFrom`, so a Secret or ConfigMap referenced only through `envFrom` cannot override the chart-managed version. |
+
+`ELEVATE_BASE_URL`, `ELEVATE_CLIENT_ID`, and one secret variable must be set together. Support Bot fails at startup when the configuration is incomplete or a URL or interval is invalid.
+
+Each job gets a fresh OAuth client-credentials token. The status job reports the connection to Elevate. The sync job records its start before making a remote request, follows every page of the products, journeys, and users collections, then replaces the local snapshot in one transaction. Each HTTP attempt has finite connection and response timeouts, and the complete fetch has an elapsed-time limit. Transient transport, rate-limit, and selected server failures are retried up to three attempts. A valid `Retry-After` is honored up to `ELEVATE_MAX_SERVER_RETRY_DELAY` and within the remaining sync time; a longer delay ends the operation rather than retrying early. Failed complete syncs use exponential backoff for `ELEVATE_SYNC_RETRY_BURST_ATTEMPTS`, then remain on the capped `ELEVATE_SYNC_RETRY_MAX_DELAY` cadence until one succeeds; only success restores the normal `ELEVATE_SYNC_INTERVAL`. Per-page and cumulative response-byte limits, entity limits, and materialized-relationship limits bound one fetched snapshot; cursor cycles, cursor chains beyond the configured page limit, and journeys whose products are absent from the fetched product collection reject the refresh. Journey-user links whose user is missing or belongs to another product are retained as integrity evidence. A successful empty response clears the old snapshot. A failed or partial refresh preserves the last complete snapshot and records a sanitised failure for the status page.
+
+The snapshot keeps each source JSON object while also normalising the fields and journey-user links used by the UI. Every successful replacement receives a new snapshot version. Paginated UI reads supply that version, so a refresh that lands between page requests is returned as a conflict instead of mixing two snapshots.
+
+Substring search deliberately uses extension-free `LIKE` scans instead of `pg_trgm`, so migrations work in restricted database schemas; the snapshot limits bound the scanned dataset.
+
+Leadership and support-engineer users can inspect the connection, last attempts, last successes, errors, and locally stored collections on the **Elevate** page under **Integrations**.
 
 ## Single Sign-On (SSO)
 

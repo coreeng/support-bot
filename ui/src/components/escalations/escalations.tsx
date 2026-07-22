@@ -107,7 +107,7 @@ export default function EscalationsPage() {
   }, [params.dateFilter, params.dateFrom, params.dateTo, setParams]);
 
   const {
-    hasFullAccess,
+    hasUnrestrictedDataScope,
     effectiveTeams,
     hasNoTeamScope: contextHasNoTeamScope,
     isViewingAsEscalationTeam: contextIsViewingAsEscalationTeam,
@@ -224,7 +224,7 @@ export default function EscalationsPage() {
     // to match the home dashboard "Tickets We Own - Escalated" count.
     // Do not dedupe explicit tenant/all-team overrides: those should show raw escalation rows.
     const isCurrentScopeView = !selectedTeam;
-    if (isViewingAsEscalationTeam && !hasFullAccess && isCurrentScopeView) {
+    if (isViewingAsEscalationTeam && !hasUnrestrictedDataScope && isCurrentScopeView) {
       const ticketMap = new Map<string, (typeof baseEscalations)[0]>();
       baseEscalations.forEach((esc) => {
         const existing = ticketMap.get(esc.ticketId);
@@ -246,7 +246,7 @@ export default function EscalationsPage() {
     effectiveTeams,
     hasNoTeamScope,
     isViewingAsEscalationTeam,
-    hasFullAccess,
+    hasUnrestrictedDataScope,
     ALL_TEAMS_FILTER,
   ]);
 
@@ -315,7 +315,7 @@ export default function EscalationsPage() {
   const scopeLabel = effectiveTeams.length === 0 ? "All Teams" : effectiveTeams.map(teamLabel).join(", ");
   const teamFilterLabel = selectedTeam === ALL_TEAMS_FILTER ? "All Teams" : teamLabel(selectedTeam) || "Current Team Scope";
   const topTagsTitleSuffix = selectedTeam ? (selectedTeam === ALL_TEAMS_FILTER ? "for All Teams" : `for ${teamLabel(selectedTeam)}`) : "";
-  const showEscalatedForColumn = hasFullAccess || selectedTeam === ALL_TEAMS_FILTER;
+  const showEscalatedForColumn = hasUnrestrictedDataScope || selectedTeam === ALL_TEAMS_FILTER;
 
   return (
     <div className="space-y-6">

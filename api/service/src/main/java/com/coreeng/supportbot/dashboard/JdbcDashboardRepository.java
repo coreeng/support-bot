@@ -2,6 +2,7 @@ package com.coreeng.supportbot.dashboard;
 
 import static com.coreeng.supportbot.util.JooqUtils.nullToZero;
 
+import com.coreeng.supportbot.dashboard.DashboardData.*;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -330,15 +331,15 @@ public class JdbcDashboardRepository implements DashboardRepository {
         return earliestActivity;
     }
 
-    static DashboardRepository.IncomingVsResolvedGranularity resolveEmptyResultGranularity(
+    static IncomingVsResolvedGranularity resolveEmptyResultGranularity(
             IncomingVsResolvedQuery.@Nullable Granularity granularity) {
         if (granularity == IncomingVsResolvedQuery.Granularity.HOUR) {
-            return DashboardRepository.IncomingVsResolvedGranularity.HOUR;
+            return IncomingVsResolvedGranularity.HOUR;
         }
         if (granularity == IncomingVsResolvedQuery.Granularity.WEEK) {
-            return DashboardRepository.IncomingVsResolvedGranularity.WEEK;
+            return IncomingVsResolvedGranularity.WEEK;
         }
-        return DashboardRepository.IncomingVsResolvedGranularity.DAY;
+        return IncomingVsResolvedGranularity.DAY;
     }
 
     private List<String> normalizeTeams(@Nullable List<String> teams) {
@@ -466,8 +467,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
         }
     }
 
-    record IncomingVsResolvedBucketing(
-            DashboardRepository.IncomingVsResolvedGranularity granularity, String truncUnit, String interval) {
+    record IncomingVsResolvedBucketing(IncomingVsResolvedGranularity granularity, String truncUnit, String interval) {
 
         private static final int LEGACY_DAILY_BUCKET_THRESHOLD_DAYS = 60;
         private static final int MAX_HOURLY_RANGE_DAYS = 4;
@@ -491,18 +491,15 @@ public class JdbcDashboardRepository implements DashboardRepository {
         }
 
         private static IncomingVsResolvedBucketing hourly() {
-            return new IncomingVsResolvedBucketing(
-                    DashboardRepository.IncomingVsResolvedGranularity.HOUR, "hour", "'1 hour'::interval");
+            return new IncomingVsResolvedBucketing(IncomingVsResolvedGranularity.HOUR, "hour", "'1 hour'::interval");
         }
 
         private static IncomingVsResolvedBucketing daily() {
-            return new IncomingVsResolvedBucketing(
-                    DashboardRepository.IncomingVsResolvedGranularity.DAY, "day", "'1 day'::interval");
+            return new IncomingVsResolvedBucketing(IncomingVsResolvedGranularity.DAY, "day", "'1 day'::interval");
         }
 
         private static IncomingVsResolvedBucketing weekly() {
-            return new IncomingVsResolvedBucketing(
-                    DashboardRepository.IncomingVsResolvedGranularity.WEEK, "week", "'1 week'::interval");
+            return new IncomingVsResolvedBucketing(IncomingVsResolvedGranularity.WEEK, "week", "'1 week'::interval");
         }
 
         private static IncomingVsResolvedQuery.Granularity resolveGranularity(

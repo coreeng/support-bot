@@ -67,6 +67,14 @@ spec:
             {{- $apiEnv = append $apiEnv (dict "name" "DEX_ISSUER_URI" "value" .Values.dex.config.issuer) }}
             {{- $apiEnv = append $apiEnv (dict "name" "DEX_INTERNAL_BASE_URL" "value" (include "support-bot.dex.internalBaseURL" .)) }}
             {{- end }}
+            {{- $hasSupportBotVersion := false }}
+            {{- range $apiEnv }}
+            {{- if eq .name "SUPPORT_BOT_VERSION" }}{{- $hasSupportBotVersion = true }}{{- end }}
+            {{- end }}
+            {{- if not $hasSupportBotVersion }}
+            {{- $deployedVersion := .Values.supportBotVersion | default .Values.image.tag | default .Chart.AppVersion }}
+            {{- $apiEnv = append $apiEnv (dict "name" "SUPPORT_BOT_VERSION" "value" $deployedVersion) }}
+            {{- end }}
             {{- toYaml $apiEnv | nindent 12 }}
             {{- if .Values.analysisBundle.enabled }}
             - name: SUMMARY_DATA_ANALYSIS_BUNDLE_PATH

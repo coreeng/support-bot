@@ -1,4 +1,5 @@
 import { publicFetch } from "@/app/api/_lib/public-fetch";
+import { normalizeBackendRoles } from "@/lib/auth/capabilities";
 import { isOauthUiKnownProvider } from "@/lib/auth/oauth-ui-callback";
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
@@ -129,7 +130,7 @@ export const authConfig: NextAuthConfig = {
               ...t,
               name: t.code || t.label,
             })),
-            roles: userData.roles as string[],
+            roles: normalizeBackendRoles(userData.roles),
             accessToken: tokenResult.token,
           };
         } catch (error) {
@@ -177,7 +178,7 @@ export const authConfig: NextAuthConfig = {
                       ...t,
                       name: t.code || t.label,
                     })),
-                    roles: userData.roles as string[],
+                    roles: normalizeBackendRoles(userData.roles),
                     accessToken: json.token,
                   };
                 } else {
@@ -213,7 +214,7 @@ export const authConfig: NextAuthConfig = {
         token.email = user.email!;
         token.name = user.name!;
         token.teams = user.teams as AuthTeam[];
-        token.roles = user.roles as string[];
+        token.roles = normalizeBackendRoles(user.roles);
       }
       return token;
     },
@@ -224,7 +225,7 @@ export const authConfig: NextAuthConfig = {
         session.user.email = token.email as string;
         session.user.name = token.name as string;
         session.user.teams = token.teams as AuthTeam[];
-        session.user.roles = token.roles as string[];
+        session.user.roles = normalizeBackendRoles(token.roles);
       }
       return session;
     },

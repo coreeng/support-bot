@@ -67,7 +67,7 @@ describe("EscalationsPage", () => {
       hasNoTeamScope: false,
       isViewingAllTeams: false,
       isViewingAsEscalationTeam: true,
-      hasFullAccess: false,
+      hasUnrestrictedDataScope: false,
       allTeams: ["Escalation Team 2 Test"],
       initialized: true,
     });
@@ -124,7 +124,7 @@ describe("EscalationsPage", () => {
       hasNoTeamScope: false,
       isViewingAllTeams: false,
       isViewingAsEscalationTeam: true,
-      hasFullAccess: false,
+      hasUnrestrictedDataScope: false,
       allTeams: ["Escalation Team 2 Test"],
       initialized: true,
     });
@@ -178,7 +178,7 @@ describe("EscalationsPage", () => {
       hasNoTeamScope: false,
       isViewingAllTeams: true,
       isViewingAsEscalationTeam: false,
-      hasFullAccess: true,
+      hasUnrestrictedDataScope: true,
       allTeams: [],
       initialized: true,
     });
@@ -239,7 +239,7 @@ describe("EscalationsPage", () => {
       hasNoTeamScope: false,
       isViewingAllTeams: true,
       isViewingAsEscalationTeam: false,
-      hasFullAccess: true,
+      hasUnrestrictedDataScope: true,
       allTeams: [],
       initialized: true,
     });
@@ -289,7 +289,7 @@ describe("EscalationsPage", () => {
       hasNoTeamScope: true,
       isViewingAllTeams: false,
       isViewingAsEscalationTeam: false,
-      hasFullAccess: false,
+      hasUnrestrictedDataScope: false,
       allTeams: [],
       initialized: true,
     });

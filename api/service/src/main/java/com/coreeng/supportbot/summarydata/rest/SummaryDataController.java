@@ -1,10 +1,8 @@
 package com.coreeng.supportbot.summarydata.rest;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository;
+import com.coreeng.supportbot.analysis.AnalysisRecord;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.AnalysisProps;
-import com.coreeng.supportbot.config.SlackChannelRegistry;
-import com.coreeng.supportbot.summarydata.ThreadService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.BufferedReader;
@@ -16,9 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -41,78 +37,9 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class SummaryDataController {
 
-    private final ThreadService threadService;
-    private final SlackChannelRegistry channelRegistry;
     private final AnalysisProps analysisProps;
     private final AnalysisResultsService analysisResultsService;
     private final ObjectMapper objectMapper;
-
-    /**
-     * Export summary data as a zip file containing thread texts.
-     * Each file in the zip is named with the thread timestamp.
-     *
-     * @param days Number of days to look back (default: 31)
-     * @return Zip file containing thread texts
-     */
-    @GetMapping(value = "/export", produces = "application/zip")
-    public ResponseEntity<byte[]> exportSummaryData(@RequestParam(defaultValue = "31") int days) {
-        if (days < 1 || days > 365) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        List<String> channelIds = channelRegistry.monitoredChannelIds();
-        log.info("Exporting summary data for last {} days from channels {}", days, channelIds);
-
-        // Fetch all threads with white_check_mark, aggregated across every monitored channel. A
-        // failure for one channel (e.g. the bot is not a member, or a Slack API error) must not fail
-        // the whole export, so each channel is fetched independently and a failing one is skipped.
-        List<ThreadService.ThreadData> threads = new ArrayList<>();
-        for (String channelId : channelIds) {
-            try {
-                threads.addAll(threadService.getThreadsWithCheckMarkAsText(channelId, days));
-            } catch (Exception e) {
-                log.warn("Failed to fetch threads for channel {}; skipping it in the export", channelId, e);
-            }
-        }
-
-        log.info("Found {} threads to export", threads.size());
-
-        // Create zip file in memory
-        try (var byteArrayOutputStream = new java.io.ByteArrayOutputStream();
-                var zip = new java.util.zip.ZipOutputStream(byteArrayOutputStream)) {
-
-            // Add each thread as a separate file in the zip. Genuine duplicates within a single
-            // channel (a thread_ts repeated by a reply_broadcast or a page boundary) are already
-            // deduped at the source in ThreadService. The remaining collisions are cross-channel:
-            // two genuinely different threads in different channels can share a thread_ts, so
-            // disambiguate the name instead of dropping one and silently losing data.
-            Set<String> usedNames = new HashSet<>();
-            for (ThreadService.ThreadData thread : threads) {
-                String fileName = thread.threadTs() + ".txt";
-                for (int dup = 2; !usedNames.add(fileName); dup++) {
-                    fileName = thread.threadTs() + "-" + dup + ".txt";
-                }
-                log.debug("Adding thread to zip: {}", fileName);
-
-                zip.putNextEntry(new java.util.zip.ZipEntry(fileName));
-                zip.write(thread.text().getBytes(StandardCharsets.UTF_8));
-                zip.closeEntry();
-            }
-
-            zip.finish();
-            log.info("Successfully exported {} threads to zip file", threads.size());
-
-            byte[] zipBytes = byteArrayOutputStream.toByteArray();
-
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"content.zip\"")
-                    .body(zipBytes);
-
-        } catch (IOException e) {
-            log.error("Failed to create zip file for export of {} threads", threads.size(), e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
 
     /**
      * Export analysis bundle analysis.zip containing AI prompt and script to run analysis on thread texts.
@@ -229,7 +156,7 @@ public class SummaryDataController {
 
         try {
             // Parse JSONL file
-            List<AnalysisRepository.AnalysisRecord> records = new ArrayList<>();
+            List<AnalysisRecord> records = new ArrayList<>();
             int totalLines = parseJsonlFile(file, records);
 
             if (records.isEmpty()) {
@@ -263,7 +190,7 @@ public class SummaryDataController {
      * @return total number of lines parsed
      * @throws IOException if reading the file fails
      */
-    private int parseJsonlFile(MultipartFile file, List<AnalysisRepository.AnalysisRecord> records) throws IOException {
+    private int parseJsonlFile(MultipartFile file, List<AnalysisRecord> records) throws IOException {
         int totalLines = 0;
         try (BufferedReader reader =
                 new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
@@ -272,8 +199,7 @@ public class SummaryDataController {
             while ((line = reader.readLine()) != null) {
                 try {
                     ++totalLines;
-                    AnalysisRepository.AnalysisRecord record =
-                            objectMapper.readValue(line, AnalysisRepository.AnalysisRecord.class);
+                    AnalysisRecord record = objectMapper.readValue(line, AnalysisRecord.class);
                     if (!record.isValid()) {
                         log.warn("Skipping line - missing or empty fields: {}", line);
                         continue;

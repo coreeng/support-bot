@@ -248,6 +248,50 @@ public class PrLifecyclePoller {
     }
 
     /**
+     * Resolves whether the code-owner gate is satisfied, disambiguating a case the provider's
+     * aggregate decision alone can't: {@code pr.codeOwnersApproved()} (GitHub {@code reviewDecision})
+     * conflates "require code-owner review" with any separately configured minimum-approval-count
+     * rule, so a repo with both reports the *unsatisfied* aggregate for a PR whose paths need no
+     * code-owner review at all, purely because the generic approval count isn't met yet.
+     *
+     * <ol>
+     *   <li>A currently pending code-owner request ({@code pr.codeOwnerReviewers()} non-empty) is
+     *       always outstanding — {@code false}, no ambiguity.
+     *   <li>A {@code null} aggregate means the provider read failed or the gate is unknowable (GitHub
+     *       GraphQL error, GitLab CE/transport error — both source clients document null as
+     *       must-fail-closed), and on those paths the pending list is empty too. Absence of signal is
+     *       not evidence that code-owner review never applied, so hold the gate shut and let the next
+     *       poll retry. The ambiguity this method disambiguates always presents as a definite {@code
+     *       false} ({@code REVIEW_REQUIRED}), never {@code null}, so this costs nothing.
+     *   <li>No pending request, and none has ever been observed for this record ({@code
+     *       record.codeownerReviewRequested()} still false after {@link
+     *       #withCodeownerReviewRequestedIfNewlySeen}) — code-owner review has never applied to this
+     *       PR's paths, so the gate doesn't apply: {@code true}, regardless of what the aggregate
+     *       decision says.
+     *   <li>No pending request, but one was observed on an earlier poll — a genuine code-owner
+     *       approval once satisfied the gate and may since have been dismissed or invalidated by a
+     *       later push (GitHub does NOT restore a dismissed reviewer to {@code reviewRequests} —
+     *       confirmed by hand against a real PR, not merely assumed). Trust the raw provider
+     *       aggregate here: {@code true} only on an actual {@code APPROVED}/inapplicable read.
+     * </ol>
+     */
+    private boolean codeownerApproved(PrTrackingRecord record, PrMetadata pr, boolean requiresCodeowners) {
+        if (!requiresCodeowners) {
+            return false;
+        }
+        if (!pr.codeOwnerReviewers().isEmpty()) {
+            return false;
+        }
+        if (pr.codeOwnersApproved() == null) {
+            return false;
+        }
+        if (!record.codeownerReviewRequested()) {
+            return true;
+        }
+        return Boolean.TRUE.equals(pr.codeOwnersApproved());
+    }
+
+    /**
      * The only place that touches the repository / Slack / escalation. Writes the status row implied by
      * {@code (next, slaOp)}, then runs effects in list order against the <b>post-write</b> record — every
      * mutating repository method already returns the row it just wrote, so an effect that reads

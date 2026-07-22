@@ -99,6 +99,29 @@ app:
   db:
     schema: ${DB_SCHEMA:public}
 
+elevate:
+  # Leave all three connection values blank to disable the optional Elevate integration.
+  base-url: ${ELEVATE_BASE_URL:}
+  client-id: ${ELEVATE_CLIENT_ID:}
+  client-secret: ${ELEVATE_CLIENT_SECRET:${ELEVATE_API_KEY:}}
+  connect-timeout: ${ELEVATE_CONNECT_TIMEOUT:5s}
+  read-timeout: ${ELEVATE_READ_TIMEOUT:30s}
+  max-insights-page-response-bytes: ${ELEVATE_MAX_INSIGHTS_PAGE_RESPONSE_BYTES:16777216}
+  max-insights-snapshot-response-bytes: ${ELEVATE_MAX_INSIGHTS_SNAPSHOT_RESPONSE_BYTES:67108864}
+  max-server-retry-delay: ${ELEVATE_MAX_SERVER_RETRY_DELAY:1m}
+  status-interval: ${ELEVATE_STATUS_INTERVAL:1h}
+  sync-interval: ${ELEVATE_SYNC_INTERVAL:12h}
+  sync-timeout: ${ELEVATE_SYNC_TIMEOUT:10m}
+  max-pages-per-resource: ${ELEVATE_MAX_PAGES_PER_RESOURCE:100}
+  max-total-entities: ${ELEVATE_MAX_TOTAL_ENTITIES:20000}
+  max-materialized-relationships: ${ELEVATE_MAX_MATERIALIZED_RELATIONSHIPS:100000}
+  sync-retry-burst-attempts: ${ELEVATE_SYNC_RETRY_BURST_ATTEMPTS:3}
+  sync-retry-initial-delay: ${ELEVATE_SYNC_RETRY_INITIAL_DELAY:30s}
+  sync-retry-max-delay: ${ELEVATE_SYNC_RETRY_MAX_DELAY:5m}
+  agent-name: ${ELEVATE_AGENT_NAME:Support Bot}
+  support-bot-url: ${SUPPORT_BOT_URL:${UI_ORIGIN:http://localhost:3000}}
+  version: ${SUPPORT_BOT_VERSION:dev}
+
 slack:
   mode: socket # socket or http
   enable-request-verification: true

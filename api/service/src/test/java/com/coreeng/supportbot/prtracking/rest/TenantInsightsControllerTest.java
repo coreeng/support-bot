@@ -38,7 +38,12 @@ class TenantInsightsControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new TenantInsightsController(prTrackingRepository, escalationTeamsRegistry, propsWithNoRepos());
+        controller = controllerWithProps(propsWithNoRepos());
+    }
+
+    private TenantInsightsController controllerWithProps(PrTrackingProps props) {
+        return new TenantInsightsController(
+                new TenantInsightsService(prTrackingRepository, escalationTeamsRegistry, props));
     }
 
     private static PrTrackingProps propsWithNoRepos() {
@@ -94,8 +99,7 @@ class TenantInsightsControllerTest {
     @Test
     void prStats_returnsMultipleReposWithDifferentTeams() {
         // given — repo-a is in SLA config, repo-b is not
-        controller = new TenantInsightsController(
-                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
+        controller = controllerWithProps(propsWithRepos(List.of(slaRepo("org/repo-a"))));
         LocalDate from = LocalDate.of(2026, 2, 1);
         List<RepoInsights> insights = List.of(
                 new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 5, 1, 1, 2, 3600.0, 7200.0, 86400.0, false),
@@ -185,8 +189,7 @@ class TenantInsightsControllerTest {
     void prStats_hasSlaIsTrueWhenRepoCurrentlyInSlaConfig() {
         // given — a repo stored with has_sla=false (e.g. only pre-V15 closures) but currently
         // in config with an SLA
-        controller = new TenantInsightsController(
-                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
+        controller = controllerWithProps(propsWithRepos(List.of(slaRepo("org/repo-a"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
                 .thenReturn(List.of(
                         new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
@@ -202,8 +205,7 @@ class TenantInsightsControllerTest {
     @Test
     void prStats_otherFieldsAreUntouchedByHasSlaReplacement() {
         // given — config-based hasSla must not touch counts, percentiles, owning team etc
-        controller = new TenantInsightsController(
-                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
+        controller = controllerWithProps(propsWithRepos(List.of(slaRepo("org/repo-a"))));
         RepoInsights stored =
                 new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 5, 1, 1, 2, 10.0, 20.0, 30.0, false);
         when(prTrackingRepository.getInsightsByRepo(null, null)).thenReturn(List.of(stored));
@@ -227,8 +229,7 @@ class TenantInsightsControllerTest {
     @Test
     void prStats_hasSlaIsFalseWhenRepoConfiguredAsNoSla() {
         // given — a repo present in config as a no-SLA tracked repo (hasNoSla()=true)
-        controller = new TenantInsightsController(
-                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(noSlaRepo("org/repo-a"))));
+        controller = controllerWithProps(propsWithRepos(List.of(noSlaRepo("org/repo-a"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
                 .thenReturn(List.of(
                         new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
@@ -244,8 +245,7 @@ class TenantInsightsControllerTest {
     @Test
     void prStats_hasSlaIsFalseWhenRepoNotInConfig() {
         // given — a repo absent from current config (e.g. previously tracked, now removed)
-        controller = new TenantInsightsController(
-                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/other-repo"))));
+        controller = controllerWithProps(propsWithRepos(List.of(slaRepo("org/other-repo"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
                 .thenReturn(List.of(
                         new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
@@ -262,8 +262,7 @@ class TenantInsightsControllerTest {
     void prStats_hasSlaIsFlippedFalseForRepoReconfiguredFromSlaToNoSla() {
         // given — a repo that was SLA-tracked (so has stored rows with has_sla=true) and has
         // since been reconfigured as no-SLA. The stored SLA signal is history; config rules present.
-        controller = new TenantInsightsController(
-                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(noSlaRepo("org/repo-a"))));
+        controller = controllerWithProps(propsWithRepos(List.of(noSlaRepo("org/repo-a"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
                 .thenReturn(List.of(
                         new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 2, 0, 0, 1, 1.0, 2.0, 3.0, true)));
@@ -279,8 +278,7 @@ class TenantInsightsControllerTest {
     @Test
     void prStats_hasSlaIsFlippedFalseForRepoRemovedFromConfig() {
         // given — a repo with historical SLA rows (has_sla=true) that is no longer in config at all
-        controller = new TenantInsightsController(
-                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/other-repo"))));
+        controller = controllerWithProps(propsWithRepos(List.of(slaRepo("org/other-repo"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
                 .thenReturn(List.of(
                         new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 2, 0, 0, 1, 1.0, 2.0, 3.0, true)));
@@ -298,8 +296,7 @@ class TenantInsightsControllerTest {
         // given — a GitLab-backed repo currently in config with an SLA. The config-join must key
         // on (provider, name) using each repo's actual provider, otherwise the GITLAB row's lookup
         // key never matches a GITHUB-stamped config entry and hasSla is silently false.
-        controller = new TenantInsightsController(
-                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaGitlabRepo("group/project"))));
+        controller = controllerWithProps(propsWithRepos(List.of(slaGitlabRepo("group/project"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
                 .thenReturn(List.of(new RepoInsights(
                         Provider.GITLAB, "group/project", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
@@ -316,8 +313,7 @@ class TenantInsightsControllerTest {
     void prStats_hasSlaMatchesAcrossCasingDifferences() {
         // given — config is lowercased by PrTrackingProps, but a legacy DB row may be mixed case.
         // The config match must still fire for that row.
-        controller = new TenantInsightsController(
-                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
+        controller = controllerWithProps(propsWithRepos(List.of(slaRepo("org/repo-a"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
                 .thenReturn(List.of(
                         new RepoInsights(Provider.GITHUB, "Org/Repo-A", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
@@ -596,7 +592,7 @@ class TenantInsightsControllerTest {
         // hasSla column is the authoritative signal at row granularity — a future refactor that
         // unified the two endpoints through the config-join would silently flip historical rows
         // for repos no longer in config, hiding in-flight PRs that still have a live SLA deadline.
-        controller = new TenantInsightsController(prTrackingRepository, escalationTeamsRegistry, propsWithNoRepos());
+        controller = controllerWithProps(propsWithNoRepos());
         Instant now = Instant.parse("2026-03-25T12:00:00Z");
         InFlightPr pr = new InFlightPr(
                 Provider.GITHUB,
