@@ -1,27 +1,17 @@
 package com.coreeng.supportbot.prtracking.rest;
 
-import static com.coreeng.supportbot.dbschema.Tables.PR_TRACKING;
-
-import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
-import com.coreeng.supportbot.prtracking.NewPrTracking;
-import com.coreeng.supportbot.prtracking.PrLifecyclePoller;
 import com.coreeng.supportbot.prtracking.PrTrackingRecord;
-import com.coreeng.supportbot.prtracking.PrTrackingRepository;
-import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
-import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @Profile({"functionaltests", "nft"})
@@ -29,75 +19,31 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/test/prtracking")
 @RequiredArgsConstructor
 public class PrTrackingTestController {
-    private final PrLifecyclePoller prLifecyclePoller;
-    private final PrTrackingRepository prTrackingRepository;
-    private final DSLContext dsl;
+    private final PrTrackingTestService prTrackingTestService;
 
     @PostMapping("/poll")
     public void triggerPoll() {
-        prLifecyclePoller.poll();
+        prTrackingTestService.triggerPoll();
     }
 
     @PostMapping("/record")
     public PrTrackingRecord createRecord(@RequestBody PrTrackingToCreate request) {
-        boolean canAutoClose = request.canAutoCloseTicket() == null || request.canAutoCloseTicket();
-        // Provider defaults to GitHub when omitted so existing functional-test fixtures (all
-        // GitHub) keep working without touching their JSON.
-        Provider provider = request.provider() == null ? Provider.GITHUB : Provider.fromStorage(request.provider());
-        PrTrackingRecord created = prTrackingRepository.insertIfAbsent(new NewPrTracking(
-                request.ticketId(),
-                provider,
-                request.githubRepo(),
-                request.prNumber(),
-                request.prCreatedAt(),
-                request.slaDeadline(),
-                request.owningTeam(),
-                canAutoClose));
-        if (created == null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "PR tracking record already exists");
-        }
-        // Optionally seed the record in a non-OPEN status (e.g. AWAITING_MERGE with an already-breached
-        // slaDeadline) so merge-SLA lifecycle tests are deterministic. Omitted/OPEN status leaves the
-        // default insert untouched. AWAITING_MERGE/MERGE_ESCALATED go through enterMergePhase instead of
-        // startSla so merge_phase_entered is correctly true for a record seeded already in the merge phase
-        // — otherwise a test that then drives it through a changes-requested detour would hit the same
-        // review/merge sla_remaining ambiguity this flag exists to resolve.
-        String status = request.status();
-        if (status != null && !"OPEN".equals(status)) {
-            PrTrackingStatus target = PrTrackingStatus.valueOf(status);
-            created = target == PrTrackingStatus.AWAITING_MERGE || target == PrTrackingStatus.MERGE_ESCALATED
-                    ? prTrackingRepository.enterMergePhase(created.id(), target, request.slaDeadline())
-                    : prTrackingRepository.startSla(created.id(), target, request.slaDeadline());
-        }
-        if (Boolean.TRUE.equals(request.codeownerReviewRequested())) {
-            created = prTrackingRepository.markCodeownerReviewRequested(created.id());
-        }
-        return created;
+        return prTrackingTestService.createRecord(request);
     }
 
     @GetMapping("/record/{id}")
     public PrTrackingRecord getRecord(@PathVariable long id) {
-        PrTrackingRecord record = prTrackingRepository.findById(id);
-        if (record == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "PR tracking record not found");
-        }
-        return record;
+        return prTrackingTestService.getRecord(id);
     }
 
     @PostMapping("/cleanup")
     public void cleanupRecords() {
-        dsl.deleteFrom(PR_TRACKING).execute();
+        prTrackingTestService.cleanupRecords();
     }
 
     @PostMapping("/record/{id}/close")
     public PrTrackingRecord closeRecord(@PathVariable long id) {
-        // Uses the same repo method as the lifecycle poller so the test goes through the real
-        // write path — nulling SLA fields, leaving has_sla untouched. See V15__pr_tracking_has_sla.sql.
-        PrTrackingRecord existing = prTrackingRepository.findById(id);
-        if (existing == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "PR tracking record not found");
-        }
-        return prTrackingRepository.updateStatus(id, PrTrackingStatus.CLOSED, Instant.now(), existing.escalationId());
+        return prTrackingTestService.closeRecord(id);
     }
 
     public record PrTrackingToCreate(
