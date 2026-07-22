@@ -607,8 +607,8 @@ touching the listed paths and never escalate.
 | `name` | yes | both | `org/repo` (GitHub) or `group/project` / nested `group/subgroup/project` (GitLab). Unique, case-insensitive. |
 | `owning-team` | yes | both | Code from `enums.escalation-teams`; chased when the SLA is breached. |
 | `provider` | — | both | `github` (default) or `gitlab`. |
-| `github-team-slug` | — | GitHub only | Team whose members' reviews count as a qualifying review. Falls back to the PR's requested team reviewers when omitted. |
-| `gitlab-group-path` | — | GitLab only | Reviewer group whose members' approvals count (see [Approver validation and CODEOWNERS](#approver-validation-and-codeowners)). |
+| `github-team-slug` | — | GitHub only | Team whose members' reviews count as a qualifying review. Falls back to the PR's requested team reviewers when omitted. On a `requires-codeowners` repo, this is also the field the bot compares pending code owners against for the maintaining-team carve-out — see [Code-owner merge gate](#code-owner-merge-gate-requires-codeowners). |
+| `gitlab-group-path` | — | GitLab only | Reviewer group whose members' approvals count (see [Approver validation and CODEOWNERS](#approver-validation-and-codeowners)). On a `requires-codeowners` repo, this doubles as the maintaining-team carve-out comparison — see [Code-owner merge gate](#code-owner-merge-gate-requires-codeowners). |
 | `requires-codeowners` | — | both | `false` (default) / `true`. When `true`, gate the merge on **code-owner** approval read from the provider, and chase the code owner before the SLA clock starts. See [Code-owner merge gate](#code-owner-merge-gate-requires-codeowners). |
 | `exclude-author-teams` | — | both | Author admission deny-list: when non-empty, a PR/MR is **skipped** if the Slack user who posted the link belongs to one of these platform teams. Values are platform team codes (same vocabulary as `owning-team`). See [Author admission](#author-admission). |
 | `sla` | one of `sla`/`paths` | both | SLA block — see below. |
@@ -709,17 +709,36 @@ specific reviewer group.
 #### Code-owner merge gate (`requires-codeowners`)
 
 Set `requires-codeowners: true` on a repo whose merges are gated on **code-owner**
-approval. It changes *when* the SLA clock runs and *who* gets chased, so the bot
-doesn't escalate a PR that is still legitimately waiting on a code owner:
+approval. It changes *who* gets named as the chase target during review and adds
+a second, merge-phase SLA clock once the code owners are satisfied:
 
 1. **At detection** the PR is reported as waiting on its **code owners** (named,
-   where the provider lists them), and the SLA clock is **held** — the repo's PR
-   sits in `OPEN` with no live deadline.
+   where the provider lists them), and the review-phase SLA clock is **held** —
+   the PR sits in `OPEN` with no live deadline, same as a repo with no `sla`
+   configured at all. This is the default and applies to almost every
+   `requires-codeowners` repo: a PR that's still legitimately waiting on an
+   owner is never escalated for being "slow".
+
+   **The one carve-out:** if the code owners the provider still lists as
+   outstanding on the PR are themselves the repo's configured maintaining team
+   — confirmed by matching them against `github-team-slug` (GitHub) or
+   `gitlab-group-path` (GitLab), see below — the detected message reads like a
+   normal SLA'd repo instead of naming someone to "chase", and the PR gets a
+   real review-phase deadline from the repo's `sla` block. If that deadline
+   passes, it escalates to the owning team (`ESCALATED`) exactly like a normal
+   repo. This only fires when the overlap can be positively confirmed at
+   detection time; a repo with no `github-team-slug` / `gitlab-group-path`
+   configured, or whose code owners are genuinely a different team, always gets
+   the default held-clock behaviour above, regardless of whether `sla` is set.
 2. **When the code owners have approved and the PR is mergeable**, it moves to
-   `AWAITING_MERGE`, the SLA clock **starts**, and the chase switches to the
-   **owning team to merge**.
+   `AWAITING_MERGE` (from `OPEN`, `CHANGES_REQUESTED`, or `ESCALATED` — a
+   codeowner repo's verdict is never `APPROVED`, so that source state is
+   unreachable here), a merge-phase SLA clock **starts**, and the chase
+   switches to the **owning team to merge**.
 3. **If the merge deadline passes**, it becomes `MERGE_ESCALATED` (owning team
-   escalated again). The ticket closes **only when the provider reports the PR
+   escalated again — reusing the still-open escalation from a review-phase
+   breach, if there was one, rather than paging the team a second time for the
+   same PR). The ticket closes **only when the provider reports the PR
    merged** — never on "mergeable" alone.
 
 The end-user view of these states is in the
@@ -771,14 +790,23 @@ its signals never reflect code-owner status — the gate silently becomes a no-o
   only when the MR is actually merged/closed. Do **not** enable
   `requires-codeowners` on such a repo; validate against a real MR first.
 
-**SLA.** The merge clock (`AWAITING_MERGE` → `MERGE_ESCALATED`) uses the repo's
-configured `sla`. A `requires-codeowners` repo with **no** `sla` block still gets
-the held-clock / code-owner-chase behaviour, but never starts a merge clock and
-so never reaches `MERGE_ESCALATED`. `requires-codeowners` is independent of
-`gitlab-group-path` / `github-team-slug` (which restrict *whose* review counts) —
-you can use either, both, or neither.
+**SLA.** The merge clock (`AWAITING_MERGE` → `MERGE_ESCALATED`) always uses the
+repo's configured `sla` once the code owners approve. The review clock (`OPEN` →
+`ESCALATED`) uses the same `sla` block, but **only** in the maintaining-team
+carve-out above — every other `requires-codeowners` repo never gets a review
+deadline and so never reaches `ESCALATED`, regardless of whether `sla` is
+configured. A `requires-codeowners` repo with **no** `sla` block never starts
+either clock and so never reaches `ESCALATED` or `MERGE_ESCALATED`.
 
-**Example — GitHub repo gated on code owners:**
+`requires-codeowners` is otherwise independent of `gitlab-group-path` /
+`github-team-slug` (which primarily restrict *whose* review counts toward the
+non-codeowner SLA path) — you can use either, both, or neither. The
+maintaining-team carve-out above is the one place a codeowner repo's behaviour
+*does* depend on one of them being set: without it, the bot has nothing to
+compare the pending code owners against and always falls back to the default
+held-clock behaviour.
+
+**Example — GitHub repo gated on code owners, external code owners (default):**
 
 ```yaml
   - name: my-org/codeowned-repo
@@ -787,6 +815,28 @@ you can use either, both, or neither.
     sla:
       default: 48h                         # the *merge* clock once code owners have approved
 ```
+
+No `github-team-slug` is set, so the maintaining-team carve-out never engages
+here regardless of `sla` — this repo's code owners are assumed to be a separate
+party from `support-team`, and the review phase is never escalated.
+
+**Example — GitHub repo where the code owners *are* the maintaining team:**
+
+```yaml
+  - name: my-org/self-owned-repo
+    owning-team: support-team
+    requires-codeowners: true
+    github-team-slug: support-team-gh      # the GitHub team CODEOWNERS names; matched against the
+                                            # pending code owners to enable the carve-out below
+    sla:
+      default: 48h                         # drives BOTH the review clock (carve-out only) and the merge clock
+```
+
+Here `CODEOWNERS` names `my-org/support-team-gh` (or individual members of that
+team) as the code owner. Because that matches `github-team-slug`, this repo's
+review phase behaves like a normal SLA'd repo — a real deadline, the standard
+"tracked" message, and an `ESCALATED` review-phase escalation to `support-team`
+if nobody on that team reviews in time — instead of holding indefinitely.
 
 #### Author admission
 

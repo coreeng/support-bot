@@ -68,14 +68,29 @@ behaves differently to keep the chase pointed at the right people:
 1. **At detection** the bot tells you the PR is waiting on its **code owners**
    (and names them, where the provider reports them) — so you chase the owner of
    the changed area, not the maintaining team.
-2. **The SLA clock is held** while the PR is waiting on code-owner review — a PR
-   that is still legitimately waiting on an owner is never escalated for being
-   "slow". Code-owner repos therefore don't pass through `APPROVED`/`ESCALATED`.
+2. **The review SLA clock is held while waiting on code-owner review, by
+   default.** A PR that's still legitimately waiting on an owner is never
+   escalated for being "slow" — code-owner repos hold in `OPEN` with no review
+   deadline and never review-escalate, same as a repo with no `requires-codeowners`
+   SLA at all. The one exception: if the code owners GitHub/GitLab still lists as
+   outstanding on the PR **are themselves the repo's configured maintaining
+   team**, telling you to "chase" them would be telling you to chase the team the
+   bot already tracks — so that case instead gets a real review deadline and
+   escalates to the owning team (`ESCALATED`) exactly like a normal SLA'd repo if
+   they don't approve in time. This only engages when the operator has configured
+   a `github-team-slug` / `gitlab-group-path` the bot can positively match the
+   pending code owners against — see the
+   [configuration reference][config-codeowners] for the exact rule. Code-owner
+   repos never pass through `APPROVED`, since their review verdict comes from the
+   provider's code-owner decision, not a plain approval.
 3. **Once the code owners approve and the PR is mergeable**, the bot moves it to
-   `AWAITING_MERGE`, **starts the SLA clock**, and switches the chase to the
-   **owning team to get it merged**.
+   `AWAITING_MERGE`, **starts a separate merge-phase SLA clock**, and switches
+   the chase to the **owning team to get it merged** — this happens whether the
+   PR arrived there straight from `OPEN`/`CHANGES_REQUESTED` or via `ESCALATED`.
 4. **If that merge deadline passes**, it becomes `MERGE_ESCALATED` and the owning
-   team is escalated again.
+   team is escalated again. (A PR that was already escalated during the review
+   phase reuses that same open escalation rather than paging the team twice for
+   one PR.)
 5. **The ticket closes only when the provider reports the PR actually merged** (or
    closed) — never just because it became mergeable.
 

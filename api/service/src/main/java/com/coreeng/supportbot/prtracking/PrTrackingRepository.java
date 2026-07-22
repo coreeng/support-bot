@@ -29,11 +29,18 @@ public interface PrTrackingRepository {
     PrTrackingRecord resumeSla(long id, Instant newDeadline);
 
     /**
-     * Starts the SLA clock with a fresh deadline and an explicit status (the merge clock on entry to
-     * AWAITING_MERGE), nulling any stored remaining duration. Unlike {@link #resumeSla}, the status is
-     * a parameter rather than fixed to OPEN.
+     * Starts the SLA clock with a fresh deadline and an explicit status, nulling any stored remaining.
+     * Test-seeding helper only ({@code PrTrackingTestController}) — production entry into the merge phase
+     * uses {@link #enterMergePhase} instead, which also latches {@code merge_phase_entered}.
      */
     PrTrackingRecord startSla(long id, PrTrackingStatus newStatus, Instant newDeadline);
+
+    /**
+     * Enters (or re-enters) the merge phase: sets status + deadline, clears any stored remaining, and
+     * latches {@code merge_phase_entered = true} — all in one write, so a crash or overlapping poll can
+     * never see {@code AWAITING_MERGE} with the flag still false.
+     */
+    PrTrackingRecord enterMergePhase(long id, PrTrackingStatus newStatus, @Nullable Instant newDeadline);
 
     /**
      * Returns true if any non-terminal record (OPEN, ESCALATED, CHANGES_REQUESTED, APPROVED, AWAITING_MERGE,

@@ -57,12 +57,17 @@ public class PrTrackingTestController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "PR tracking record already exists");
         }
         // Optionally seed the record in a non-OPEN status (e.g. AWAITING_MERGE with an already-breached
-        // slaDeadline) so merge-SLA lifecycle tests are deterministic. startSla sets both status and
-        // deadline, nulling any stored remaining. Omitted/OPEN status leaves the default insert untouched.
+        // slaDeadline) so merge-SLA lifecycle tests are deterministic. Omitted/OPEN status leaves the
+        // default insert untouched. AWAITING_MERGE/MERGE_ESCALATED go through enterMergePhase instead of
+        // startSla so merge_phase_entered is correctly true for a record seeded already in the merge phase
+        // — otherwise a test that then drives it through a changes-requested detour would hit the same
+        // review/merge sla_remaining ambiguity this flag exists to resolve.
         String status = request.status();
         if (status != null && !"OPEN".equals(status)) {
             PrTrackingStatus target = PrTrackingStatus.valueOf(status);
-            created = prTrackingRepository.startSla(created.id(), target, request.slaDeadline());
+            created = target == PrTrackingStatus.AWAITING_MERGE || target == PrTrackingStatus.MERGE_ESCALATED
+                    ? prTrackingRepository.enterMergePhase(created.id(), target, request.slaDeadline())
+                    : prTrackingRepository.startSla(created.id(), target, request.slaDeadline());
         }
         if (Boolean.TRUE.equals(request.codeownerReviewRequested())) {
             created = prTrackingRepository.markCodeownerReviewRequested(created.id());
