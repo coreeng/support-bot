@@ -59,6 +59,11 @@ function SortableHeader({
   );
 }
 
+// Used by the Analytics & Operations page to hide the Products View tab
+// entirely when the registry has no active product tags.
+export const hasActiveProductTags = (registryData?: { tags?: TicketTag[] }): boolean =>
+  (registryData?.tags ?? []).some((tag) => tag.active !== false && tag.label.startsWith(PRODUCT_TAG_PREFIX));
+
 const stripProductPrefix = (label: string): string => label.slice(PRODUCT_TAG_PREFIX.length).trim();
 
 const formatPercentage = (count: number, total: number): string => (total > 0 ? `${((count / total) * 100).toFixed(1)}%` : "0.0%");
@@ -120,12 +125,6 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
   }, [ticketsContent, hasNoTeamScope, effectiveTeams]);
 
   const totalTickets = visibleTickets.length;
-
-  // Distinguish "no product tags configured" (registry has none) from "no tickets tagged".
-  // Only asserted once the registry has loaded, to avoid flashing the message.
-  const noProductTagsConfigured =
-    registryData !== undefined &&
-    !(registryData.tags ?? []).some((tag: TicketTag) => tag.active !== false && tag.label.startsWith(PRODUCT_TAG_PREFIX));
 
   const productCounts = useMemo(() => {
     const labelByCode = new Map<string, string>();
@@ -203,17 +202,7 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
         </div>
       )}
 
-      {noProductTagsConfigured && (
-        <div className="bg-card rounded-lg border p-8 text-center">
-          <p className="text-foreground font-semibold">No product tags configured yet</p>
-          <p className="text-muted-foreground mt-1 text-sm">
-            This view is powered by ticket tags labelled <code className="bg-muted rounded px-1 py-0.5">Product - &lt;name&gt;</code>.
-            Contact your support-bot operator to add some.
-          </p>
-        </div>
-      )}
-
-      {!noProductTagsConfigured && !ticketsQuery.isLoading && !ticketsQuery.error && !hasNoTeamScope && (
+      {!ticketsQuery.isLoading && !ticketsQuery.error && !hasNoTeamScope && (
         <div className="flex items-center gap-2">
           <input
             id="hide-untagged"
@@ -228,7 +217,7 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
         </div>
       )}
 
-      {!noProductTagsConfigured && !ticketsQuery.isLoading && !ticketsQuery.error && !hasNoTeamScope && chartData.length > 0 && (
+      {!ticketsQuery.isLoading && !ticketsQuery.error && !hasNoTeamScope && chartData.length > 0 && (
         <div className="bg-card rounded-lg border p-4">
           <h2 className="text-foreground mb-2 text-center font-semibold">Tickets by Product</h2>
           <div style={{ width: "100%", height: Math.max(200, chartData.length * 36 + 60) }}>
@@ -279,53 +268,51 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
         </div>
       )}
 
-      {!noProductTagsConfigured && (
-        <div className="overflow-hidden rounded-lg border">
-          {ticketsQuery.isLoading ? (
-            <LoadingSkeleton />
-          ) : ticketsQuery.error ? (
-            <div className="border-destructive/30 bg-destructive/10 text-destructive m-6 rounded-lg border p-4">
-              <p className="font-semibold">Error loading products</p>
-              <p className="mt-1 text-sm">Unable to load ticket data. Please try refreshing the page.</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader className="bg-muted z-10">
+      <div className="overflow-hidden rounded-lg border">
+        {ticketsQuery.isLoading ? (
+          <LoadingSkeleton />
+        ) : ticketsQuery.error ? (
+          <div className="border-destructive/30 bg-destructive/10 text-destructive m-6 rounded-lg border p-4">
+            <p className="font-semibold">Error loading products</p>
+            <p className="mt-1 text-sm">Unable to load ticket data. Please try refreshing the page.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader className="bg-muted z-10">
+              <TableRow>
+                <SortableHeader col="product" label="Product" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                <SortableHeader col="count" label="Tickets" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                <TableHead>% of Tickets</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedProducts.length === 0 ? (
                 <TableRow>
-                  <SortableHeader col="product" label="Product" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                  <SortableHeader col="count" label="Tickets" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                  <TableHead>% of Tickets</TableHead>
+                  <TableCell colSpan={3} className="text-muted-foreground py-8 text-center">
+                    No product tags found
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedProducts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-muted-foreground py-8 text-center">
-                      No product tags found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  <>
-                    {sortedProducts.map(({ product, count }) => (
-                      <TableRow key={product}>
-                        <TableCell>{product}</TableCell>
-                        <TableCell className="font-mono text-sm tabular-nums">{count}</TableCell>
-                        <TableCell className="font-mono text-sm tabular-nums">{formatPercentage(count, displayedTotal)}</TableCell>
-                      </TableRow>
-                    ))}
-                    {/* Distinct tickets in scope — can be below the column sum since a ticket may carry several product tags. */}
-                    <TableRow className="bg-muted/50 border-t font-semibold">
-                      <TableCell>Totals</TableCell>
-                      <TableCell className="font-mono text-sm tabular-nums">{displayedTotal}</TableCell>
-                      <TableCell className="font-mono text-sm tabular-nums">{formatPercentage(displayedTotal, displayedTotal)}</TableCell>
+              ) : (
+                <>
+                  {sortedProducts.map(({ product, count }) => (
+                    <TableRow key={product}>
+                      <TableCell>{product}</TableCell>
+                      <TableCell className="font-mono text-sm tabular-nums">{count}</TableCell>
+                      <TableCell className="font-mono text-sm tabular-nums">{formatPercentage(count, displayedTotal)}</TableCell>
                     </TableRow>
-                  </>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-      )}
+                  ))}
+                  {/* Distinct tickets in scope — can be below the column sum since a ticket may carry several product tags. */}
+                  <TableRow className="bg-muted/50 border-t font-semibold">
+                    <TableCell>Totals</TableCell>
+                    <TableCell className="font-mono text-sm tabular-nums">{displayedTotal}</TableCell>
+                    <TableCell className="font-mono text-sm tabular-nums">{formatPercentage(displayedTotal, displayedTotal)}</TableCell>
+                  </TableRow>
+                </>
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </div>
     </div>
   );
 }

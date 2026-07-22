@@ -74,7 +74,10 @@ describe("HealthPage", () => {
     mockUseRegistry.mockReturnValue({
       data: {
         impacts: [{ code: "high", label: "High" }],
-        tags: [{ code: "bug", label: "Bug" }],
+        tags: [
+          { code: "bug", label: "Bug" },
+          { code: "product-alpha", label: "Product - Alpha" },
+        ],
       },
       isLoading: false,
       error: null,
@@ -150,6 +153,52 @@ describe("HealthPage", () => {
       expect(screen.getByText("Ratings")).toBeInTheDocument();
       expect(screen.getByText("Ticket Workbench")).toBeInTheDocument();
       expect(screen.getByText("Products View")).toBeInTheDocument();
+    });
+
+    it("hides the Products View tab when no product tags are configured", () => {
+      mockUseRegistry.mockReturnValue({
+        data: {
+          impacts: [{ code: "high", label: "High" }],
+          tags: [{ code: "bug", label: "Bug" }],
+        },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useRegistry>);
+
+      render(<HealthPage />, { wrapper: Wrapper });
+
+      expect(screen.queryByText("Products View")).not.toBeInTheDocument();
+      expect(screen.getByText("Activity Trends")).toBeInTheDocument();
+      expect(screen.getByText("Ratings")).toBeInTheDocument();
+      expect(screen.getByText("Ticket Workbench")).toBeInTheDocument();
+    });
+
+    it("hides the Products View tab when the only product tags are inactive", () => {
+      mockUseRegistry.mockReturnValue({
+        data: {
+          impacts: [],
+          tags: [{ code: "product-retired", label: "Product - Retired", active: false }],
+        },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useRegistry>);
+
+      render(<HealthPage />, { wrapper: Wrapper });
+
+      expect(screen.queryByText("Products View")).not.toBeInTheDocument();
+    });
+
+    it("hides the Products View tab while the registry is still loading", () => {
+      mockUseRegistry.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useRegistry>);
+
+      render(<HealthPage />, { wrapper: Wrapper });
+
+      expect(screen.queryByText("Products View")).not.toBeInTheDocument();
+      expect(screen.getByText("Activity Trends")).toBeInTheDocument();
     });
 
     it("defaults to Activity Trends tab", () => {

@@ -217,38 +217,6 @@ describe("Products Component", () => {
     expect(screen.getByText("No Team Access")).toBeInTheDocument();
   });
 
-  it("shows an operator message instead of the chart and table when no product tags are configured", () => {
-    mockUseRegistry.mockReturnValue({
-      data: { impacts: [], tags: [{ code: "bug", label: "Bug" }] },
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof hooks.useRegistry>);
-    mockUseAllTickets.mockReturnValue({
-      data: getMockPaginatedTickets([createMockTicket("1", ["bug"])]),
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof hooks.useAllTickets>);
-
-    renderProducts();
-
-    expect(screen.getByText("No product tags configured yet")).toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Hide tickets without a product tag")).not.toBeInTheDocument();
-  });
-
-  it("treats a registry with only inactive product tags as not configured", () => {
-    mockUseRegistry.mockReturnValue({
-      data: { impacts: [], tags: [{ code: "product-retired", label: "Product - Retired", active: false }] },
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof hooks.useRegistry>);
-
-    renderProducts();
-
-    expect(screen.getByText("No product tags configured yet")).toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-  });
-
   it("sorts by count descending by default", () => {
     renderProducts();
 

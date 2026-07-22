@@ -1,7 +1,7 @@
 "use client";
 
 import LoadingSkeleton from "@/components/LoadingSkeleton";
-import ProductsPage from "@/components/products/products";
+import ProductsPage, { hasActiveProductTags } from "@/components/products/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,11 +34,15 @@ export default function HealthPage() {
   const { data: isAssignmentEnabled } = useAssignmentEnabled();
   const queryClient = useQueryClient();
 
+  // The Products View tab only exists when the registry has active product tags,
+  // so it stays hidden while the registry loads and never flashes in and out.
+  const productTagsConfigured = hasActiveProductTags(registryData);
+
   const tabs = [
     { key: "tickets" as const, label: "Activity Trends", icon: ClipboardList, color: "blue" },
     { key: "ratings" as const, label: "Ratings", icon: Star, color: "yellow" },
     { key: "workbench" as const, label: "Ticket Workbench", icon: Headphones, color: "purple" },
-    { key: "products" as const, label: "Products View", icon: Package, color: "green" },
+    ...(productTagsConfigured ? [{ key: "products" as const, label: "Products View", icon: Package, color: "green" }] : []),
   ];
 
   // Persist date filter mode, custom date range, and active tab in the URL.
@@ -55,6 +59,14 @@ export default function HealthPage() {
   // Safe to cast: validators guarantee these are valid enum values.
   const dateFilter = params.dateFilter as "lastWeek" | "last2Weeks" | "lastMonth" | "lastYear" | "custom";
   const activeTab = params.tab as "tickets" | "ratings" | "workbench" | "products";
+
+  // A deep link or stale bookmark can still point at the hidden Products View
+  // tab; fall back to the default tab once the registry confirms no product tags.
+  useEffect(() => {
+    if (activeTab === "products" && registryData !== undefined && !productTagsConfigured) {
+      setParams({ tab: "tickets" });
+    }
+  }, [activeTab, registryData, productTagsConfigured, setParams]);
 
   // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
   useEffect(() => {
