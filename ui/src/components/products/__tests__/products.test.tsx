@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import React from "react";
 import * as hooks from "../../../lib/hooks";
-import Products from "../products";
+import Products, { hasActiveProductTags } from "../products";
 
 // Mock recharts to avoid rendering errors in tests
 jest.mock("recharts", () => ({
@@ -205,6 +205,85 @@ describe("Products Component", () => {
     const rows = screen.getAllByRole("row").slice(1);
     const products = rows.map((row) => within(row).getAllByRole("cell")[0].textContent);
     expect(products).toEqual(["Beta", "None", "Alpha", "Totals"]);
+  });
+
+  it("counts tickets tagged with a retired product under its own row", () => {
+    mockUseAllTickets.mockReturnValue({
+      data: getMockPaginatedTickets([createMockTicket("1", ["product-retired"]), createMockTicket("2", ["product-alpha"])]),
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+    renderProducts();
+
+    // Retired products are not seeded, but their tickets still count when in range
+    const retiredRow = screen.getByText("Retired").closest("tr")!;
+    expect(within(retiredRow).getByText("1")).toBeInTheDocument();
+  });
+
+  it("tolerates case and dash variants in product tag labels", () => {
+    mockUseRegistry.mockReturnValue({
+      data: {
+        impacts: [],
+        tags: [
+          { code: "product-gamma", label: "Product – Gamma" }, // en dash
+          { code: "product-delta", label: "product - delta" }, // lowercase
+        ],
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useRegistry>);
+    mockUseAllTickets.mockReturnValue({
+      data: getMockPaginatedTickets([createMockTicket("1", ["product-gamma"]), createMockTicket("2", ["product-delta"])]),
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+    renderProducts();
+
+    const gammaRow = screen.getByText("Gamma").closest("tr")!;
+    expect(within(gammaRow).getByText("1")).toBeInTheDocument();
+    const deltaRow = screen.getByText("delta").closest("tr")!;
+    expect(within(deltaRow).getByText("1")).toBeInTheDocument();
+  });
+
+  it("treats prefix-only labels as non-product tags", () => {
+    mockUseRegistry.mockReturnValue({
+      data: {
+        impacts: [],
+        tags: [
+          { code: "product-alpha", label: "Product - Alpha" },
+          { code: "product-empty", label: "Product -" },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useRegistry>);
+    mockUseAllTickets.mockReturnValue({
+      data: getMockPaginatedTickets([createMockTicket("1", ["product-empty"])]),
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+    renderProducts();
+
+    // The prefix-only tag seeds no blank row; its ticket counts as untagged
+    const noneRow = screen.getByText("None").closest("tr")!;
+    expect(within(noneRow).getByText("1")).toBeInTheDocument();
+  });
+
+  describe("hasActiveProductTags", () => {
+    it("ignores prefix-only labels", () => {
+      expect(hasActiveProductTags({ tags: [{ code: "p", label: "Product -" }] })).toBe(false);
+    });
+
+    it("accepts case and dash variants", () => {
+      expect(hasActiveProductTags({ tags: [{ code: "p", label: "product – alpha" }] })).toBe(true);
+    });
+
+    it("ignores inactive product tags", () => {
+      expect(hasActiveProductTags({ tags: [{ code: "p", label: "Product - Alpha", active: false }] })).toBe(false);
+    });
   });
 
   it("shows the loading skeleton while the registry is still loading", () => {

@@ -10,7 +10,6 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-const PRODUCT_TAG_PREFIX = "Product -";
 const NO_PRODUCT_LABEL = "None";
 
 const CHART_COLORS = [
@@ -56,12 +55,21 @@ function SortableHeader({
   );
 }
 
+// Product tags are detected by their label prefix ("Product - <name>") — a UI
+// convention until the registry can declare a tag category. Matching tolerates
+// case, spacing, and hyphen/en/em dash variants so a slightly different label
+// doesn't silently drop a product; a label that is only the prefix (empty
+// product name) is not a product tag.
+const PRODUCT_TAG_PREFIX_RE = /^\s*product\s*[-–—]\s*/i;
+
+const stripProductPrefix = (label: string): string => label.replace(PRODUCT_TAG_PREFIX_RE, "").trim();
+
+const isProductLabel = (label: string): boolean => PRODUCT_TAG_PREFIX_RE.test(label) && stripProductPrefix(label) !== "";
+
 // Used by the Analytics & Operations page to hide the Products View tab
 // entirely when the registry has no active product tags.
 export const hasActiveProductTags = (registryData?: { tags?: TicketTag[] }): boolean =>
-  (registryData?.tags ?? []).some((tag) => tag.active !== false && tag.label.startsWith(PRODUCT_TAG_PREFIX));
-
-const stripProductPrefix = (label: string): string => label.slice(PRODUCT_TAG_PREFIX.length).trim();
+  (registryData?.tags ?? []).some((tag) => tag.active !== false && isProductLabel(tag.label));
 
 const formatPercentage = (count: number, total: number): string => (total > 0 ? `${((count / total) * 100).toFixed(1)}%` : "0.0%");
 
@@ -123,9 +131,12 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
     (registryData?.tags ?? []).forEach((tag: TicketTag) => labelByCode.set(tag.code, tag.label));
 
     const counts = new Map<string, number>();
-    // Seed with active registry product tags so products with no tickets in range still appear.
+    // Seed with active registry product tags so products with no tickets in
+    // range still appear. Retired (inactive) product tags are deliberately not
+    // seeded, but tickets carrying them still count below — a retired product
+    // surfaces only for date ranges that contain its tickets.
     (registryData?.tags ?? []).forEach((tag: TicketTag) => {
-      if (tag.active !== false && tag.label.startsWith(PRODUCT_TAG_PREFIX)) {
+      if (tag.active !== false && isProductLabel(tag.label)) {
         counts.set(stripProductPrefix(tag.label), 0);
       }
     });
@@ -136,7 +147,7 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
       const products = new Set<string>();
       (t.tags ?? []).forEach((code) => {
         const label = labelByCode.get(code as string) || getTagLabel(code);
-        if (label.startsWith(PRODUCT_TAG_PREFIX)) products.add(stripProductPrefix(label));
+        if (isProductLabel(label)) products.add(stripProductPrefix(label));
       });
       if (products.size === 0) products.add(NO_PRODUCT_LABEL);
       products.forEach((product) => counts.set(product, (counts.get(product) ?? 0) + 1));
@@ -160,15 +171,21 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
     [displayedCounts]
   );
 
-  // Hues are assigned by alphabetical position, not rank, so a product keeps its
-  // color when counts shift between date ranges. "None" stays gray (catch-all).
+  // Hues are assigned by alphabetical position over every registry product tag
+  // (retired included), not by rank or by which rows currently have tickets —
+  // so a product keeps its color when counts shift between date ranges, even
+  // when a retired product's row only exists for some ranges. "None" stays
+  // gray (catch-all).
   const colorByProduct = useMemo(() => {
-    const products = productCounts
-      .map((p) => p.product)
-      .filter((p) => p !== NO_PRODUCT_LABEL)
-      .sort((a, b) => a.localeCompare(b));
+    const products = Array.from(
+      new Set(
+        (registryData?.tags ?? [])
+          .filter((tag: TicketTag) => isProductLabel(tag.label))
+          .map((tag: TicketTag) => stripProductPrefix(tag.label))
+      )
+    ).sort((a, b) => a.localeCompare(b));
     return new Map(products.map((p, idx) => [p, CHART_COLORS[idx % CHART_COLORS.length]]));
-  }, [productCounts]);
+  }, [registryData]);
 
   const sortedProducts = useMemo(() => {
     return [...displayedCounts].sort((a, b) => {
