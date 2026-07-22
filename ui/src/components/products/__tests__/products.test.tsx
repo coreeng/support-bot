@@ -207,6 +207,33 @@ describe("Products Component", () => {
     expect(products).toEqual(["Beta", "None", "Alpha", "Totals"]);
   });
 
+  it("shows the loading skeleton while the registry is still loading", () => {
+    mockUseRegistry.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useRegistry>);
+
+    const { container } = renderProducts();
+
+    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+    // No final-looking data while the code→label map is unavailable
+    expect(screen.queryByText("Totals")).not.toBeInTheDocument();
+  });
+
+  it("shows an error message when the registry fails to load", () => {
+    mockUseRegistry.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error("registry down"),
+    } as unknown as ReturnType<typeof hooks.useRegistry>);
+
+    renderProducts();
+
+    expect(screen.getByText("Error loading products")).toBeInTheDocument();
+    expect(screen.queryByText("Totals")).not.toBeInTheDocument();
+  });
+
   it("shows an error message when tickets fail to load", () => {
     mockUseAllTickets.mockReturnValue({
       data: undefined,

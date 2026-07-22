@@ -7,7 +7,7 @@
  * - Loading and error states
  */
 
-import { useMockUrlParams as mockUseUrlParams } from "@/test-utils/mock-url-params";
+import { clearMockUrlParamsInitial, useMockUrlParams as mockUseUrlParams, setMockUrlParamsInitial } from "@/test-utils/mock-url-params";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
@@ -39,6 +39,7 @@ jest.mock("../../../lib/hooks/useUrlParams", () => ({
 }));
 
 const mockUseTickets = hooks.useTickets as jest.MockedFunction<typeof hooks.useTickets>;
+const mockUseAllTickets = hooks.useAllTickets as jest.MockedFunction<typeof hooks.useAllTickets>;
 const mockUseRatings = hooks.useRatings as jest.MockedFunction<typeof hooks.useRatings>;
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
 const mockUseSupportMembers = hooks.useSupportMembers as jest.MockedFunction<typeof hooks.useSupportMembers>;
@@ -70,6 +71,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => {
 describe("HealthPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearMockUrlParamsInitial();
 
     mockUseRegistry.mockReturnValue({
       data: {
@@ -206,6 +208,52 @@ describe("HealthPage", () => {
 
       // Should show activity trends tab content (has date filter picklist with "Last Week")
       expect(screen.getByText(/Last Week/i)).toBeInTheDocument();
+    });
+
+    it("falls back to Activity Trends when deep-linked to Products View with no product tags", () => {
+      setMockUrlParamsInitial({ tab: "products" });
+      mockUseRegistry.mockReturnValue({
+        data: {
+          impacts: [],
+          tags: [{ code: "bug", label: "Bug" }],
+        },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useRegistry>);
+
+      render(<HealthPage />, { wrapper: Wrapper });
+
+      // The hidden view must not mount, and Activity Trends renders instead
+      expect(screen.queryByText("Products View")).not.toBeInTheDocument();
+      expect(screen.queryByText("Ticket counts per product tag")).not.toBeInTheDocument();
+      expect(screen.getByText(/Last Week/i)).toBeInTheDocument();
+    });
+
+    it("falls back to Activity Trends when deep-linked to Products View and the registry fails", () => {
+      setMockUrlParamsInitial({ tab: "products" });
+      mockUseRegistry.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: new Error("registry down"),
+      } as unknown as ReturnType<typeof hooks.useRegistry>);
+
+      render(<HealthPage />, { wrapper: Wrapper });
+
+      expect(screen.queryByText("Ticket counts per product tag")).not.toBeInTheDocument();
+      expect(screen.getByText(/Last Week/i)).toBeInTheDocument();
+    });
+
+    it("opens Products View from a deep link when product tags are configured", () => {
+      setMockUrlParamsInitial({ tab: "products" });
+      mockUseAllTickets.mockReturnValue({
+        data: { content: [], page: 0, totalPages: 1, totalElements: 0 },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+      render(<HealthPage />, { wrapper: Wrapper });
+
+      expect(screen.getByText("Ticket counts per product tag")).toBeInTheDocument();
     });
   });
 

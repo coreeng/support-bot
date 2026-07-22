@@ -58,15 +58,14 @@ export default function HealthPage() {
   );
   // Safe to cast: validators guarantee these are valid enum values.
   const dateFilter = params.dateFilter as "lastWeek" | "last2Weeks" | "lastMonth" | "lastYear" | "custom";
-  const activeTab = params.tab as "tickets" | "ratings" | "workbench" | "products";
+  const urlTab = params.tab as "tickets" | "ratings" | "workbench" | "products";
 
-  // A deep link or stale bookmark can still point at the hidden Products View
-  // tab; fall back to the default tab once the registry confirms no product tags.
-  useEffect(() => {
-    if (activeTab === "products" && registryData !== undefined && !productTagsConfigured) {
-      setParams({ tab: "tickets" });
-    }
-  }, [activeTab, registryData, productTagsConfigured, setParams]);
+  // A deep link or stale bookmark can point at the Products View tab while the
+  // registry is loading, errored, or has no product tags configured. Deriving
+  // the active tab (instead of correcting the URL from an effect) means the
+  // hidden view never mounts or fetches, and the URL's intent still wins if
+  // the registry later confirms product tags exist.
+  const activeTab = urlTab === "products" && !productTagsConfigured ? "tickets" : urlTab;
 
   // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
   useEffect(() => {

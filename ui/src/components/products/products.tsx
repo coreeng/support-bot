@@ -75,7 +75,8 @@ const getTagLabel = (tag: unknown): string => {
 };
 
 export default function ProductsPage({ dateRange }: { dateRange?: { from?: string; to?: string } }) {
-  const { data: registryData } = useRegistry();
+  const registryQuery = useRegistry();
+  const registryData = registryQuery.data;
 
   const [params, setParams] = useUrlParams(
     {
@@ -108,6 +109,12 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
   const ticketsQuery = useAllTickets(200, dateRange?.from, dateRange?.to);
   const ticketsData = ticketsQuery.data as PaginatedTickets | undefined;
   const visibleTickets = useMemo(() => (ticketsData?.content as TicketWithLogs[] | undefined) ?? [], [ticketsData]);
+
+  // Product bucketing needs the registry's code→label map, so the view is not
+  // ready until BOTH queries resolve — rendering on tickets alone would bucket
+  // every ticket under "None" and present it as final data.
+  const isLoading = ticketsQuery.isLoading || registryQuery.isLoading;
+  const loadError = ticketsQuery.error || registryQuery.error;
 
   const totalTickets = visibleTickets.length;
 
@@ -180,7 +187,7 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">Ticket counts per product tag</p>
 
-      {!ticketsQuery.isLoading && !ticketsQuery.error && (
+      {!isLoading && !loadError && (
         <div className="flex items-center gap-2">
           <input
             id="hide-untagged"
@@ -195,7 +202,7 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
         </div>
       )}
 
-      {!ticketsQuery.isLoading && !ticketsQuery.error && chartData.length > 0 && (
+      {!isLoading && !loadError && chartData.length > 0 && (
         <div className="bg-card rounded-lg border p-4">
           <h2 className="text-foreground mb-2 text-center font-semibold">Tickets by Product</h2>
           <div style={{ width: "100%", height: Math.max(200, chartData.length * 36 + 60) }}>
@@ -247,12 +254,12 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
       )}
 
       <div className="overflow-hidden rounded-lg border">
-        {ticketsQuery.isLoading ? (
+        {isLoading ? (
           <LoadingSkeleton />
-        ) : ticketsQuery.error ? (
+        ) : loadError ? (
           <div className="border-destructive/30 bg-destructive/10 text-destructive m-6 rounded-lg border p-4">
             <p className="font-semibold">Error loading products</p>
-            <p className="mt-1 text-sm">Unable to load ticket data. Please try refreshing the page.</p>
+            <p className="mt-1 text-sm">Unable to load data. Please try refreshing the page.</p>
           </div>
         ) : (
           <Table>
