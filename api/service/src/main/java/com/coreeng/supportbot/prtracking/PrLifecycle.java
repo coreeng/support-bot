@@ -66,6 +66,16 @@ public final class PrLifecycle {
             boolean codeownerApproved,
             boolean mergePhaseEntered) {
 
+        public Observation {
+            if (hasLiveDeadline != (remainingForPause != null)) {
+                throw new IllegalArgumentException(
+                        "remainingForPause must be set if and only if hasLiveDeadline is true");
+            }
+            if (slaBreached && !hasLiveDeadline) {
+                throw new IllegalArgumentException("slaBreached can only be true alongside a live deadline");
+            }
+        }
+
         boolean approved() {
             return latestVerdict == Verdict.APPROVED;
         }
@@ -279,8 +289,11 @@ public final class PrLifecycle {
                     List.of()),
             // Reacts to any live breached deadline, codeowner or not — codeowner repos normally never have
             // one, except the maintaining-team carve-out (see processCodeownerOpenPr), which can also
-            // merge-escalate later; both escalations page the same team and share one open Escalation row
-            // (escalation_open_unique), so no duplicate page.
+            // merge-escalate later. Both escalations target the same team and, absent someone manually
+            // resolving the review escalation (or the ticket closing) in between, reuse the same open
+            // Escalation row (escalation_open_unique) — so ordinarily no duplicate page. If the review
+            // escalation is resolved before the merge SLA breaches, a second, independent escalation is
+            // created and does page again.
             new Transition(
                     OPEN,
                     ESCALATED,

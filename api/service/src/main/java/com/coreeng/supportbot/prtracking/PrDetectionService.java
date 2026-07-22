@@ -915,8 +915,10 @@ public class PrDetectionService {
 
     /**
      * Review deadline for the maintaining-team carve-out — only called once that's already confirmed.
-     * Same resolution as {@link #processOpenPr}. A lookup failure degrades to "no deadline" rather than
-     * failing detection outright; this is a one-shot attempt, not retried later.
+     * Resolves the SLA via the same {@link SlaLookup#getSla} call as {@link #processOpenPr}, but with
+     * different failure handling: {@link #processOpenPr} skips tracking the PR outright on a lookup
+     * failure, whereas here a failure degrades to "no deadline" and the PR is still tracked (see {@code
+     * lookupFailed}); this is a one-shot attempt, not retried later.
      */
     private ReviewSlaResolution codeownerReviewSlaDeadline(
             DetectedPr detectedPr, PrTrackingProps.Repository repoConfig, PrMetadata prMetadata) {
@@ -1388,7 +1390,9 @@ public class PrDetectionService {
                 return false;
             }
             for (CodeOwnerRef ref : pending) {
-                if (!members.contains(ref.display())) {
+                // GitLab usernames/paths are case-insensitive, so match the same way the GitHub branch
+                // above does rather than relying on the API always returning canonical case.
+                if (members.stream().noneMatch(member -> member.equalsIgnoreCase(ref.display()))) {
                     return false;
                 }
             }
@@ -1428,7 +1432,10 @@ public class PrDetectionService {
             slackClient.postMessage(new SlackPostMessageRequest(
                     SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
             log.atInfo().addArgument(() -> repo).addArgument(() -> type).log("Notification posted for {} ({})");
-        } catch (SlackException e) {
+        } catch (Exception e) {
+            // Broad catch is deliberate: this post is best-effort and must never block the escalation
+            // that follows it in callers like postBreachAndEscalate — a non-SlackException failure here
+            // (not just a Slack API error) shouldn't skip paging the owning team.
             log.atWarn()
                     .setCause(e)
                     .addArgument(() -> type)
