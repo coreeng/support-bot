@@ -30,18 +30,6 @@ jest.mock("../../../lib/hooks/useUrlParams", () => ({
 const mockUseAllTickets = hooks.useAllTickets as jest.MockedFunction<typeof hooks.useAllTickets>;
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
 
-// Mock team filter context
-jest.mock("../../../contexts/TeamFilterContext", () => ({
-  TeamFilterProvider: ({ children }: { children: React.ReactNode }) => children,
-  useTeamFilter: jest.fn(),
-}));
-const mockUseTeamFilter = jest.requireMock("../../../contexts/TeamFilterContext").useTeamFilter as jest.MockedFunction<
-  () => {
-    effectiveTeams: string[];
-    hasNoTeamScope: boolean;
-  }
->;
-
 const mockRegistry = {
   impacts: [],
   tags: [
@@ -80,11 +68,6 @@ const renderProducts = () => render(<Products />, { wrapper: Wrapper });
 describe("Products Component", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-
-    mockUseTeamFilter.mockReturnValue({
-      effectiveTeams: [],
-      hasNoTeamScope: false,
-    });
 
     mockUseRegistry.mockReturnValue({
       data: mockRegistry,
@@ -191,30 +174,6 @@ describe("Products Component", () => {
     expect(within(alphaRow).getByText("0")).toBeInTheDocument();
     // Retired product tags are not seeded
     expect(screen.queryByText("Retired")).not.toBeInTheDocument();
-  });
-
-  it("scopes counts to the effective teams", () => {
-    mockUseTeamFilter.mockReturnValue({
-      effectiveTeams: ["Team B"],
-      hasNoTeamScope: false,
-    });
-
-    renderProducts();
-
-    // All mock tickets belong to Team A, so Alpha keeps its seeded zero count
-    const alphaRow = screen.getByText("Alpha").closest("tr")!;
-    expect(within(alphaRow).getByText("0")).toBeInTheDocument();
-  });
-
-  it("shows the no-team-access warning when the user has no team scope", () => {
-    mockUseTeamFilter.mockReturnValue({
-      effectiveTeams: [],
-      hasNoTeamScope: true,
-    });
-
-    renderProducts();
-
-    expect(screen.getByText("No Team Access")).toBeInTheDocument();
   });
 
   it("sorts by count descending by default", () => {

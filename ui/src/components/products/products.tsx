@@ -3,11 +3,8 @@
 import LoadingSkeleton from "@/components/LoadingSkeleton";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useTeamFilter } from "@/contexts/TeamFilterContext";
-import { TEAM_SCOPE } from "@/lib/constants";
 import { useAllTickets, useRegistry } from "@/lib/hooks";
 import { enumValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
-import { normalizeTeamKey } from "@/lib/teamUtils";
 import { PaginatedTickets, TicketTag, TicketWithLogs } from "@/lib/types";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useMemo } from "react";
@@ -78,9 +75,6 @@ const getTagLabel = (tag: unknown): string => {
 };
 
 export default function ProductsPage({ dateRange }: { dateRange?: { from?: string; to?: string } }) {
-  const { effectiveTeams, hasNoTeamScope: contextHasNoTeamScope } = useTeamFilter();
-  const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS);
-
   const { data: registryData } = useRegistry();
 
   const [params, setParams] = useUrlParams(
@@ -109,20 +103,11 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
     }
   };
 
-  const ticketsQuery = useAllTickets(200, dateRange?.from, dateRange?.to, !hasNoTeamScope);
+  // Deliberately unscoped by the sidebar team filter: like the other analytics
+  // tabs on this page, Products View reports across all teams.
+  const ticketsQuery = useAllTickets(200, dateRange?.from, dateRange?.to);
   const ticketsData = ticketsQuery.data as PaginatedTickets | undefined;
-  const ticketsContent = useMemo(() => (ticketsData?.content as TicketWithLogs[] | undefined) ?? [], [ticketsData]);
-
-  // Scope tickets to the teams the user is viewing, mirroring the tickets page.
-  const visibleTickets = useMemo(() => {
-    if (hasNoTeamScope) return [];
-    if (effectiveTeams.length === 0) return ticketsContent;
-    return ticketsContent.filter((t: TicketWithLogs) => {
-      if (!t.team?.name) return false;
-      const ticketTeam = normalizeTeamKey(t.team.name);
-      return effectiveTeams.some((team) => normalizeTeamKey(team) === ticketTeam);
-    });
-  }, [ticketsContent, hasNoTeamScope, effectiveTeams]);
+  const visibleTickets = useMemo(() => (ticketsData?.content as TicketWithLogs[] | undefined) ?? [], [ticketsData]);
 
   const totalTickets = visibleTickets.length;
 
@@ -195,14 +180,7 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">Ticket counts per product tag</p>
 
-      {hasNoTeamScope && (
-        <div className="border-warning/30 bg-warning/10 text-warning rounded-lg border p-4">
-          <p className="font-semibold">No Team Access</p>
-          <p className="mt-1 text-sm">You are not assigned to any teams, so product ticket counts cannot be displayed.</p>
-        </div>
-      )}
-
-      {!ticketsQuery.isLoading && !ticketsQuery.error && !hasNoTeamScope && (
+      {!ticketsQuery.isLoading && !ticketsQuery.error && (
         <div className="flex items-center gap-2">
           <input
             id="hide-untagged"
@@ -217,7 +195,7 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
         </div>
       )}
 
-      {!ticketsQuery.isLoading && !ticketsQuery.error && !hasNoTeamScope && chartData.length > 0 && (
+      {!ticketsQuery.isLoading && !ticketsQuery.error && chartData.length > 0 && (
         <div className="bg-card rounded-lg border p-4">
           <h2 className="text-foreground mb-2 text-center font-semibold">Tickets by Product</h2>
           <div style={{ width: "100%", height: Math.max(200, chartData.length * 36 + 60) }}>
