@@ -253,7 +253,7 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
               <TableRow>
                 <SortableHeader col="product" label="Product" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
                 <SortableHeader col="count" label="Tickets" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                <TableHead>% of Tickets</TableHead>
+                <TableHead>% of total Tickets</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
