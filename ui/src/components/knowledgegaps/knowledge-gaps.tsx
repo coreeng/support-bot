@@ -728,6 +728,7 @@ export default function KnowledgeGapsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="7">Week</SelectItem>
+                        <SelectItem value="14">Fortnight</SelectItem>
                         <SelectItem value="31">Month</SelectItem>
                         <SelectItem value="92">Quarter</SelectItem>
                       </SelectContent>
