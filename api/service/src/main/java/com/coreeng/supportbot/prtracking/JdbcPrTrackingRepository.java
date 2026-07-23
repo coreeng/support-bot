@@ -158,6 +158,20 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
         return toRecord(row);
     }
 
+    @Override
+    public PrTrackingRecord enterMergePhase(long id, PrTrackingStatus newStatus, @Nullable Instant newDeadline) {
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.update(PR_TRACKING)
+                .set(PR_TRACKING.STATUS, newStatus)
+                .set(PR_TRACKING.SLA_DEADLINE, newDeadline)
+                .setNull(PR_TRACKING.SLA_REMAINING)
+                .set(PR_TRACKING.MERGE_PHASE_ENTERED, true)
+                .where(PR_TRACKING.ID.eq(id))
+                .returning()
+                .fetchOptional()
+                .orElseThrow(() -> new IllegalStateException("PR tracking record not found for id " + id));
+        return toRecord(row);
+    }
+
     @Transactional(readOnly = true)
     @Override
     public boolean hasAnyActiveClosableForTicket(long ticketId) {
@@ -496,6 +510,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 slaRemaining,
                 row.getLastReviewAt(),
                 row.getLastAuthorActivityAt(),
-                checkNotNull(row.getCodeownerReviewRequested()));
+                checkNotNull(row.getCodeownerReviewRequested()),
+                checkNotNull(row.getMergePhaseEntered()));
     }
 }

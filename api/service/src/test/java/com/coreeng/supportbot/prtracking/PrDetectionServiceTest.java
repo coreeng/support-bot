@@ -219,7 +219,8 @@ class PrDetectionServiceTest {
 
         @Test
         void tracksCodeownerRepoWithNoDeadlineAndChaseMessage() {
-            // given — a requires-codeowners repo and a detected open PR with a pending code owner
+            // given — a requires-codeowners repo with an SLA configured but no github-team-slug to compare
+            // pending code owners against, and a detected open PR with a pending code owner
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
@@ -257,14 +258,15 @@ class PrDetectionServiceTest {
                                             CodeOwnerRef.Kind.TEAM,
                                             "my-org/docs-team",
                                             "https://github.com/orgs/my-org/teams/docs-team"))));
-            when(prTrackingRepository.insertIfAbsent(any()))
-                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
 
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
-            // then — no SLA deadline at detection: the PR sits in OPEN until the code owners approve, so
-            // the owning team is never escalated before then.
+            // then — no SLA deadline at detection: with no github-team-slug configured, the bot can't
+            // confirm the pending code owners are the maintaining team, so it falls back to the original
+            // held-clock behaviour — the PR sits in OPEN until the code owners approve, and the owning team
+            // is never escalated before then.
             verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
             assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
             // and the detected message tells the tenant to chase the code owner.
@@ -282,6 +284,210 @@ class PrDetectionServiceTest {
             // close before the first lifecycle poll ever runs (approved then dismissed overnight or over
             // a weekend) and never reopens, so detection must not leave this to the poller alone.
             verify(prTrackingRepository).markCodeownerReviewRequested(1L);
+        }
+
+        @Test
+        void postsNormalSlaMessageWhenPendingCodeOwnerTeamIsTheMaintainingTeam() {
+            // given — the repo's github-team-slug names the exact team GitHub lists as the pending code
+            // owner: telling the tenant to "chase" that team would be telling them to chase the team the
+            // bot already tracks and would escalate to, so the normal SLA message is used instead.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            "docs-team",
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE)).thenReturn(null);
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/docs-team", null))));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — a real deadline is set (the overlap was confirmed), and the normal "tracked with a
+            // deadline" wording is used instead of the code-owner chase copy.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isEqualTo(prCreatedAt.plus(SLA_24H));
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).doesNotContain("code-owner").doesNotContain("chase");
+            assertThat(text).contains("expected to be reviewed within").contains("escalate it to the owning team");
+        }
+
+        @Test
+        void postsNormalSlaMessageWhenPendingCodeOwnerUserIsAMemberOfTheMaintainingTeam() {
+            // given — same overlap, but CODEOWNERS names an individual who happens to be a member of the
+            // configured github-team-slug, rather than the team directly.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            "docs-team",
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE)).thenReturn(null);
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.resolveTeamMembers(COORD, "docs-team")).thenReturn(List.of("owner-a"));
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", null))));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isEqualTo(prCreatedAt.plus(SLA_24H));
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).doesNotContain("code-owner").doesNotContain("chase");
+            assertThat(text).contains("expected to be reviewed within");
+        }
+
+        @Test
+        void keepsChaseMessageWhenGithubTeamSlugNotConfiguredEvenIfNamesMatch() {
+            // given — same pending team as the overlap case above, but the repo never declared its
+            // maintaining team via github-team-slug, so the overlap can't be positively confirmed: the
+            // bot must not guess and must keep the existing chase copy.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            null,
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/docs-team", null))));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — no deadline (the overlap couldn't be confirmed), and the original chase copy.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).contains("code-owner");
+        }
+
+        @Test
+        void keepsChaseMessageWhenPendingCodeOwnerIsExternalToTheMaintainingTeam() {
+            // given — github-team-slug IS configured, but the pending code owner is a different team
+            // entirely: a genuinely external code owner must still be named as someone to chase.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            "docs-team",
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/security-team", null))));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — no deadline (external code owner), and the original chase copy.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).contains("code-owner");
         }
 
         @Test
@@ -428,6 +634,400 @@ class PrDetectionServiceTest {
             verify(prTrackingRepository, never()).insertIfAbsent(any());
             verify(slackClient, never()).addReaction(any());
             verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
+        void postsNormalSlaMessageWhenPendingGitlabCodeOwnerIsAMemberOfTheMaintainingGroup() {
+            // given — GitLab codeowners are always individual users (no team concept), so the carve-out
+            // here only ever goes through the membership-resolution branch, not the direct team-ref match.
+            String gitlabRepo = "my-group/my-project";
+            RepoCoord gitlabCoord = RepoCoord.gitlab(gitlabRepo);
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prSourceClients.forProvider(Provider.GITLAB)).thenReturn(prSourceClient);
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            gitlabRepo,
+                            TEAM_CODE,
+                            Provider.GITLAB,
+                            null,
+                            "my-group/maintainers",
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITLAB, gitlabRepo, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.resolveTeamMembers(gitlabCoord, "my-group/maintainers"))
+                    .thenReturn(List.of("owner-a"));
+            when(prSourceClient.fetchPullRequest(gitlabCoord, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            gitlabCoord,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", null))));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — a real deadline is set, and the normal tracked wording is used, not the chase copy.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isEqualTo(prCreatedAt.plus(SLA_24H));
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).doesNotContain("code-owner").doesNotContain("chase");
+            assertThat(text).contains("expected to be reviewed within");
+        }
+
+        @Test
+        void keepsChaseMessageWhenGitlabGroupPathNotConfigured() {
+            // given — same pending code owner, but no gitlab-group-path to compare against, so the
+            // overlap can't be confirmed and the default chase behaviour applies.
+            String gitlabRepo = "my-group/my-project";
+            RepoCoord gitlabCoord = RepoCoord.gitlab(gitlabRepo);
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prSourceClients.forProvider(Provider.GITLAB)).thenReturn(prSourceClient);
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            gitlabRepo,
+                            TEAM_CODE,
+                            Provider.GITLAB,
+                            null,
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITLAB, gitlabRepo, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(gitlabCoord, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            gitlabCoord,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", null))));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — no deadline, and the original chase copy.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).contains("code-owner");
+        }
+
+        @Test
+        void postsNoMessageWhenMaintainingTeamConfirmedButSlaLookupFails() {
+            // given — the overlap IS confirmed (pending team matches github-team-slug), but the SLA lookup
+            // then throws. Neither the chase copy (wrong — we know this "external" party is the repo's own
+            // team) nor the tracked-with-a-deadline copy (there's no deadline) is accurate, so no message
+            // should post at all. The record is still created, with no deadline.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            PrTrackingProps.Repository repoConfig = new PrTrackingProps.Repository(
+                    REPO,
+                    TEAM_CODE,
+                    Provider.GITHUB,
+                    "docs-team",
+                    null,
+                    List.of(),
+                    sla(SLA_24H),
+                    null,
+                    null,
+                    List.of(),
+                    true,
+                    false);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/docs-team", null))));
+            when(slaLookup.getSla(eq(repoConfig), eq(COORD), eq(PR_NUMBER)))
+                    .thenThrow(new PrSourceException("SLA file fetch failed"));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — tracked with no deadline, but no Slack message at all.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
+        void escalatesImmediatelyWhenMaintainingTeamCarveOutAlreadyOverdueAtDetection() {
+            // given — the overlap is confirmed and the computed deadline (createdAt + sla) is already in
+            // the past by the time the PR is linked (an old PR just posted, or a very short sla). Mirrors
+            // processOpenPr's immediate-breach handling instead of posting a stale "tracked" message.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            PrTrackingProps.Repository repoConfig = new PrTrackingProps.Repository(
+                    REPO,
+                    TEAM_CODE,
+                    Provider.GITHUB,
+                    "docs-team",
+                    null,
+                    List.of(),
+                    sla(SLA_24H),
+                    null,
+                    null,
+                    List.of(),
+                    true,
+                    false);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/docs-team", null))));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+            when(prTrackingRepository.markCodeownerReviewRequested(anyLong()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+            when(escalationProcessingService.createEscalation(any()))
+                    .thenReturn(Escalation.builder()
+                            .id(new EscalationId(77L))
+                            .channelId(CHANNEL_ID)
+                            .build());
+
+            // when
+            Ticket ticket = ticketWithId(1L);
+            service.handleMessagePosted(messagePostedWith("msg"), ticket);
+
+            // then — escalates synchronously, right at detection, not just "tracked with a deadline".
+            verify(escalationProcessingService).createEscalation(any());
+            verify(prTrackingRepository).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), eq(null), eq(77L));
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("expected to be reviewed within").contains("has exceeded that timeframe");
+        }
+
+        @Test
+        void pausesToChangesRequestedWhenMaintainingTeamCarveOutAlreadyOverdueAndChangesRequested() {
+            // given — same already-overdue setup, but the code owner already requested changes. Changes
+            // requested wins over escalating, same priority as everywhere else in the FSM.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            PrTrackingProps.Repository repoConfig = new PrTrackingProps.Repository(
+                    REPO,
+                    TEAM_CODE,
+                    Provider.GITHUB,
+                    "docs-team",
+                    null,
+                    List.of(),
+                    sla(SLA_24H),
+                    null,
+                    null,
+                    List.of(),
+                    true,
+                    false);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            true,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/docs-team", null))));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+            when(prTrackingRepository.markCodeownerReviewRequested(anyLong()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — paused to CHANGES_REQUESTED with zero remaining, no escalation.
+            verify(prTrackingRepository).pauseSla(anyLong(), eq(PrTrackingStatus.CHANGES_REQUESTED), eq(Duration.ZERO));
+            verifyNoInteractions(escalationProcessingService);
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText())
+                    .contains("has been reviewed and changes have been requested");
+        }
+
+        @Test
+        void escalatesImmediatelyWhenGitlabMaintainingTeamCarveOutAlreadyOverdueAtDetection() {
+            // given — same already-overdue scenario as the GitHub test, but through GitLab's
+            // membership-resolution branch (GitLab code owners are always individual users, never a team
+            // ref) — pins down that the provider-specific wording (MR / "!") renders through this path too.
+            String gitlabRepo = "my-group/my-project";
+            RepoCoord gitlabCoord = RepoCoord.gitlab(gitlabRepo);
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            when(prSourceClients.forProvider(Provider.GITLAB)).thenReturn(prSourceClient);
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            PrTrackingProps.Repository repoConfig = new PrTrackingProps.Repository(
+                    gitlabRepo,
+                    TEAM_CODE,
+                    Provider.GITLAB,
+                    null,
+                    "my-group/maintainers",
+                    List.of(),
+                    sla(SLA_24H),
+                    null,
+                    null,
+                    List.of(),
+                    true,
+                    false);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITLAB, gitlabRepo, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.resolveTeamMembers(gitlabCoord, "my-group/maintainers"))
+                    .thenReturn(List.of("owner-a"));
+            when(prSourceClient.fetchPullRequest(gitlabCoord, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            gitlabCoord,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", null))));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+            when(prTrackingRepository.markCodeownerReviewRequested(anyLong()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+            when(escalationProcessingService.createEscalation(any()))
+                    .thenReturn(Escalation.builder()
+                            .id(new EscalationId(77L))
+                            .channelId(CHANNEL_ID)
+                            .build());
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — escalates synchronously, with GitLab wording (MR, "!").
+            verify(escalationProcessingService).createEscalation(any());
+            verify(prTrackingRepository).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), eq(null), eq(77L));
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text)
+                    .contains("expected to be reviewed within")
+                    .contains("has exceeded that timeframe")
+                    .contains("Merge requests")
+                    .contains("MR !" + PR_NUMBER);
+        }
+
+        @Test
+        void pausesToChangesRequestedWhenGitlabMaintainingTeamCarveOutAlreadyOverdueAndChangesRequested() {
+            // given — same already-overdue GitLab setup, but the code owner already requested changes.
+            String gitlabRepo = "my-group/my-project";
+            RepoCoord gitlabCoord = RepoCoord.gitlab(gitlabRepo);
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            when(prSourceClients.forProvider(Provider.GITLAB)).thenReturn(prSourceClient);
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            PrTrackingProps.Repository repoConfig = new PrTrackingProps.Repository(
+                    gitlabRepo,
+                    TEAM_CODE,
+                    Provider.GITLAB,
+                    null,
+                    "my-group/maintainers",
+                    List.of(),
+                    sla(SLA_24H),
+                    null,
+                    null,
+                    List.of(),
+                    true,
+                    false);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITLAB, gitlabRepo, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.resolveTeamMembers(gitlabCoord, "my-group/maintainers"))
+                    .thenReturn(List.of("owner-a"));
+            when(prSourceClient.fetchPullRequest(gitlabCoord, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            gitlabCoord,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            true,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", null))));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+            when(prTrackingRepository.markCodeownerReviewRequested(anyLong()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — paused to CHANGES_REQUESTED with zero remaining, no escalation, GitLab wording.
+            verify(prTrackingRepository).pauseSla(anyLong(), eq(PrTrackingStatus.CHANGES_REQUESTED), eq(Duration.ZERO));
+            verifyNoInteractions(escalationProcessingService);
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text)
+                    .contains("has been reviewed and changes have been requested")
+                    .contains("MR !" + PR_NUMBER);
         }
     }
 
@@ -1026,6 +1626,7 @@ class PrDetectionServiceTest {
                                     null,
                                     null,
                                     null,
+                                    false,
                                     false),
                             new PrTrackingRecord(
                                     2L,
@@ -1043,6 +1644,7 @@ class PrDetectionServiceTest {
                                     null,
                                     null,
                                     null,
+                                    false,
                                     false));
 
             // when
@@ -1184,6 +1786,7 @@ class PrDetectionServiceTest {
                                     null,
                                     null,
                                     null,
+                                    false,
                                     false),
                             new PrTrackingRecord(
                                     2L,
@@ -1201,6 +1804,7 @@ class PrDetectionServiceTest {
                                     null,
                                     null,
                                     null,
+                                    false,
                                     false));
 
             // when
@@ -1574,7 +2178,9 @@ class PrDetectionServiceTest {
                             .id(new EscalationId(77L))
                             .channelId(CHANNEL_ID)
                             .build());
-            doThrow(new RuntimeException("slack down")).when(slackClient).postMessage(any());
+            doThrow(new SlackException(new RuntimeException("slack down")))
+                    .when(slackClient)
+                    .postMessage(any());
 
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticket);
@@ -2987,6 +3593,7 @@ class PrDetectionServiceTest {
                 null,
                 null,
                 null,
+                false,
                 false);
     }
 }

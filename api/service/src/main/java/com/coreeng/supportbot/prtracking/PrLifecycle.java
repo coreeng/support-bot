@@ -45,6 +45,11 @@ public final class PrLifecycle {
      * {@code now()}-derived fields ({@code slaBreached}, {@code remainingForPause}) are computed once
      * in {@code observe()}. {@code remainingForPause} is non-null exactly when {@code hasLiveDeadline}.
      *
+     * <p>{@code mergePhaseEntered}: true once a record has ever reached {@code AWAITING_MERGE}, never
+     * unset. {@code slaRemainingStored} is shared by a paused review clock and a paused merge clock — this
+     * flag is the only way to tell which one a stored value is. Always {@code false} for non-codeowner
+     * repos.
+     *
      * <p>(B later adds {@code requiredApprovalsSatisfied}.)
      */
     public record Observation(
@@ -58,7 +63,18 @@ public final class PrLifecycle {
             @Nullable Duration remainingForPause,
             @Nullable Duration slaRemainingStored,
             boolean requiresCodeowners,
-            boolean codeownerApproved) {
+            boolean codeownerApproved,
+            boolean mergePhaseEntered) {
+
+        public Observation {
+            if (hasLiveDeadline != (remainingForPause != null)) {
+                throw new IllegalArgumentException(
+                        "remainingForPause must be set if and only if hasLiveDeadline is true");
+            }
+            if (slaBreached && !hasLiveDeadline) {
+                throw new IllegalArgumentException("slaBreached can only be true alongside a live deadline");
+            }
+        }
 
         boolean approved() {
             return latestVerdict == Verdict.APPROVED;
@@ -271,21 +287,18 @@ public final class PrLifecycle {
                     o -> o.approved() && !o.mergeable() && !o.hasLiveDeadline(),
                     PrLifecycle::none,
                     List.of()),
-            // The !requiresCodeowners guard makes "clock held in OPEN for code-owner repos" structural: such
-            // a repo must never review-escalate in OPEN, even if a live deadline leaked in (e.g. a merge
-            // clock paused on a changes-requested detour and later resumed via CHANGES_REQUESTED → OPEN).
-            //
-            // This is also the only row that ever sets ESCALATED, and requiresCodeowners is fixed per repo
-            // (never toggles per-PR) — so together with readyForCodeownerMerge() requiring requiresCodeowners
-            // to reach AWAITING_MERGE/MERGE_ESCALATED, a single PR can never pass through both ESCALATED and
-            // MERGE_ESCALATED. Don't relax this guard without first handling escalate()/escalateMerge()
-            // sharing one Escalation row per ticket (escalation_open_unique) — today that's a non-issue
-            // only because the two effects are mutually exclusive per repo.
+            // Reacts to any live breached deadline, codeowner or not — codeowner repos normally never have
+            // one, except the maintaining-team carve-out (see processCodeownerOpenPr), which can also
+            // merge-escalate later. Both escalations target the same team and, absent someone manually
+            // resolving the review escalation (or the ticket closing) in between, reuse the same open
+            // Escalation row (escalation_open_unique) — so ordinarily no duplicate page. If the review
+            // escalation is resolved before the merge SLA breaches, a second, independent escalation is
+            // created and does page again.
             new Transition(
                     OPEN,
                     ESCALATED,
                     "no verdict + SLA breached",
-                    o -> o.noVerdict() && o.slaBreached() && !o.requiresCodeowners(),
+                    o -> o.noVerdict() && o.slaBreached(),
                     PrLifecycle::none,
                     List.of(Effect.ESCALATE)),
 
@@ -304,12 +317,23 @@ public final class PrLifecycle {
                     o -> o.approved() && !o.mergeable(),
                     PrLifecycle::none,
                     List.of()),
+            // Split on mergePhaseEntered: the stored remaining is either a paused review clock (resume it
+            // as a live deadline, same as always) or a paused merge clock that detoured through here
+            // (leave it alone — promoting it to a live review deadline could wrongly trigger the ESCALATED
+            // row above on a repo that should never review-escalate).
             new Transition(
                     CHANGES_REQUESTED,
                     OPEN,
-                    "no actionable reviews remain",
-                    o -> o.noVerdict() && o.slaRemainingStored() != null,
+                    "no actionable reviews remain, review-phase pause",
+                    o -> o.noVerdict() && o.slaRemainingStored() != null && !o.mergePhaseEntered(),
                     PrLifecycle::resume,
+                    List.of()),
+            new Transition(
+                    CHANGES_REQUESTED,
+                    OPEN,
+                    "no actionable reviews remain, merge-phase pause",
+                    o -> o.noVerdict() && o.slaRemainingStored() != null && o.mergePhaseEntered(),
+                    PrLifecycle::none,
                     List.of()),
 
             // APPROVED — mergeable checked first (any verdict)

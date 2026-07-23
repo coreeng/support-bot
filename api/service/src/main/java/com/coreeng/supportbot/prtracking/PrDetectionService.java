@@ -163,7 +163,8 @@ public class PrDetectionService {
                         .setCause(e)
                         .addArgument(pr::repositoryName)
                         .addArgument(pr::pullNumber)
-                        .log("Failed to process PR {}#{}, skipping");
+                        .addArgument(ticketId::id)
+                        .log("Failed to process PR {}#{} for ticket {}, skipping");
                 continue;
             }
             switch (result) {
@@ -280,11 +281,13 @@ public class PrDetectionService {
                     }
                 }
             } catch (Exception e) {
+                TicketId ticketIdForLog = ticketId;
                 log.atError()
                         .setCause(e)
                         .addArgument(pr::repositoryName)
                         .addArgument(pr::pullNumber)
-                        .log("Failed to process PR {}#{}, skipping");
+                        .addArgument(() -> ticketIdForLog == null ? "none" : ticketIdForLog.id())
+                        .log("Failed to process PR {}#{} for ticket {}, skipping");
             }
         }
 
@@ -369,12 +372,12 @@ public class PrDetectionService {
             if (authorExcluded(detectedPr, repoConfig.get(), posterTeamCodes)) {
                 return PerPrResult.SKIPPED;
             }
-            // Code-owner repos sit in OPEN with no SLA deadline until the code owners approve, so the
-            // owning team is never escalated before then; the merge clock starts on the poller's
-            // transition into AWAITING_MERGE. Checked before the SLA branches so it holds whether or not
-            // the repo also has an SLA configured (the SLA is used for the merge phase).
+            // Code-owner repos: held in OPEN with no review deadline by default, unless the pending code
+            // owners ARE the repo's maintaining team (see processCodeownerOpenPr). Checked before the SLA
+            // branches since it applies whether or not the repo has an SLA configured.
             if (repoConfig.get().requiresCodeowners()) {
-                return processCodeownerOpenPr(detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata);
+                return processCodeownerOpenPr(
+                        detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata, teamReviewerCache);
             }
             // Repo is configured for PR tracking with or without SLA
             if (repoConfig.get().hasNoSla()) {
@@ -571,27 +574,8 @@ public class PrDetectionService {
                 // now visible to the poller (status=OPEN, SLA already breached), so if we deferred
                 // both steps the poller could fire between the insert and postNotificationsAndEscalations,
                 // posting the escalation card before our notification arrives in the thread.
-                PrMessageContext breachCtx = new PrMessageContext(
-                        detectedPr.provider(),
-                        detectedPr.repositoryName(),
-                        detectedPr.pullNumber(),
-                        teamLabel,
-                        sla,
-                        slaDeadline);
-                String override =
-                        messageRenderer.render(detectedPr.repositoryName(), MessageEvent.ESCALATED, breachCtx);
-                String breachText = override != null
-                        ? override
-                        : formatEscalatedText(
-                                detectedPr.provider(), detectedPr.repositoryName(), detectedPr.pullNumber(), sla);
-                postText(
-                        breachText,
-                        detectedPr.repositoryName(),
-                        detectedPr.pullNumber(),
-                        NotificationType.ESCALATED,
-                        ticket.queryTs(),
-                        ticket.channelId());
-                escalateImmediately(tracking, ticket, repoConfig.owningTeam());
+                postBreachAndEscalate(
+                        detectedPr, ticket, tracking, repoConfig.owningTeam(), teamLabel, sla, slaDeadline);
             }
         } else if (latestVerdict != null && latestVerdict.requestsChanges()) {
             Duration remaining = clampNonNegative(Duration.between(Instant.now(), slaDeadline));
@@ -716,22 +700,25 @@ public class PrDetectionService {
     }
 
     /**
-     * Detection for requires-codeowners repos: the record is created in OPEN with no SLA deadline, so the
-     * owning team is never escalated before the code owners approve. The tenant gets a "chase the code
-     * owner" detected message listing the inferred code owners; the merge clock starts later, on the
-     * poller's transition into AWAITING_MERGE.
+     * Detection for requires-codeowners repos. By default: no review deadline, "chase the code owner"
+     * message, never review-escalates — unchanged from before this class had any code-owner awareness.
      *
-     * <p>Path filtering still applies in no-SLA mode: a requires-codeowners repo with no {@code sla} block
-     * is a no-SLA repo (config validation mandates {@code paths} there), and — like any no-SLA repo — it
-     * tracks only PRs/MRs touching those paths. SLA-mode codeowner repos track every PR, mirroring the
-     * non-codeowner SLA path ({@link #processOpenPr}), which likewise ignores the top-level {@code paths}.
+     * <p>One carve-out (an exception to that default): if the pending code owners ARE the repo's own
+     * maintaining team ({@link #pendingCodeOwnersAreMaintainingTeam}), chasing them makes no sense — that
+     * case gets a real review deadline instead (when {@code sla} is configured) and the normal
+     * tracked-with-a-deadline message, and can review-escalate on breach like any repo. Everything else
+     * keeps the default.
+     *
+     * <p>Path filtering still applies with no {@code sla} block: like any no-SLA repo, only PRs touching
+     * the configured {@code paths} are tracked.
      */
     private PerPrResult processCodeownerOpenPr(
             DetectedPr detectedPr,
             Ticket ticket,
             boolean canAutoCloseTicket,
             PrTrackingProps.Repository repoConfig,
-            PrMetadata prMetadata) {
+            PrMetadata prMetadata,
+            Map<String, Optional<Set<String>>> teamReviewerCache) {
 
         if (repoConfig.hasNoSla()
                 && !matchesPathFilter(
@@ -746,6 +733,15 @@ public class PrDetectionService {
             return PerPrResult.SKIPPED;
         }
 
+        // Only give this PR a real review deadline if the pending code owners are the repo's own
+        // maintaining team. Otherwise slaDeadline stays null, same as before this feature existed.
+        boolean codeOwnerIsMaintainingTeam = pendingCodeOwnersAreMaintainingTeam(
+                detectedPr, repoConfig, prMetadata.codeOwnerReviewers(), teamReviewerCache);
+        ReviewSlaResolution reviewSla = codeOwnerIsMaintainingTeam
+                ? codeownerReviewSlaDeadline(detectedPr, repoConfig, prMetadata)
+                : ReviewSlaResolution.NOT_APPLICABLE;
+        Instant slaDeadline = reviewSla.deadline();
+
         TicketId ticketId = checkNotNull(ticket.id());
         PrTrackingRecord tracking = prTrackingRepository.insertIfAbsent(new NewPrTracking(
                 ticketId.id(),
@@ -753,7 +749,7 @@ public class PrDetectionService {
                 detectedPr.repositoryName(),
                 detectedPr.pullNumber(),
                 prMetadata.createdAt(),
-                null,
+                slaDeadline,
                 repoConfig.owningTeam(),
                 canAutoCloseTicket));
         if (tracking == null) {
@@ -779,41 +775,172 @@ public class PrDetectionService {
                 .addArgument(detectedPr::repositoryName)
                 .addArgument(detectedPr::pullNumber)
                 .addArgument(ticketId::id)
-                .log("PR {}#{} tracking record created for ticket {} (codeowner repo, no pre-approval deadline)");
+                .addArgument(() -> slaDeadline == null ? "none" : slaDeadline)
+                .log("PR {}#{} tracking record created for ticket {} (codeowner repo, review deadline: {})");
 
         addReaction(prTrackingProps.prEmoji(), ticket.queryTs(), ticket.channelId());
 
-        // The DETECTED copy tells the tenant the PR is "waiting on its code owners … I'll let you know once
-        // the code owners have approved". Only post it when the gate is actually still open. If the code
-        // owners have already approved (or the PR's changed paths need no code-owner review) by detection
-        // time, that message would be factually wrong — and it might name people who already approved as the
-        // ones we're waiting on. Skip it: the record and the emoji reaction still land, and the poller posts
-        // the accurate "code owners approved — awaiting merge" message on its next cycle.
+        // Skip the DETECTED message if the gate's already satisfied (it would be factually wrong to say
+        // "waiting on code owners") — the record and reaction still land, and the poller catches up next
+        // cycle with the accurate "awaiting merge" message.
         if (!Boolean.TRUE.equals(prMetadata.codeOwnersApproved())) {
-            PrMessageContext ctx = new PrMessageContext(
-                    detectedPr.provider(),
-                    detectedPr.repositoryName(),
-                    detectedPr.pullNumber(),
-                    resolveTeamLabel(repoConfig.owningTeam()),
-                    null,
-                    null);
-            String override = messageRenderer.render(detectedPr.repositoryName(), MessageEvent.DETECTED, ctx);
-            String text = override != null
-                    ? override
-                    : formatCodeownerDetectedText(
+            if (reviewSla.lookupFailed()) {
+                // We confirmed these code owners ARE the maintaining team, but the SLA lookup that would
+                // give the message a real deadline just failed. Neither the chase copy (telling the tenant
+                // to chase their own team) nor the deadline copy (no deadline) is accurate — post nothing.
+                log.atInfo()
+                        .addArgument(detectedPr::repositoryName)
+                        .addArgument(detectedPr::pullNumber)
+                        .log("PR {}#{}: maintaining-team carve-out confirmed but SLA lookup failed, skipping message");
+            } else if (slaDeadline != null && Instant.now().isAfter(slaDeadline)) {
+                // Already overdue at detection (e.g. an old PR just linked, or a short SLA like a few
+                // minutes) — mirrors processOpenPr's immediate-breach handling instead of posting a
+                // "tracked" message with a deadline that's already in the past.
+                handleCodeownerAlreadyOverdue(detectedPr, ticket, tracking, repoConfig, prMetadata, slaDeadline);
+            } else {
+                Duration reviewSlaDuration =
+                        slaDeadline != null ? Duration.between(prMetadata.createdAt(), slaDeadline) : null;
+                PrMessageContext ctx = new PrMessageContext(
+                        detectedPr.provider(),
+                        detectedPr.repositoryName(),
+                        detectedPr.pullNumber(),
+                        resolveTeamLabel(repoConfig.owningTeam()),
+                        reviewSlaDuration,
+                        slaDeadline);
+                String override = messageRenderer.render(detectedPr.repositoryName(), MessageEvent.DETECTED, ctx);
+                String text;
+                if (override != null) {
+                    text = override;
+                } else if (slaDeadline != null) {
+                    text = formatTrackedText(
+                            detectedPr.provider(),
+                            detectedPr.repositoryName(),
+                            detectedPr.pullNumber(),
+                            checkNotNull(ctx.sla()),
+                            checkNotNull(ctx.slaDeadline()),
+                            ctx.owningTeam());
+                } else {
+                    text = formatCodeownerDetectedText(
                             detectedPr.provider(),
                             detectedPr.repositoryName(),
                             detectedPr.pullNumber(),
                             prMetadata.codeOwnerReviewers());
-            postText(
-                    text,
-                    detectedPr.repositoryName(),
-                    detectedPr.pullNumber(),
-                    NotificationType.TRACKED,
-                    ticket.queryTs(),
-                    ticket.channelId());
+                }
+                postText(
+                        text,
+                        detectedPr.repositoryName(),
+                        detectedPr.pullNumber(),
+                        NotificationType.TRACKED,
+                        ticket.queryTs(),
+                        ticket.channelId());
+            }
         }
         return PerPrResult.TRACKED;
+    }
+
+    /**
+     * Mirrors {@link #processOpenPr}'s immediate-breach handling for the maintaining-team carve-out: a
+     * changes-requested verdict still wins over escalating (same priority as everywhere else in the FSM),
+     * otherwise this escalates right now instead of waiting for the next poll.
+     */
+    private void handleCodeownerAlreadyOverdue(
+            DetectedPr detectedPr,
+            Ticket ticket,
+            PrTrackingRecord tracking,
+            PrTrackingProps.Repository repoConfig,
+            PrMetadata prMetadata,
+            Instant slaDeadline) {
+        Duration sla = Duration.between(prMetadata.createdAt(), slaDeadline);
+        if (prMetadata.codeownerChangesRequested()) {
+            prTrackingRepository.pauseSla(tracking.id(), PrTrackingStatus.CHANGES_REQUESTED, Duration.ZERO);
+            postText(
+                    formatChangesRequestedText(
+                            detectedPr.provider(), detectedPr.repositoryName(), detectedPr.pullNumber()),
+                    detectedPr.repositoryName(),
+                    detectedPr.pullNumber(),
+                    NotificationType.CHANGES_REQUESTED,
+                    ticket.queryTs(),
+                    ticket.channelId());
+            return;
+        }
+        postBreachAndEscalate(
+                detectedPr,
+                ticket,
+                tracking,
+                repoConfig.owningTeam(),
+                resolveTeamLabel(repoConfig.owningTeam()),
+                sla,
+                slaDeadline);
+    }
+
+    /** Shared by {@link #processOpenPr} and {@link #handleCodeownerAlreadyOverdue}: post the breach notification,
+     * then create the escalation. */
+    private void postBreachAndEscalate(
+            DetectedPr detectedPr,
+            Ticket ticket,
+            PrTrackingRecord tracking,
+            String owningTeam,
+            String teamLabel,
+            Duration sla,
+            Instant slaDeadline) {
+        PrMessageContext breachCtx = new PrMessageContext(
+                detectedPr.provider(),
+                detectedPr.repositoryName(),
+                detectedPr.pullNumber(),
+                teamLabel,
+                sla,
+                slaDeadline);
+        String override = messageRenderer.render(detectedPr.repositoryName(), MessageEvent.ESCALATED, breachCtx);
+        String breachText = override != null
+                ? override
+                : formatEscalatedText(detectedPr.provider(), detectedPr.repositoryName(), detectedPr.pullNumber(), sla);
+        postText(
+                breachText,
+                detectedPr.repositoryName(),
+                detectedPr.pullNumber(),
+                NotificationType.ESCALATED,
+                ticket.queryTs(),
+                ticket.channelId());
+        escalateImmediately(tracking, ticket, owningTeam);
+    }
+
+    /**
+     * {@code deadline} is null for several reasons (no SLA configured, nothing resolved, or the lookup
+     * failed) — {@code lookupFailed} isolates just the last one, since that's the only case the caller
+     * needs to treat differently (skip the message instead of showing the default chase copy).
+     */
+    private record ReviewSlaResolution(@Nullable Instant deadline, boolean lookupFailed) {
+        static final ReviewSlaResolution NOT_APPLICABLE = new ReviewSlaResolution(null, false);
+    }
+
+    /**
+     * Review deadline for the maintaining-team carve-out — only called once that's already confirmed.
+     * Resolves the SLA via the same {@link SlaLookup#getSla} call as {@link #processOpenPr}, but with
+     * different failure handling: {@link #processOpenPr} skips tracking the PR outright on a lookup
+     * failure, whereas here a failure degrades to "no deadline" and the PR is still tracked (see {@code
+     * lookupFailed}); this is a one-shot attempt, not retried later.
+     */
+    private ReviewSlaResolution codeownerReviewSlaDeadline(
+            DetectedPr detectedPr, PrTrackingProps.Repository repoConfig, PrMetadata prMetadata) {
+        if (repoConfig.hasNoSla()) {
+            return ReviewSlaResolution.NOT_APPLICABLE;
+        }
+        try {
+            Duration sla = slaLookup.getSla(
+                    repoConfig,
+                    new RepoCoord(detectedPr.provider(), detectedPr.repositoryName()),
+                    detectedPr.pullNumber());
+            Instant deadline = sla != null ? prMetadata.createdAt().plus(sla) : null;
+            return new ReviewSlaResolution(deadline, false);
+        } catch (PrSourceException e) {
+            log.atWarn()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .addArgument(e::getMessage)
+                    .log(
+                            "Failed to look up review-phase SLA for codeowner repo {}#{}, tracking without a deadline: {}");
+            return new ReviewSlaResolution(null, true);
+        }
     }
 
     private boolean matchesPathFilter(List<String> paths, Provider provider, String repositoryName, int pullNumber) {
@@ -957,23 +1084,18 @@ public class PrDetectionService {
         Provider p = pendingNotification.provider();
         String noun = PrTerminology.noun(p);
         String sep = PrTerminology.separator(p);
-        String longForm = PrTerminology.longForm(p);
         String plural = PrTerminology.plural(p);
         String text = override != null
                 ? override
                 : switch (pendingNotification.type()) {
                     case TRACKED ->
-                        "%s submitted to `%s` are expected to be reviewed within %s. You don't have to ping us for reviews, but I'll keep an eye on this one. If <%s|%s %s%d> hasn't been reviewed by %s, I'll automatically escalate it to the owning team (%s)."
-                                .formatted(
-                                        longForm,
-                                        pendingNotification.repo(),
-                                        formatDuration(checkNotNull(pendingNotification.sla())),
-                                        prUrl(pendingNotification.repo(), pendingNotification.prNumber()),
-                                        noun,
-                                        sep,
-                                        pendingNotification.prNumber(),
-                                        DEADLINE_FMT.format(checkNotNull(pendingNotification.slaDeadline())),
-                                        checkNotNull(pendingNotification.teamLabel()));
+                        formatTrackedText(
+                                p,
+                                pendingNotification.repo(),
+                                pendingNotification.prNumber(),
+                                checkNotNull(pendingNotification.sla()),
+                                checkNotNull(pendingNotification.slaDeadline()),
+                                checkNotNull(pendingNotification.teamLabel()));
                     case NO_SLA_TRACKED ->
                         "%s to %s have no automated SLAs, they are monitored by %s team. I'll still keep an eye on this one and let you know when it moves."
                                 .formatted(
@@ -981,13 +1103,7 @@ public class PrDetectionService {
                                         pendingNotification.repo(),
                                         checkNotNull(pendingNotification.teamLabel()));
                     case CHANGES_REQUESTED ->
-                        "<%s|%s %s%d> for `%s` has been reviewed and changes have been requested. :eyes:"
-                                .formatted(
-                                        prUrl(pendingNotification.repo(), pendingNotification.prNumber()),
-                                        noun,
-                                        sep,
-                                        pendingNotification.prNumber(),
-                                        pendingNotification.repo());
+                        formatChangesRequestedText(p, pendingNotification.repo(), pendingNotification.prNumber());
                     case APPROVED ->
                         "<%s|%s %s%d> for `%s` has been approved and is ready to merge. :white_check_mark:"
                                 .formatted(
@@ -1145,6 +1261,41 @@ public class PrDetectionService {
         return prUrlResolver.publicUrlFor(repo, prNumber);
     }
 
+    /**
+     * The "tracked with a review deadline" message a normal SLA'd repo gets on detection. Shared between
+     * {@link #postSingleNotification}'s {@code TRACKED} case and {@link #processCodeownerOpenPr}'s
+     * maintainer-overlap case (see {@link #pendingCodeOwnersAreMaintainingTeam}) — the latter needs the
+     * same wording, just reached from a different code-owner-specific code path.
+     */
+    private String formatTrackedText(
+            Provider provider, String repo, int prNumber, Duration sla, Instant slaDeadline, String teamLabel) {
+        return "%s submitted to `%s` are expected to be reviewed within %s. You don't have to ping us for reviews, but I'll keep an eye on this one. If <%s|%s %s%d> hasn't been reviewed by %s, I'll automatically escalate it to the owning team (%s)."
+                .formatted(
+                        PrTerminology.longForm(provider),
+                        repo,
+                        formatDuration(sla),
+                        prUrl(repo, prNumber),
+                        PrTerminology.noun(provider),
+                        PrTerminology.separator(provider),
+                        prNumber,
+                        DEADLINE_FMT.format(slaDeadline),
+                        teamLabel);
+    }
+
+    /**
+     * Shared between {@link #postSingleNotification}'s {@code CHANGES_REQUESTED} case and the codeowner
+     * already-overdue-at-detection path — same wording, different callers.
+     */
+    private String formatChangesRequestedText(Provider provider, String repo, int prNumber) {
+        return "<%s|%s %s%d> for `%s` has been reviewed and changes have been requested. :eyes:"
+                .formatted(
+                        prUrl(repo, prNumber),
+                        PrTerminology.noun(provider),
+                        PrTerminology.separator(provider),
+                        prNumber,
+                        repo);
+    }
+
     private String formatEscalatedText(Provider provider, String repo, int prNumber, Duration sla) {
         return "%s submitted to `%s` are expected to be reviewed within %s. It looks like <%s|%s %s%d> has exceeded that timeframe."
                 .formatted(
@@ -1176,6 +1327,91 @@ public class PrDetectionService {
     }
 
     /**
+     * True when every pending code owner on this PR is a member of the repo's configured maintaining team
+     * ({@code github-team-slug} / {@code gitlab-group-path}). A one-shot check at detection time — never
+     * re-evaluated later.
+     *
+     * <p>Defaults to {@code false} (keep the chase copy) whenever it can't be confirmed for sure: nothing
+     * pending, no team configured, or membership can't be resolved.
+     */
+    private boolean pendingCodeOwnersAreMaintainingTeam(
+            DetectedPr detectedPr,
+            PrTrackingProps.Repository repoConfig,
+            List<CodeOwnerRef> pending,
+            Map<String, Optional<Set<String>>> teamReviewerCache) {
+        if (pending.isEmpty()) {
+            return false;
+        }
+        RepoCoord coord = new RepoCoord(detectedPr.provider(), detectedPr.repositoryName());
+        if (detectedPr.provider() == Provider.GITHUB) {
+            String teamSlug = repoConfig.githubTeamSlug();
+            if (teamSlug == null) {
+                return false;
+            }
+            String repoName = detectedPr.repositoryName();
+            int slash = repoName.indexOf('/');
+            if (slash <= 0) {
+                // Repo name came from parsing whatever URL the user pasted, so "org/repo" isn't guaranteed.
+                log.atWarn()
+                        .addArgument(() -> repoName)
+                        .addArgument(detectedPr::pullNumber)
+                        .log(
+                                "Repo name {} for PR #{} has no org/repo separator — can't confirm the maintaining-team carve-out, keeping the code-owner chase copy");
+                return false;
+            }
+            String expectedTeamDisplay = repoName.substring(0, slash) + "/" + teamSlug;
+            for (CodeOwnerRef ref : pending) {
+                if (ref.isTeam()) {
+                    if (!ref.display().equalsIgnoreCase(expectedTeamDisplay)) {
+                        return false;
+                    }
+                } else {
+                    Set<String> members = teamReviewFilter.resolveTeamMembers(coord, teamSlug, teamReviewerCache);
+                    if (members == null) {
+                        logTeamResolutionFailed(detectedPr, teamSlug);
+                        return false;
+                    }
+                    // GitHub logins are case-insensitive, so match the same way the team-ref branch above does.
+                    if (members.stream().noneMatch(member -> member.equalsIgnoreCase(ref.display()))) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+        if (detectedPr.provider() == Provider.GITLAB) {
+            String groupPath = repoConfig.gitlabGroupPath();
+            if (groupPath == null) {
+                return false;
+            }
+            Set<String> members = teamReviewFilter.resolveTeamMembers(coord, groupPath, teamReviewerCache);
+            if (members == null) {
+                logTeamResolutionFailed(detectedPr, groupPath);
+                return false;
+            }
+            for (CodeOwnerRef ref : pending) {
+                // GitLab usernames/paths are case-insensitive, so match the same way the GitHub branch
+                // above does rather than relying on the API always returning canonical case.
+                if (members.stream().noneMatch(member -> member.equalsIgnoreCase(ref.display()))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /** Marks that a lookup failure, not a genuine mismatch, is why the carve-out didn't engage. */
+    private void logTeamResolutionFailed(DetectedPr detectedPr, String teamRef) {
+        log.atWarn()
+                .addArgument(() -> teamRef)
+                .addArgument(detectedPr::repositoryName)
+                .addArgument(detectedPr::pullNumber)
+                .log(
+                        "Could not resolve {} team membership for {}#{} — falling back to the code-owner chase copy instead of confirming the maintaining-team carve-out");
+    }
+
+    /**
      * Renders a code owner for the chase list: a linked GitHub login/team when a URL is known (plain
      * backticked text otherwise), with teams prefixed by a people marker and shown org-qualified
      * (e.g. {@code org/team}) so they're distinguishable from individual users.
@@ -1197,6 +1433,9 @@ public class PrDetectionService {
                     SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
             log.atInfo().addArgument(() -> repo).addArgument(() -> type).log("Notification posted for {} ({})");
         } catch (Exception e) {
+            // Broad catch is deliberate: this post is best-effort and must never block the escalation
+            // that follows it in callers like postBreachAndEscalate — a non-SlackException failure here
+            // (not just a Slack API error) shouldn't skip paging the owning team.
             log.atWarn()
                     .setCause(e)
                     .addArgument(() -> type)

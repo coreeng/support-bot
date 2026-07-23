@@ -37,6 +37,7 @@ class PrTrackingRecordTest {
                         SLA_REMAINING,
                         LAST_REVIEW,
                         LAST_AUTHOR_ACTIVITY,
+                        false,
                         false))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("provider");
@@ -61,6 +62,7 @@ class PrTrackingRecordTest {
                         SLA_REMAINING,
                         LAST_REVIEW,
                         LAST_AUTHOR_ACTIVITY,
+                        false,
                         false))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("repo");
@@ -85,6 +87,7 @@ class PrTrackingRecordTest {
                         SLA_REMAINING,
                         LAST_REVIEW,
                         LAST_AUTHOR_ACTIVITY,
+                        false,
                         false))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("prCreatedAt");
@@ -109,6 +112,7 @@ class PrTrackingRecordTest {
                         SLA_REMAINING,
                         LAST_REVIEW,
                         LAST_AUTHOR_ACTIVITY,
+                        false,
                         false))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("owningTeam");
@@ -132,6 +136,7 @@ class PrTrackingRecordTest {
                         SLA_REMAINING,
                         LAST_REVIEW,
                         LAST_AUTHOR_ACTIVITY,
+                        false,
                         false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("owningTeam must not be blank");
@@ -156,6 +161,7 @@ class PrTrackingRecordTest {
                         SLA_REMAINING,
                         LAST_REVIEW,
                         LAST_AUTHOR_ACTIVITY,
+                        false,
                         false))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("status");
@@ -179,6 +185,7 @@ class PrTrackingRecordTest {
                         null,
                         LAST_REVIEW,
                         LAST_AUTHOR_ACTIVITY,
+                        false,
                         false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("closedAt must not be null when status is CLOSED");
@@ -202,6 +209,7 @@ class PrTrackingRecordTest {
                 null,
                 LAST_REVIEW,
                 LAST_AUTHOR_ACTIVITY,
+                false,
                 false);
         assertThat(record.status()).isEqualTo(PrTrackingStatus.CLOSED);
         assertThat(record.closedAt()).isEqualTo(NOW);
@@ -225,6 +233,7 @@ class PrTrackingRecordTest {
                         SLA_REMAINING,
                         LAST_REVIEW,
                         LAST_AUTHOR_ACTIVITY,
+                        false,
                         false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("slaDeadline and slaRemaining must not both be set");
@@ -248,6 +257,7 @@ class PrTrackingRecordTest {
                         Duration.ofHours(-1),
                         LAST_REVIEW,
                         LAST_AUTHOR_ACTIVITY,
+                        false,
                         false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("slaRemaining must not be negative");
@@ -271,7 +281,8 @@ class PrTrackingRecordTest {
                 SLA_REMAINING,
                 LAST_REVIEW,
                 LAST_AUTHOR_ACTIVITY,
-                true);
+                true,
+                false);
 
         assertThat(record.slaRemaining()).isEqualTo(SLA_REMAINING);
         assertThat(record.lastReviewAt()).isEqualTo(LAST_REVIEW);

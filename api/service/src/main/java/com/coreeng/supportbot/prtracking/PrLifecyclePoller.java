@@ -198,7 +198,8 @@ public class PrLifecyclePoller {
                 remainingForPause,
                 record.slaRemaining(),
                 requiresCodeowners,
-                codeownerApproved);
+                codeownerApproved,
+                record.mergePhaseEntered());
     }
 
     /**
@@ -237,6 +238,11 @@ public class PrLifecyclePoller {
             return false;
         }
         if (pr.codeOwnersApproved() == null) {
+            log.atWarn()
+                    .addArgument(record::repo)
+                    .addArgument(record::prNumber)
+                    .log(
+                            "Code-owner approval signal unreadable for {}#{} (provider read failed or unavailable), holding gate shut");
             return false;
         }
         if (!record.codeownerReviewRequested()) {
@@ -271,16 +277,9 @@ public class PrLifecyclePoller {
         boolean escalateOwnsWrite = decision.effects().stream()
                 .anyMatch(
                         e -> e instanceof PrLifecycle.Effect.Escalate || e instanceof PrLifecycle.Effect.EscalateMerge);
-        // Resolve the merge-clock window once, before any write: the paused remaining if we're resuming a
-        // changes-requested detour (slaRemaining and slaDeadline are mutually exclusive, so a stored
-        // remaining can only be a paused merge clock), else the configured merge SLA. This single value
-        // both stamps the deadline (startMergeClock) and renders the NotifyAwaitingMerge context, so that
-        // notification never re-issues a SlaLookup after the status write commits. A resolution failure on
-        // the fresh path throws here, before any write, so poll()'s per-record catch retries the whole
-        // transition (SlaLookup included) next poll — never a half-applied write with no notification.
-        Duration mergeWindow = decision.slaOp() instanceof PrLifecycle.SlaOp.Start
-                ? (record.slaRemaining() != null ? record.slaRemaining() : mergeSlaFor(record))
-                : null;
+        // Resolve the merge-clock window once, before any write. Also renders the NotifyAwaitingMerge
+        // context, so no second SlaLookup runs after the write commits.
+        Duration mergeWindow = decision.slaOp() instanceof PrLifecycle.SlaOp.Start ? resolveMergeWindow(record) : null;
         PrTrackingRecord current =
                 switch (decision.slaOp()) {
                     case PrLifecycle.SlaOp.Pause pause ->
@@ -329,23 +328,27 @@ public class PrLifecyclePoller {
     }
 
     /**
-     * Stamps the merge-chase SLA clock on entry to AWAITING_MERGE from the window {@link #apply} resolved
-     * before the write ({@code mergeWindow} = the paused remaining when resuming a changes-requested
-     * detour, else the configured merge SLA — see {@code apply}). Resuming from the paused remaining
-     * rather than restarting a full window matters: otherwise every tenant change mid-merge-phase would
-     * hand the maintaining team a brand-new full window and the merge SLA could never breach. A {@code
-     * null} window means the repo has no merge SLA (or none was resolvable), so the state is entered
-     * without a deadline and never merge-escalates. Returns the post-write record so {@link #apply} can
-     * render effects (e.g. {@code NotifyAwaitingMerge}) off the deadline just set, not the pre-transition
-     * one (which for a first entry may be a leftover review-phase deadline this fresh clock overwrites).
+     * Reuses a paused remaining only if we're RE-entering the merge phase ({@code mergePhaseEntered} was
+     * already true) — otherwise any stored remaining is a paused REVIEW clock, not a merge one, and reusing
+     * it would hand the maintaining team an arbitrary, too-short deadline instead of the real merge SLA.
+     */
+    private @Nullable Duration resolveMergeWindow(PrTrackingRecord record) {
+        if (record.mergePhaseEntered() && record.slaRemaining() != null) {
+            return record.slaRemaining();
+        }
+        return mergeSlaFor(record);
+    }
+
+    /**
+     * Stamps the merge clock on entry to AWAITING_MERGE using the window {@link #apply} already resolved
+     * ({@code mergeWindow}). A {@code null} window means no merge SLA, so the state is entered without a
+     * deadline and never merge-escalates. Delegates to {@link PrTrackingRepository#enterMergePhase}, which
+     * latches {@code merge_phase_entered} in the same write as the status/deadline change.
      */
     private PrTrackingRecord startMergeClock(
             PrTrackingRecord record, PrTrackingStatus next, @Nullable Duration mergeWindow) {
-        if (mergeWindow != null) {
-            return prTrackingRepository.startSla(
-                    record.id(), next, Instant.now().plus(mergeWindow));
-        }
-        return prTrackingRepository.updateStatus(record.id(), next, null, record.escalationId());
+        Instant deadline = mergeWindow != null ? Instant.now().plus(mergeWindow) : null;
+        return prTrackingRepository.enterMergePhase(record.id(), next, deadline);
     }
 
     /**
@@ -689,6 +692,8 @@ public class PrLifecyclePoller {
             slackClient.postMessage(new SlackPostMessageRequest(
                     SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
         } catch (Exception e) {
+            // Broad catch is deliberate: this post is best-effort and must never block createEscalation()
+            // in doEscalate — a non-SlackException failure here shouldn't skip paging the owning team.
             log.atWarn()
                     .setCause(e)
                     .addArgument(record::repo)

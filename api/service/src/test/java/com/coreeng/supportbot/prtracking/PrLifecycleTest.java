@@ -288,6 +288,24 @@ class PrLifecycleTest {
         }
 
         @Test
+        void entersAwaitingMergeFromEscalated() {
+            // Now reachable: a codeowner repo in the maintaining-team carve-out (see PrDetectionService
+            // .pendingCodeOwnersAreMaintainingTeam) can review-escalate (OPEN → ESCALATED, see
+            // codeownerRepoReviewEscalatesWhenItHasALiveBreachedDeadline below) before the code owners
+            // approve. Once they do, ESCALATED → AWAITING_MERGE hands off to the merge phase exactly like
+            // the other source states — this row previously existed only for table symmetry and was
+            // unreachable.
+            assertDecision(
+                    decide(obs(ESCALATED)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()),
+                    AWAITING_MERGE,
+                    START,
+                    NOTIFY_AWAITING_MERGE);
+        }
+
+        @Test
         void awaitingMergeDoesNotCloseOnMergeable() {
             // The whole point of AWAITING_MERGE: mergeability alone never closes it — only the real merge.
             assertDecision(
@@ -437,10 +455,39 @@ class PrLifecycleTest {
         }
 
         @Test
-        void codeownerRepoDoesNotReviewEscalateInOpen() {
-            // Clock held in OPEN for code-owner repos is structural: even if a live deadline leaked in and
-            // breached with no verdict, OPEN must not review-escalate (that is the merge phase's job).
-            assertDecision(decide(obs(OPEN).requiresCodeowners().slaBreached()), OPEN, NONE);
+        void codeownerRepoReviewEscalatesWhenItHasALiveBreachedDeadline() {
+            // This row (OPEN → ESCALATED) has no !requiresCodeowners guard: it reacts purely to whether
+            // the record has a live, breached deadline, regardless of repo kind. It does NOT mean
+            // codeowner repos escalate whenever an SLA is configured — PrDetectionService.
+            // processCodeownerOpenPr only ever hands out a review-phase deadline for the narrow
+            // maintaining-team carve-out (pendingCodeOwnersAreMaintainingTeam); every other codeowner repo
+            // gets slaDeadline == null and so can never reach this row at all (see the no-op test below).
+            // This test isolates the FSM's reaction given a deadline already exists, independent of how
+            // detection decided to set one.
+            assertDecision(decide(obs(OPEN).requiresCodeowners().slaBreached()), ESCALATED, NONE, ESCALATE);
+        }
+
+        @Test
+        void codeownerRepoWithNoLiveDeadlineNeverReviewEscalates() {
+            // The default for every codeowner repo outside the maintaining-team carve-out: no deadline is
+            // ever set (see PrDetectionService.processCodeownerOpenPr), so slaBreached() can never be true
+            // and the OPEN → ESCALATED row above can never match — held in OPEN indefinitely, exactly as
+            // before this feature existed.
+            assertDecision(decide(obs(OPEN).requiresCodeowners()), OPEN, NONE);
+        }
+
+        @Test
+        void changesRequestedResumesAsReviewDeadlineWhenNeverInMergePhase() {
+            // Never reached AWAITING_MERGE, so the stored remaining is unambiguously a review clock —
+            // resumes as a live deadline, same as before this fix.
+            assertDecision(decide(obs(CHANGES_REQUESTED).storedRemaining(STORED)), OPEN, RESUME);
+        }
+
+        @Test
+        void changesRequestedDoesNotResumeAsALiveDeadlineOnceMergePhaseHasBeenEntered() {
+            // Already reached AWAITING_MERGE, so the stored remaining is a paused merge clock — must stay
+            // untouched (None), not promoted into a live review deadline that could wrongly escalate.
+            assertDecision(decide(obs(CHANGES_REQUESTED).storedRemaining(STORED).mergePhaseEntered()), OPEN, NONE);
         }
     }
 
@@ -473,6 +520,7 @@ class PrLifecycleTest {
         private @Nullable Duration slaRemainingStored;
         private boolean requiresCodeowners;
         private boolean codeownerApproved;
+        private boolean mergePhaseEntered;
 
         private ObsBuilder(PrTrackingStatus current) {
             this.current = current;
@@ -532,6 +580,11 @@ class PrLifecycleTest {
             return this;
         }
 
+        ObsBuilder mergePhaseEntered() {
+            this.mergePhaseEntered = true;
+            return this;
+        }
+
         Observation build() {
             return new Observation(
                     current,
@@ -544,7 +597,8 @@ class PrLifecycleTest {
                     remainingForPause,
                     slaRemainingStored,
                     requiresCodeowners,
-                    codeownerApproved);
+                    codeownerApproved,
+                    mergePhaseEntered);
         }
     }
 }
