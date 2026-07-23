@@ -106,47 +106,42 @@ describe("Products Component", () => {
     expect(screen.queryByText("Product - Alpha")).not.toBeInTheDocument();
   });
 
-  it("counts tickets without a product tag under None", () => {
+  it("excludes untagged tickets from rows, Totals, and the percentage denominator", () => {
     renderProducts();
 
-    // Ticket 3 only has the non-product "bug" tag
-    const noneRow = screen.getByText("None").closest("tr")!;
-    expect(within(noneRow).getByText("1")).toBeInTheDocument();
-  });
-
-  it("hides untagged tickets from the table and totals when the checkbox is checked", () => {
-    renderProducts();
-
-    fireEvent.click(screen.getByLabelText("Hide tickets without a product tag"));
-
+    // Ticket 3 only has the non-product "bug" tag: no None row, and it doesn't
+    // count — Totals is 3 (tickets 1, 2, 4) and Alpha's share is 3/3
     expect(screen.queryByText("None")).not.toBeInTheDocument();
-    // Ticket 3 (untagged) is excluded entirely: 3 tickets remain and percentages rebase
     const totalsRow = screen.getByText("Totals").closest("tr")!;
     expect(within(totalsRow).getByText("3")).toBeInTheDocument();
     const alphaRow = screen.getByText("Alpha").closest("tr")!;
     expect(within(alphaRow).getByText("100.0%")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByLabelText("Hide tickets without a product tag"));
-    expect(screen.getByText("None")).toBeInTheDocument();
   });
 
-  it("shows each product's percentage of all tickets", () => {
+  it("does not render a hide-untagged control", () => {
     renderProducts();
 
-    // Alpha appears on 3 of the 4 tickets
+    expect(screen.queryByLabelText("Hide tickets without a product tag")).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("shows each product's percentage of product-tagged tickets", () => {
+    renderProducts();
+
+    // 3 tickets carry product tags; Alpha appears on all 3, Beta on 1
     const alphaRow = screen.getByText("Alpha").closest("tr")!;
-    expect(within(alphaRow).getByText("75.0%")).toBeInTheDocument();
+    expect(within(alphaRow).getByText("100.0%")).toBeInTheDocument();
 
     const betaRow = screen.getByText("Beta").closest("tr")!;
-    expect(within(betaRow).getByText("25.0%")).toBeInTheDocument();
+    expect(within(betaRow).getByText("33.3%")).toBeInTheDocument();
   });
 
-  it("renders a Totals row counting distinct tickets, always last regardless of sorting", () => {
+  it("renders a Totals row counting distinct product-tagged tickets, always last regardless of sorting", () => {
     renderProducts();
 
-    // Ticket 4 carries two product tags but counts once: 4 tickets, not the column sum of 5
+    // Ticket 4 carries two product tags but counts once: 3 tagged tickets, not the column sum of 4
     const totalsRow = screen.getByText("Totals").closest("tr")!;
-    expect(within(totalsRow).getByText("4")).toBeInTheDocument();
+    expect(within(totalsRow).getByText("3")).toBeInTheDocument();
     expect(within(totalsRow).getByText("100.0%")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Product"));
@@ -181,7 +176,7 @@ describe("Products Component", () => {
 
     const rows = screen.getAllByRole("row").slice(1); // skip header row
     const products = rows.map((row) => within(row).getAllByRole("cell")[0].textContent);
-    expect(products).toEqual(["Alpha", "Beta", "None", "Totals"]);
+    expect(products).toEqual(["Alpha", "Beta", "Totals"]);
   });
 
   it("sorts by product name when the Product header is clicked and flips direction on second click", () => {
@@ -190,12 +185,12 @@ describe("Products Component", () => {
     fireEvent.click(screen.getByText("Product"));
     let rows = screen.getAllByRole("row").slice(1);
     let products = rows.map((row) => within(row).getAllByRole("cell")[0].textContent);
-    expect(products).toEqual(["Alpha", "Beta", "None", "Totals"]);
+    expect(products).toEqual(["Alpha", "Beta", "Totals"]);
 
     fireEvent.click(screen.getByText("Product"));
     rows = screen.getAllByRole("row").slice(1);
     products = rows.map((row) => within(row).getAllByRole("cell")[0].textContent);
-    expect(products).toEqual(["None", "Beta", "Alpha", "Totals"]);
+    expect(products).toEqual(["Beta", "Alpha", "Totals"]);
   });
 
   it("flips count sort direction when the Tickets header is clicked", () => {
@@ -204,7 +199,7 @@ describe("Products Component", () => {
     fireEvent.click(screen.getByText("Tickets"));
     const rows = screen.getAllByRole("row").slice(1);
     const products = rows.map((row) => within(row).getAllByRole("cell")[0].textContent);
-    expect(products).toEqual(["Beta", "None", "Alpha", "Totals"]);
+    expect(products).toEqual(["Beta", "Alpha", "Totals"]);
   });
 
   it("counts tickets tagged with a retired product under its own row", () => {
@@ -268,8 +263,10 @@ describe("Products Component", () => {
     renderProducts();
 
     // The prefix-only tag seeds no blank row; its ticket counts as untagged
-    const noneRow = screen.getByText("None").closest("tr")!;
-    expect(within(noneRow).getByText("1")).toBeInTheDocument();
+    // and is excluded entirely, leaving only the seeded Alpha row at zero
+    expect(screen.queryByText("None")).not.toBeInTheDocument();
+    const totalsRow = screen.getByText("Totals").closest("tr")!;
+    expect(within(totalsRow).getByText("0")).toBeInTheDocument();
   });
 
   describe("hasActiveProductTags", () => {

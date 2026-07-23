@@ -1,7 +1,6 @@
 "use client";
 
 import LoadingSkeleton from "@/components/LoadingSkeleton";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAllTickets, useRegistry } from "@/lib/hooks";
 import { enumValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
@@ -9,8 +8,6 @@ import { PaginatedTickets, TicketTag, TicketWithLogs } from "@/lib/types";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-
-const NO_PRODUCT_LABEL = "None";
 
 const CHART_COLORS = [
   "var(--chart-1)",
@@ -90,19 +87,16 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
     {
       sortBy: "count",
       sortDir: "desc",
-      hideUntagged: "false",
     },
     {
       sortBy: enumValidator(["product", "count"] as const, "count"),
       sortDir: enumValidator(["asc", "desc"] as const, "desc"),
-      hideUntagged: enumValidator(["true", "false"] as const, "false"),
     }
   );
 
   // Casts are safe: sortBy and sortDir are guarded by enumValidators above.
   const sortColumn = params.sortBy as SortColumn;
   const sortDirection = params.sortDir as "asc" | "desc";
-  const hideUntagged = params.hideUntagged === "true";
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -124,9 +118,11 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
   const isLoading = ticketsQuery.isLoading || registryQuery.isLoading;
   const loadError = ticketsQuery.error || registryQuery.error;
 
-  const totalTickets = visibleTickets.length;
-
-  const productCounts = useMemo(() => {
+  // Tickets without a product tag are excluded before counting: they get no
+  // row, and they don't feed the Totals count or the percentage denominator —
+  // so percentages are shares of product-tagged tickets (and only sum to 100%
+  // exactly when no ticket carries more than one product tag).
+  const { productCounts, taggedTicketCount } = useMemo(() => {
     const labelByCode = new Map<string, string>();
     (registryData?.tags ?? []).forEach((tag: TicketTag) => labelByCode.set(tag.code, tag.label));
 
@@ -140,8 +136,8 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
         counts.set(stripProductPrefix(tag.label), 0);
       }
     });
-    counts.set(NO_PRODUCT_LABEL, 0);
 
+    let taggedTicketCount = 0;
     visibleTickets.forEach((t: TicketWithLogs) => {
       // A ticket counts once per distinct product, even if tagged twice.
       const products = new Set<string>();
@@ -149,33 +145,24 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
         const label = labelByCode.get(code as string) || getTagLabel(code);
         if (isProductLabel(label)) products.add(stripProductPrefix(label));
       });
-      if (products.size === 0) products.add(NO_PRODUCT_LABEL);
+      if (products.size === 0) return;
+      taggedTicketCount++;
       products.forEach((product) => counts.set(product, (counts.get(product) ?? 0) + 1));
     });
 
-    return Array.from(counts, ([product, count]) => ({ product, count }));
+    return { productCounts: Array.from(counts, ([product, count]) => ({ product, count })), taggedTicketCount };
   }, [visibleTickets, registryData]);
-
-  // Hiding untagged tickets removes them entirely: no None row, and they leave
-  // the Totals count and percentage denominator too.
-  const noneCount = productCounts.find((p) => p.product === NO_PRODUCT_LABEL)?.count ?? 0;
-  const displayedCounts = useMemo(
-    () => (hideUntagged ? productCounts.filter((p) => p.product !== NO_PRODUCT_LABEL) : productCounts),
-    [productCounts, hideUntagged]
-  );
-  const displayedTotal = hideUntagged ? totalTickets - noneCount : totalTickets;
 
   // The chart is a fixed magnitude ranking (largest first), independent of the table's sort.
   const chartData = useMemo(
-    () => [...displayedCounts].sort((a, b) => b.count - a.count || a.product.localeCompare(b.product)),
-    [displayedCounts]
+    () => [...productCounts].sort((a, b) => b.count - a.count || a.product.localeCompare(b.product)),
+    [productCounts]
   );
 
   // Hues are assigned by alphabetical position over every registry product tag
   // (retired included), not by rank or by which rows currently have tickets —
   // so a product keeps its color when counts shift between date ranges, even
-  // when a retired product's row only exists for some ranges. "None" stays
-  // gray (catch-all).
+  // when a retired product's row only exists for some ranges.
   const colorByProduct = useMemo(() => {
     const products = Array.from(
       new Set(
@@ -188,7 +175,7 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
   }, [registryData]);
 
   const sortedProducts = useMemo(() => {
-    return [...displayedCounts].sort((a, b) => {
+    return [...productCounts].sort((a, b) => {
       if (sortColumn === "count") {
         const cmp = a.count - b.count;
         // Ties stay alphabetical regardless of sort direction
@@ -198,26 +185,11 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
       const cmp = a.product.localeCompare(b.product);
       return sortDirection === "asc" ? cmp : -cmp;
     });
-  }, [displayedCounts, sortColumn, sortDirection]);
+  }, [productCounts, sortColumn, sortDirection]);
 
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">Ticket counts per product tag</p>
-
-      {!isLoading && !loadError && (
-        <div className="flex items-center gap-2">
-          <input
-            id="hide-untagged"
-            type="checkbox"
-            checked={hideUntagged}
-            onChange={(e) => setParams({ hideUntagged: e.target.checked ? "true" : "false" })}
-            className="accent-primary h-4 w-4 cursor-pointer"
-          />
-          <Label htmlFor="hide-untagged" className="cursor-pointer font-normal">
-            Hide tickets without a product tag
-          </Label>
-        </div>
-      )}
 
       {!isLoading && !loadError && chartData.length > 0 && (
         <div className="bg-card rounded-lg border p-4">
@@ -250,18 +222,11 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
                   labelStyle={{ color: "var(--popover-foreground)" }}
                   itemStyle={{ color: "var(--popover-foreground)" }}
                   cursor={{ fill: "var(--accent)" }}
-                  formatter={(value: number) => [`${value} (${formatPercentage(value, displayedTotal)})`, "Tickets"]}
+                  formatter={(value: number) => [`${value} (${formatPercentage(value, taggedTicketCount)})`, "Tickets"]}
                 />
                 <Bar dataKey="count" fill="var(--chart-1)" barSize={20} radius={[0, 4, 4, 0]}>
                   {chartData.map((entry) => (
-                    <Cell
-                      key={entry.product}
-                      fill={
-                        entry.product === NO_PRODUCT_LABEL
-                          ? "var(--muted-foreground)"
-                          : (colorByProduct.get(entry.product) ?? "var(--chart-1)")
-                      }
-                    />
+                    <Cell key={entry.product} fill={colorByProduct.get(entry.product) ?? "var(--chart-1)"} />
                   ))}
                 </Bar>
               </BarChart>
@@ -300,14 +265,16 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
                     <TableRow key={product}>
                       <TableCell>{product}</TableCell>
                       <TableCell className="font-mono text-sm tabular-nums">{count}</TableCell>
-                      <TableCell className="font-mono text-sm tabular-nums">{formatPercentage(count, displayedTotal)}</TableCell>
+                      <TableCell className="font-mono text-sm tabular-nums">{formatPercentage(count, taggedTicketCount)}</TableCell>
                     </TableRow>
                   ))}
-                  {/* Distinct tickets in scope — can be below the column sum since a ticket may carry several product tags. */}
+                  {/* Distinct product-tagged tickets in scope — can be below the column sum since a ticket may carry several product tags. */}
                   <TableRow className="bg-muted/50 border-t font-semibold">
                     <TableCell>Totals</TableCell>
-                    <TableCell className="font-mono text-sm tabular-nums">{displayedTotal}</TableCell>
-                    <TableCell className="font-mono text-sm tabular-nums">{formatPercentage(displayedTotal, displayedTotal)}</TableCell>
+                    <TableCell className="font-mono text-sm tabular-nums">{taggedTicketCount}</TableCell>
+                    <TableCell className="font-mono text-sm tabular-nums">
+                      {formatPercentage(taggedTicketCount, taggedTicketCount)}
+                    </TableCell>
                   </TableRow>
                 </>
               )}
