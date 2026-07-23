@@ -118,10 +118,14 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
   const isLoading = ticketsQuery.isLoading || registryQuery.isLoading;
   const loadError = ticketsQuery.error || registryQuery.error;
 
-  // Tickets without a product tag are excluded before counting: they get no
-  // row, and they don't feed the Totals count or the percentage denominator —
-  // so percentages are shares of product-tagged tickets (and only sum to 100%
-  // exactly when no ticket carries more than one product tag).
+  // All tickets in range (untagged included) — the percentage denominator, so
+  // each row reads as "share of all tickets in the selected period".
+  const totalTickets = visibleTickets.length;
+
+  // Tickets without a product tag get no row and don't count toward Total
+  // Product Tickets, but they stay in the percentage denominator above — with
+  // mostly-untagged data the percentages are deliberately small and don't sum
+  // to 100%.
   const { productCounts, taggedTicketCount } = useMemo(() => {
     const labelByCode = new Map<string, string>();
     (registryData?.tags ?? []).forEach((tag: TicketTag) => labelByCode.set(tag.code, tag.label));
@@ -222,7 +226,7 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
                   labelStyle={{ color: "var(--popover-foreground)" }}
                   itemStyle={{ color: "var(--popover-foreground)" }}
                   cursor={{ fill: "var(--accent)" }}
-                  formatter={(value: number) => [`${value} (${formatPercentage(value, taggedTicketCount)})`, "Tickets"]}
+                  formatter={(value: number) => [`${value} (${formatPercentage(value, totalTickets)})`, "Tickets"]}
                 />
                 <Bar dataKey="count" fill="var(--chart-1)" barSize={20} radius={[0, 4, 4, 0]}>
                   {chartData.map((entry) => (
@@ -249,7 +253,7 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
               <TableRow>
                 <SortableHeader col="product" label="Product" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
                 <SortableHeader col="count" label="Tickets" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                <TableHead>% of Tickets</TableHead>
+                <TableHead>% of total Tickets</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -265,16 +269,14 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
                     <TableRow key={product}>
                       <TableCell>{product}</TableCell>
                       <TableCell className="font-mono text-sm tabular-nums">{count}</TableCell>
-                      <TableCell className="font-mono text-sm tabular-nums">{formatPercentage(count, taggedTicketCount)}</TableCell>
+                      <TableCell className="font-mono text-sm tabular-nums">{formatPercentage(count, totalTickets)}</TableCell>
                     </TableRow>
                   ))}
                   {/* Distinct product-tagged tickets in scope — can be below the column sum since a ticket may carry several product tags. */}
                   <TableRow className="bg-muted/50 border-t font-semibold">
-                    <TableCell>Totals</TableCell>
+                    <TableCell>Total Product Tickets</TableCell>
                     <TableCell className="font-mono text-sm tabular-nums">{taggedTicketCount}</TableCell>
-                    <TableCell className="font-mono text-sm tabular-nums">
-                      {formatPercentage(taggedTicketCount, taggedTicketCount)}
-                    </TableCell>
+                    <TableCell className="font-mono text-sm tabular-nums">{formatPercentage(taggedTicketCount, totalTickets)}</TableCell>
                   </TableRow>
                 </>
               )}

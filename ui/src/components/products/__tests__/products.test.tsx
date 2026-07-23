@@ -106,16 +106,17 @@ describe("Products Component", () => {
     expect(screen.queryByText("Product - Alpha")).not.toBeInTheDocument();
   });
 
-  it("excludes untagged tickets from rows, Totals, and the percentage denominator", () => {
+  it("excludes untagged tickets from rows and Totals, but keeps them in the percentage denominator", () => {
     renderProducts();
 
-    // Ticket 3 only has the non-product "bug" tag: no None row, and it doesn't
-    // count — Totals is 3 (tickets 1, 2, 4) and Alpha's share is 3/3
+    // Ticket 3 only has the non-product "bug" tag: no None row and it's not in
+    // Total Product Tickets (3: tickets 1, 2, 4), but it still counts toward
+    // the denominator — Alpha's share is 3 of all 4 tickets in range
     expect(screen.queryByText("None")).not.toBeInTheDocument();
-    const totalsRow = screen.getByText("Totals").closest("tr")!;
+    const totalsRow = screen.getByText("Total Product Tickets").closest("tr")!;
     expect(within(totalsRow).getByText("3")).toBeInTheDocument();
     const alphaRow = screen.getByText("Alpha").closest("tr")!;
-    expect(within(alphaRow).getByText("100.0%")).toBeInTheDocument();
+    expect(within(alphaRow).getByText("75.0%")).toBeInTheDocument();
   });
 
   it("does not render a hide-untagged control", () => {
@@ -125,29 +126,30 @@ describe("Products Component", () => {
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 
-  it("shows each product's percentage of product-tagged tickets", () => {
+  it("shows each product's percentage of all tickets in range, untagged included", () => {
     renderProducts();
 
-    // 3 tickets carry product tags; Alpha appears on all 3, Beta on 1
+    // 4 tickets in range; Alpha appears on 3, Beta on 1
     const alphaRow = screen.getByText("Alpha").closest("tr")!;
-    expect(within(alphaRow).getByText("100.0%")).toBeInTheDocument();
+    expect(within(alphaRow).getByText("75.0%")).toBeInTheDocument();
 
     const betaRow = screen.getByText("Beta").closest("tr")!;
-    expect(within(betaRow).getByText("33.3%")).toBeInTheDocument();
+    expect(within(betaRow).getByText("25.0%")).toBeInTheDocument();
   });
 
-  it("renders a Totals row counting distinct product-tagged tickets, always last regardless of sorting", () => {
+  it("renders a Total Product Tickets row counting distinct tagged tickets, always last regardless of sorting", () => {
     renderProducts();
 
-    // Ticket 4 carries two product tags but counts once: 3 tagged tickets, not the column sum of 4
-    const totalsRow = screen.getByText("Totals").closest("tr")!;
+    // Ticket 4 carries two product tags but counts once: 3 tagged tickets (not
+    // the column sum of 4), which is 75% of the 4 tickets in range
+    const totalsRow = screen.getByText("Total Product Tickets").closest("tr")!;
     expect(within(totalsRow).getByText("3")).toBeInTheDocument();
-    expect(within(totalsRow).getByText("100.0%")).toBeInTheDocument();
+    expect(within(totalsRow).getByText("75.0%")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Product"));
     fireEvent.click(screen.getByText("Product"));
     const rows = screen.getAllByRole("row");
-    expect(within(rows[rows.length - 1]).getByText("Totals")).toBeInTheDocument();
+    expect(within(rows[rows.length - 1]).getByText("Total Product Tickets")).toBeInTheDocument();
   });
 
   it("does not list non-product tags", () => {
@@ -176,7 +178,7 @@ describe("Products Component", () => {
 
     const rows = screen.getAllByRole("row").slice(1); // skip header row
     const products = rows.map((row) => within(row).getAllByRole("cell")[0].textContent);
-    expect(products).toEqual(["Alpha", "Beta", "Totals"]);
+    expect(products).toEqual(["Alpha", "Beta", "Total Product Tickets"]);
   });
 
   it("sorts by product name when the Product header is clicked and flips direction on second click", () => {
@@ -185,12 +187,12 @@ describe("Products Component", () => {
     fireEvent.click(screen.getByText("Product"));
     let rows = screen.getAllByRole("row").slice(1);
     let products = rows.map((row) => within(row).getAllByRole("cell")[0].textContent);
-    expect(products).toEqual(["Alpha", "Beta", "Totals"]);
+    expect(products).toEqual(["Alpha", "Beta", "Total Product Tickets"]);
 
     fireEvent.click(screen.getByText("Product"));
     rows = screen.getAllByRole("row").slice(1);
     products = rows.map((row) => within(row).getAllByRole("cell")[0].textContent);
-    expect(products).toEqual(["Beta", "Alpha", "Totals"]);
+    expect(products).toEqual(["Beta", "Alpha", "Total Product Tickets"]);
   });
 
   it("flips count sort direction when the Tickets header is clicked", () => {
@@ -199,7 +201,7 @@ describe("Products Component", () => {
     fireEvent.click(screen.getByText("Tickets"));
     const rows = screen.getAllByRole("row").slice(1);
     const products = rows.map((row) => within(row).getAllByRole("cell")[0].textContent);
-    expect(products).toEqual(["Beta", "Alpha", "Totals"]);
+    expect(products).toEqual(["Beta", "Alpha", "Total Product Tickets"]);
   });
 
   it("counts tickets tagged with a retired product under its own row", () => {
@@ -265,7 +267,7 @@ describe("Products Component", () => {
     // The prefix-only tag seeds no blank row; its ticket counts as untagged
     // and is excluded entirely, leaving only the seeded Alpha row at zero
     expect(screen.queryByText("None")).not.toBeInTheDocument();
-    const totalsRow = screen.getByText("Totals").closest("tr")!;
+    const totalsRow = screen.getByText("Total Product Tickets").closest("tr")!;
     expect(within(totalsRow).getByText("0")).toBeInTheDocument();
   });
 
@@ -294,7 +296,7 @@ describe("Products Component", () => {
 
     expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
     // No final-looking data while the code→label map is unavailable
-    expect(screen.queryByText("Totals")).not.toBeInTheDocument();
+    expect(screen.queryByText("Total Product Tickets")).not.toBeInTheDocument();
   });
 
   it("shows an error message when the registry fails to load", () => {
@@ -307,7 +309,7 @@ describe("Products Component", () => {
     renderProducts();
 
     expect(screen.getByText("Error loading products")).toBeInTheDocument();
-    expect(screen.queryByText("Totals")).not.toBeInTheDocument();
+    expect(screen.queryByText("Total Product Tickets")).not.toBeInTheDocument();
   });
 
   it("shows an error message when tickets fail to load", () => {
