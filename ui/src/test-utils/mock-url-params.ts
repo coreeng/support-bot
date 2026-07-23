@@ -23,8 +23,31 @@ import { useState } from "react";
 
 type StringRecord = Record<string, string>;
 
+let initialParams: StringRecord | null = null;
+
+/**
+ * Seed the next `useMockUrlParams` mounts with URL params, simulating a deep
+ * link (e.g. `?tab=products`). Only keys present in a hook call's defaults are
+ * applied, so unrelated `useUrlParams` consumers are unaffected. Call
+ * `clearMockUrlParamsInitial` in `beforeEach` to avoid leaking across tests.
+ */
+export function setMockUrlParamsInitial(params: StringRecord): void {
+  initialParams = params;
+}
+
+export function clearMockUrlParamsInitial(): void {
+  initialParams = null;
+}
+
 export function useMockUrlParams<T extends StringRecord>(defaults: T): [T, (updates: Partial<T>) => void] {
-  const [params, setParamsState] = useState<T>(defaults);
+  const [params, setParamsState] = useState<T>(() => {
+    if (!initialParams) return defaults;
+    const seeded: StringRecord = { ...defaults };
+    for (const key of Object.keys(defaults)) {
+      if (initialParams[key] !== undefined) seeded[key] = initialParams[key];
+    }
+    return seeded as T;
+  });
   const setParams = (updates: Partial<T>) => {
     setParamsState((prev) => {
       const next: StringRecord = { ...prev };

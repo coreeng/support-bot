@@ -1,6 +1,7 @@
 "use client";
 
 import LoadingSkeleton from "@/components/LoadingSkeleton";
+import ProductsPage, { hasActiveProductTags } from "@/components/products/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +24,7 @@ import {
   TicketWithLogs,
 } from "@/lib/types";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ChevronDown, ClipboardList, Headphones, Star } from "lucide-react";
+import { AlertTriangle, ChevronDown, ClipboardList, Headphones, Package, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
@@ -33,10 +34,15 @@ export default function HealthPage() {
   const { data: isAssignmentEnabled } = useAssignmentEnabled();
   const queryClient = useQueryClient();
 
+  // The Products View tab only exists when the registry has active product tags,
+  // so it stays hidden while the registry loads and never flashes in and out.
+  const productTagsConfigured = hasActiveProductTags(registryData);
+
   const tabs = [
     { key: "tickets" as const, label: "Activity Trends", icon: ClipboardList, color: "blue" },
     { key: "ratings" as const, label: "Ratings", icon: Star, color: "yellow" },
     { key: "workbench" as const, label: "Ticket Workbench", icon: Headphones, color: "purple" },
+    ...(productTagsConfigured ? [{ key: "products" as const, label: "Products View", icon: Package, color: "green" }] : []),
   ];
 
   // Persist date filter mode, custom date range, and active tab in the URL.
@@ -47,12 +53,19 @@ export default function HealthPage() {
       dateFilter: enumValidator(["lastWeek", "last2Weeks", "lastMonth", "lastYear", "custom"] as const, "lastWeek"),
       dateFrom: isoDateValidator,
       dateTo: isoDateValidator,
-      tab: enumValidator(["tickets", "ratings", "workbench"] as const, "tickets"),
+      tab: enumValidator(["tickets", "ratings", "workbench", "products"] as const, "tickets"),
     }
   );
   // Safe to cast: validators guarantee these are valid enum values.
   const dateFilter = params.dateFilter as "lastWeek" | "last2Weeks" | "lastMonth" | "lastYear" | "custom";
-  const activeTab = params.tab as "tickets" | "ratings" | "workbench";
+  const urlTab = params.tab as "tickets" | "ratings" | "workbench" | "products";
+
+  // A deep link or stale bookmark can point at the Products View tab while the
+  // registry is loading, errored, or has no product tags configured. Deriving
+  // the active tab (instead of correcting the URL from an effect) means the
+  // hidden view never mounts or fetches, and the URL's intent still wins if
+  // the registry later confirms product tags exist.
+  const activeTab = urlTab === "products" && !productTagsConfigured ? "tickets" : urlTab;
 
   // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
   useEffect(() => {
@@ -1636,6 +1649,8 @@ export default function HealthPage() {
               </div>
             </>
           )}
+
+          {activeTab === "products" && <ProductsPage dateRange={dateRange} />}
         </TabsContent>
       </Tabs>
     </div>
