@@ -29,6 +29,7 @@ import com.coreeng.supportbot.prtracking.source.Provider;
 import com.coreeng.supportbot.prtracking.source.RepoCoord;
 import com.coreeng.supportbot.prtracking.source.Review;
 import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.ticket.Ticket;
@@ -116,7 +117,7 @@ class PrLifecyclePollerTest {
                 .when(prTrackingRepository.resumeSla(anyLong(), any()))
                 .thenAnswer(inv -> register(withResume(known(inv.getArgument(0)), inv.getArgument(1))));
         lenient()
-                .when(prTrackingRepository.startSla(anyLong(), any(), any()))
+                .when(prTrackingRepository.enterMergePhase(anyLong(), any(), any()))
                 .thenAnswer(
                         inv -> register(withStart(known(inv.getArgument(0)), inv.getArgument(1), inv.getArgument(2))));
         lenient()
@@ -158,7 +159,8 @@ class PrLifecyclePollerTest {
                 closed ? null : base.slaRemaining(),
                 base.lastReviewAt(),
                 base.lastAuthorActivityAt(),
-                base.codeownerReviewRequested());
+                base.codeownerReviewRequested(),
+                base.mergePhaseEntered());
     }
 
     private static PrTrackingRecord withPause(PrTrackingRecord base, PrTrackingStatus status, Duration remaining) {
@@ -178,7 +180,8 @@ class PrLifecyclePollerTest {
                 remaining,
                 base.lastReviewAt(),
                 base.lastAuthorActivityAt(),
-                base.codeownerReviewRequested());
+                base.codeownerReviewRequested(),
+                base.mergePhaseEntered());
     }
 
     private static PrTrackingRecord withResume(PrTrackingRecord base, Instant newDeadline) {
@@ -198,10 +201,13 @@ class PrLifecyclePollerTest {
                 null,
                 base.lastReviewAt(),
                 base.lastAuthorActivityAt(),
-                base.codeownerReviewRequested());
+                base.codeownerReviewRequested(),
+                base.mergePhaseEntered());
     }
 
-    private static PrTrackingRecord withStart(PrTrackingRecord base, PrTrackingStatus status, Instant newDeadline) {
+    /** Simulates {@link PrTrackingRepository#enterMergePhase} — always sets mergePhaseEntered=true. */
+    private static PrTrackingRecord withStart(
+            PrTrackingRecord base, PrTrackingStatus status, @Nullable Instant newDeadline) {
         return new PrTrackingRecord(
                 base.id(),
                 base.ticketId(),
@@ -218,7 +224,8 @@ class PrLifecyclePollerTest {
                 null,
                 base.lastReviewAt(),
                 base.lastAuthorActivityAt(),
-                base.codeownerReviewRequested());
+                base.codeownerReviewRequested(),
+                true);
     }
 
     private static PrTrackingRecord withCodeownerReviewRequested(PrTrackingRecord base) {
@@ -238,7 +245,8 @@ class PrLifecyclePollerTest {
                 base.slaRemaining(),
                 base.lastReviewAt(),
                 base.lastAuthorActivityAt(),
-                true);
+                true,
+                base.mergePhaseEntered());
     }
 
     // ── Existing behaviour (PR closed/merged, escalation) ──
@@ -325,7 +333,7 @@ class PrLifecyclePollerTest {
                 .thenReturn(false);
         when(prTrackingProps.tags()).thenReturn(List.of("pr-review"));
         when(prTrackingProps.impact()).thenReturn("low");
-        when(slackClient.postMessage(any())).thenThrow(new RuntimeException("slack down"));
+        when(slackClient.postMessage(any())).thenThrow(new SlackException(new RuntimeException("slack down")));
 
         // when
         poller.poll();
@@ -505,6 +513,7 @@ class PrLifecyclePollerTest {
                 null,
                 null,
                 null,
+                false,
                 false));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
         when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
@@ -861,6 +870,7 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
+                    false,
                     false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
@@ -897,6 +907,7 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
+                    false,
                     false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(ancientNoSlaRecord));
             when(prSourceClient.fetchPullRequest(
@@ -929,6 +940,7 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
+                    false,
                     false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
@@ -973,6 +985,7 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
+                    false,
                     false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
@@ -1051,7 +1064,7 @@ class PrLifecyclePollerTest {
             // given
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record = pausedRecord(
-                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4));
+                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4), false);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openMergeablePrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
@@ -1076,7 +1089,7 @@ class PrLifecyclePollerTest {
             // given
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record = pausedRecord(
-                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4));
+                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4), false);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
@@ -1095,7 +1108,7 @@ class PrLifecyclePollerTest {
             // given
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record = pausedRecord(
-                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4));
+                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4), false);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.DISMISSED))));
@@ -1112,7 +1125,7 @@ class PrLifecyclePollerTest {
             // given
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record = pausedRecord(
-                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4));
+                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4), false);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
@@ -1137,7 +1150,7 @@ class PrLifecyclePollerTest {
             // given
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record =
-                    pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4));
+                    pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4), false);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openMergeablePrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
@@ -1162,7 +1175,7 @@ class PrLifecyclePollerTest {
             // given
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record =
-                    pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4));
+                    pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4), false);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
@@ -1180,7 +1193,7 @@ class PrLifecyclePollerTest {
             // given
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record =
-                    pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4));
+                    pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4), false);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
@@ -1200,7 +1213,7 @@ class PrLifecyclePollerTest {
             // given
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record =
-                    pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4));
+                    pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4), false);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(mergedPr(record));
@@ -1596,7 +1609,7 @@ class PrLifecyclePollerTest {
             // then
             ArgumentCaptor<Instant> deadlineCaptor = ArgumentCaptor.forClass(Instant.class);
             verify(prTrackingRepository)
-                    .startSla(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), deadlineCaptor.capture());
+                    .enterMergePhase(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), deadlineCaptor.capture());
             assertThat(deadlineCaptor.getValue())
                     .isCloseTo(Instant.now().plus(Duration.ofHours(6)), within(Duration.ofSeconds(30)));
         }
@@ -1619,10 +1632,9 @@ class PrLifecyclePollerTest {
             // when
             poller.poll();
 
-            // then — status still advances, but via the no-deadline path
+            // then — status still advances, but via enterMergePhase with a null deadline
             verify(prTrackingRepository)
-                    .updateStatus(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), isNull(), any());
-            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
+                    .enterMergePhase(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), isNull());
         }
 
         @Test
@@ -1679,7 +1691,7 @@ class PrLifecyclePollerTest {
             assertDoesNotThrow(poller::poll);
 
             // then — no write and no notification for this poll
-            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
+            verify(prTrackingRepository, never()).enterMergePhase(anyLong(), any(), any());
             verify(prTrackingRepository, never())
                     .updateStatus(anyLong(), eq(PrTrackingStatus.AWAITING_MERGE), any(), any());
             verifyNoInteractions(slackClient);
@@ -1693,8 +1705,10 @@ class PrLifecyclePollerTest {
             // resume from the paused 2h, not restart the full 6h window — otherwise a code owner toggling
             // changes-requested would keep the merge SLA from ever breaching.
             PrLifecyclePoller poller = createPoller();
+            // mergePhaseEntered=true: already reached AWAITING_MERGE once, so the paused remaining should
+            // resume as the merge window instead of resolving a fresh one.
             PrTrackingRecord record = pausedRecord(
-                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(2));
+                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(2), true);
             PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
@@ -1708,10 +1722,143 @@ class PrLifecyclePollerTest {
             // lookup is never consulted (proving a resume, not a fresh full-window restart).
             ArgumentCaptor<Instant> deadlineCaptor = ArgumentCaptor.forClass(Instant.class);
             verify(prTrackingRepository)
-                    .startSla(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), deadlineCaptor.capture());
+                    .enterMergePhase(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), deadlineCaptor.capture());
             assertThat(deadlineCaptor.getValue())
                     .isCloseTo(Instant.now().plus(Duration.ofHours(2)), within(Duration.ofSeconds(30)));
             verify(slaLookup, never()).getSla(any(), any(), eq(record.prNumber()));
+        }
+
+        @Test
+        void firstEntryIntoAwaitingMergeIgnoresAPausedReviewPhaseRemainingAndResolvesFreshMergeSla() {
+            // Regression: a code owner requests changes before ever approving, pausing the REVIEW clock's
+            // remaining into the same column the merge clock later reads. First entry into AWAITING_MERGE
+            // must resolve a fresh merge SLA, not reuse that leftover review time.
+            PrLifecyclePoller poller = createPoller();
+            // Poll 1 — OPEN with a live review deadline (the carve-out); code owner requests changes.
+            PrTrackingRecord record = record(
+                    1L,
+                    100L,
+                    "my-org/repo-a",
+                    11,
+                    PrTrackingStatus.OPEN,
+                    Instant.now().plus(Duration.ofHours(20)));
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofDays(2));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithReviews(record, false, false, true, List.of()));
+
+            poller.poll();
+
+            PrTrackingRecord afterReviewPause = known(record.id());
+            assertThat(afterReviewPause.status()).isEqualTo(PrTrackingStatus.CHANGES_REQUESTED);
+            assertThat(afterReviewPause.slaRemaining()).isNotNull();
+            assertThat(afterReviewPause.mergePhaseEntered()).isFalse();
+
+            // Poll 2 — code owner approves, PR mergeable: first-ever entry into AWAITING_MERGE.
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(afterReviewPause));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithReviews(record, true, true, false, List.of()));
+            when(slaLookup.getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber())))
+                    .thenReturn(Duration.ofDays(2));
+
+            poller.poll();
+
+            ArgumentCaptor<Instant> deadlineCaptor = ArgumentCaptor.forClass(Instant.class);
+            verify(prTrackingRepository)
+                    .enterMergePhase(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), deadlineCaptor.capture());
+            assertThat(deadlineCaptor.getValue())
+                    .isCloseTo(Instant.now().plus(Duration.ofDays(2)), within(Duration.ofMinutes(1)));
+            verify(slaLookup).getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber()));
+        }
+
+        @Test
+        void entersAwaitingMergeFromEscalatedViaCodeownerCarveOut() {
+            // Regression: ESCALATED -> AWAITING_MERGE previously existed only for FSM-table symmetry — a
+            // codeowner repo never had a review deadline to breach, so it was unreachable. The
+            // maintaining-team carve-out gives it a real review deadline, making this transition reachable
+            // for real. Pins down that the merge-clock wiring (enterMergePhase + a freshly-resolved merge
+            // SLA) is correct starting from ESCALATED, not just from OPEN.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = register(withCodeownerReviewRequested(record(
+                    1L,
+                    100L,
+                    "my-org/repo-a",
+                    11,
+                    PrTrackingStatus.ESCALATED,
+                    Instant.now().minusSeconds(60))));
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofDays(2));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithReviews(record, true, true, false, List.of()));
+            when(slaLookup.getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber())))
+                    .thenReturn(Duration.ofDays(2));
+
+            // when
+            poller.poll();
+
+            // then — enters the merge phase with a freshly-resolved merge SLA.
+            ArgumentCaptor<Instant> deadlineCaptor = ArgumentCaptor.forClass(Instant.class);
+            verify(prTrackingRepository)
+                    .enterMergePhase(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), deadlineCaptor.capture());
+            assertThat(deadlineCaptor.getValue())
+                    .isCloseTo(Instant.now().plus(Duration.ofDays(2)), within(Duration.ofMinutes(1)));
+            verify(slaLookup).getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber()));
+        }
+
+        @Test
+        void changesRequestedAfterMergePhaseEnteredNeverResurfacesAsALiveReviewDeadline() {
+            // Regression: once in AWAITING_MERGE, a changes-requested detour pauses the MERGE clock's
+            // remaining. If both the changes-requested verdict and the approval then clear at once (one
+            // push dismissing both), the record must fall back to OPEN with no live deadline — not
+            // resurface the paused merge time as a live review deadline that could later review-escalate.
+            PrLifecyclePoller poller = createPoller();
+            // Poll 1 — already in AWAITING_MERGE with a live merge deadline; code owner requests changes.
+            // codeownerReviewRequested=true models a genuine prior request, so poll 2's codeownersApproved
+            // reads as "revoked" rather than "gate never applied" — see PrLifecyclePoller#codeownerApproved.
+            PrTrackingRecord record = register(withCodeownerReviewRequested(record(
+                    1L,
+                    100L,
+                    "my-org/repo-a",
+                    11,
+                    PrTrackingStatus.AWAITING_MERGE,
+                    Instant.now().plus(Duration.ofHours(6)))));
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofDays(2));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithReviews(record, true, false, true, List.of()));
+
+            poller.poll();
+
+            PrTrackingRecord afterMergePause = known(record.id());
+            assertThat(afterMergePause.status()).isEqualTo(PrTrackingStatus.CHANGES_REQUESTED);
+            assertThat(afterMergePause.slaRemaining()).isNotNull();
+            assertThat(afterMergePause.mergePhaseEntered()).isTrue();
+
+            // Poll 2 — both the review and the approval were dismissed: no verdict, but also not approved,
+            // so it can't go straight back to AWAITING_MERGE.
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(afterMergePause));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithPendingReview(record, true, false, false, List.of(), List.of()));
+
+            poller.poll();
+
+            PrTrackingRecord afterFallback = known(record.id());
+            assertThat(afterFallback.status()).isEqualTo(PrTrackingStatus.OPEN);
+            assertThat(afterFallback.slaDeadline()).isNull();
+            verify(prTrackingRepository, never()).resumeSla(anyLong(), any());
+
+            // Poll 3 — no live deadline means no escalation, no matter how much time passes.
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(afterFallback));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithPendingReview(record, true, false, false, List.of(), List.of()));
+
+            poller.poll();
+
+            verify(prTrackingRepository, never()).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), any(), any());
+            verifyNoInteractions(escalationProcessingService);
         }
 
         @Test
@@ -1739,7 +1886,7 @@ class PrLifecyclePollerTest {
             // then — a single SlaLookup, the AWAITING_MERGE clock started, and the notification posted.
             verify(slaLookup, times(1)).getSla(any(), any(), eq(record.prNumber()));
             verify(prTrackingRepository)
-                    .startSla(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), any(Instant.class));
+                    .enterMergePhase(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), any(Instant.class));
             verify(slackClient).postMessage(any());
         }
 
@@ -1769,7 +1916,7 @@ class PrLifecyclePollerTest {
 
             // then — advances to AWAITING_MERGE, not held in OPEN.
             verify(prTrackingRepository)
-                    .startSla(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), any(Instant.class));
+                    .enterMergePhase(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), any(Instant.class));
             verify(prTrackingRepository, never()).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), any(), any());
         }
 
@@ -1793,7 +1940,7 @@ class PrLifecyclePollerTest {
 
             // then — no transition of any kind and no notification: the gate stays shut until a
             // successful read.
-            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
+            verify(prTrackingRepository, never()).enterMergePhase(anyLong(), any(), any());
             verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
             verify(slackClient, never()).postMessage(any());
         }
@@ -1830,7 +1977,7 @@ class PrLifecyclePollerTest {
             verify(prTrackingRepository).pauseSla(eq(record.id()), eq(PrTrackingStatus.OPEN), any(Duration.class));
             verify(prTrackingRepository, never())
                     .updateStatus(anyLong(), eq(PrTrackingStatus.MERGE_ESCALATED), any(), any());
-            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
+            verify(prTrackingRepository, never()).enterMergePhase(anyLong(), any(), any());
         }
 
         @Test
@@ -1858,7 +2005,7 @@ class PrLifecyclePollerTest {
             // then — advances to AWAITING_MERGE; the drive-by verdict never writes CHANGES_REQUESTED nor
             // renders a changes-requested message.
             verify(prTrackingRepository)
-                    .startSla(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), any(Instant.class));
+                    .enterMergePhase(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), any(Instant.class));
             verify(prTrackingRepository, never())
                     .updateStatus(anyLong(), eq(PrTrackingStatus.CHANGES_REQUESTED), any(), any());
             verify(prTrackingRepository, never()).pauseSla(anyLong(), eq(PrTrackingStatus.CHANGES_REQUESTED), any());
@@ -1893,7 +2040,7 @@ class PrLifecyclePollerTest {
             // then — no status transition of any kind, and no changes-requested message.
             verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
             verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
-            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
+            verify(prTrackingRepository, never()).enterMergePhase(anyLong(), any(), any());
             verify(messageRenderer, never()).render(any(), eq(MessageEvent.CHANGES_REQUESTED), any());
         }
 
@@ -1955,8 +2102,47 @@ class PrLifecyclePollerTest {
             verify(prTrackingRepository).pauseSla(eq(record.id()), eq(PrTrackingStatus.OPEN), any(Duration.class));
             verify(prTrackingRepository, never())
                     .updateStatus(anyLong(), eq(PrTrackingStatus.MERGE_ESCALATED), any(), any());
-            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
+            verify(prTrackingRepository, never()).enterMergePhase(anyLong(), any(), any());
             verifyNoInteractions(escalationProcessingService);
+        }
+
+        @Test
+        void reviewPhaseSlaBreachEscalatesEvenThoughCodeownersStillPending() {
+            // The gap this closes: a codeowner repo with a review SLA configured (PrDetectionService now
+            // sets a real deadline for these, instead of always null) must still escalate to the owning
+            // team if the code owners never review — otherwise a repo whose code owners overlap the
+            // owning team would sit unescalated forever. This is the review phase, before AWAITING_MERGE
+            // ever starts a separate merge clock.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = record(
+                    1L,
+                    100L,
+                    "my-org/repo-a",
+                    11,
+                    PrTrackingStatus.OPEN,
+                    Instant.now().minusSeconds(60));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithPendingReview(
+                            record,
+                            false,
+                            false,
+                            false,
+                            List.of(),
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", null))));
+            when(prTrackingProps.repositories()).thenReturn(List.of(codeownerRepoConfig(Duration.ofHours(24))));
+            when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
+                    .thenReturn(ticket(100L));
+            when(escalationProcessingService.createEscalation(any()))
+                    .thenReturn(Escalation.builder().id(new EscalationId(700L)).build());
+
+            // when
+            poller.poll();
+
+            // then
+            verify(prTrackingRepository)
+                    .updateStatus(eq(record.id()), eq(PrTrackingStatus.ESCALATED), isNull(), eq(700L));
+            verify(ticketSlackService).markTicketEscalated(any());
         }
 
         private PrTrackingProps.Repository codeownerRepoConfig(Duration defaultSla) {
@@ -2098,6 +2284,7 @@ class PrLifecyclePollerTest {
                     null,
                     existingReviewTime,
                     null,
+                    false,
                     false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
@@ -2138,6 +2325,7 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
+                    false,
                     false));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
@@ -2155,7 +2343,7 @@ class PrLifecyclePollerTest {
             // given — CHANGES_REQUESTED record, empty review list
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record = pausedRecord(
-                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4));
+                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4), false);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPr(record));
@@ -2266,8 +2454,11 @@ class PrLifecyclePollerTest {
                 escalationTeamsRegistry);
     }
 
+    /** mergePhaseEntered is derived from status: AWAITING_MERGE/MERGE_ESCALATED means it's already true. */
     private PrTrackingRecord record(
             long id, long ticketId, String repo, int prNumber, PrTrackingStatus status, @Nullable Instant slaDeadline) {
+        boolean mergePhaseEntered =
+                status == PrTrackingStatus.AWAITING_MERGE || status == PrTrackingStatus.MERGE_ESCALATED;
         return register(new PrTrackingRecord(
                 id,
                 ticketId,
@@ -2284,11 +2475,19 @@ class PrLifecyclePollerTest {
                 null,
                 null,
                 null,
-                false));
+                false,
+                mergePhaseEntered));
     }
 
+    /** mergePhaseEntered is explicit here: a paused CHANGES_REQUESTED could be either clock. */
     private PrTrackingRecord pausedRecord(
-            long id, long ticketId, String repo, int prNumber, PrTrackingStatus status, Duration slaRemaining) {
+            long id,
+            long ticketId,
+            String repo,
+            int prNumber,
+            PrTrackingStatus status,
+            Duration slaRemaining,
+            boolean mergePhaseEntered) {
         return register(new PrTrackingRecord(
                 id,
                 ticketId,
@@ -2305,7 +2504,8 @@ class PrLifecyclePollerTest {
                 slaRemaining,
                 null,
                 null,
-                false));
+                false,
+                mergePhaseEntered));
     }
 
     private static PrMetadata openPr(PrTrackingRecord record) {

@@ -151,8 +151,11 @@ public class GitHubCodeownerLifecycleFunctionalTests {
                         .createdMessageTs(ticketTs)
                         .build());
 
-        // Seed OPEN with a live deadline. A code-owner repo holds the review clock in OPEN (the
-        // OPEN → ESCALATED row is guarded by !requiresCodeowners), so a live deadline can't review-escalate.
+        // Seed OPEN with a live, not-yet-breached deadline (23h remaining out of the repo's 24h SLA) —
+        // seeded directly, bypassing detection's maintaining-team check. PrLifecycle's OPEN → ESCALATED
+        // row reacts to any live, breached deadline regardless of how it got there, so a record in this
+        // state COULD review-escalate on breach; this deadline is comfortably in the future, so the
+        // transitions under test here are the code-owner ones, not a breach.
         var record = supportBotClient
                 .test()
                 .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()

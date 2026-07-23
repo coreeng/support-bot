@@ -43,8 +43,6 @@ public class PrTrackingTestController {
 
     @PostMapping("/record/{id}/close")
     public PrTrackingRecord closeRecord(@PathVariable long id) {
-        // Uses the same repo method as the lifecycle poller so the test goes through the real
-        // write path — nulling SLA fields, leaving has_sla untouched. See V15__pr_tracking_has_sla.sql.
         return prTrackingTestService.closeRecord(id);
     }
 
