@@ -1,9 +1,9 @@
 ---
-name: elevate-review
-description: Use when reviewing an Elevate change, local branch, or GitHub PR before merge, especially when focused security, ADR, frontend, backend, or high-risk-surface feedback is needed.
+name: support-bot-review
+description: Use when reviewing a support-bot change, local branch, or GitHub PR before merge, especially when focused security, ADR, frontend, backend, or high-risk-surface feedback is needed.
 ---
 
-# Elevate Review
+# Support Bot Review
 
 ## Overview
 
@@ -14,7 +14,7 @@ Run five independent, focused reviews against either the current branch or a Git
 - Shared review context built by this skill
 - Review rubrics in `docs/reviews/`
 - Root `AGENTS.md`
-- Touched component `AGENTS.md` files
+- Touched module `AGENTS.md` files (`api/AGENTS.md`, `ui/AGENTS.md`)
 - Relevant `docs/adr/*.md`, plans, and issue documents
 - Jira ticket context when a Jira key is supplied or inferred, or the user's explicit reason when there is no Jira ticket
 
@@ -29,7 +29,7 @@ Run five independent, focused reviews against either the current branch or a Git
 
 1. Identify the current branch.
 2. Compare with `origin/main` using the merge-base diff, not local `main` and not only uncommitted changes.
-3. Capture changed files, changed delivery units, and a diff summary for the shared review context.
+3. Capture changed files, changed modules, and a diff summary for the shared review context.
 
 Useful commands:
 
@@ -74,7 +74,7 @@ git diff --stat origin/<baseRefName>...HEAD
 git diff origin/<baseRefName>...HEAD
 ```
 
-6. Capture PR number, worktree path, head branch, base branch, changed files, changed delivery units, and a diff summary for the shared review context.
+6. Capture PR number, worktree path, head branch, base branch, changed files, changed modules, and a diff summary for the shared review context.
 
 If `gh` is unavailable, authentication fails, PR metadata cannot be read, or PR checkout fails, stop with a clear blocker. Do not fall back to reviewing the current checkout.
 
@@ -82,7 +82,7 @@ If `gh` is unavailable, authentication fails, PR metadata cannot be read, or PR 
 
 Gather Jira ticket context once and include it in the shared review context.
 
-1. If the user supplies a Jira key such as `PT-456`, use it.
+1. If the user supplies a Jira key such as `EL-456`, use it.
 2. If no key is supplied, infer one from PR title/body, branch name, or commits in the reviewed range.
 3. If no key can be inferred, prompt the user before dispatching review workers. The user must either provide the Jira key or state that there is no Jira ticket and give a short reason.
 4. If the user provides a Jira key, use it. If the user states there is no Jira ticket, set `Jira: none - <user reason>` in the shared review context.
@@ -112,7 +112,7 @@ Missing Jira context is not automatically a `fix now`. Treat it as unknown inten
 
 ## Shared Review Context
 
-Build this once before running any focused review. Each review must use this as the single source of truth for what changed and why.
+Build this once before running any focused review. Each review must use this as the single source of truth for what changed and why. Changed modules are the touched top-level directories: `api/`, `ui/`, `dex/`, `ldap/`, `helm-chart/`, and `docs/`.
 
 ```text
 Review Target: local branch | PR <number>
@@ -122,7 +122,7 @@ Base: <base branch>
 Diff Range: <base>...HEAD
 Diff Commands: <commands used>
 Changed Files: <name-status summary>
-Changed Delivery Units: <list>
+Changed Modules: <list>
 Diff Summary: <stat and concise behavioral summary>
 Jira: <key, summary, status, relevant description/requirements; key with fetch failure; or none - user reason>
 Guidance Read: <root/component AGENTS.md files>
@@ -161,7 +161,7 @@ Worker instructions:
 Prompt template for each review worker:
 
 ```text
-You are running the <Review Name> for an Elevate change. Do not modify files.
+You are running the <Review Name> for a support-bot change. Do not modify files.
 
 Use exactly these inputs:
 1. Shared review context:
@@ -170,7 +170,7 @@ Use exactly these inputs:
 2. Rubric:
 <paste docs/reviews/<rubric>.md>
 
-Return one GitHub-flavored Markdown review section using the Elevate Review summary format. Use only these finding classifications: fix now, defer, reject with reason. Do not emit an overall verdict. Do not choose a different diff range, base branch, Jira ticket, or rubric.
+Return one GitHub-flavored Markdown review section using the Support Bot Review summary format. Use only these finding classifications: fix now, defer, reject with reason. Do not emit an overall verdict. Do not choose a different diff range, base branch, Jira ticket, or rubric.
 ```
 
 ## Finding Classifications
@@ -201,7 +201,7 @@ After all review workers return and before printing the final review, moderate t
    - the earliest review in this order: Security, ADR, Frontend, Backend, High-Risk Surface.
 6. Preserve useful evidence from duplicates by merging it into the canonical finding if it adds materially different context.
 
-Example duplicate group: if Backend Review and High-Risk Surface Review both report that exported YAML omits DB identifiers required for import update-vs-create semantics, keep one canonical finding and suppress the duplicate in the later section.
+Example duplicate group: if Security Review and Backend Review both report that a new `api/` endpoint is missing an authorization check, keep one canonical finding and suppress the duplicate in the later section.
 
 ### User Classification Gates
 
@@ -347,10 +347,6 @@ Do not save a file or post a PR comment before the user chooses one of these opt
 - Reviews remain independent during worker execution. Deduplication happens only in the coordinating worker's moderation step after all reviews have returned.
 - If evidence is insufficient, classify the uncertainty as `fix now` only when merge would be unsafe without resolving it; otherwise use `defer` with the missing evidence.
 
-## Test Recommendations
-
-This review skill does not run functional, integration, Extended, or Kind tests. When the change warrants one of those workflows, recommend the applicable repository testing skill after the moderated review. Do not invoke that skill or execute its commands automatically; any later run must follow that skill's separate preview and explicit-confirmation contract.
-
 ## Common Mistakes
 
 | Mistake | Correction |
@@ -371,7 +367,7 @@ This review skill does not run functional, integration, Extended, or Kind tests.
 | Using severity labels | Use only `fix now`, `defer`, or `reject with reason`. |
 | Treating deferred findings as blocking | Defer-only reviews are `approved`. |
 | Skipping ADR lookup | ADR review must identify and include selected accepted ADRs in the review output. |
-| Treating `elevate-frontend/AGENTS.md` as background only | Frontend Review must validate frontend PRs against every applicable instruction in `elevate-frontend/AGENTS.md`. |
+| Treating `ui/AGENTS.md` as background only | Frontend Review must validate frontend PRs against every applicable instruction in `ui/AGENTS.md`. |
 | Printing raw worker output directly | First dedupe findings and run the fix-now and defer classification gates. |
 | Repeating the same fix-now issue in multiple sections | Keep the canonical finding and replace duplicates with compact suppression findings. |
 
@@ -380,7 +376,7 @@ This review skill does not run functional, integration, Extended, or Kind tests.
 - "This is just a quick review" means still run all five review sections.
 - "PR 123" means PR number mode; do not review the current checkout.
 - "main...HEAD is close enough" means stop; use `origin/<baseRefName>...HEAD` for PR number mode or `origin/main...HEAD` for local branch mode.
-- "PT-456" means include Jira ticket context in every focused review.
+- "EL-456" means include Jira ticket context in every focused review.
 - "The rubric says diff" means use the shared context; rubrics do not own diff selection.
 - "I'll just do the reviews myself" means stop and dispatch one separate general-purpose worker per review.
 - "Frontend/backend did not change" means emit `not applicable`, not skip the section silently.
