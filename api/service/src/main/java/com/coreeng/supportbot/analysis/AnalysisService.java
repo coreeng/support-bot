@@ -239,7 +239,7 @@ public class AnalysisService {
      * @return The prompt text content
      * @throws RuntimeException if the file cannot be read
      */
-    private String loadPrompt() {
+    public String loadPrompt() {
         try {
             String promptFile = analysisProps.prompt().file();
             return Files.readString(Path.of(promptFile));

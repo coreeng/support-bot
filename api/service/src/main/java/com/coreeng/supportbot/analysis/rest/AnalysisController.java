@@ -45,6 +45,13 @@ public class AnalysisController {
                 status.jobId(), status.exportedCount(), status.analyzedCount(), status.running(), status.error()));
     }
 
+    @GetMapping("/prompt")
+    public ResponseEntity<AnalysisPromptResponse> getPrompt() {
+        return ResponseEntity.ok(new AnalysisPromptResponse(analysisService.loadPrompt()));
+    }
+
+    public record AnalysisPromptResponse(String prompt) {}
+
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record AnalysisStatusResponse(
             @Nullable String jobId,

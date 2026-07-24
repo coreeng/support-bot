@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.analysis;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -416,5 +417,27 @@ class AnalysisServiceTest {
         assertThat(status.error()).isNotNull();
         verify(asyncJobRepository).deleteJob("analysis");
         verifyNoInteractions(llmAnalysisService);
+    }
+
+    @Test
+    void loadPrompt_returnsPromptFileContent() {
+        assertThat(service.loadPrompt()).isEqualTo("Test prompt content");
+    }
+
+    @Test
+    void loadPrompt_throwsWithFilePathWhenFileMissing() {
+        AnalysisProps badProps = new AnalysisProps(
+                analysisProps.vertex(), analysisProps.bundle(), new Prompt(true, "/nonexistent/prompt.md"));
+        AnalysisService badService = new AnalysisService(
+                asyncJobRepository,
+                threadsAwaitingAnalysisService,
+                llmAnalysisService,
+                analysisRepository,
+                badProps,
+                applicationContext);
+
+        assertThatThrownBy(badService::loadPrompt)
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("/nonexistent/prompt.md");
     }
 }

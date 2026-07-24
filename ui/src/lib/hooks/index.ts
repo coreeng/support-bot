@@ -521,6 +521,15 @@ export function useElevateEnabled() {
   });
 }
 
+export function useAnalysisPrompt(enabled: boolean) {
+  return useQuery<{ prompt: string }>({
+    queryKey: ["analysis", "prompt"],
+    queryFn: () => apiGet("/analysis/prompt"),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useTenantInsightsEnabled() {
   return useQuery<boolean>({
     queryKey: ["tenant-insights", "enabled"],

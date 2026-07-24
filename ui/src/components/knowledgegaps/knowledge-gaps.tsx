@@ -1,5 +1,6 @@
 "use client";
 
+import AnalysisPromptDialog from "@/components/knowledgegaps/AnalysisPromptDialog";
 import EditTicketModal from "@/components/tickets/EditTicketModal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -10,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiFetch, useAnalysis } from "@/lib/hooks";
 import type { DimensionSummary, QuerySummary } from "@/lib/types";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, ChevronDown, Download, FileText, Play, ShieldCheck, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, Download, Eye, FileText, Play, ShieldCheck, Upload } from "lucide-react";
 import React, { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -70,6 +71,7 @@ export default function KnowledgeGapsPage() {
   const [, setExportElapsedTick] = useState(0);
   const exportElapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const settingsTitleId = useId();
   const settingsDescriptionId = useId();
 
@@ -689,6 +691,12 @@ export default function KnowledgeGapsPage() {
                 <TooltipContent>{exportStatus.filename}</TooltipContent>
               </Tooltip>
             )}
+            {isAnalysisEnabled && (
+              <Button type="button" variant="outline" onClick={() => setIsPromptDialogOpen(true)}>
+                <Eye className="h-4 w-4" />
+                View Prompt
+              </Button>
+            )}
             <Popover open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
               {!isAnalysisEnabled && (
                 <input ref={fileInputRef} type="file" accept=".jsonl" onChange={handleFileChange} className="hidden" />
@@ -928,6 +936,8 @@ export default function KnowledgeGapsPage() {
         }}
         onSuccess={handleTicketModalSuccess}
       />
+
+      <AnalysisPromptDialog open={isPromptDialogOpen} onOpenChange={setIsPromptDialogOpen} />
     </div>
   );
 }
