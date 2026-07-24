@@ -6,7 +6,7 @@ import static org.mockito.Mockito.*;
 
 import com.coreeng.supportbot.analysis.AnalysisRecord;
 import com.coreeng.supportbot.summarydata.ThreadService;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,7 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class LlmAnalysisServiceTest {
 
     @Mock
-    private ChatLanguageModel chatLanguageModel;
+    private ChatModel chatModel;
 
     @Mock
     private ThreadService threadService;
@@ -26,7 +26,7 @@ class LlmAnalysisServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new LlmAnalysisService(chatLanguageModel, threadService);
+        service = new LlmAnalysisService(chatModel, threadService);
     }
 
     @Test
@@ -47,7 +47,7 @@ class LlmAnalysisServiceTest {
                 """;
 
         when(threadService.getThreadAsText(channelId, threadTs)).thenReturn(threadText);
-        when(chatLanguageModel.generate(anyString())).thenReturn(llmResponse);
+        when(chatModel.chat(anyString())).thenReturn(llmResponse);
 
         // when
         AnalysisRecord result = service.analyzeThread(channelId, threadTs, ticketId, prompt);
@@ -63,7 +63,7 @@ class LlmAnalysisServiceTest {
         assertThat(result.promptId()).isNull(); // promptId is set by caller
 
         verify(threadService).getThreadAsText(channelId, threadTs);
-        verify(chatLanguageModel).generate(anyString());
+        verify(chatModel).chat(anyString());
     }
 
     @Test
@@ -83,7 +83,7 @@ class LlmAnalysisServiceTest {
                 """;
 
         when(threadService.getThreadAsText(channelId, threadTs)).thenReturn(threadText);
-        when(chatLanguageModel.generate(anyString())).thenReturn(llmResponse);
+        when(chatModel.chat(anyString())).thenReturn(llmResponse);
 
         // when
         AnalysisRecord result = service.analyzeThread(channelId, threadTs, ticketId, prompt);
@@ -113,7 +113,7 @@ class LlmAnalysisServiceTest {
         // then
         assertThat(result).isNull();
         verify(threadService).getThreadAsText(channelId, threadTs);
-        verifyNoInteractions(chatLanguageModel);
+        verifyNoInteractions(chatModel);
     }
 
     @Test
@@ -126,7 +126,7 @@ class LlmAnalysisServiceTest {
         String threadText = "Some thread content";
 
         when(threadService.getThreadAsText(channelId, threadTs)).thenReturn(threadText);
-        when(chatLanguageModel.generate(anyString())).thenThrow(new RuntimeException("LLM API error"));
+        when(chatModel.chat(anyString())).thenThrow(new RuntimeException("LLM API error"));
 
         // when
         AnalysisRecord result = service.analyzeThread(channelId, threadTs, ticketId, prompt);
@@ -134,7 +134,7 @@ class LlmAnalysisServiceTest {
         // then
         assertThat(result).isNull();
         verify(threadService).getThreadAsText(channelId, threadTs);
-        verify(chatLanguageModel).generate(anyString());
+        verify(chatModel).chat(anyString());
     }
 
     @Test
@@ -154,7 +154,7 @@ class LlmAnalysisServiceTest {
                 """;
 
         when(threadService.getThreadAsText(channelId, threadTs)).thenReturn(threadText);
-        when(chatLanguageModel.generate(anyString())).thenReturn(llmResponse);
+        when(chatModel.chat(anyString())).thenReturn(llmResponse);
 
         // when
         AnalysisRecord result = service.analyzeThread(channelId, threadTs, ticketId, prompt);
@@ -185,7 +185,7 @@ class LlmAnalysisServiceTest {
                 """;
 
         when(threadService.getThreadAsText(channelId, threadTs)).thenReturn(threadText);
-        when(chatLanguageModel.generate(anyString())).thenReturn(llmResponse);
+        when(chatModel.chat(anyString())).thenReturn(llmResponse);
 
         // when
         AnalysisRecord result = service.analyzeThread(channelId, threadTs, ticketId, prompt);
@@ -207,7 +207,7 @@ class LlmAnalysisServiceTest {
         String llmResponse = "Primary Driver: Bug\r\nCategory: Config\r\nPlatform Feature: storage\r\nReason: Issue";
 
         when(threadService.getThreadAsText(channelId, threadTs)).thenReturn(threadText);
-        when(chatLanguageModel.generate(anyString())).thenReturn(llmResponse);
+        when(chatModel.chat(anyString())).thenReturn(llmResponse);
 
         // when
         AnalysisRecord result = service.analyzeThread(channelId, threadTs, ticketId, prompt);
@@ -235,7 +235,7 @@ class LlmAnalysisServiceTest {
                 """;
 
         when(threadService.getThreadAsText(channelId, threadTs)).thenReturn(threadText);
-        when(chatLanguageModel.generate(anyString())).thenReturn(llmResponse);
+        when(chatModel.chat(anyString())).thenReturn(llmResponse);
 
         // when
         AnalysisRecord result = service.analyzeThread(channelId, threadTs, ticketId, prompt);

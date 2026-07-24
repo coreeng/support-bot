@@ -1,10 +1,9 @@
 package com.coreeng.supportbot.analysis.llm;
 
 import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.model.chat.ChatLanguageModel;
-import dev.langchain4j.model.output.Response;
-import java.util.List;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -16,7 +15,7 @@ import org.springframework.stereotype.Component;
 @Profile("functionaltests")
 @Primary
 @Component
-public class FakeChatLanguageModel implements ChatLanguageModel {
+public class FakeChatModel implements ChatModel {
 
     private static final String STUB_ANALYSIS_RESPONSE = """
             Ticket: 0
@@ -27,7 +26,9 @@ public class FakeChatLanguageModel implements ChatLanguageModel {
             """;
 
     @Override
-    public Response<AiMessage> generate(List<ChatMessage> messages) {
-        return Response.from(AiMessage.from(STUB_ANALYSIS_RESPONSE));
+    public ChatResponse doChat(ChatRequest chatRequest) {
+        return ChatResponse.builder()
+                .aiMessage(AiMessage.from(STUB_ANALYSIS_RESPONSE))
+                .build();
     }
 }

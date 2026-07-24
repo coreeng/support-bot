@@ -118,13 +118,13 @@ dependencies {
 
     implementation("com.google.cloud:spring-cloud-gcp-starter:5.10.0")
     implementation("com.google.apis:google-api-services-cloudidentity:v1-rev20241208-2.0.0")
-    implementation("com.google.cloud:google-cloud-vertexai:1.52.0")
 
     implementation("com.microsoft.graph:microsoft-graph:6.36.0")
     implementation("com.azure.spring:spring-cloud-azure-starter:5.22.0")
 
-    implementation("dev.langchain4j:langchain4j-vertex-ai-gemini:0.36.2")
-    implementation("dev.langchain4j:langchain4j:0.36.2")
+    implementation(platform("dev.langchain4j:langchain4j-bom:1.18.0"))
+    implementation("dev.langchain4j:langchain4j")
+    implementation("dev.langchain4j:langchain4j-vertex-ai-gemini")
 
     implementation("net.logstash.logback:logstash-logback-encoder:8.0")
     implementation("org.springframework.boot:spring-boot-starter-validation")
