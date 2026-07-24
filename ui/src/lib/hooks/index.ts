@@ -526,7 +526,6 @@ export function useAnalysisPrompt(enabled: boolean) {
     queryKey: ["analysis", "prompt"],
     queryFn: () => apiGet("/analysis/prompt"),
     enabled,
-    staleTime: 5 * 60 * 1000,
   });
 }
 

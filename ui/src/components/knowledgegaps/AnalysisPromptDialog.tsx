@@ -9,7 +9,7 @@ interface AnalysisPromptDialogProps {
 }
 
 export default function AnalysisPromptDialog({ open, onOpenChange }: AnalysisPromptDialogProps) {
-  const { data, isLoading, error } = useAnalysisPrompt(open);
+  const { data, isFetching, error } = useAnalysisPrompt(open);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -18,9 +18,9 @@ export default function AnalysisPromptDialog({ open, onOpenChange }: AnalysisPro
           <DialogTitle>Analysis Prompt</DialogTitle>
           <DialogDescription>The prompt template used by the backend when running analysis.</DialogDescription>
         </DialogHeader>
-        {isLoading && <p className="text-muted-foreground text-sm">Loading prompt...</p>}
-        {error && <p className="text-destructive text-sm">Failed to load analysis prompt. Please try again.</p>}
-        {data && (
+        {isFetching && <p className="text-muted-foreground text-sm">Loading prompt...</p>}
+        {error && !isFetching && <p className="text-destructive text-sm">Failed to load analysis prompt. Please try again.</p>}
+        {data && !isFetching && !error && (
           <pre className="bg-muted max-h-[60vh] overflow-auto rounded-md p-4 font-mono text-xs whitespace-pre-wrap">{data.prompt}</pre>
         )}
       </DialogContent>
