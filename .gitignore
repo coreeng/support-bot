@@ -599,7 +599,7 @@ ui/.next/
 
 # Gas Town (added by gt)
 .runtime/
-# Claude Code — local-only state
+# Claude Code — local worktrees and settings (not committed)
 **/.claude/worktrees/
 **/.claude/settings.local.json
 .beads/
