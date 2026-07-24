@@ -2,7 +2,7 @@ package com.coreeng.supportbot.analysis.llm;
 
 import com.coreeng.supportbot.analysis.AnalysisRecord;
 import com.coreeng.supportbot.summarydata.ThreadService;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
  * <ul>
  *   <li>Fetches thread content from Slack via {@link ThreadService}</li>
  *   <li>Combines the thread with a prompt template</li>
- *   <li>Calls the LLM (configured via {@link dev.langchain4j.model.chat.ChatLanguageModel})</li>
+ *   <li>Calls the LLM (configured via {@link dev.langchain4j.model.chat.ChatModel})</li>
  *   <li>Parses the LLM response into structured {@link AnalysisRecord} data</li>
  * </ul>
  *
@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class LlmAnalysisService {
 
-    private final ChatLanguageModel chatLanguageModel;
+    private final ChatModel chatModel;
     private final ThreadService threadService;
 
     /**
@@ -57,7 +57,7 @@ public class LlmAnalysisService {
 
             // Call LLM
             log.debug("Calling LLM for thread {}", threadTs);
-            String response = chatLanguageModel.generate(threadWithPrompt);
+            String response = chatModel.chat(threadWithPrompt);
 
             // Parse response into structured data
             return parseResponse(response, ticketId);

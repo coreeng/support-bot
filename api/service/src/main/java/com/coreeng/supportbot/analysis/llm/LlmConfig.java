@@ -1,8 +1,8 @@
 package com.coreeng.supportbot.analysis.llm;
 
 import com.coreeng.supportbot.config.AnalysisProps;
-import dev.langchain4j.model.chat.ChatLanguageModel;
-import dev.langchain4j.model.vertexai.VertexAiGeminiChatModel;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.vertexai.gemini.VertexAiGeminiChatModel;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -14,7 +14,7 @@ public class LlmConfig {
 
     @Bean
     @ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
-    public ChatLanguageModel chatLanguageModel(AnalysisProps analysisProps) {
+    public ChatModel chatModel(AnalysisProps analysisProps) {
         log.info(
                 "Configuring Vertex AI Gemini model: project={}, location={}, model={}",
                 analysisProps.vertex().projectId(),
