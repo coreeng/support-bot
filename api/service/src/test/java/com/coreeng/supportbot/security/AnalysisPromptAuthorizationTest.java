@@ -1,7 +1,7 @@
 package com.coreeng.supportbot.security;
 
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -9,7 +9,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.analysis.rest.AnalysisController;
 import com.coreeng.supportbot.teams.SupportTeamService;
+import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
+import com.coreeng.supportbot.teams.TeamType;
+import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -69,19 +72,32 @@ class AnalysisPromptAuthorizationTest {
         }
     }
 
+    // The production filter chain authenticates with JwtAuthenticationToken; user(...) would
+    // install a UsernamePasswordAuthenticationToken and could diverge from real behaviour.
+    private static JwtAuthenticationToken authTokenWithRoles(Role... roles) {
+        var principal = new UserPrincipal(
+                "user@example.com",
+                "Test User",
+                ImmutableList.of(new Team("Test Tenant", "test-tenant", ImmutableList.of(TeamType.TENANT))),
+                ImmutableList.copyOf(roles));
+        return new JwtAuthenticationToken(principal, "test-token");
+    }
+
     @Test
     void promptEndpoint_returnsPromptForSupportEngineers() throws Exception {
         when(analysisService.loadPrompt()).thenReturn("prompt text");
 
-        mockMvc.perform(get("/analysis/prompt").with(user("engineer").roles("SUPPORT_ENGINEER")))
+        mockMvc.perform(get("/analysis/prompt")
+                        .with(authentication(authTokenWithRoles(Role.USER, Role.SUPPORT_ENGINEER))))
                 .andExpect(status().isOk())
                 .andExpect(content().json("{\"prompt\":\"prompt text\"}"));
     }
 
     @Test
     void promptEndpoint_forbidsAuthenticatedUsersWithoutSupportEngineerRole() throws Exception {
-        mockMvc.perform(get("/analysis/prompt").with(user("tenant").roles("USER")))
-                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/analysis/prompt").with(authentication(authTokenWithRoles(Role.USER))))
+                .andExpect(status().isForbidden())
+                .andExpect(content().json("{\"error\":\"Forbidden\"}"));
     }
 
     @Test

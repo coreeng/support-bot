@@ -524,8 +524,17 @@ export function useElevateEnabled() {
 export function useAnalysisPrompt(enabled: boolean) {
   return useQuery<{ prompt: string }>({
     queryKey: ["analysis", "prompt"],
-    queryFn: () => apiGet("/analysis/prompt"),
+    queryFn: async () => {
+      const response = await apiFetch("/api/analysis/prompt");
+      if (!response.ok) {
+        throw new ApiError(response.status);
+      }
+      return (await response.json()) as { prompt: string };
+    },
     enabled,
+    // GlobalProviders defaults staleTime to 5 minutes; reopening the dialog must show the live file
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 

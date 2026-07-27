@@ -3,6 +3,11 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { useAnalysisPrompt } from "../index";
 
+jest.mock("next-auth/react", () => ({
+  getCsrfToken: jest.fn(() => Promise.resolve("mock-csrf-token")),
+  signOut: jest.fn(() => Promise.resolve()),
+}));
+
 const originalFetch = global.fetch;
 
 afterEach(() => {
@@ -10,7 +15,8 @@ afterEach(() => {
 });
 
 const createWrapper = () => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // Mirror GlobalProviders' 5-minute default so the refetch test guards against the global cache
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 1000 * 60 * 5 } } });
   const Wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
   Wrapper.displayName = "QueryClientTestWrapper";
   return Wrapper;
@@ -26,7 +32,7 @@ describe("useAnalysisPrompt", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("fetches the prompt from the BFF route when enabled", async () => {
+  it("fetches the prompt from the BFF route with the CSRF token attached", async () => {
     global.fetch = jest.fn(async () => ({
       ok: true,
       json: async () => ({ prompt: "prompt text" }),
@@ -36,7 +42,9 @@ describe("useAnalysisPrompt", () => {
 
     await waitFor(() => expect(result.current.data).toEqual({ prompt: "prompt text" }));
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe("/api/analysis/prompt");
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/analysis/prompt");
+    expect(options.headers).toMatchObject({ "X-CSRF-Token": "mock-csrf-token" });
   });
 
   it("refetches instead of serving cached data when re-enabled", async () => {
