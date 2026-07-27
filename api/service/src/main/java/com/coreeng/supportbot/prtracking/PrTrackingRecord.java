@@ -24,6 +24,8 @@ public record PrTrackingRecord(
         @Nullable Duration slaRemaining,
         @Nullable Instant lastReviewAt,
         @Nullable Instant lastAuthorActivityAt,
+        // Sticky, write-once; observability only — no gating decision reads this (see
+        // PrLifecyclePoller#codeownerApproved).
         boolean codeownerReviewRequested,
         boolean mergePhaseEntered) {
     public PrTrackingRecord {

@@ -1,6 +1,6 @@
 import { useTeamFilter } from "@/contexts/TeamFilterContext";
 import { useAuth } from "@/hooks/useAuth";
-import { useKnowledgeGapsEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
+import { useElevateEnabled, useKnowledgeGapsEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
 import { render, screen, waitFor } from "@testing-library/react";
 import { useRouter } from "next/navigation";
 import DashboardLayoutComponent from "../(dashboard)/layout";
@@ -23,6 +23,7 @@ jest.mock("../../contexts/TeamFilterContext", () => ({
 jest.mock("../../lib/hooks", () => ({
   useKnowledgeGapsEnabled: jest.fn(),
   useTenantInsightsEnabled: jest.fn(),
+  useElevateEnabled: jest.fn(),
 }));
 
 // Mock all the page components
@@ -77,6 +78,7 @@ const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseTeamFilter = useTeamFilter as jest.MockedFunction<typeof useTeamFilter>;
 const mockUseKnowledgeGapsEnabled = useKnowledgeGapsEnabled as jest.MockedFunction<typeof useKnowledgeGapsEnabled>;
 const mockUseTenantInsightsEnabled = useTenantInsightsEnabled as jest.MockedFunction<typeof useTenantInsightsEnabled>;
+const mockUseElevateEnabled = useElevateEnabled as jest.MockedFunction<typeof useElevateEnabled>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 
 // Helper to render Dashboard with Layout (simulating the route group structure)
@@ -93,6 +95,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
     jest.clearAllMocks();
     mockUseRouter.mockReturnValue(mockRouter as any);
     mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+    mockUseElevateEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTeamFilter.mockReturnValue({
       hasUnrestrictedDataScope: true,
       selectedTeam: null,
@@ -446,6 +449,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
         error: null,
       } as any);
       mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+      mockUseElevateEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
 
       mockUseTeamFilter.mockReturnValue({
         hasUnrestrictedDataScope: false,
@@ -567,5 +571,68 @@ describe("Dashboard - Support Area Summary visibility", () => {
         expect(screen.getByText("Escalations")).toBeInTheDocument();
       });
     });
+  });
+});
+
+describe("Dashboard - Elevate nav item visibility", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseRouter.mockReturnValue(mockRouter as any);
+    mockUseKnowledgeGapsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+    mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+    mockUseTeamFilter.mockReturnValue({
+      hasUnrestrictedDataScope: true,
+      selectedTeam: null,
+      setSelectedTeam: jest.fn(),
+      effectiveTeams: [],
+      allTeams: [],
+      initialized: true,
+      teamScope: { mode: "uninitialized" as const },
+      hasNoTeamScope: false,
+      isViewingAllTeams: false,
+      isViewingAsEscalationTeam: false,
+    });
+    mockUseAuth.mockReturnValue({
+      user: {
+        id: "user@example.com",
+        name: "User",
+        email: "user@example.com",
+        roles: ["SUPPORT_ENGINEER"],
+        teams: [],
+      },
+      isLoading: false,
+      isAuthenticated: true,
+      logout: jest.fn(),
+      isLeadership: false,
+      isEscalationTeam: false,
+      isSupportEngineer: true,
+      actualEscalationTeams: [],
+    });
+  });
+
+  it("hides Elevate when the integration is not configured, even with the required role", async () => {
+    // Regression: the Elevate nav item previously had no requiresFeatureFlag, so it was visible to
+    // any user with the restricted-dashboards role regardless of whether Elevate was ever configured
+    // (base-url/client-id/client-secret all blank) — see /elevate/enabled.
+    mockUseElevateEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText("Home")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Elevate")).not.toBeInTheDocument();
+    expect(screen.queryByText("Integrations")).not.toBeInTheDocument();
+  });
+
+  it("shows Elevate once the integration is configured and the role capability is present", async () => {
+    mockUseElevateEnabled.mockReturnValue({ data: true, isLoading: false, error: null } as any);
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText("Elevate")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Integrations")).toBeInTheDocument();
   });
 });

@@ -1815,15 +1815,13 @@ class PrLifecyclePollerTest {
             // resurface the paused merge time as a live review deadline that could later review-escalate.
             PrLifecyclePoller poller = createPoller();
             // Poll 1 — already in AWAITING_MERGE with a live merge deadline; code owner requests changes.
-            // codeownerReviewRequested=true models a genuine prior request, so poll 2's codeownersApproved
-            // reads as "revoked" rather than "gate never applied" — see PrLifecyclePoller#codeownerApproved.
-            PrTrackingRecord record = register(withCodeownerReviewRequested(record(
+            PrTrackingRecord record = register(record(
                     1L,
                     100L,
                     "my-org/repo-a",
                     11,
                     PrTrackingStatus.AWAITING_MERGE,
-                    Instant.now().plus(Duration.ofHours(6)))));
+                    Instant.now().plus(Duration.ofHours(6))));
             PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofDays(2));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
@@ -1891,16 +1889,17 @@ class PrLifecyclePollerTest {
         }
 
         @Test
-        void prWithNoOwnedPathsAdvancesToAwaitingMergeDespiteUnsatisfiedAggregateDecision() {
-            // given — regression test: a repo combining "require code-owner review" with a separate
-            // minimum-approval-count rule reports the aggregate decision as unsatisfied (codeownersApproved
-            // =false, mirroring GitHub reviewDecision=REVIEW_REQUIRED) for ANY PR that hasn't met the generic
-            // approval count yet — including one whose changed paths match no CODEOWNERS rule at all, so no
-            // code-owner review request was ever created (empty pendingCodeOwners) and none has ever been
-            // observed for this record. The gate must not read that as "code-owner review outstanding": it
-            // never applied to this PR's paths, so the record advances to AWAITING_MERGE regardless of what
-            // the aggregate says. (Verified against a real repo — see coreeng-dev/code-owner PR #5 — before
-            // this test was written.)
+        void prWithNoOwnedPathsHoldsGateShutUntilAggregateActuallyApproves() {
+            // given — a repo combining "require code-owner review" with a separate minimum-approval-count
+            // rule reports the aggregate decision as unsatisfied (codeownersApproved=false, mirroring
+            // GitHub reviewDecision=REVIEW_REQUIRED) for ANY PR that hasn't met the generic approval count
+            // yet — including one whose changed paths match no CODEOWNERS rule at all, so no code-owner
+            // review request was ever created (empty pendingCodeOwners). codeownerApproved() deliberately
+            // does not try to disambiguate this from a genuinely-still-pending code-owner requirement
+            // GitHub's API just fails to surface in reviewRequests (see codeownerApproved's Javadoc, and
+            // project_codeowner_approved_fail_open_bug) — it fails closed either way. This case simply
+            // holds in OPEN one poll longer than it used to, until its own ordinary approval lands and
+            // flips the aggregate to APPROVED.
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null);
             PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
@@ -1908,16 +1907,15 @@ class PrLifecyclePollerTest {
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(codeownerPrWithPendingReview(record, true, false, false, List.of(), List.of()));
             when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
-            when(slaLookup.getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber())))
-                    .thenReturn(Duration.ofHours(6));
 
             // when
             poller.poll();
 
-            // then — advances to AWAITING_MERGE, not held in OPEN.
-            verify(prTrackingRepository)
-                    .enterMergePhase(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), any(Instant.class));
-            verify(prTrackingRepository, never()).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), any(), any());
+            // then — held in OPEN, not advanced and not escalated (no review-phase SLA is ever set for a
+            // PR with no owned paths, so there is nothing to escalate on).
+            verify(prTrackingRepository, never()).enterMergePhase(anyLong(), any(), any());
+            verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
+            verifyNoInteractions(slackClient);
         }
 
         @Test
@@ -1948,22 +1946,19 @@ class PrLifecyclePollerTest {
         @Test
         void failedProviderReadPausesRecordWithPriorApprovalInsteadOfTrustingAggregate() {
             // given — same failed-read shape as the test above (codeOwnersApproved=null, empty pending
-            // list), but this time on a record whose flag IS already marked (a genuine code-owner request
-            // was seen on an earlier poll) and which has already advanced to AWAITING_MERGE. This exercises
-            // the other half of codeownerApproved()'s branch ordering: the null-check must take priority
-            // over "trust the aggregate" even when the flag is marked, not just when it isn't (covered
-            // above). A record in this shape must pause back to OPEN exactly like a definite revoked
-            // approval (see revokedApprovalInAwaitingMergePausesMergeClockAndReturnsToOpen) — it must NOT
-            // keep the merge clock running just because the aggregate is unreadable rather than a definite
-            // false.
+            // list), but this time on a record that has already advanced to AWAITING_MERGE. The null-check
+            // must take priority regardless of prior state — a record in this shape must pause back to OPEN
+            // exactly like a definite revoked approval (see
+            // revokedApprovalInAwaitingMergePausesMergeClockAndReturnsToOpen) — it must NOT keep the merge
+            // clock running just because the aggregate is unreadable rather than a definite false.
             PrLifecyclePoller poller = createPoller();
-            PrTrackingRecord record = register(withCodeownerReviewRequested(record(
+            PrTrackingRecord record = register(record(
                     1L,
                     100L,
                     "my-org/repo-a",
                     11,
                     PrTrackingStatus.AWAITING_MERGE,
-                    Instant.now().plus(Duration.ofHours(6)))));
+                    Instant.now().plus(Duration.ofHours(6))));
             PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
@@ -2017,9 +2012,9 @@ class PrLifecyclePollerTest {
             // given — same repo shape, but the code owners have NOT approved yet (gate closed) and none has
             // requested changes (codeownerChangesRequested=false). A drive-by raw CHANGES_REQUESTED review
             // must not surface as a tenant notification or a status change: the record simply holds in OPEN
-            // with the clock held, waiting on the code owners. A real, still-pending code-owner request is
-            // modeled explicitly (a non-empty pendingCodeOwners list) — otherwise this is indistinguishable
-            // from "code-owner review never applied here" and would wrongly advance to AWAITING_MERGE.
+            // with the clock held, waiting on the code owners. Models a real, still-pending code-owner
+            // request (non-empty pendingCodeOwners) to distinguish this from the "pending list empty"
+            // shape covered by prWithNoOwnedPathsHoldsGateShutUntilAggregateActuallyApproves.
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null);
             PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
@@ -2042,6 +2037,44 @@ class PrLifecyclePollerTest {
             verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
             verify(prTrackingRepository, never()).enterMergePhase(anyLong(), any(), any());
             verify(messageRenderer, never()).render(any(), eq(MessageEvent.CHANGES_REQUESTED), any());
+        }
+
+        @Test
+        void advancesToAwaitingMergeWhenApprovedDespiteOtherCodeOwnersStillPending() {
+            // Regression (PR #4659 on a real repo): aggregate reviewDecision is already APPROVED — code
+            // owner review is satisfied — but one other auto-requested member of the same CODEOWNERS team
+            // hasn't responded yet, so pr.codeOwnerReviewers() (the pending list) is still non-empty.
+            // GitHub does not clear the rest of an auto-requested team from reviewRequests just because
+            // the requirement is already met by one approval. Before this fix, codeownerApproved() treated
+            // ANY non-empty pending list as outstanding regardless of the aggregate decision, so the
+            // record never left OPEN and the tenant got no message at all — permanently stuck, since the
+            // remaining reviewer might never respond. The aggregate decision must win here.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = register(withCodeownerReviewRequested(record(
+                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null)));
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithPendingReview(
+                            record,
+                            true,
+                            true,
+                            false,
+                            List.of(),
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-b", null))));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(slaLookup.getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber())))
+                    .thenReturn(Duration.ofHours(6));
+            when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
+                    .thenReturn(ticket(100L));
+
+            // when
+            poller.poll();
+
+            // then — advances to AWAITING_MERGE and notifies, not left stuck in OPEN.
+            verify(prTrackingRepository)
+                    .enterMergePhase(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), any(Instant.class));
+            verify(slackClient).postMessage(any());
         }
 
         @Test
@@ -2075,20 +2108,16 @@ class PrLifecyclePollerTest {
             // given — a record chasing the merge (AWAITING_MERGE, live merge deadline). The code owners'
             // approval is then revoked (a push dismissed it → codeOwnersApproved=false, no changes-requested)
             // while the PR stays mergeable. It must leave AWAITING_MERGE for OPEN with the merge clock paused,
-            // NOT keep running and merge-escalate a PR that now needs code-owner re-review.
-            //
-            // codeownerReviewRequested=true models that a genuine code-owner request was seen on an earlier
-            // poll (confirmed empirically: GitHub does NOT restore a dismissed reviewer to reviewRequests).
-            // Without it, this is indistinguishable from "code-owner review never applied to this PR's
-            // paths" and the record would wrongly stay in AWAITING_MERGE instead of returning to OPEN.
+            // NOT keep running and merge-escalate a PR that now needs code-owner re-review — codeownerApproved()
+            // fails closed on any false aggregate unconditionally, so this holds regardless of prior state.
             PrLifecyclePoller poller = createPoller();
-            PrTrackingRecord record = register(withCodeownerReviewRequested(record(
+            PrTrackingRecord record = register(record(
                     1L,
                     100L,
                     "my-org/repo-a",
                     11,
                     PrTrackingStatus.AWAITING_MERGE,
-                    Instant.now().plus(Duration.ofHours(6)))));
+                    Instant.now().plus(Duration.ofHours(6))));
             PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
@@ -2182,10 +2211,11 @@ class PrLifecyclePollerTest {
 
         /**
          * Like {@link #codeownerPrWithReviews}, but with an explicit pending-code-owner-request list —
-         * needed to model "a real code-owner review is genuinely still outstanding" once the poller
-         * disambiguates on it (see {@code PrLifecyclePoller#codeownerApproved}): an empty list plus
-         * {@code codeownersApproved=false} is otherwise indistinguishable from "code-owner review never
-         * applied to this PR's paths" and would be read as the gate being satisfied instead.
+         * needed to model "a real code-owner review is genuinely still outstanding" for tests that pass a
+         * non-empty {@code pendingCodeOwners}. A non-empty aggregate-{@code false} test doesn't strictly
+         * need this over {@link #codeownerPrWithReviews} anymore ({@code codeownerApproved()} now fails
+         * closed on any false aggregate regardless of the pending list), but it keeps the PR metadata
+         * shape realistic for cases where a pending reviewer genuinely exists.
          */
         private PrMetadata codeownerPrWithPendingReview(
                 PrTrackingRecord record,

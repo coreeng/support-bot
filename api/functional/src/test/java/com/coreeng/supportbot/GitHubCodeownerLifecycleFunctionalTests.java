@@ -313,11 +313,9 @@ public class GitHubCodeownerLifecycleFunctionalTests {
                         .build());
 
         // Seed straight into AWAITING_MERGE with a live merge deadline, so the transition under test is the
-        // "no longer approved/mergeable" exit, not a merge-SLA breach. codeownerReviewRequested(true) models
-        // a genuine prior code-owner approval that's since been revoked: without it, the poller can't tell
-        // this apart from "code-owner review never applied to this PR's paths" (a repo that also has a
-        // minimum-approval-count rule reports the identical REVIEW_REQUIRED + empty reviewRequests signature
-        // either way — see PrLifecyclePoller#codeownerApproved) and would wrongly stay in AWAITING_MERGE.
+        // "no longer approved/mergeable" exit, not a merge-SLA breach. A revoked code-owner approval reads
+        // as a definite `false` aggregate (reviewDecision REVIEW_REQUIRED, no changes-requested verdict) —
+        // codeownerApproved() fails closed on that unconditionally, so the record must pause back to OPEN.
         var record = supportBotClient
                 .test()
                 .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
@@ -329,7 +327,6 @@ public class GitHubCodeownerLifecycleFunctionalTests {
                         .slaDeadline(Instant.now().plus(Duration.ofHours(23)))
                         .owningTeam("wow")
                         .canAutoCloseTicket(false)
-                        .codeownerReviewRequested(true)
                         .build());
 
         // Poll: the PR is still open and mergeable, but the code-owner approval was revoked (GraphQL
