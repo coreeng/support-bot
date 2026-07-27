@@ -2050,8 +2050,8 @@ class PrLifecyclePollerTest {
             // record never left OPEN and the tenant got no message at all — permanently stuck, since the
             // remaining reviewer might never respond. The aggregate decision must win here.
             PrLifecyclePoller poller = createPoller();
-            PrTrackingRecord record = register(withCodeownerReviewRequested(record(
-                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null)));
+            PrTrackingRecord record = register(
+                    withCodeownerReviewRequested(record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null)));
             PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
