@@ -44,6 +44,8 @@ analysis:
 
 The `ChatLanguageModel` bean is annotated `@ConditionalOnProperty(name = "analysis.vertex.project-id")` so it is only created when Vertex is configured, keeping local/test environments unaffected.
 
+> **Correction (2026-07, see ADR-009):** as implemented, the bean (now `ChatModel` since the LangChain4j 1.x upgrade) is constructed explicitly in `LlmConfig` — not via Spring Boot auto-configuration — and is conditional on `analysis.prompt.enabled=true`, not on project-id presence. Provider selection and configuration have since moved to `analysis.llm.*` (ADR-009).
+
 ### 2. GCP Identity — Workload Identity Federation (no new secrets)
 
 The existing `platform-integration.gcp.enabled` integration already configures the Kubernetes `ServiceAccount` to carry a GCP Service Account annotation:
