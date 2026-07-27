@@ -138,9 +138,11 @@ public class PrLifecyclePoller {
     /**
      * The first time this poll sees a genuinely pending code-owner review request ({@code
      * pr.codeOwnerReviewers()} non-empty), permanently marks {@code codeownerReviewRequested} true on
-     * the record so it's remembered on every later poll — see {@link #codeownerApproved} for why this
-     * needs to be remembered rather than re-derived each time. A no-op (no write, same record
-     * returned) once already marked, for a non-codeowner repo, or when nothing is currently pending.
+     * the record so it's remembered on every later poll. {@link #codeownerApproved} no longer reads this
+     * flag for gating (it now fails closed on any unsatisfied aggregate, pending list aside — see its
+     * Javadoc), but it is still set for observability: a durable record of whether code-owner review was
+     * ever genuinely requested for this PR. A no-op (no write, same record returned) once already
+     * marked, for a non-codeowner repo, or when nothing is currently pending.
      */
     private PrTrackingRecord withCodeownerReviewRequestedIfNewlySeen(
             PrTrackingRecord record, PrTrackingProps.@Nullable Repository repoConfig, PrMetadata pr) {
@@ -203,38 +205,34 @@ public class PrLifecyclePoller {
     }
 
     /**
-     * Resolves whether the code-owner gate is satisfied, disambiguating a case the provider's
-     * aggregate decision alone can't: {@code pr.codeOwnersApproved()} (GitHub {@code reviewDecision})
-     * conflates "require code-owner review" with any separately configured minimum-approval-count
-     * rule, so a repo with both reports the *unsatisfied* aggregate for a PR whose paths need no
-     * code-owner review at all, purely because the generic approval count isn't met yet.
+     * Resolves whether the code-owner gate is satisfied. Always {@code false} when {@code
+     * requiresCodeowners} is false; otherwise:
      *
      * <ol>
-     *   <li>A currently pending code-owner request ({@code pr.codeOwnerReviewers()} non-empty) is
-     *       always outstanding — {@code false}, no ambiguity.
      *   <li>A {@code null} aggregate means the provider read failed or the gate is unknowable (GitHub
      *       GraphQL error, GitLab CE/transport error — both source clients document null as
-     *       must-fail-closed), and on those paths the pending list is empty too. Absence of signal is
-     *       not evidence that code-owner review never applied, so hold the gate shut and let the next
-     *       poll retry. The ambiguity this method disambiguates always presents as a definite {@code
-     *       false} ({@code REVIEW_REQUIRED}), never {@code null}, so this costs nothing.
-     *   <li>No pending request, and none has ever been observed for this record ({@code
-     *       record.codeownerReviewRequested()} still false after {@link
-     *       #withCodeownerReviewRequestedIfNewlySeen}) — code-owner review has never applied to this
-     *       PR's paths, so the gate doesn't apply: {@code true}, regardless of what the aggregate
-     *       decision says.
-     *   <li>No pending request, but one was observed on an earlier poll — a genuine code-owner
-     *       approval once satisfied the gate and may since have been dismissed or invalidated by a
-     *       later push (GitHub does NOT restore a dismissed reviewer to {@code reviewRequests} —
-     *       confirmed by hand against a real PR, not merely assumed). Trust the raw provider
-     *       aggregate here: {@code true} only on an actual {@code APPROVED}/inapplicable read.
+     *       must-fail-closed). Absence of signal is not evidence that code-owner review never applied,
+     *       so hold the gate shut and let the next poll retry.
+     *   <li>An unambiguous {@code true} aggregate ({@code APPROVED}, or no review required at all) is
+     *       satisfied on its own — {@code true}, even if {@code pr.codeOwnerReviewers()} still lists
+     *       other pending reviewers. GitHub's {@code reviewDecision} is satisfied once any required
+     *       code owner approves; it does not auto-clear the rest of an auto-requested team from
+     *       {@code reviewRequests}, so a non-empty pending list here does not mean the gate is still
+     *       shut (see {@code project_codeowner_gate_mismatch_stuck_pr} — PR left permanently stuck with
+     *       no message otherwise).
+     *   <li>Anything else — aggregate is definitely {@code false} ({@code REVIEW_REQUIRED} /
+     *       {@code CHANGES_REQUESTED}) — holds the gate shut: {@code false}, whether or not a
+     *       code-owner request is currently pending.
      * </ol>
+     *
+     * <p>Deliberately fails closed on a {@code false} aggregate rather than guessing whether an empty
+     * pending list means "review never applied" or "GitHub just isn't surfacing it" — those are
+     * indistinguishable and a wrong guess previously reported PRs approved with zero real approvals
+     * (see {@code project_codeowner_approved_fail_open_bug}). Worst case here: a PR with no owned paths
+     * waits until its own ordinary approval lands before advancing, same as a non-codeowner PR would.
      */
     private boolean codeownerApproved(PrTrackingRecord record, PrMetadata pr, boolean requiresCodeowners) {
         if (!requiresCodeowners) {
-            return false;
-        }
-        if (!pr.codeOwnerReviewers().isEmpty()) {
             return false;
         }
         if (pr.codeOwnersApproved() == null) {
@@ -244,9 +242,6 @@ public class PrLifecyclePoller {
                     .log(
                             "Code-owner approval signal unreadable for {}#{} (provider read failed or unavailable), holding gate shut");
             return false;
-        }
-        if (!record.codeownerReviewRequested()) {
-            return true;
         }
         return Boolean.TRUE.equals(pr.codeOwnersApproved());
     }

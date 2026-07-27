@@ -50,6 +50,11 @@ public class SecurityConfig {
                         // Slack webhook endpoint - uses Slack's own signing secret verification
                         .requestMatchers("/slack/events")
                         .permitAll()
+                        // Feature-enabled checks are open to any authenticated user (not just leadership/
+                        // support engineers) so the UI sidebar can safely query them for everyone to decide
+                        // whether to show the nav item, without a 403 for users lacking that role.
+                        .requestMatchers("/elevate/enabled")
+                        .authenticated()
                         // Dashboard restricted to leadership or support engineers
                         .requestMatchers("/dashboard/**", "/summary-data/results", "/elevate/**")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")

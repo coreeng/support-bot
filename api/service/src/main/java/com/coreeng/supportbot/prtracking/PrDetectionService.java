@@ -704,10 +704,14 @@ public class PrDetectionService {
      * message, never review-escalates — unchanged from before this class had any code-owner awareness.
      *
      * <p>One carve-out (an exception to that default): if the pending code owners ARE the repo's own
-     * maintaining team ({@link #pendingCodeOwnersAreMaintainingTeam}), chasing them makes no sense — that
-     * case gets a real review deadline instead (when {@code sla} is configured) and the normal
-     * tracked-with-a-deadline message, and can review-escalate on breach like any repo. Everything else
-     * keeps the default.
+     * maintaining team ({@link #pendingCodeOwnersAreMaintainingTeam}), chasing them makes no sense — the
+     * message never names them as something to chase, regardless of {@code sla}. The repo's configured
+     * override always wins first if present (same precedence as everywhere else in this file); failing
+     * that, {@code sla} configured gets a real review deadline and the normal tracked-with-a-deadline
+     * message and can review-escalate on breach like any repo, while no {@code sla} gets the standard
+     * no-SLA-tracked message. Everything else (a genuinely external pending code owner) keeps the
+     * default chase message even if an override is configured — the override applies to the
+     * normal/no-codeowner flow, not to a real chase.
      *
      * <p>Path filtering still applies with no {@code sla} block: like any no-SLA repo, only PRs touching
      * the configured {@code paths} are tracked.
@@ -764,9 +768,9 @@ public class PrDetectionService {
         // Mark the code-owner-request flag at insert time too, not just from the poller: the pending
         // window can close (approved then dismissed by a push) before the first poll ever runs — overnight
         // or over a weekend under the default business-hours cron — and it never reopens (GitHub does not
-        // restore a dismissed reviewer to reviewRequests). Missing it here would permanently misread the
-        // record as "code-owner review never applied to this PR's paths" (see
-        // PrLifecyclePoller#codeownerApproved).
+        // restore a dismissed reviewer to reviewRequests). Purely observability today (see
+        // PrTrackingRecord#codeownerReviewRequested), but the audit trail should reflect reality even for
+        // a PR that closes before it's ever polled.
         if (!prMetadata.codeOwnerReviewers().isEmpty()) {
             tracking = prTrackingRepository.markCodeownerReviewRequested(tracking.id());
         }
@@ -798,27 +802,35 @@ public class PrDetectionService {
                 // "tracked" message with a deadline that's already in the past.
                 handleCodeownerAlreadyOverdue(detectedPr, ticket, tracking, repoConfig, prMetadata, slaDeadline);
             } else {
-                Duration reviewSlaDuration =
-                        slaDeadline != null ? Duration.between(prMetadata.createdAt(), slaDeadline) : null;
-                PrMessageContext ctx = new PrMessageContext(
-                        detectedPr.provider(),
-                        detectedPr.repositoryName(),
-                        detectedPr.pullNumber(),
-                        resolveTeamLabel(repoConfig.owningTeam()),
-                        reviewSlaDuration,
-                        slaDeadline);
-                String override = messageRenderer.render(detectedPr.repositoryName(), MessageEvent.DETECTED, ctx);
                 String text;
-                if (override != null) {
-                    text = override;
-                } else if (slaDeadline != null) {
-                    text = formatTrackedText(
+                if (codeOwnerIsMaintainingTeam) {
+                    // See the maintaining-team carve-out paragraph in this method's class-level Javadoc.
+                    Duration reviewSlaDuration =
+                            slaDeadline != null ? Duration.between(prMetadata.createdAt(), slaDeadline) : null;
+                    PrMessageContext ctx = new PrMessageContext(
                             detectedPr.provider(),
                             detectedPr.repositoryName(),
                             detectedPr.pullNumber(),
-                            checkNotNull(ctx.sla()),
-                            checkNotNull(ctx.slaDeadline()),
-                            ctx.owningTeam());
+                            resolveTeamLabel(repoConfig.owningTeam()),
+                            reviewSlaDuration,
+                            slaDeadline);
+                    String override = messageRenderer.render(detectedPr.repositoryName(), MessageEvent.DETECTED, ctx);
+                    if (override != null) {
+                        text = override;
+                    } else if (slaDeadline != null) {
+                        text = formatTrackedText(
+                                detectedPr.provider(),
+                                detectedPr.repositoryName(),
+                                detectedPr.pullNumber(),
+                                checkNotNull(ctx.sla()),
+                                checkNotNull(ctx.slaDeadline()),
+                                ctx.owningTeam());
+                    } else {
+                        text = formatNoSlaTrackedText(
+                                detectedPr.provider(),
+                                detectedPr.repositoryName(),
+                                resolveTeamLabel(repoConfig.owningTeam()));
+                    }
                 } else {
                     text = formatCodeownerDetectedText(
                             detectedPr.provider(),
@@ -1084,7 +1096,6 @@ public class PrDetectionService {
         Provider p = pendingNotification.provider();
         String noun = PrTerminology.noun(p);
         String sep = PrTerminology.separator(p);
-        String plural = PrTerminology.plural(p);
         String text = override != null
                 ? override
                 : switch (pendingNotification.type()) {
@@ -1097,11 +1108,8 @@ public class PrDetectionService {
                                 checkNotNull(pendingNotification.slaDeadline()),
                                 checkNotNull(pendingNotification.teamLabel()));
                     case NO_SLA_TRACKED ->
-                        "%s to %s have no automated SLAs, they are monitored by %s team. I'll still keep an eye on this one and let you know when it moves."
-                                .formatted(
-                                        plural,
-                                        pendingNotification.repo(),
-                                        checkNotNull(pendingNotification.teamLabel()));
+                        formatNoSlaTrackedText(
+                                p, pendingNotification.repo(), checkNotNull(pendingNotification.teamLabel()));
                     case CHANGES_REQUESTED ->
                         formatChangesRequestedText(p, pendingNotification.repo(), pendingNotification.prNumber());
                     case APPROVED ->
@@ -1294,6 +1302,11 @@ public class PrDetectionService {
                         PrTerminology.separator(provider),
                         prNumber,
                         repo);
+    }
+
+    private String formatNoSlaTrackedText(Provider provider, String repo, String teamLabel) {
+        return "%s to %s have no automated SLAs, they are monitored by %s team. I'll still keep an eye on this one and let you know when it moves."
+                .formatted(PrTerminology.plural(provider), repo, teamLabel);
     }
 
     private String formatEscalatedText(Provider provider, String repo, int prNumber, Duration sla) {

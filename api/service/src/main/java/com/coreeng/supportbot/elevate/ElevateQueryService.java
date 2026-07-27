@@ -14,6 +14,10 @@ public class ElevateQueryService {
     private final ElevateProps props;
     private final ElevateRepository repository;
 
+    public boolean configured() {
+        return props.configured();
+    }
+
     public ElevateStatusResponse status() {
         ElevateStoredStatus storedStatus = repository.getStoredStatus();
         ElevateSyncState state = storedStatus.state();

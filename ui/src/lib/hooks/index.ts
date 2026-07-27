@@ -510,6 +510,17 @@ export function useAnalysis() {
   });
 }
 
+export function useElevateEnabled() {
+  return useQuery<boolean>({
+    queryKey: ["elevate", "enabled"],
+    queryFn: async () => {
+      const response = await apiGet<{ enabled: boolean }>("/elevate/enabled");
+      return response.enabled;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useTenantInsightsEnabled() {
   return useQuery<boolean>({
     queryKey: ["tenant-insights", "enabled"],

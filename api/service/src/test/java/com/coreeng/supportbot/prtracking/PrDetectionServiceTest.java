@@ -394,6 +394,163 @@ class PrDetectionServiceTest {
         }
 
         @Test
+        void postsNoSlaDefaultMessageWhenMaintainingTeamPendingAndNoOverrideConfigured() {
+            // given — same maintaining-team overlap as above, but no `sla` block configured and no
+            // `messages.detected` override either. Chasing the maintaining team still makes no sense, so
+            // this must read exactly like a normal no-SLA repo — never the code-owner chase copy.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            "docs-team",
+                            null,
+                            List.of("**"),
+                            null,
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE)).thenReturn(null);
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/docs-team", null))));
+            when(prSourceClient.listChangedFiles(COORD, PR_NUMBER)).thenReturn(List.of("src/app.js"));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — no deadline, and the standard no-SLA-tracked wording, never the chase copy.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).doesNotContain("code-owner").doesNotContain("chase");
+            assertThat(text).contains("have no automated SLAs");
+        }
+
+        @Test
+        void postsConfiguredOverrideWhenMaintainingTeamPendingAndNoSla() {
+            // given — same shape as above, but this repo has a `messages.detected` override configured
+            // (mirrors a real config: NBCUDTC/kaas-platform). The override must win over the default
+            // no-SLA text, same as it would for a normal (non-codeowner) no-SLA repo.
+            String customMessage = "DPE engineers monitor this repository regularly for pull requests.";
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            "docs-team",
+                            null,
+                            List.of("**"),
+                            null,
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE)).thenReturn(null);
+            when(messageRenderer.render(eq(REPO), eq(MessageEvent.DETECTED), any()))
+                    .thenReturn(customMessage);
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/docs-team", null))));
+            when(prSourceClient.listChangedFiles(COORD, PR_NUMBER)).thenReturn(List.of("src/app.js"));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — the configured override replaces the default no-SLA text.
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).isEqualTo(customMessage);
+        }
+
+        @Test
+        void keepsChaseMessageOverConfiguredOverrideWhenExternalCodeOwnerPendingWithNoSla() {
+            // given — pending code owner is a genuinely different team (not the maintaining team), no SLA
+            // configured, but this repo DOES have a `messages.detected` override. The override is meant
+            // for the normal/no-codeowner flow; a real chase target must still be named regardless.
+            String customMessage = "DPE engineers monitor this repository regularly for pull requests.";
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            "docs-team",
+                            null,
+                            List.of("**"),
+                            null,
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/other-team", null))));
+            when(prSourceClient.listChangedFiles(COORD, PR_NUMBER)).thenReturn(List.of("src/app.js"));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — the chase copy wins; the configured override isn't even consulted for this path.
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).isNotEqualTo(customMessage);
+            assertThat(text).contains("code-owner").contains("chase");
+            verifyNoInteractions(messageRenderer);
+        }
+
+        @Test
         void keepsChaseMessageWhenGithubTeamSlugNotConfiguredEvenIfNamesMatch() {
             // given — same pending team as the overlap case above, but the repo never declared its
             // maintaining team via github-team-slug, so the overlap can't be positively confirmed: the
