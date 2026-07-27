@@ -125,6 +125,7 @@ dependencies {
     implementation(platform("dev.langchain4j:langchain4j-bom:1.18.0"))
     implementation("dev.langchain4j:langchain4j")
     implementation("dev.langchain4j:langchain4j-vertex-ai-gemini")
+    implementation("dev.langchain4j:langchain4j-google-ai-gemini")
 
     implementation("net.logstash.logback:logstash-logback-encoder:8.0")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -132,6 +133,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")
+    testImplementation("org.wiremock:wiremock-jetty12:3.13.+")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     compileOnly("org.projectlombok:lombok:${lombokVersion}")
