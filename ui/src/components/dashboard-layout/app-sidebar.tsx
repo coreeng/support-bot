@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { type UiCapability, hasUiCapability, UI_CAPABILITIES } from "@/lib/auth/capabilities";
-import { useKnowledgeGapsEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
+import { useElevateEnabled, useKnowledgeGapsEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
 
 type NavItem = {
   title: string;
@@ -33,7 +33,7 @@ type NavItem = {
 
 type TabVisibility = {
   requiredCapability?: UiCapability;
-  requiresFeatureFlag?: "knowledgeGaps" | "tenantInsights";
+  requiresFeatureFlag?: "knowledgeGaps" | "tenantInsights" | "elevate";
 };
 
 type SupportTab = {
@@ -78,7 +78,7 @@ const INTEGRATION_TABS: SupportTab[] = [
     path: "/elevate",
     title: "Elevate",
     icon: Cable,
-    visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS },
+    visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS, requiresFeatureFlag: "elevate" },
   },
 ];
 
@@ -88,10 +88,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { user, isLoading } = useAuth();
   const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled();
   const { data: isTenantInsightsEnabled } = useTenantInsightsEnabled();
+  const { data: isElevateEnabled } = useElevateEnabled();
 
   const flags: Record<NonNullable<TabVisibility["requiresFeatureFlag"]>, boolean | undefined> = {
     knowledgeGaps: isKnowledgeGapsEnabled,
     tenantInsights: isTenantInsightsEnabled,
+    elevate: isElevateEnabled,
   };
 
   const isVisible = (tab: SupportTab) => {
