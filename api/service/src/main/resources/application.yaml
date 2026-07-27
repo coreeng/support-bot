@@ -397,11 +397,18 @@ knowledge-gaps:
 
 # Analysis configuration
 analysis:
-  vertex:
-    project-id: ${VERTEX_PROJECT_ID:support-bot-cecg-efb3c84c}
-    location: ${VERTEX_LOCATION:europe-west2}
+  llm:
+    provider: ${ANALYSIS_LLM_PROVIDER:vertex}
     model-name: ${VERTEX_MODEL_NAME:gemini-2.5-flash}
     request-delay: ${VERTEX_REQUEST_DELAY:500ms}
+    vertex:
+      project-id: ${VERTEX_PROJECT_ID:support-bot-cecg-efb3c84c}
+      location: ${VERTEX_LOCATION:europe-west2}
+    gateway:
+      # Full base URL including /v1beta, e.g. https://<host>/platform/google-vertex/proxy/v1beta
+      base-url: ${AI_GATEWAY_BASE_URL:}
+      basic-auth-token: ${AI_GATEWAY_BASIC_AUTH_TOKEN:}
+      timeout: ${AI_GATEWAY_TIMEOUT:30s}
   bundle:
     path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip}
   prompt:

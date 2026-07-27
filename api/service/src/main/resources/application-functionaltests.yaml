@@ -234,8 +234,9 @@ platform-integration:
           groupRef: group-ref-pr-author-excluded
 
 analysis:
-  vertex:
-    project-id: "false"
+  llm:
     request-delay: 10ms
+    vertex:
+      project-id: "false"
   prompt:
     enabled: true

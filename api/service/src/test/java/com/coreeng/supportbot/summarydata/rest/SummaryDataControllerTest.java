@@ -42,11 +42,9 @@ class SummaryDataControllerTest {
 
     @BeforeEach
     void setUp() {
-        AnalysisProps.Vertex vertex =
-                new AnalysisProps.Vertex("test-project", "europe-west2", "gemini-2.5-flash", Duration.ofMillis(100));
         AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
         AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(true);
-        analysisProps = new AnalysisProps(vertex, bundle, prompt);
+        analysisProps = new AnalysisProps(testLlm(), bundle, prompt);
         objectMapper = new ObjectMapper();
         controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
     }
@@ -168,9 +166,7 @@ class SummaryDataControllerTest {
     void download_shouldReturnNotFound_whenClasspathResourceDoesNotExist() {
         // given
         analysisProps = new AnalysisProps(
-                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
-                new AnalysisProps.Bundle("classpath:nonexistent.zip"),
-                new AnalysisProps.Prompt(true));
+                testLlm(), new AnalysisProps.Bundle("classpath:nonexistent.zip"), new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
 
         // when
@@ -188,9 +184,7 @@ class SummaryDataControllerTest {
         Files.writeString(tempDir.resolve("script.sh"), "#!/bin/bash\necho 'test'");
 
         analysisProps = new AnalysisProps(
-                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
-                new AnalysisProps.Bundle(tempDir.toString()),
-                new AnalysisProps.Prompt(true));
+                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
 
         // when
@@ -224,9 +218,7 @@ class SummaryDataControllerTest {
     void download_shouldReturnEmptyZip_whenDirectoryIsEmpty(@TempDir Path tempDir) throws IOException {
         // given - empty directory
         analysisProps = new AnalysisProps(
-                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
-                new AnalysisProps.Bundle(tempDir.toString()),
-                new AnalysisProps.Prompt(true));
+                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
 
         // when
@@ -252,9 +244,7 @@ class SummaryDataControllerTest {
         Files.writeString(subDir.resolve("file2.txt"), "Content 2");
 
         analysisProps = new AnalysisProps(
-                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
-                new AnalysisProps.Bundle(tempDir.toString()),
-                new AnalysisProps.Prompt(true));
+                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
 
         // when
@@ -281,9 +271,7 @@ class SummaryDataControllerTest {
     void download_shouldReturnNotFound_whenDirectoryDoesNotExist() {
         // given
         analysisProps = new AnalysisProps(
-                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
-                new AnalysisProps.Bundle("/nonexistent/directory"),
-                new AnalysisProps.Prompt(true));
+                testLlm(), new AnalysisProps.Bundle("/nonexistent/directory"), new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
 
         // when
@@ -291,5 +279,14 @@ class SummaryDataControllerTest {
 
         // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    private static AnalysisProps.Llm testLlm() {
+        return new AnalysisProps.Llm(
+                AnalysisProps.LlmProvider.VERTEX,
+                "gemini-2.5-flash",
+                Duration.ofSeconds(1),
+                new AnalysisProps.Vertex("test-project", "europe-west2"),
+                new AnalysisProps.Gateway("", "", Duration.ofSeconds(30)));
     }
 }

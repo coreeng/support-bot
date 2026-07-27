@@ -9,22 +9,23 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
 @Slf4j
 public class LlmConfig {
 
     @Bean
-    @ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
     public ChatModel chatModel(AnalysisProps analysisProps) {
+        AnalysisProps.Llm llm = analysisProps.llm();
         log.info(
                 "Configuring Vertex AI Gemini model: project={}, location={}, model={}",
-                analysisProps.vertex().projectId(),
-                analysisProps.vertex().location(),
-                analysisProps.vertex().modelName());
+                llm.vertex().projectId(),
+                llm.vertex().location(),
+                llm.modelName());
 
         return VertexAiGeminiChatModel.builder()
-                .project(analysisProps.vertex().projectId())
-                .location(analysisProps.vertex().location())
-                .modelName(analysisProps.vertex().modelName())
+                .project(llm.vertex().projectId())
+                .location(llm.vertex().location())
+                .modelName(llm.modelName())
                 .build();
     }
 }
