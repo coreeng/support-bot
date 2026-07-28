@@ -1,11 +1,28 @@
 from pathlib import Path
 import json
+import os
 import re
 
 
 env_file = Path(".env.local")
 template_file = Path("config/config.example.yaml")
 output_file = Path("config/config.yaml")
+
+_VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def _expand(value: str, key: str) -> str:
+    """${NAME} in values resolves from the process environment — but an unresolvable
+    name fails instead of expanding to empty."""
+
+    def resolve(match):
+        name = match.group(1)
+        if name in os.environ:
+            return os.environ[name]
+        raise SystemExit(f".env.local: {key} references ${{{name}}}, which is not an exported environment variable")
+
+    return _VAR_RE.sub(resolve, value)
+
 
 env = {}
 for line in env_file.read_text().splitlines():
@@ -15,7 +32,7 @@ for line in env_file.read_text().splitlines():
     if "=" not in line:
         continue
     key, value = line.split("=", 1)
-    env[key] = value
+    env[key] = _expand(value, key)
 
 
 def _truthy(key: str, e: dict) -> bool:
