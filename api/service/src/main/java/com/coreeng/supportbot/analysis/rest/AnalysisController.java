@@ -47,12 +47,7 @@ public class AnalysisController {
 
     @GetMapping("/prompt")
     public ResponseEntity<AnalysisPromptResponse> getPrompt() {
-        try {
-            return ResponseEntity.ok(new AnalysisPromptResponse(analysisService.loadPrompt()));
-        } catch (RuntimeException e) {
-            log.error("Failed to load analysis prompt", e);
-            return ResponseEntity.internalServerError().build();
-        }
+        return ResponseEntity.ok(new AnalysisPromptResponse(analysisService.loadPrompt()));
     }
 
     public record AnalysisPromptResponse(String prompt) {}

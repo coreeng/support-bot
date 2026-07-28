@@ -89,14 +89,4 @@ class AnalysisControllerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().prompt()).isEqualTo("prompt text");
     }
-
-    @Test
-    void getPrompt_returns500_whenPromptFileCannotBeLoaded() {
-        when(analysisService.loadPrompt()).thenThrow(new RuntimeException("Failed to load prompt file: /missing.md"));
-
-        ResponseEntity<AnalysisController.AnalysisPromptResponse> response = controller.getPrompt();
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody()).isNull();
-    }
 }

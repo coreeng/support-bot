@@ -437,7 +437,7 @@ class AnalysisServiceTest {
                 applicationContext);
 
         assertThatThrownBy(badService::loadPrompt)
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(AnalysisPromptLoadException.class)
                 .hasMessageContaining("/nonexistent/prompt.md");
     }
 }

@@ -4,8 +4,10 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.coreeng.supportbot.analysis.AnalysisPromptLoadException;
 import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.analysis.rest.AnalysisController;
 import com.coreeng.supportbot.teams.SupportTeamService;
@@ -13,6 +15,7 @@ import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -91,6 +94,19 @@ class AnalysisPromptAuthorizationTest {
                         .with(authentication(authTokenWithRoles(Role.USER, Role.SUPPORT_ENGINEER))))
                 .andExpect(status().isOk())
                 .andExpect(content().json("{\"prompt\":\"prompt text\"}"));
+    }
+
+    @Test
+    void promptEndpoint_returns500ProblemWhenPromptCannotBeLoaded() throws Exception {
+        when(analysisService.loadPrompt())
+                .thenThrow(new AnalysisPromptLoadException(
+                        "Failed to load prompt file: /missing.md", new IOException("missing")));
+
+        mockMvc.perform(get("/analysis/prompt")
+                        .with(authentication(authTokenWithRoles(Role.USER, Role.SUPPORT_ENGINEER))))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.title").value("Analysis prompt unavailable"))
+                .andExpect(jsonPath("$.code").value("ANALYSIS_PROMPT_LOAD_FAILED"));
     }
 
     @Test
