@@ -2,6 +2,8 @@ import type { NextRequest } from "next/server";
 import { backendFetch } from "../../_lib/backend-fetch";
 import { GET } from "./route";
 
+// backend-error is deliberately left unmocked so this test pins the exact body shape
+// useAnalysisPrompt parses, including the forwarded backend `code`.
 jest.mock("../../_lib/backend-fetch", () => ({
   backendFetch: jest.fn(),
   errorResponse: (message: string, status = 500) => ({ status, json: async () => ({ error: message }) }),
@@ -10,11 +12,12 @@ jest.mock("../../_lib/backend-fetch", () => ({
 
 const mockBackendFetch = backendFetch as jest.MockedFunction<typeof backendFetch>;
 
-// jsdom has no global Response; provide the static json() the route uses for its success path.
+// jsdom has no global Response; provide the static json() the route uses, honouring init.status
+// so the helpers' status codes are asserted rather than defaulted away.
 const originalResponse = global.Response;
 beforeAll(() => {
   global.Response = {
-    json: (data: unknown) => ({ status: 200, json: async () => data }),
+    json: (data: unknown, init?: { status?: number }) => ({ status: init?.status ?? 200, json: async () => data }),
   } as unknown as typeof Response;
 });
 afterAll(() => {
@@ -75,13 +78,35 @@ describe("analysis prompt BFF route", () => {
     expect(mockBackendFetch).not.toHaveBeenCalled();
   });
 
-  it("forwards backend errors without a fallback", async () => {
-    mockBackendFetch.mockResolvedValue({ ok: false, status: 500 } as Response);
+  it("forwards the backend error code so the dialog can distinguish failures", async () => {
+    mockBackendFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({ code: "ANALYSIS_PROMPT_LOAD_FAILED" }),
+    } as unknown as Response);
 
     const response = await GET(makeRequest());
 
     expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ error: "Backend error: 500" });
+    await expect(response.json()).resolves.toEqual({
+      error: "Backend error: 500",
+      code: "ANALYSIS_PROMPT_LOAD_FAILED",
+    });
+  });
+
+  it("forwards backend errors without a fallback when the body carries no code", async () => {
+    mockBackendFetch.mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new SyntaxError("not JSON");
+      },
+    } as unknown as Response);
+
+    const response = await GET(makeRequest());
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({ error: "Backend error: 502" });
   });
 
   it("returns 401 when there is no session token", async () => {

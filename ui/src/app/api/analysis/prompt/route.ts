@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { backendFetch, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
+import { backendErrorResponse } from "../../_lib/backend-error";
+import { backendFetch, unauthorizedResponse } from "../../_lib/backend-fetch";
 import { validateCsrfToken } from "../../_lib/csrf";
 
 export async function GET(request: NextRequest) {
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {
-    return errorResponse(`Backend error: ${response.status}`, response.status);
+    return backendErrorResponse(response);
   }
 
   const data = await response.json();
