@@ -11,23 +11,14 @@ To contribute to this project, you will need:
 - **Gradle**: The project uses the Gradle wrapper (`gradlew`) for builds, tests and code generation.
 - **Docker Desktop or alternative**: Used for running the local database and optionally building Docker images.
 
-## Running Support Bot locally
+## Running The Entire Support Bot Stack Locally
 
-The full stack — PostgreSQL, OpenLDAP, Dex, the API and the UI — starts with one target:
+Running the full stack — PostgreSQL, OpenLDAP, Dex, the API and the UI — needs, alongside Java 21 and Docker,
+Python 3 (used to render the Dex config), a Slack app with Socket Mode enabled and a channel for it to watch
+(see [api/service/README.md](api/service/README.md)), and these ports free: `3000` (UI), `8080` and `8081`
+(API and management), `5432` (Postgres), `389` (LDAP), `18081` (phpLDAPadmin), `5556` and `5558` (Dex).
 
-```bash
-source ./pathToMyVariablesFile/file.sh
-make run-local-dex-ldap
-```
-
-That first line is your own variables file — a shell script of `export` statements, described in step 2. It must be
-sourced in the **same shell** that runs `make`: the API and LDAP Makefiles `source` their `.env.local` files, and
-`dex/scripts/render_config.py` resolves `${NAME}` references from the process environment. Nothing loads it for you.
-
-Alongside Java 21 and Docker you will also need Python 3 (used to render the Dex config), a Slack app with Socket Mode
-enabled and a channel for it to watch (see [api/service/README.md](api/service/README.md)), and these ports free:
-`3000` (UI), `8080` and `8081` (API and management), `5432` (Postgres), `389` (LDAP), `18081` (phpLDAPadmin),
-`5556` and `5558` (Dex).
+If you are part of the CECG dev team, reach out to team members for all the necessary dev secrets.
 
 ### 1. Create the four `.env.local` files
 
@@ -81,17 +72,6 @@ SUPPORT_BOT_URL=http://localhost:3000
 SUPPORT_BOT_VERSION=dev
 ```
 
-`JWT_SECRET` must be at least 256 bits. Leave `UI_ORIGIN` unset — `api/Makefile` runs with
-`SPRING_PROFILES_ACTIVE=local`, where the OAuth redirect defaults to `http://localhost:3000`. To offer Dex on the login
-page as well, add three more values matching `dex/.env.local`; without them the stack still runs, the API just does not
-register Dex as a login provider:
-
-```bash
-DEX_CLIENT_ID=support-bot-dex
-DEX_CLIENT_SECRET=<same value as dex/.env.local>
-DEX_ISSUER_URI=http://127.0.0.1:5556
-```
-
 **`ui/.env.local`**
 
 ```bash
@@ -105,8 +85,6 @@ NEXTAUTH_URL=http://localhost:3000
 # Generate with: openssl rand -base64 32
 AUTH_SECRET=${AUTH_SECRET}
 ```
-
-All three are required — the UI refuses to boot without them.
 
 **`dex/.env.local`**
 
@@ -138,11 +116,6 @@ DEX_MICROSOFT_CLIENT_SECRET=${DEX_MS_CLIENT_SECRET}
 DEX_MICROSOFT_TENANT=${DEX_MICROSOFT_TENANT}
 ```
 
-You need at least one way to sign in — the static password DB, LDAP, or one of the social connectors.
-`DEX_LDAP_BIND_PW` must equal `LDAP_ADMIN_PASSWORD` in `ldap/.env.local`. `host.docker.internal:389` reaches LDAP
-through the port it publishes on the host, which works on macOS and Windows; `openldap:389` uses the compose service
-name over the shared `supportbot-ldap` network instead.
-
 **`ldap/.env.local`**
 
 ```bash
@@ -153,11 +126,12 @@ LDAP_ADMIN_PASSWORD=changeme
 LDAP_BOOTSTRAP_USER_PASSWORD=change-me-local-only
 ```
 
+With the above settings you will be able to log in via Google
+
 ### 2. Create your variables file
 
 Name it whatever you like and keep it **outside the repository** so it can never be committed. It holds every secret
-the `.env.local` files reference, and you source it by path when you start the stack. Prefer a shared secret store over
-copying the file between machines.
+the `.env.local` files reference.
 
 ```bash
 export GOOGLE_CLIENT_ID=<fill in yours here>
@@ -193,15 +167,12 @@ source ./pathToMyVariablesFile/file.sh
 make run-local-dex-ldap
 ```
 
-The target starts Postgres and waits for it, starts OpenLDAP and waits for the container, renders
-`dex/config/config.yaml` and starts Dex, then runs the API and UI in the foreground with `[API]` and `[UI]` prefixes.
-The UI is on <http://localhost:3000>, the API on <http://localhost:8080>, and phpLDAPadmin on
-<http://localhost:18081>.
+Your variables file must be sourced in the **same shell** that runs `make`: the API and LDAP Makefiles `source` their
+`.env.local` files, and `dex/scripts/render_config.py` resolves `${NAME}` references from the process environment.
+Nothing loads it for you.
 
 Startup is healthy when the log shows `Started SupportBotApplication`, `SocketModeClient: New session is open` and
 `Active login providers: [...]` listing the providers you configured.
-
-To run without Dex and LDAP — Postgres, API and UI only — use `make run-local` instead.
 
 ### 4. Stopping and restarting
 
@@ -210,51 +181,6 @@ To run without Dex and LDAP — Postgres, API and UI only — use `make run-loca
 ```bash
 make stop-local-dex-ldap
 ```
-
-Prefer that target over tearing down `ldap/` on its own. `ldap/docker-compose.yaml` **owns** the `supportbot-ldap`
-network and `dex/docker-compose.yaml` consumes it as `external`, so Dex must be removed before the network it depends
-on — which is exactly the order `stop-local-dex-ldap` uses.
-
-### Troubleshooting
-
-**`failed to set up container networking: network <id> not found` when Dex starts.** The `supportbot-ldap` network was
-recreated with a new ID while the previous `dex-dex-1` container survived, still pinned to the old one. Recreate the
-container with `make -C dex down-local && make -C dex run-local`, or `docker rm -f dex-dex-1` if the first command also
-fails on the missing network. Stopping with `make stop-local-dex-ldap` avoids it.
-
-**OpenLDAP will not start again after a restart, or `ldap/bootstrap/` contains stray `sed*` files.** The osixia
-entrypoint rewrites the bootstrap LDIFs in place on the bind mount, and on macOS that can leave temp files behind which
-crash the next boot's `chown`. Remove them and start LDAP again:
-
-```bash
-rm -f ldap/bootstrap/sed*
-make -C ldap run-local
-```
-
-If the container still will not come up, force a clean bootstrap with
-`docker compose -f ldap/docker-compose.yaml down -v`. That also removes the `supportbot-ldap` network, so recreate Dex
-afterwards as described above.
-
-**`.env.local: X references ${Y}, which is not an exported environment variable`.** Your variables file was not sourced
-in this shell. The Dex renderer fails loudly on unresolved references; the API and LDAP Makefiles do not — `source`
-substitutes an empty string — so a missing export there surfaces later as an authentication or validation failure
-instead.
-
-**API exits with `elevate.base-url, elevate.client-id, and elevate.client-secret must either all be configured or all
-be blank`.** One or two of the three resolved to empty. Export all three, or leave all three unset.
-
-**API fails to open the Slack socket.** `SLACK_TOKEN`, `SLACK_SOCKET_TOKEN` and `SLACK_SIGNING_SECRET` have no
-defaults, and empty values reach Slack as an authentication failure.
-
-**A login button is missing from the UI.** The API registers an identity provider only when its whole credential set is
-non-blank. Compare the `Active login providers: [...]` startup line against what you expected.
-
-**A snakeyaml or fabric8 `KubeConfigUtils` stack trace during startup.** Harmless. The Kubernetes client bean is built
-unconditionally and parses your `~/.kube/config`, but nothing in the local stack consumes it. Add
-`export KUBECONFIG=/path/that/does/not/exist` to your variables file to silence it.
-
-**A port is still in use after an unclean exit.** `make stop-local-api-ui` kills whatever is listening on 8080 and
-3000.
 
 ## Code Guidelines
 
