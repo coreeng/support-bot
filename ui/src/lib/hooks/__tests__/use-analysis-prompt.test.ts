@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { useAnalysisPrompt } from "../index";
+import { ApiError, useAnalysisPrompt } from "../index";
 
 jest.mock("next-auth/react", () => ({
   getCsrfToken: jest.fn(() => Promise.resolve("mock-csrf-token")),
@@ -14,9 +14,9 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
-const createWrapper = () => {
+const createWrapper = (defaults: { retry?: boolean; staleTime: number } = { retry: false, staleTime: 1000 * 60 * 5 }) => {
   // Mirror GlobalProviders' 5-minute default so the refetch test guards against the global cache
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 1000 * 60 * 5 } } });
+  const queryClient = new QueryClient({ defaultOptions: { queries: defaults } });
   const Wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
   Wrapper.displayName = "QueryClientTestWrapper";
   return Wrapper;
@@ -78,5 +78,37 @@ describe("useAnalysisPrompt", () => {
 
     await waitFor(() => expect(result.current.error).not.toBeNull());
     expect(result.current.data).toBeUndefined();
+  });
+
+  it("parses the backend error code into the ApiError", async () => {
+    global.fetch = jest.fn(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({ code: "ANALYSIS_PROMPT_LOAD_FAILED" }),
+    })) as unknown as jest.MockedFunction<typeof fetch>;
+
+    const { result } = renderHook(() => useAnalysisPrompt(true), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.error).toBeInstanceOf(ApiError);
+    expect((result.current.error as ApiError).status).toBe(500);
+    expect((result.current.error as ApiError).reason).toBe("ANALYSIS_PROMPT_LOAD_FAILED");
+  });
+
+  it("does not retry a failed fetch", async () => {
+    global.fetch = jest.fn(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    })) as unknown as jest.MockedFunction<typeof fetch>;
+
+    // No retry override in the wrapper: like GlobalProviders, only staleTime is set,
+    // so the hook's own retry: false is what's under test.
+    const { result } = renderHook(() => useAnalysisPrompt(true), {
+      wrapper: createWrapper({ staleTime: 1000 * 60 * 5 }),
+    });
+
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });

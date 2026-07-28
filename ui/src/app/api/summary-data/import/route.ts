@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { backendAccessToken, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
+import { validateCsrfToken } from "../../_lib/csrf";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
@@ -10,23 +11,8 @@ export async function POST(request: NextRequest) {
     return unauthorizedResponse();
   }
 
-  // Validate CSRF token
-  const csrfTokenFromHeader = request.headers.get("X-CSRF-Token");
-  const csrfCookieName = process.env.NODE_ENV === "production" ? "__Host-authjs.csrf-token" : "authjs.csrf-token";
-  const csrfCookieValue = request.cookies.get(csrfCookieName)?.value;
-
-  if (!csrfTokenFromHeader || !csrfCookieValue) {
-    return errorResponse("Missing CSRF token", 403);
-  }
-
-  // NextAuth CSRF token format: "token|hash"
-  // The cookie contains "token|hash", the header should contain just "token"
-  // We need to extract the token part from the cookie and compare
-  const cookieToken = csrfCookieValue.split("|")[0];
-
-  if (csrfTokenFromHeader !== cookieToken) {
-    return errorResponse("Invalid CSRF token", 403);
-  }
+  const csrfError = validateCsrfToken(request);
+  if (csrfError) return csrfError;
 
   try {
     // Get the form data from the request

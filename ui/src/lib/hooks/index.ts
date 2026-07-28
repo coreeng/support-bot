@@ -527,11 +527,20 @@ export function useAnalysisPrompt(enabled: boolean) {
     queryFn: async () => {
       const response = await apiFetch("/api/analysis/prompt");
       if (!response.ok) {
-        throw new ApiError(response.status);
+        let reason: string | undefined;
+        try {
+          const body = (await response.json()) as { code?: string; reason?: string };
+          reason = body.code ?? body.reason;
+        } catch {
+          // The status code remains sufficient when a proxy returns no JSON body.
+        }
+        throw new ApiError(response.status, reason);
       }
       return (await response.json()) as { prompt: string };
     },
     enabled,
+    // Fail fast: the dialog renders the error state; default retries only prolong the spinner.
+    retry: false,
     // GlobalProviders defaults staleTime to 5 minutes; reopening the dialog must show the live file
     staleTime: 0,
     gcTime: 0,

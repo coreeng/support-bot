@@ -15,10 +15,6 @@ services:
       # Osixia deletes bootstrap assets after first start by default; restarts then fail (missing
       # replication-disable.ldif / root-password-change.ldif under /container/service/...).
       LDAP_REMOVE_CONFIG_AFTER_SETUP: "false"
-    # Process a copy of the mounted assets instead of sed-ing the bind mount in place —
-    # on macOS VirtioFS mounts the in-place sed leaves temp files that crash the next
-    # boot's chown (stray bootstrap/sed* files).
-    command: --copy-service
     ports:
       - "389:389"
     volumes:

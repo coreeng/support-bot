@@ -683,7 +683,7 @@ export default function KnowledgeGapsPage() {
             {!isAnalysisEnabled && exportStatus?.ready && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button type="button" variant="outline" onClick={handleDownloadReadyExport} disabled={isDownloading}>
+                  <Button type="button" variant="outline" size="default" onClick={handleDownloadReadyExport} disabled={isDownloading}>
                     <Download className="h-4 w-4" />
                     {isDownloading ? "Downloading..." : "Threads ready"}
                   </Button>
@@ -692,7 +692,7 @@ export default function KnowledgeGapsPage() {
               </Tooltip>
             )}
             {isAnalysisEnabled && (
-              <Button type="button" variant="outline" onClick={() => setIsPromptDialogOpen(true)}>
+              <Button type="button" variant="outline" size="default" onClick={() => setIsPromptDialogOpen(true)}>
                 <Eye className="h-4 w-4" />
                 View Prompt
               </Button>
@@ -704,6 +704,8 @@ export default function KnowledgeGapsPage() {
               <PopoverTrigger asChild>
                 <Button
                   type="button"
+                  variant="default"
+                  size="default"
                   disabled={isAnalysisEnabled && (analysisStatus?.running || isStartingAnalysis || showCompletedStatus)}
                 >
                   <Play className="h-4 w-4" />

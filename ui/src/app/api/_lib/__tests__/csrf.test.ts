@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
-import { validateCsrfToken } from "./csrf";
+import { validateCsrfToken } from "../csrf";
 
-jest.mock("./backend-fetch", () => ({
+jest.mock("../backend-fetch", () => ({
   errorResponse: (message: string, status = 500) => ({ status, json: async () => ({ error: message }) }),
 }));
 

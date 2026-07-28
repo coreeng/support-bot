@@ -2,7 +2,14 @@ import { render, screen } from "@testing-library/react";
 import * as hooks from "../../../lib/hooks";
 import AnalysisPromptDialog from "../AnalysisPromptDialog";
 
+jest.mock("next-auth/react", () => ({
+  getCsrfToken: jest.fn(() => Promise.resolve("mock-csrf-token")),
+  signOut: jest.fn(() => Promise.resolve()),
+}));
+
+// Spread the real module so the component keeps the genuine ApiError/isApiError.
 jest.mock("../../../lib/hooks", () => ({
+  ...jest.requireActual("../../../lib/hooks"),
   useAnalysisPrompt: jest.fn(),
 }));
 
@@ -53,6 +60,26 @@ describe("AnalysisPromptDialog", () => {
     render(<AnalysisPromptDialog open onOpenChange={jest.fn()} />);
 
     expect(screen.getByText("Failed to load analysis prompt. Please try again.")).toBeInTheDocument();
+  });
+
+  it("shows permission copy for a 403", () => {
+    mockUseAnalysisPrompt.mockReturnValue({ data: undefined, isFetching: false, error: new hooks.ApiError(403) } as any);
+
+    render(<AnalysisPromptDialog open onOpenChange={jest.fn()} />);
+
+    expect(screen.getByText("You do not have permission to view the analysis prompt.")).toBeInTheDocument();
+  });
+
+  it("shows server-side copy when the backend reports the prompt failed to load", () => {
+    mockUseAnalysisPrompt.mockReturnValue({
+      data: undefined,
+      isFetching: false,
+      error: new hooks.ApiError(500, "ANALYSIS_PROMPT_LOAD_FAILED"),
+    } as any);
+
+    render(<AnalysisPromptDialog open onOpenChange={jest.fn()} />);
+
+    expect(screen.getByText("The analysis prompt could not be loaded on the server.")).toBeInTheDocument();
   });
 
   it("does not fetch or render content while closed", () => {

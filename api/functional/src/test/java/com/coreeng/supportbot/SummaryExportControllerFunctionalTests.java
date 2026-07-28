@@ -34,8 +34,10 @@ public class SummaryExportControllerFunctionalTests {
     // a non-support-engineer principal. "escalation" has neither.
     private static final String NON_SUPPORT_ENGINEER_ROLE = "escalation";
 
-    // 401, not 403: this app has no AccessDeniedHandler, so insufficient role and missing auth both
-    // go through the same authenticationEntryPoint.
+    // 401, not 403: the default access-denied path (AccessDeniedHandlerImpl, the delegating
+    // handler's fallback in SecurityConfig) sendErrors a 403 whose ERROR dispatch re-enters the
+    // filter chain unauthenticated and lands in the authenticationEntryPoint. Only
+    // /analysis/prompt opts out via a scoped handler.
     @Test
     void start_returns401_forNonSupportEngineerRole() {
         int statusCode =
