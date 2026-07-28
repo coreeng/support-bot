@@ -16,13 +16,13 @@ To contribute to this project, you will need:
 The full stack — PostgreSQL, OpenLDAP, Dex, the API and the UI — starts with one target:
 
 ```bash
-source ./variables.sh
+source ./pathToMyVariablesFile/file.sh
 make run-local-dex-ldap
 ```
 
-`variables.sh` must be sourced in the **same shell** that runs `make`. The API and LDAP Makefiles `source` their
-`.env.local` files, and `dex/scripts/render_config.py` resolves `${NAME}` references from the process environment.
-Nothing reads `variables.sh` for you.
+That first line is your own variables file — a shell script of `export` statements, described in step 2. It must be
+sourced in the **same shell** that runs `make`: the API and LDAP Makefiles `source` their `.env.local` files, and
+`dex/scripts/render_config.py` resolves `${NAME}` references from the process environment. Nothing loads it for you.
 
 Alongside Java 21 and Docker you will also need Python 3 (used to render the Dex config), a Slack app with Socket Mode
 enabled and a channel for it to watch (see [api/service/README.md](api/service/README.md)), and these ports free:
@@ -31,52 +31,133 @@ enabled and a channel for it to watch (see [api/service/README.md](api/service/R
 
 ### 1. Create the four `.env.local` files
 
-Each module ships an `.env.example` to copy:
-
-```bash
-cp api/.env.example  api/.env.local
-cp ui/.env.example   ui/.env.local
-cp dex/.env.example  dex/.env.local
-cp ldap/.env.example ldap/.env.local
-```
-
-All four are gitignored. Keep secrets out of them by referencing exported variables — `SLACK_TOKEN=${SLACK_TOKEN}`
-rather than a pasted token. The name inside `${...}` must match the exported name exactly.
-
-Beyond the examples, this workflow needs:
+Every module ships an `.env.example` documenting each setting in full. The four files below are a working set for this
+stack — start from them and adjust. All four are gitignored, and secrets stay out of them by referencing variables
+exported from your variables file (step 2) rather than pasting values. The name inside `${...}` must match the exported
+name exactly.
 
 **`api/.env.local`**
 
-- `JWT_SECRET` — a literal of at least 256 bits (`openssl rand -base64 32`).
-- `SLACK_*`, `GOOGLE_*`, `AZURE_*`, `ELEVATE_*`, `GITHUB_*` and `GITLAB_TOKEN` — as `${...}` references.
-- To offer Dex on the login page, add the three values commented out in the example, matching `dex/.env.local`:
+```bash
+CORS_ALLOWED_ORIGINS=*
 
-  ```bash
-  DEX_CLIENT_ID=support-bot-dex
-  DEX_CLIENT_SECRET=<same value as dex/.env.local>
-  DEX_ISSUER_URI=http://127.0.0.1:5556
-  ```
+JWT_SECRET=local-dev-jwt-secret-change-me-in-production-min-256-bits
 
-  Without them the stack still runs — the API simply does not register Dex as a login provider.
-- Leave `UI_ORIGIN` unset. `api/Makefile` runs with `SPRING_PROFILES_ACTIVE=local`, where the OAuth redirect defaults
-  to `http://localhost:3000`.
+GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
 
-**`ui/.env.local`** — `BACKEND_URL=http://localhost:8080`, `NEXTAUTH_URL=http://localhost:3000` and
-`AUTH_SECRET=${AUTH_SECRET}`. All three are required; the UI refuses to boot without them. The origin of
-`NEXTAUTH_URL` must match the API's OAuth redirect origin above, or proxied OAuth returns 400.
+AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+AZURE_TENANT_ID=${AZURE_TENANT_ID}
+AZURE_CLIENT_LOG_LEVEL=BODY
 
-**`dex/.env.local`** — enable at least one way to sign in: `DEX_ENABLE_PASSWORD_DB=true` with the `DEX_LOCAL_USER_*`
-values, and/or `DEX_LDAP_ENABLED=true`. `DEX_LDAP_BIND_PW` must equal `LDAP_ADMIN_PASSWORD` in `ldap/.env.local`, and
-`DEX_LDAP_HOST` should be `openldap:389` — the compose service name, since both projects share the `supportbot-ldap`
-network.
+# Database Configuration
+DB_URL=jdbc:postgresql://localhost:5432/postgres
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
 
-**`ldap/.env.local`** — `LDAP_ADMIN_PASSWORD` and `LDAP_BOOTSTRAP_USER_PASSWORD`, the latter used to render the
-`alice` and `bob` bootstrap users.
+# Slack Configuration (values for local slack app)
+SLACK_TOKEN=${SLACK_TOKEN}
+SLACK_SOCKET_TOKEN=${SLACK_SOCKET_TOKEN}
+SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
+SLACK_TICKET_CHANNEL_ID=${SLACK_TICKET_CHANNEL_ID}
 
-### 2. Create `variables.sh`
+ALLOWED_EMAILS=your.email@cecg.io
+ALLOWED_DOMAINS=cecg.io
 
-Create it at the repository root with every secret the `.env.local` files reference. It is gitignored — never commit
-it, and prefer a shared secret store over copying the file between machines.
+GITHUB_AUTH_MODE="app"
+GITHUB_APP_ID="${GITHUB_APP_ID}"
+GITHUB_APP_INSTALLATION_ID="${GITHUB_APP_INSTALLATION_ID}"
+GITHUB_APP_PRIVATE_KEY_PEM="${GITHUB_APP_PRIVATE_KEY_PEM}"
+
+GITLAB_TOKEN=${GITLAB_TOKEN}
+
+ELEVATE_BASE_URL=${ELEVATE_BASE_URL}
+ELEVATE_CLIENT_ID=${ELEVATE_CLIENT_ID}
+ELEVATE_CLIENT_SECRET=${ELEVATE_CLIENT_SECRET}
+
+ELEVATE_AGENT_NAME=Support Bot Integration
+SUPPORT_BOT_URL=http://localhost:3000
+SUPPORT_BOT_VERSION=dev
+```
+
+`JWT_SECRET` must be at least 256 bits. Leave `UI_ORIGIN` unset — `api/Makefile` runs with
+`SPRING_PROFILES_ACTIVE=local`, where the OAuth redirect defaults to `http://localhost:3000`. To offer Dex on the login
+page as well, add three more values matching `dex/.env.local`; without them the stack still runs, the API just does not
+register Dex as a login provider:
+
+```bash
+DEX_CLIENT_ID=support-bot-dex
+DEX_CLIENT_SECRET=<same value as dex/.env.local>
+DEX_ISSUER_URI=http://127.0.0.1:5556
+```
+
+**`ui/.env.local`**
+
+```bash
+# Internal backend API URL (server-side only, never exposed to browser)
+BACKEND_URL=http://localhost:8080
+
+# This app's public URL (for OAuth callbacks). The origin must match the API's OAuth redirect origin,
+# or proxied OAuth returns 400. localhost and 127.0.0.1 are distinct; use one canonical URL everywhere.
+NEXTAUTH_URL=http://localhost:3000
+
+# Generate with: openssl rand -base64 32
+AUTH_SECRET=${AUTH_SECRET}
+```
+
+All three are required — the UI refuses to boot without them.
+
+**`dex/.env.local`**
+
+```bash
+DEX_ISSUER=http://127.0.0.1:5556
+DEX_CLIENT_ID=support-bot-dex
+DEX_CLIENT_SECRET=replace-me
+DEX_REDIRECT_URIS=http://localhost:3000/api/oauth/callback/dex,http://localhost:8080/login/oauth2/code/dex,http://127.0.0.1:3000/api/oauth/callback/dex,http://127.0.0.1:8080/login/oauth2/code/dex,http://127.0.0.1:5556/callback,http://localhost:5556/callback
+
+DEX_LOCAL_USER_EMAIL=your.email@cecg.io
+DEX_LOCAL_USER_USERNAME=admin
+DEX_LOCAL_USER_ID=08a8684b-db88-4b73-90a9-3cd1661f5466
+DEX_LOCAL_USER_PASSWORD_HASH=${DEX_USER_PW_HASH}
+
+DEX_ENABLE_PASSWORD_DB=true
+
+DEX_LDAP_ENABLED=true
+DEX_LDAP_HOST=host.docker.internal:389
+DEX_LDAP_BIND_DN=cn=admin,dc=supportbot,dc=local
+DEX_LDAP_BIND_PW=changeme
+DEX_LDAP_USER_SEARCH_BASE=ou=People,dc=supportbot,dc=local
+DEX_LDAP_GROUP_SEARCH_BASE=ou=Groups,dc=supportbot,dc=local
+
+# Microsoft (Entra) connector. The app registration needs http://127.0.0.1:5556/callback
+# among its Web platform redirect URIs.
+DEX_MICROSOFT_ENABLED=true
+DEX_MICROSOFT_CLIENT_ID=${DEX_MICROSOFT_CLIENT_ID}
+DEX_MICROSOFT_CLIENT_SECRET=${DEX_MS_CLIENT_SECRET}
+DEX_MICROSOFT_TENANT=${DEX_MICROSOFT_TENANT}
+```
+
+You need at least one way to sign in — the static password DB, LDAP, or one of the social connectors.
+`DEX_LDAP_BIND_PW` must equal `LDAP_ADMIN_PASSWORD` in `ldap/.env.local`. `host.docker.internal:389` reaches LDAP
+through the port it publishes on the host, which works on macOS and Windows; `openldap:389` uses the compose service
+name over the shared `supportbot-ldap` network instead.
+
+**`ldap/.env.local`**
+
+```bash
+# Password for the local OpenLDAP admin.
+LDAP_ADMIN_PASSWORD=changeme
+
+# Required for bootstrap users alice/bob (LDIF is generated before compose up).
+LDAP_BOOTSTRAP_USER_PASSWORD=change-me-local-only
+```
+
+### 2. Create your variables file
+
+Name it whatever you like and keep it **outside the repository** so it can never be committed. It holds every secret
+the `.env.local` files reference, and you source it by path when you start the stack. Prefer a shared secret store over
+copying the file between machines.
 
 ```bash
 export GOOGLE_CLIENT_ID=<fill in yours here>
@@ -108,7 +189,7 @@ Generate `AUTH_SECRET` with `openssl rand -base64 32` and `DEX_USER_PW_HASH` wit
 ### 3. Start the stack
 
 ```bash
-source ./variables.sh
+source ./pathToMyVariablesFile/file.sh
 make run-local-dex-ldap
 ```
 
@@ -154,8 +235,8 @@ If the container still will not come up, force a clean bootstrap with
 `docker compose -f ldap/docker-compose.yaml down -v`. That also removes the `supportbot-ldap` network, so recreate Dex
 afterwards as described above.
 
-**`.env.local: X references ${Y}, which is not an exported environment variable`.** `variables.sh` was not sourced in
-this shell. The Dex renderer fails loudly on unresolved references; the API and LDAP Makefiles do not — `source`
+**`.env.local: X references ${Y}, which is not an exported environment variable`.** Your variables file was not sourced
+in this shell. The Dex renderer fails loudly on unresolved references; the API and LDAP Makefiles do not — `source`
 substitutes an empty string — so a missing export there surfaces later as an authentication or validation failure
 instead.
 
@@ -170,7 +251,7 @@ non-blank. Compare the `Active login providers: [...]` startup line against what
 
 **A snakeyaml or fabric8 `KubeConfigUtils` stack trace during startup.** Harmless. The Kubernetes client bean is built
 unconditionally and parses your `~/.kube/config`, but nothing in the local stack consumes it. Add
-`export KUBECONFIG=/path/that/does/not/exist` to `variables.sh` to silence it.
+`export KUBECONFIG=/path/that/does/not/exist` to your variables file to silence it.
 
 **A port is still in use after an unclean exit.** `make stop-local-api-ui` kills whatever is listening on 8080 and
 3000.

@@ -592,7 +592,6 @@ api/service/logs/support-bot.log
 
 # Environment files with secrets (anywhere in repo)
 .env.local
-variables.sh
 
 # UI (Next.js)
 ui/node_modules/
