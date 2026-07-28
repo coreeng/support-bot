@@ -256,6 +256,18 @@ public class SupportBotClient {
                     .as(AnalysisStatusResponse.class);
         }
 
+        public AnalysisPromptResponse prompt() {
+            return request()
+                    .when()
+                    .get(baseUrl + "/analysis/prompt")
+                    .then()
+                    .log()
+                    .ifValidationFails(LogDetail.ALL, true)
+                    .statusCode(200)
+                    .extract()
+                    .as(AnalysisPromptResponse.class);
+        }
+
         public SummaryDataResultsResponse results() {
             return request()
                     .when()
@@ -618,6 +630,8 @@ public class SupportBotClient {
     }
 
     public record AnalysisEnabledResponse(boolean enabled) {}
+
+    public record AnalysisPromptResponse(String prompt) {}
 
     public record AnalysisStatusResponse(
             boolean running, @Nullable String error) {}
