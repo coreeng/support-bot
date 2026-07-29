@@ -6,7 +6,7 @@ Identify which accepted ADRs are relevant to a change and check whether the impl
 
 ## Change Context
 
-Review the supplied change context: changed files, changed modules, Jira ticket context, module guidance, relevant repository documents, and the selected ADRs. Use Jira context to understand the intended architectural scope and whether the work introduces a new decision that should be documented.
+Review the supplied change context: changed files, changed modules, module guidance, relevant repository documents, and the selected ADRs. Use that context to understand the architectural scope and whether the work introduces a new decision that should be documented.
 
 ## Scope Detection
 

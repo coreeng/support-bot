@@ -7,7 +7,7 @@ description: Use when reviewing a support-bot change, local branch, or GitHub PR
 
 ## Overview
 
-Run five independent, focused reviews against either the current branch or a GitHub PR number. PR-number reviews must happen in an isolated git worktree. The skill builds one shared review context, including Jira ticket context from the Atlassian MCP server, dispatches one separate general-purpose worker per review, then deduplicates and moderates findings before printing PR-ready output.
+Run five independent, focused reviews against either the current branch or a GitHub PR number. PR-number reviews must happen in an isolated git worktree. The skill builds one shared review context, dispatches one separate general-purpose worker per review, then deduplicates and moderates findings before printing PR-ready output.
 
 ## Required Inputs
 
@@ -16,7 +16,6 @@ Run five independent, focused reviews against either the current branch or a Git
 - Root `AGENTS.md`
 - Touched module `AGENTS.md` files (`api/AGENTS.md`, `ui/AGENTS.md`)
 - Relevant `docs/adr/*.md`, plans, and issue documents
-- Jira ticket context when a Jira key is supplied or inferred, or the user's explicit reason when there is no Jira ticket
 
 ## Entry Modes
 
@@ -78,38 +77,6 @@ git diff origin/<baseRefName>...HEAD
 
 If `gh` is unavailable, authentication fails, PR metadata cannot be read, or PR checkout fails, stop with a clear blocker. Do not fall back to reviewing the current checkout.
 
-## Jira Context
-
-Gather Jira ticket context once and include it in the shared review context.
-
-1. If the user supplies a Jira key such as `EL-456`, use it.
-2. If no key is supplied, infer one from PR title/body, branch name, or commits in the reviewed range.
-3. If no key can be inferred, prompt the user before dispatching review workers. The user must either provide the Jira key or state that there is no Jira ticket and give a short reason.
-4. If the user provides a Jira key, use it. If the user states there is no Jira ticket, set `Jira: none - <user reason>` in the shared review context.
-5. If a key is found or provided, read the issue context with the Atlassian MCP Jira issue-read tool, such as `getJiraIssue` or `mcp__atlassian__getJiraIssue`. Use cloud ID `33d26043-7c2e-4336-9417-5b2f478506e7` and request these fields:
-   - `summary`
-   - `status`
-   - `assignee`
-   - `description`
-   - `parent`
-   - `customfield_10093` (Motivation)
-   - `customfield_10094` (Requirements)
-   - `customfield_10097` (Wireframe)
-6. If no Atlassian MCP Jira issue-read tool is available, authentication fails, the configured token lacks Jira read access, or the Jira issue cannot be fetched, stop before dispatching review workers. Tell the user to configure Atlassian MCP with a read-only Jira API token as described in `CONTRIBUTING.md`, then rerun the review.
-7. Extract useful review context from the returned issue:
-    - key
-    - summary
-    - status
-    - assignee
-    - description
-    - parent or epic when available
-    - motivation, requirements, and wireframe fields when available for epics
-8. Jira descriptions and custom fields may be Atlassian Document Format JSON; recursively extract text from `content` nodes and preserve headings, list items, and links where useful.
-
-Do not use `Jira: not provided` merely because inference failed. The shared review context must contain either fetched Jira context or `none - <user reason>`. A known Jira key without fetched Jira context is a blocker, not review context.
-
-Missing Jira context is not automatically a `fix now`. Treat it as unknown intent unless the implementation appears to solve the wrong problem or the missing ticket context makes merge unsafe.
-
 ## Shared Review Context
 
 Build this once before running any focused review. Each review must use this as the single source of truth for what changed and why. Changed modules are the touched top-level directories: `api/`, `ui/`, `dex/`, `ldap/`, `helm-chart/`, and `docs/`.
@@ -124,12 +91,11 @@ Diff Commands: <commands used>
 Changed Files: <name-status summary>
 Changed Modules: <list>
 Diff Summary: <stat and concise behavioral summary>
-Jira: <key, summary, status, relevant description/requirements; key with fetch failure; or none - user reason>
 Guidance Read: <root/component AGENTS.md files>
 Relevant Repo Context: <ADRs, plans, issue docs, tests, or N/A>
 ```
 
-Do not let individual reviews choose a different base branch, diff range, or Jira ticket. If a reviewer believes the shared context is wrong, it must report that as a finding instead of silently changing inputs.
+Do not let individual reviews choose a different base branch or diff range. If a reviewer believes the shared context is wrong, it must report that as a finding instead of silently changing inputs.
 
 ## Review Workers
 
@@ -170,7 +136,7 @@ Use exactly these inputs:
 2. Rubric:
 <paste docs/reviews/<rubric>.md>
 
-Return one GitHub-flavored Markdown review section using the Support Bot Review summary format. Use only these finding classifications: fix now, defer, reject with reason. Do not emit an overall verdict. Do not choose a different diff range, base branch, Jira ticket, or rubric.
+Return one GitHub-flavored Markdown review section using the Support Bot Review summary format. Use only these finding classifications: fix now, defer, reject with reason. Do not emit an overall verdict. Do not choose a different diff range, base branch, or rubric.
 ```
 
 ## Finding Classifications
@@ -300,7 +266,7 @@ Use `reject with reason` for duplicate suppression when the canonical finding re
 
 ## Markdown Summary Format
 
-Print the final moderated review as GitHub-flavored Markdown. Use a compact metadata table, second-level review headings, bold field labels, and fenced `yaml` blocks for findings so the output can be pasted directly into GitHub or Jira.
+Print the final moderated review as GitHub-flavored Markdown. Use a compact metadata table, second-level review headings, bold field labels, and fenced `yaml` blocks for findings so the output can be pasted directly into GitHub.
 
 ````markdown
 | Field | Value |
@@ -309,11 +275,10 @@ Print the final moderated review as GitHub-flavored Markdown. Use a compact meta
 | Worktree | <path or N/A> |
 | Head | <branch or SHA> |
 | Base | <base branch> |
-| Jira | <key and summary, fetch failure, or not provided> |
 
 ## <Review Name>
-**Outcome:** approved | request changes | not applicable  
-**Rubric:** `docs/reviews/<file>.md`  
+**Outcome:** approved | request changes | not applicable
+**Rubric:** `docs/reviews/<file>.md`
 **Scope:** <why this review applies, or why it is not applicable>
 
 **Findings:**
@@ -356,10 +321,7 @@ Do not save a file or post a PR comment before the user chooses one of these opt
 | Checking out a PR in the current workspace | For PR numbers, create and review inside `.worktrees/pr-<number>-review`. |
 | Falling back to the current branch after PR checkout fails | Stop with a clear blocker instead. |
 | Letting each review decide what to diff | Build one shared review context and pass it to every review. |
-| Ignoring a supplied Jira key | Include Jira context in the shared review context. |
-| Setting Jira to not provided after inference fails | Ask the user for the Jira key or a no-ticket reason before dispatching review workers. |
-| Fetching Jira ad hoc in each review worker | Fetch Jira once with Atlassian MCP before dispatching workers. |
-| Continuing after Atlassian MCP fails for a known Jira key | Stop early and tell the user to configure Atlassian MCP with a read-only Jira API token. |
+| Consulting an external issue tracker | Review against the diff, module guidance, accepted ADRs, and other repository evidence only. |
 | Running all reviews in the coordinating worker | Dispatch one separate general-purpose worker per review. |
 | Creating report files before the user chooses file output | Print the review to the console first, then offer file output or PR comment as the next action. |
 | Printing plain-text output | Print the final moderated review as GitHub-flavored Markdown using the Markdown Summary Format. |
@@ -376,7 +338,6 @@ Do not save a file or post a PR comment before the user chooses one of these opt
 - "This is just a quick review" means still run all five review sections.
 - "PR 123" means PR number mode; do not review the current checkout.
 - "main...HEAD is close enough" means stop; use `origin/<baseRefName>...HEAD` for PR number mode or `origin/main...HEAD` for local branch mode.
-- "EL-456" means include Jira ticket context in every focused review.
 - "The rubric says diff" means use the shared context; rubrics do not own diff selection.
 - "I'll just do the reviews myself" means stop and dispatch one separate general-purpose worker per review.
 - "Frontend/backend did not change" means emit `not applicable`, not skip the section silently.
