@@ -702,6 +702,9 @@ public class PrDetectionService {
     /**
      * Detection for requires-codeowners repos. By default: no review deadline, "chase the code owner"
      * message, never review-escalates — unchanged from before this class had any code-owner awareness.
+     * On GitHub, {@link #excludingOwningTeam} drops the repo's own maintaining team from the chase list,
+     * so a pending list mixing the maintaining team with a genuinely external reviewer names only the
+     * external one.
      *
      * <p>One carve-out (an exception to that default): if the pending code owners ARE the repo's own
      * maintaining team ({@link #pendingCodeOwnersAreMaintainingTeam}), chasing them makes no sense — the
@@ -712,6 +715,10 @@ public class PrDetectionService {
      * no-SLA-tracked message. Everything else (a genuinely external pending code owner) keeps the
      * default chase message even if an override is configured — the override applies to the
      * normal/no-codeowner flow, not to a real chase.
+     *
+     * <p>A copy-only variation (no effect on the deadline or escalation): a draft PR with an empty pending
+     * list and a confirmed-unsatisfied gate that isn't changes-requested gets {@link
+     * #formatCodeownerDraftPendingText} instead of the default chase copy.
      *
      * <p>Path filtering still applies with no {@code sla} block: like any no-SLA repo, only PRs touching
      * the configured {@code paths} are tracked.
@@ -831,12 +838,23 @@ public class PrDetectionService {
                                 detectedPr.repositoryName(),
                                 resolveTeamLabel(repoConfig.owningTeam()));
                     }
+                } else if (prMetadata.isDraft()
+                        && prMetadata.codeOwnerReviewers().isEmpty()
+                        && Boolean.FALSE.equals(prMetadata.codeOwnersApproved())
+                        && !prMetadata.codeownerChangesRequested()) {
+                    // An empty pending list on a draft means the generic "needs code-owner approval" copy
+                    // would imply someone was asked when nobody may have been. codeOwnersApproved==FALSE
+                    // (rather than just an empty list) keeps this off the unknown case, where the gate
+                    // couldn't be read at all and the value is null.
+                    text = formatCodeownerDraftPendingText(
+                            detectedPr.provider(), detectedPr.repositoryName(), detectedPr.pullNumber());
                 } else {
                     text = formatCodeownerDetectedText(
                             detectedPr.provider(),
                             detectedPr.repositoryName(),
                             detectedPr.pullNumber(),
-                            prMetadata.codeOwnerReviewers());
+                            excludingOwningTeam(
+                                    detectedPr, repoConfig, prMetadata.codeOwnerReviewers(), teamReviewerCache));
                 }
                 postText(
                         text,
@@ -1340,12 +1358,32 @@ public class PrDetectionService {
     }
 
     /**
+     * Draft counterpart to {@link #formatCodeownerDetectedText}'s empty-list branch, which would imply
+     * someone had already been asked. States only that the PR is a draft — an empty pending list has
+     * several indistinguishable causes (never auto-requested, a review already submitted, an approval
+     * dismissed by a push), so the copy deliberately attributes none of them.
+     */
+    private String formatCodeownerDraftPendingText(Provider provider, String repo, int prNumber) {
+        String prRef = "<%s|%s %s%d>"
+                .formatted(
+                        prUrl(repo, prNumber),
+                        PrTerminology.noun(provider),
+                        PrTerminology.separator(provider),
+                        prNumber);
+        return "%s in `%s` is still a draft, so it's not ready for code-owner review yet. I'll let you know once the code owners have approved."
+                .formatted(prRef, repo);
+    }
+
+    /**
      * True when every pending code owner on this PR is a member of the repo's configured maintaining team
      * ({@code github-team-slug} / {@code gitlab-group-path}). A one-shot check at detection time — never
      * re-evaluated later.
      *
-     * <p>Defaults to {@code false} (keep the chase copy) whenever it can't be confirmed for sure: nothing
-     * pending, no team configured, or membership can't be resolved.
+     * <p>Defaults to {@code false} whenever it can't be confirmed for sure: nothing pending, no team
+     * configured, or membership can't be resolved. That default doesn't always mean the chase copy is
+     * used verbatim — an empty pending list on a draft PR can instead get {@link
+     * #formatCodeownerDraftPendingText}, and even the default chase copy has the maintaining team
+     * excluded from it by {@link #excludingOwningTeam}.
      */
     private boolean pendingCodeOwnersAreMaintainingTeam(
             DetectedPr detectedPr,
@@ -1361,18 +1399,12 @@ public class PrDetectionService {
             if (teamSlug == null) {
                 return false;
             }
-            String repoName = detectedPr.repositoryName();
-            int slash = repoName.indexOf('/');
-            if (slash <= 0) {
-                // Repo name came from parsing whatever URL the user pasted, so "org/repo" isn't guaranteed.
-                log.atWarn()
-                        .addArgument(() -> repoName)
-                        .addArgument(detectedPr::pullNumber)
-                        .log(
-                                "Repo name {} for PR #{} has no org/repo separator — can't confirm the maintaining-team carve-out, keeping the code-owner chase copy");
+            String expectedTeamDisplay = expectedGithubTeamDisplay(detectedPr, teamSlug);
+            if (expectedTeamDisplay == null) {
+                logUnparseableRepoName(
+                        detectedPr, "can't confirm the maintaining-team carve-out, keeping the code-owner chase copy");
                 return false;
             }
-            String expectedTeamDisplay = repoName.substring(0, slash) + "/" + teamSlug;
             for (CodeOwnerRef ref : pending) {
                 if (ref.isTeam()) {
                     if (!ref.display().equalsIgnoreCase(expectedTeamDisplay)) {
@@ -1412,6 +1444,96 @@ public class PrDetectionService {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Drops the repo's own maintaining team ({@code github-team-slug}) — as a team ref, or as an
+     * individual member of it — out of a pending code-owner list before it's rendered in the chase
+     * message. {@link #pendingCodeOwnersAreMaintainingTeam} only suppresses the chase copy when the
+     * maintaining team is the ENTIRE pending list; when the list is mixed (the maintaining team plus a
+     * genuinely external reviewer), that carve-out doesn't engage and the chase message would otherwise
+     * tell the owning team to chase itself. This never changes which repos get the carve-out or their SLA
+     * deadline — it only trims what gets named in the chase text. Mirrors
+     * {@link #pendingCodeOwnersAreMaintainingTeam}'s own per-entry matching (team-ref display, or
+     * individual membership via {@link #teamReviewFilter}), so anything that method would count as "the
+     * maintaining team" is excluded here too.
+     */
+    private List<CodeOwnerRef> excludingOwningTeam(
+            DetectedPr detectedPr,
+            PrTrackingProps.Repository repoConfig,
+            List<CodeOwnerRef> pending,
+            Map<String, Optional<Set<String>>> teamReviewerCache) {
+        if (pending.isEmpty() || detectedPr.provider() != Provider.GITHUB) {
+            return pending;
+        }
+        String teamSlug = repoConfig.githubTeamSlug();
+        if (teamSlug == null) {
+            return pending;
+        }
+        String expectedTeamDisplay = expectedGithubTeamDisplay(detectedPr, teamSlug);
+        if (expectedTeamDisplay == null) {
+            logUnparseableRepoName(
+                    detectedPr, "leaving the chase list unfiltered, so it may name the repo's own maintaining team");
+            return pending;
+        }
+        // Resolving members needs org Members:Read, which repos listing only teams in CODEOWNERS never
+        // otherwise pay for, so only look it up when an individual ref actually has to be matched.
+        Set<String> members = null;
+        if (pending.stream().anyMatch(ref -> !ref.isTeam())) {
+            RepoCoord coord = new RepoCoord(detectedPr.provider(), detectedPr.repositoryName());
+            members = teamReviewFilter.resolveTeamMembers(coord, teamSlug, teamReviewerCache);
+            if (members == null) {
+                logTeamResolutionFailed(detectedPr, teamSlug);
+            }
+        }
+        Set<String> resolvedMembers = members;
+        List<CodeOwnerRef> filtered = pending.stream()
+                .filter(ref -> {
+                    if (ref.isTeam()) {
+                        return !ref.display().equalsIgnoreCase(expectedTeamDisplay);
+                    }
+                    // resolvedMembers == null means resolution failed, same as the sibling carve-out
+                    // check — fail safe by keeping the entry in the chase list rather than risking
+                    // dropping a genuinely external reviewer we couldn't confirm is a team member.
+                    return resolvedMembers == null
+                            || resolvedMembers.stream().noneMatch(member -> member.equalsIgnoreCase(ref.display()));
+                })
+                .toList();
+        if (filtered.isEmpty()) {
+            // The carve-out runs first on this same list and would have suppressed the chase copy
+            // entirely if every entry were the maintaining team, so this should be unreachable. Falling
+            // back to the unfiltered list keeps a real chase list rather than silently naming nobody.
+            log.atWarn()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .log("Owning-team filter emptied the chase list for {}#{}, falling back to the unfiltered list");
+            return pending;
+        }
+        return filtered;
+    }
+
+    /**
+     * The org-qualified display string ({@code org/team}) GitHub uses for a team ref, derived from the
+     * repo's own {@code org/repo} name and the configured {@code teamSlug}. {@code null} when the repo
+     * name has no parseable org prefix (it came from parsing whatever URL the user pasted, so "org/repo"
+     * isn't guaranteed); callers log that themselves, since the consequence differs per caller.
+     */
+    private @Nullable String expectedGithubTeamDisplay(DetectedPr detectedPr, String teamSlug) {
+        String repoName = detectedPr.repositoryName();
+        int slash = repoName.indexOf('/');
+        if (slash <= 0) {
+            return null;
+        }
+        return repoName.substring(0, slash) + "/" + teamSlug;
+    }
+
+    /** Marks that an unparseable {@code org/repo} name, not a genuine mismatch, is why a check bailed. */
+    private void logUnparseableRepoName(DetectedPr detectedPr, String consequence) {
+        log.atWarn()
+                .addArgument(detectedPr::repositoryName)
+                .addArgument(detectedPr::pullNumber)
+                .addArgument(() -> consequence)
+                .log("Repo name {} for PR #{} has no org/repo separator — {}");
     }
 
     /** Marks that a lookup failure, not a genuine mismatch, is why the carve-out didn't engage. */

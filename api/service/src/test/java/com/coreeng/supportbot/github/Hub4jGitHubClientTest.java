@@ -347,6 +347,33 @@ class Hub4jGitHubClientTest {
     }
 
     @Test
+    void getPullRequestMapsIsDraftTrue() throws IOException {
+        // given
+        TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
+        pr.testDraft = true;
+        stubReviews(pr, List.of());
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.isDraft()).isTrue();
+    }
+
+    @Test
+    void getPullRequestMapsIsDraftFalse() throws IOException {
+        // given
+        TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
+        stubReviews(pr, List.of());
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.isDraft()).isFalse();
+    }
+
+    @Test
     void getPullRequestMapsApprovedReviewCorrectly() throws IOException {
         // given
         TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
@@ -648,6 +675,8 @@ class Hub4jGitHubClientTest {
 
         @Nullable String testMergeableState;
 
+        boolean testDraft;
+
         @Nullable String testAuthorLogin;
 
         List<GHTeam> testRequestedTeams = List.of();
@@ -684,6 +713,11 @@ class Hub4jGitHubClientTest {
         @Override
         public String getMergeableState() throws IOException {
             return testMergeableState;
+        }
+
+        @Override
+        public boolean isDraft() throws IOException {
+            return testDraft;
         }
 
         @Override
@@ -749,6 +783,7 @@ class Hub4jGitHubClientTest {
         pr.returnNullIssueState = false;
         pr.testMergeable = null;
         pr.testMergeableState = null;
+        pr.testDraft = false;
         pr.testRequestedTeams = List.of();
         pr.testRequestedTeamsException = null;
         pr.testReviewsException = null;

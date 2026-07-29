@@ -101,4 +101,28 @@ class GitHubPullRequestTest {
         assertThat(closed.isOpen()).isFalse();
         assertThat(merged.isOpen()).isFalse();
     }
+
+    @Test
+    void isDraftDefaultsFalseWhenNotSuppliedByLegacyConstructors() {
+        var pr = new GitHubPullRequest(
+                "org/repo", 1, CREATED_AT, GitHubPullRequest.PrState.OPEN, true, "clean", List.of(), List.of());
+        assertThat(pr.isDraft()).isFalse();
+    }
+
+    @Test
+    void withCodeownerReviewPreservesIsDraft() {
+        var pr = new GitHubPullRequest(
+                "org/repo",
+                1,
+                CREATED_AT,
+                GitHubPullRequest.PrState.OPEN,
+                true,
+                "clean",
+                List.of(),
+                List.of(),
+                "author",
+                true);
+        var updated = pr.withCodeownerReview(GitHubPullRequest.ReviewDecision.REVIEW_REQUIRED, List.of());
+        assertThat(updated.isDraft()).isTrue();
+    }
 }

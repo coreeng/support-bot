@@ -24,7 +24,8 @@ public record GitHubPullRequest(
         List<GitHubPullRequestReview> reviews,
         @Nullable String authorLogin,
         @Nullable ReviewDecision reviewDecision,
-        List<CodeOwnerReviewer> codeOwnerReviewers) {
+        List<CodeOwnerReviewer> codeOwnerReviewers,
+        boolean isDraft) {
     public GitHubPullRequest {
         requireNonNull(repositoryName, "repositoryName must not be null");
         requireNonNull(createdAt, "createdAt must not be null");
@@ -36,6 +37,38 @@ public record GitHubPullRequest(
         if (pullRequestNumber <= 0) {
             throw new IllegalArgumentException("pullRequestNumber must be positive, was " + pullRequestNumber);
         }
+    }
+
+    /**
+     * Preserves every existing caller's shape from before {@code isDraft} existed, defaulting it to
+     * {@code false} — draft-awareness is opt-in via the constructors below, not a behavior change for
+     * anyone not yet passing it explicitly.
+     */
+    public GitHubPullRequest(
+            String repositoryName,
+            int pullRequestNumber,
+            Instant createdAt,
+            PrState state,
+            @Nullable Boolean mergeable,
+            @Nullable String mergeableState,
+            @Nullable List<String> requestedTeamReviewerLogins,
+            List<GitHubPullRequestReview> reviews,
+            @Nullable String authorLogin,
+            @Nullable ReviewDecision reviewDecision,
+            List<CodeOwnerReviewer> codeOwnerReviewers) {
+        this(
+                repositoryName,
+                pullRequestNumber,
+                createdAt,
+                state,
+                mergeable,
+                mergeableState,
+                requestedTeamReviewerLogins,
+                reviews,
+                authorLogin,
+                reviewDecision,
+                codeOwnerReviewers,
+                false);
     }
 
     /** Convenience constructor for callers (and tests) that don't supply an author. */
@@ -91,6 +124,36 @@ public record GitHubPullRequest(
                 List.of());
     }
 
+    /**
+     * Convenience constructor for the hub4j REST path with draft status known but no code-owner signals
+     * yet (those are populated only by the GraphQL client, for {@code requires-codeowners} repos).
+     */
+    public GitHubPullRequest(
+            String repositoryName,
+            int pullRequestNumber,
+            Instant createdAt,
+            PrState state,
+            @Nullable Boolean mergeable,
+            @Nullable String mergeableState,
+            @Nullable List<String> requestedTeamReviewerLogins,
+            List<GitHubPullRequestReview> reviews,
+            @Nullable String authorLogin,
+            boolean isDraft) {
+        this(
+                repositoryName,
+                pullRequestNumber,
+                createdAt,
+                state,
+                mergeable,
+                mergeableState,
+                requestedTeamReviewerLogins,
+                reviews,
+                authorLogin,
+                null,
+                List.of(),
+                isDraft);
+    }
+
     /** Returns a copy with the code-owner review signals (from the GraphQL client) populated. */
     public GitHubPullRequest withCodeownerReview(
             @Nullable ReviewDecision reviewDecision, List<CodeOwnerReviewer> codeOwnerReviewers) {
@@ -105,7 +168,8 @@ public record GitHubPullRequest(
                 reviews,
                 authorLogin,
                 reviewDecision,
-                codeOwnerReviewers);
+                codeOwnerReviewers,
+                isDraft);
     }
 
     public boolean isOpen() {

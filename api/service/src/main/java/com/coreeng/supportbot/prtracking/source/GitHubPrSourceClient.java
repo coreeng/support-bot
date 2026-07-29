@@ -93,7 +93,8 @@ public class GitHubPrSourceClient implements PrSourceClient {
                     codeownerChangesRequested,
                     pr.codeOwnerReviewers().stream()
                             .map(GitHubPrSourceClient::mapCodeOwner)
-                            .toList());
+                            .toList(),
+                    pr.isDraft());
         } catch (GitHubApiException e) {
             throw new PrSourceException(e.getMessage(), e);
         }
