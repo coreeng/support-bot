@@ -131,7 +131,22 @@ CREATE TABLE analysis (
 ```
 
 
-### 5. AI Transformation Workflow
+### 5. Analysis Prompt Endpoint: `GET /analysis/prompt`
+
+**Purpose:** Return the raw analysis prompt template so support engineers can inspect it in the UI (View Prompt button on the Support Area Summary page).
+
+**Input:**
+- None
+
+**Output:**
+- JSON response: `{ "prompt": "..." }` — the contents of the file configured by `analysis.prompt.file`
+
+**Behavior:**
+- Registered only when `analysis.prompt.enabled=true`
+- The UI reaches it through the BFF proxy `GET /api/analysis/prompt`, which requires the `SUPPORT_ENGINEER` role and a CSRF token in the `X-CSRF-Token` header
+- If the prompt file cannot be read, returns 500 (no fallback content)
+
+### 6. AI Transformation Workflow
 
 **Pre-requisites:**
 
@@ -166,11 +181,11 @@ npm install -g @augmentcode/auggie-sdk
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│ 2. GET PROMPT                                                       │
-│    GET /api/summary-data/prompt                                                  │
+│ 2. GET ANALYSIS BUNDLE                                              │
+│    GET /api/summary-data/analysis                                   │
 │    (requires SUPPORT_ENGINEER role)                                 │
 │    (requires CSRF token in X-CSRF-Token header)                     │
-│    → analysis.zip                        │
+│    → analysis.zip                                                   │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
                              ▼
@@ -213,7 +228,7 @@ npm install -g @augmentcode/auggie-sdk
 |------------------------|----------------|------------------------------------|
 | `/summary-data/export` | Restricted     | `SUPPORT_ENGINEER`                 |
 | `/summary-data/import` | Restricted     | `SUPPORT_ENGINEER`                 |
-| `/api/prompt`          | Restricted     | `SUPPORT_ENGINEER`                 |
+| `/analysis/prompt`     | Restricted     | `SUPPORT_ENGINEER`                 |
 | `/analysis`            | Restricted     | `LEADERSHIP` or `SUPPORT_ENGINEER` |
 
 ## Taxonomy

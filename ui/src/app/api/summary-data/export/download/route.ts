@@ -1,4 +1,5 @@
 import { backendAccessToken, errorResponse, proxyFetch, unauthorizedResponse } from "@/app/api/_lib/backend-fetch";
+import { validateCsrfToken } from "@/app/api/_lib/csrf";
 import { NextRequest } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
@@ -10,21 +11,9 @@ export async function GET(request: NextRequest) {
     return unauthorizedResponse();
   }
 
-  // Validate CSRF token for GET requests that export sensitive data
-  const csrfTokenFromHeader = request.headers.get("X-CSRF-Token");
-  const csrfCookieName = process.env.NODE_ENV === "production" ? "__Host-authjs.csrf-token" : "authjs.csrf-token";
-  const csrfCookieValue = request.cookies.get(csrfCookieName)?.value;
-
-  if (!csrfTokenFromHeader || !csrfCookieValue) {
-    return errorResponse("Missing CSRF token", 403);
-  }
-
-  // NextAuth CSRF token format: "token|hash"
-  const cookieToken = csrfCookieValue.split("|")[0];
-
-  if (csrfTokenFromHeader !== cookieToken) {
-    return errorResponse("Invalid CSRF token", 403);
-  }
+  // CSRF-checked despite being a GET: the response exports sensitive data.
+  const csrfError = validateCsrfToken(request);
+  if (csrfError) return csrfError;
 
   // proxyFetch (not backendFetch) since backendFetch hardcodes Accept/Content-Type to
   // application/json — wrong for a binary zip download — but this still gets the same

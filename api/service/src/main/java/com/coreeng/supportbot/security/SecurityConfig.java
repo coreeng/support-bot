@@ -3,6 +3,7 @@ package com.coreeng.supportbot.security;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.TeamService;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.LinkedHashMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -14,7 +15,12 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.access.AccessDeniedHandlerImpl;
+import org.springframework.security.web.access.RequestMatcherDelegatingAccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfigurationSource;
 
@@ -62,18 +68,19 @@ public class SecurityConfig {
                         .requestMatchers("/summary-data/**")
                         .hasAnyRole("SUPPORT_ENGINEER")
                         // Analysis endpoints restricted to support engineers
-                        .requestMatchers("/analysis/status", "/analysis/run")
+                        .requestMatchers("/analysis/status", "/analysis/run", "/analysis/prompt")
                         .hasAnyRole("SUPPORT_ENGINEER")
                         // All other endpoints require authentication
                         .anyRequest()
                         .authenticated())
-                .exceptionHandling(
-                        exceptions -> exceptions.authenticationEntryPoint((request, response, authException) -> {
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, authException) -> {
                             // Return 401 for API endpoints with missing or expired auth
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json");
                             response.getWriter().write("{\"error\":\"Unauthorized\"}");
-                        }));
+                        })
+                        .accessDeniedHandler(accessDeniedHandler()));
 
         if (oauth2AvailabilityChecker.isOAuth2Available()) {
             http.oauth2Login(oauth2 -> oauth2.successHandler(oauth2SuccessHandler()));
@@ -83,6 +90,18 @@ public class SecurityConfig {
                 .addFilterBefore(testAuthBypassFilter(), JwtAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    private AccessDeniedHandler accessDeniedHandler() {
+        var handlers = new LinkedHashMap<RequestMatcher, AccessDeniedHandler>();
+        handlers.put(
+                PathPatternRequestMatcher.withDefaults().matcher("/analysis/prompt"),
+                (request, response, accessDeniedException) -> {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\"Forbidden\"}");
+                });
+        return new RequestMatcherDelegatingAccessDeniedHandler(handlers, new AccessDeniedHandlerImpl());
     }
 
     @Bean

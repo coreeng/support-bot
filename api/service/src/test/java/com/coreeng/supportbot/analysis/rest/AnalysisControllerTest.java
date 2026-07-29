@@ -78,4 +78,15 @@ class AnalysisControllerTest {
         assertThat(body.running()).isTrue();
         assertThat(body.error()).isNull();
     }
+
+    @Test
+    void getPrompt_returnsPromptText() {
+        when(analysisService.loadPrompt()).thenReturn("prompt text");
+
+        ResponseEntity<AnalysisController.AnalysisPromptResponse> response = controller.getPrompt();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().prompt()).isEqualTo("prompt text");
+    }
 }
