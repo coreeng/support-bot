@@ -74,6 +74,26 @@ class GitHubPrSourceClientTest {
     }
 
     @Test
+    void mapsIsDraftFromTheUnderlyingPullRequest() {
+        GitHubPrSourceClient client = codeownerClient();
+        when(gitHubClient.getPullRequest(eq(REPO), eq(PR), anyBoolean()))
+                .thenReturn(new GitHubPullRequest(
+                        REPO,
+                        PR,
+                        Instant.now(),
+                        GitHubPullRequest.PrState.OPEN,
+                        true,
+                        "clean",
+                        List.of(),
+                        List.of(),
+                        "author",
+                        true));
+        stubReview(GitHubPullRequest.ReviewDecision.REVIEW_REQUIRED);
+
+        assertThat(client.fetchPullRequest(COORD, PR).isDraft()).isTrue();
+    }
+
+    @Test
     void doesNotQueryGraphQlForNonCodeownerRepo() {
         GitHubPrSourceClient client = new GitHubPrSourceClient(gitHubClient, graphQlClient, props(false));
         stubOpenPr();

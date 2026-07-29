@@ -592,11 +592,13 @@ class PrDetectionServiceTest {
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
-            // then — no deadline (the overlap couldn't be confirmed), and the original chase copy.
+            // then — no deadline (the overlap couldn't be confirmed), and the original chase copy naming
+            // the pending team (proving the chase list wasn't silently filtered to empty).
             verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
             assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
             verify(slackClient).postMessage(postMessageCaptor.capture());
-            assertThat(postMessageCaptor.getValue().message().getText()).contains("code-owner");
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("code-owner").contains("chase").contains("my-org/docs-team");
         }
 
         @Test
@@ -645,6 +647,437 @@ class PrDetectionServiceTest {
             assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
             verify(slackClient).postMessage(postMessageCaptor.capture());
             assertThat(postMessageCaptor.getValue().message().getText()).contains("code-owner");
+        }
+
+        @Test
+        void chaseMessageExcludesOwningTeamButKeepsExternalCodeOwnerWhenPendingListIsMixed() {
+            // given — github-team-slug IS configured, and the pending list is a MIX: the maintaining team
+            // itself plus a genuinely external team. The maintaining-team carve-out doesn't engage here
+            // (not every pending owner is the maintaining team), so the chase copy is used — but it must
+            // never tell the owning team to chase itself; the external team still needs to be named.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            "docs-team",
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(
+                                    new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/security-team", null),
+                                    new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/docs-team", null))));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — no deadline (the carve-out didn't engage for a mixed list), the chase copy is used,
+            // it names the external team, and it never names the owning team as something to chase.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("code-owner").contains("chase");
+            assertThat(text).contains("my-org/security-team");
+            assertThat(text).doesNotContain("docs-team");
+        }
+
+        @Test
+        void chaseMessageExcludesIndividualOwningTeamMemberButKeepsExternalCodeOwnerWhenPendingListIsMixed() {
+            // given — same mixed-list shape as the test above, but CODEOWNERS names the maintaining
+            // team's member as an INDIVIDUAL rather than the team handle. Filtering must catch this case
+            // too, the same way pendingCodeOwnersAreMaintainingTeam's own per-entry check already does —
+            // otherwise the "chase yourself" bug reproduces verbatim whenever a repo lists individuals
+            // instead of the team.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            "docs-team",
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.resolveTeamMembers(COORD, "docs-team")).thenReturn(List.of("owner-a"));
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(
+                                    new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/security-team", null),
+                                    new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", null))));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — no deadline (the carve-out didn't engage for a mixed list), the chase copy is used,
+            // it names the external team, and it never names the owning team's individual member.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("code-owner").contains("chase");
+            assertThat(text).contains("my-org/security-team");
+            assertThat(text).doesNotContain("owner-a");
+        }
+
+        @Test
+        void postsDraftPendingTextWhenDraftPrHasNeverHadCodeownersRequested() {
+            // given — a requires-codeowners repo, and a PR that's still a draft with an EMPTY pending
+            // code-owner list: GitHub hasn't run CODEOWNERS auto-request yet (this PR was opened directly
+            // as a draft and never marked ready-for-review), not "requested and already actioned."
+            // Claiming "needs code-owner approval" here would be misleading.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            null,
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(),
+                            true));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — no deadline, and honest "still a draft" wording instead of the code-owner chase copy.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("draft");
+            assertThat(text).doesNotContain("needs code-owner approval").doesNotContain("chase");
+        }
+
+        @Test
+        void keepsGenericChaseMessageWhenDraftPrHasEmptyListButCodeownerGateWasNeverConfirmed() {
+            // given — same draft, same empty pending list as the test above, but codeOwnersApproved is
+            // null rather than false: the GraphQL codeowner query failed or was never attempted, so the
+            // empty list can't actually be attributed to "GitHub hasn't asked yet" — that's simply
+            // unknown. The draft-pending copy must NOT engage here; the original, cause-agnostic generic
+            // copy is used instead, same as a non-draft PR with the gate unresolved.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            null,
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            null,
+                            false,
+                            List.of(),
+                            true));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — no deadline, and the original generic "needs code-owner approval" copy, NOT the
+            // draft-pending wording (which would wrongly assert a cause we haven't actually confirmed).
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("needs code-owner approval");
+            assertThat(text).doesNotContain("still a draft");
+        }
+
+        @Test
+        void keepsNormalChaseMessageWhenDraftPrAlreadyHasPendingCodeOwners() {
+            // given — the PR is a draft, but it already has a real, non-empty pending code-owner list
+            // (e.g. it was opened ready-for-review and converted to draft afterward, so GitHub already ran
+            // CODEOWNERS auto-request against it). The draft-pending copy must NOT engage here — the
+            // pending code owners genuinely need chasing, same as a non-draft PR.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            null,
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/security-team", null)),
+                            true));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — the normal chase copy, naming the pending team, exactly as a non-draft PR would get.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("code-owner").contains("chase").contains("my-org/security-team");
+        }
+
+        @Test
+        void keepsGenericChaseMessageWhenDraftPrHasEmptyListBecauseCodeOwnerRequestedChanges() {
+            // given — a draft PR with an empty pending list, but the gate is unsatisfied because a code
+            // owner reviewed and REQUESTED CHANGES. GitHub drops a reviewer from reviewRequests once they
+            // submit, so the list is empty for a reason that has nothing to do with draft status, and
+            // codeOwnersApproved is false for CHANGES_REQUESTED exactly as it is for REVIEW_REQUIRED. The
+            // draft copy must not engage — a code owner demonstrably was asked and did answer.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            null,
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            true,
+                            List.of(),
+                            true));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — the generic copy, never the draft wording.
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("needs code-owner approval");
+            assertThat(text).doesNotContain("still a draft");
+        }
+
+        @Test
+        void doesNotResolveTeamMembersWhenPendingCodeOwnersAreAllTeams() {
+            // given — a mixed pending list of TEAM refs only. Team refs match on display name alone, so
+            // filtering must not spend an org Members:Read lookup that repos listing only teams in
+            // CODEOWNERS would otherwise never need.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            "docs-team",
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(
+                                    new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/security-team", null),
+                                    new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/docs-team", null))));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — the owning team is still filtered out, with no membership lookup at all.
+            verify(prSourceClient, never()).resolveTeamMembers(any(), any());
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("my-org/security-team");
+            assertThat(text).doesNotContain("docs-team");
+        }
+
+        @Test
+        void keepsExternalCodeOwnerInChaseListWhenTeamMemberResolutionFails() {
+            // given — a mixed list with an individual ref, and membership resolution failing. The filter
+            // must fail safe: an individual it couldn't confirm is a team member stays in the chase list,
+            // rather than being silently dropped and leaving nobody to chase.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            "docs-team",
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.resolveTeamMembers(COORD, "docs-team")).thenThrow(new PrSourceException("boom"));
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            false,
+                            List.of(
+                                    new CodeOwnerRef(CodeOwnerRef.Kind.TEAM, "my-org/docs-team", null),
+                                    new CodeOwnerRef(CodeOwnerRef.Kind.USER, "external-user", null))));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — the unconfirmable individual survives; the team ref (matched on display alone, which
+            // needs no lookup) is still dropped.
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("chase").contains("external-user");
+            assertThat(text).doesNotContain("docs-team");
         }
 
         @Test
@@ -698,6 +1131,55 @@ class PrDetectionServiceTest {
         }
 
         @Test
+        void skipsChaseMessageWhenCodeOwnersAlreadyApprovedAtDetectionEvenForADraftPr() {
+            // given — same already-approved case as above, but the PR is ALSO a draft with an empty
+            // pending list. The isDraft-pending branch must never even be considered here: the outer
+            // "already approved" skip has to win first, exactly as it does for a non-draft PR.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            null,
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            true,
+                            false,
+                            List.of(),
+                            true));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — the record is created but no message is posted at all, draft-pending or otherwise.
+            verify(prTrackingRepository).insertIfAbsent(any());
+            verify(slackClient, never()).postMessage(any());
+            verify(prTrackingRepository, never()).markCodeownerReviewRequested(anyLong());
+        }
+
+        @Test
         void tracksNoSlaCodeownerPrTouchingConfiguredPaths() {
             // given — a requires-codeowners repo with no SLA block (so config mandates paths) and a PR
             // that touches the configured paths.
@@ -739,11 +1221,14 @@ class PrDetectionServiceTest {
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
-            // then — tracked with no deadline, and the code-owner chase message is posted.
+            // then — tracked with no deadline, and the code-owner chase message is posted. This PR is not a
+            // draft, so it must never get the draft copy — that pins the isDraft half of the draft guard.
             verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
             assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
             verify(slackClient).postMessage(postMessageCaptor.capture());
-            assertThat(postMessageCaptor.getValue().message().getText()).contains("code-owner");
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("needs code-owner approval");
+            assertThat(text).doesNotContain("still a draft");
         }
 
         @Test
@@ -893,11 +1378,13 @@ class PrDetectionServiceTest {
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
-            // then — no deadline, and the original chase copy.
+            // then — no deadline, and the original chase copy naming the pending owner (proving the
+            // chase list wasn't silently filtered to empty).
             verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
             assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
             verify(slackClient).postMessage(postMessageCaptor.capture());
-            assertThat(postMessageCaptor.getValue().message().getText()).contains("code-owner");
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("code-owner").contains("chase").contains("owner-a");
         }
 
         @Test

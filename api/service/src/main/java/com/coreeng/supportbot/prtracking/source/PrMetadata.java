@@ -33,7 +33,8 @@ public record PrMetadata(
         @Nullable String authorLogin,
         @Nullable Boolean codeOwnersApproved,
         boolean codeownerChangesRequested,
-        List<CodeOwnerRef> codeOwnerReviewers) {
+        List<CodeOwnerRef> codeOwnerReviewers,
+        boolean isDraft) {
     public PrMetadata {
         requireNonNull(coord, "coord must not be null");
         requireNonNull(createdAt, "createdAt must not be null");
@@ -48,6 +49,38 @@ public record PrMetadata(
         if (Boolean.TRUE.equals(codeOwnersApproved) && codeownerChangesRequested) {
             throw new IllegalArgumentException("codeOwnersApproved and codeownerChangesRequested can't both be true");
         }
+    }
+
+    /**
+     * Preserves every existing caller's shape from before {@code isDraft} existed, defaulting it to
+     * {@code false} — draft-awareness is opt-in via the constructors below, not a behavior change for
+     * anyone not yet passing it explicitly.
+     */
+    public PrMetadata(
+            RepoCoord coord,
+            int number,
+            Instant createdAt,
+            PrState state,
+            @Nullable Boolean mergeable,
+            @Nullable List<String> requestedTeamReviewerLogins,
+            List<Review> reviews,
+            @Nullable String authorLogin,
+            @Nullable Boolean codeOwnersApproved,
+            boolean codeownerChangesRequested,
+            List<CodeOwnerRef> codeOwnerReviewers) {
+        this(
+                coord,
+                number,
+                createdAt,
+                state,
+                mergeable,
+                requestedTeamReviewerLogins,
+                reviews,
+                authorLogin,
+                codeOwnersApproved,
+                codeownerChangesRequested,
+                codeOwnerReviewers,
+                false);
     }
 
     /**
