@@ -92,7 +92,7 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.microsoft.kiota:microsoft-kiota-http-okHttp:1.9.1")
 
-    jooqCodegen("org.postgresql:postgresql:42.7.11")
+    jooqCodegen("org.postgresql:postgresql:42.7.12")
     jooqCodegen("org.testcontainers:testcontainers-postgresql:2.0.5")
     jooqCodegen("org.jooq:jooq-codegen:3.19.18")
 
@@ -220,7 +220,7 @@ buildscript {
     }
     dependencies {
         classpath("org.flywaydb:flyway-database-postgresql:12.0.0")
-        classpath("org.postgresql:postgresql:42.7.11")
+        classpath("org.postgresql:postgresql:42.7.12")
         classpath("org.testcontainers:testcontainers-postgresql:2.0.5")
         classpath("org.jooq:jooq-codegen:3.19.18")
     }
