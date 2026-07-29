@@ -237,14 +237,14 @@ public class AnalysisService {
      * Loads the prompt text from the file specified in {@link AnalysisProps#prompt()}.
      *
      * @return The prompt text content
-     * @throws RuntimeException if the file cannot be read
+     * @throws AnalysisPromptLoadException if the file cannot be read
      */
-    private String loadPrompt() {
+    public String loadPrompt() {
         try {
             String promptFile = analysisProps.prompt().file();
             return Files.readString(Path.of(promptFile));
         } catch (Exception e) {
-            throw new RuntimeException(
+            throw new AnalysisPromptLoadException(
                     "Failed to load prompt file: " + analysisProps.prompt().file(), e);
         }
     }
