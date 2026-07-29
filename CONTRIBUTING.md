@@ -224,7 +224,7 @@ to review the PR within 3 working days.
 
 Use the `support-bot-review` skill when reviewing support-bot PRs or local branches. The skill is in beta: treat its output as reviewer support, not as an automated decision. Reviewers are expected to understand every finding, validate it against the codebase, and make their own judgement before requesting changes or approving a PR.
 
-The review skill needs no external issue-tracker access. It derives change intent from the PR title and body, the branch name, commit messages, and repository documents such as plans, issue documents, and ADRs. Give the skill a short statement of intent when that evidence is thin.
+The review skill needs no external issue-tracker access. It reviews the diff against module guidance, accepted ADRs, and other repository evidence.
 
 During beta, improve the review system when it produces an invalid, unclear, duplicated, or missing finding. Depending on where the issue came from, update the relevant guidance in `AGENTS.md`, `.agents/skills/support-bot-review`, or `docs/reviews/`. The goal is to iterate until the review process is reliable enough to become automated.
 
