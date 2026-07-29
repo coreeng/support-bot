@@ -244,7 +244,7 @@ public class AnalysisService {
         try {
             prompt = analysisPromptRepository.findInUse();
         } catch (DataAccessException e) {
-            throw new AnalysisPromptLoadException("Failed to read the analysis prompt from the database", e);
+            throw new AnalysisPromptLoadException("Failed to read the analysis prompt", e);
         }
         if (prompt == null) {
             throw new AnalysisPromptLoadException("No analysis prompt version is marked as in use");

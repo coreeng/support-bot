@@ -139,12 +139,12 @@ CREATE TABLE analysis (
 - None
 
 **Output:**
-- JSON response: `{ "prompt": "..." }` — the text of the `analysis_prompt` version marked `is_in_use` (see [ADR-010](adr-010-database-backed-analysis-prompt.md))
+- JSON response: `{ "prompt": "..." }` — the contents of the file configured by `analysis.prompt.file`
 
 **Behavior:**
 - Registered only when `analysis.prompt.enabled=true`
 - The UI reaches it through the BFF proxy `GET /api/analysis/prompt`, which requires the `SUPPORT_ENGINEER` role and a CSRF token in the `X-CSRF-Token` header
-- If no version is in use or the database is unreachable, returns 500 (no fallback content)
+- If the prompt file cannot be read, returns 500 (no fallback content)
 
 ### 6. AI Transformation Workflow
 

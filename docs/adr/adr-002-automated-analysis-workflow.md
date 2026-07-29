@@ -103,8 +103,6 @@ This design does not prevent breaking thread batch into several sub-batches and 
 
 ### 5. Avoid re-analysis with teh same prompt
 
-> **Correction (2026-07, see [ADR-010](adr-010-database-backed-analysis-prompt.md)):** the prompt text is no longer read from `analysis/prompt.md`. It lives in the `analysis_prompt` table, and the hash below is computed over the version marked `is_in_use`. The hashing and skip logic are otherwise unchanged.
-
 In order to avoid re-analyzing the same thread with the same prompt, we will add a new column to the `analysis` table called `prompt`.
 This column will store the hash of the prompt's text. Before starting the analysis, we will compute the hash of the prompt text and check if there are any analysis records with a matching `prompt`. If there are, we will skip those threads.
 Each analysis record with be updated with the hash of the prompt used to generate it.
