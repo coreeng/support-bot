@@ -64,3 +64,6 @@ source:
       reason: "False positive: GitLab detector matched functional-test repository fixture names, not a credential."
     - id: 47cc33af5d9b098bb6d6f2effbf1b51150b5e11eec627d9fd41a8ad8ce4a343f
       reason: "False positive: URI detector matched a redirect URI validation test case for userinfo injection, not a secret."
+    - id: 38fa3e746d6e664a65484a44df7d4bbb2f913784ca977835df9801d6cc8f6b69
+      path: .agents/skills/support-bot-review/SKILL.md
+      reason: "False positive: Atlassian detector matched the public Jira cloud tenant identifier used by the Jira tool, not a credential."
