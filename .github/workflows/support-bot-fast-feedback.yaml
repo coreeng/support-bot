@@ -7,6 +7,8 @@ on:
     branches:
       - main
     paths-ignore:
+      - '.agents/**'
+      - '.claude/**'
       - 'api/k8s/dashboard/**'
       - 'ui/docs/**'
       - 'docs/**'
@@ -16,6 +18,9 @@ on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '.agents/**'
+      - '.claude/**'
 
 permissions:
   contents: write
