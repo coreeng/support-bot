@@ -15,12 +15,8 @@ import com.coreeng.supportbot.config.AnalysisProps.Bundle;
 import com.coreeng.supportbot.config.AnalysisProps.Prompt;
 import com.coreeng.supportbot.config.AnalysisProps.Vertex;
 import com.google.common.collect.ImmutableList;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.task.TaskRejectedException;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 @ExtendWith(MockitoExtension.class)
 class AnalysisServiceTest {
@@ -46,21 +43,21 @@ class AnalysisServiceTest {
     private AnalysisRepository analysisRepository;
 
     @Mock
+    private AnalysisPromptRepository analysisPromptRepository;
+
+    @Mock
     private ApplicationContext applicationContext;
+
+    private static final String PROMPT_TEXT = "Test prompt content";
 
     private AnalysisProps analysisProps;
     private AnalysisService service;
-    private Path tempPromptFile;
 
     @BeforeEach
-    void setUp() throws IOException {
-        // Create temporary prompt file for testing
-        tempPromptFile = Files.createTempFile("test-prompt", ".md");
-        Files.writeString(tempPromptFile, "Test prompt content");
-
+    void setUp() {
         Vertex vertex = new Vertex("test-project", "europe-west2", "gemini-2.5-flash", Duration.ofMillis(100));
         Bundle bundle = new Bundle("classpath:placeholder-analysis-bundle.zip");
-        Prompt prompt = new Prompt(true, tempPromptFile.toString());
+        Prompt prompt = new Prompt(true);
         analysisProps = new AnalysisProps(vertex, bundle, prompt);
 
         service = new AnalysisService(
@@ -68,15 +65,13 @@ class AnalysisServiceTest {
                 threadsAwaitingAnalysisService,
                 llmAnalysisService,
                 analysisRepository,
+                analysisPromptRepository,
                 analysisProps,
                 applicationContext);
     }
 
-    @AfterEach
-    void tearDown() throws IOException {
-        if (tempPromptFile != null) {
-            Files.deleteIfExists(tempPromptFile);
-        }
+    private void givenPromptInUse() {
+        when(analysisPromptRepository.findInUse()).thenReturn(new AnalysisPrompt(1, PROMPT_TEXT));
     }
 
     @Test
@@ -270,6 +265,7 @@ class AnalysisServiceTest {
     @Test
     void runAsyncAnalysis_analyzesThreadsAndPersists() {
         // given
+        givenPromptInUse();
         when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
                 .thenReturn(ImmutableList.of(
                         new ThreadToAnalyze(1L, "ts1", "C123456"), new ThreadToAnalyze(2L, "ts2", "C123456")));
@@ -303,6 +299,7 @@ class AnalysisServiceTest {
     @Test
     void runAsyncAnalysis_skipsInvalidRecords() {
         // given — first thread returns null (LLM failure), second returns valid record
+        givenPromptInUse();
         when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
                 .thenReturn(ImmutableList.of(
                         new ThreadToAnalyze(1L, "ts1", "C123456"), new ThreadToAnalyze(2L, "ts2", "C123456")));
@@ -370,6 +367,7 @@ class AnalysisServiceTest {
     @Test
     void runAsyncAnalysis_continuesAfterPerThreadException() {
         // given — first thread throws, second and third return valid records
+        givenPromptInUse();
         when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
                 .thenReturn(ImmutableList.of(
                         new ThreadToAnalyze(1L, "ts1", "C123456"),
@@ -397,22 +395,14 @@ class AnalysisServiceTest {
 
     @Test
     void runAsyncAnalysis_setsErrorOnPromptLoadFailure() {
-        // given — recreate service with nonexistent prompt file
-        AnalysisProps badProps = new AnalysisProps(
-                analysisProps.vertex(), analysisProps.bundle(), new Prompt(true, "/nonexistent/prompt.md"));
-        AnalysisService badService = new AnalysisService(
-                asyncJobRepository,
-                threadsAwaitingAnalysisService,
-                llmAnalysisService,
-                analysisRepository,
-                badProps,
-                applicationContext);
+        // given — no prompt version is marked as in use
+        when(analysisPromptRepository.findInUse()).thenReturn(null);
 
         // when
-        badService.runAsyncAnalysis(7);
+        service.runAsyncAnalysis(7);
 
         // then — error status set, job still cleaned up
-        AnalysisStatus status = badService.getStatus();
+        AnalysisStatus status = service.getStatus();
         assertThat(status.running()).isFalse();
         assertThat(status.error()).isNotNull();
         verify(asyncJobRepository).deleteJob("analysis");
@@ -420,24 +410,28 @@ class AnalysisServiceTest {
     }
 
     @Test
-    void loadPrompt_returnsPromptFileContent() {
-        assertThat(service.loadPrompt()).isEqualTo("Test prompt content");
+    void loadPrompt_returnsContentOfVersionInUse() {
+        givenPromptInUse();
+
+        assertThat(service.loadPrompt()).isEqualTo(PROMPT_TEXT);
     }
 
     @Test
-    void loadPrompt_throwsWithFilePathWhenFileMissing() {
-        AnalysisProps badProps = new AnalysisProps(
-                analysisProps.vertex(), analysisProps.bundle(), new Prompt(true, "/nonexistent/prompt.md"));
-        AnalysisService badService = new AnalysisService(
-                asyncJobRepository,
-                threadsAwaitingAnalysisService,
-                llmAnalysisService,
-                analysisRepository,
-                badProps,
-                applicationContext);
+    void loadPrompt_throwsWhenNoVersionIsInUse() {
+        when(analysisPromptRepository.findInUse()).thenReturn(null);
 
-        assertThatThrownBy(badService::loadPrompt)
+        assertThatThrownBy(service::loadPrompt)
                 .isInstanceOf(AnalysisPromptLoadException.class)
-                .hasMessageContaining("/nonexistent/prompt.md");
+                .hasMessageContaining("marked as in use");
+    }
+
+    @Test
+    void loadPrompt_wrapsDatabaseFailure() {
+        // Keeps the ANALYSIS_PROMPT_LOAD_FAILED contract the UI relies on when the DB is unreachable.
+        when(analysisPromptRepository.findInUse()).thenThrow(new DataAccessResourceFailureException("db down"));
+
+        assertThatThrownBy(service::loadPrompt)
+                .isInstanceOf(AnalysisPromptLoadException.class)
+                .hasRootCauseInstanceOf(DataAccessResourceFailureException.class);
     }
 }

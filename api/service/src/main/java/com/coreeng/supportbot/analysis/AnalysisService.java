@@ -6,8 +6,6 @@ import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.AnalysisProps;
 import com.google.common.collect.ImmutableList;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -20,6 +18,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.task.TaskRejectedException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -42,8 +41,8 @@ import org.springframework.stereotype.Service;
  * ({@code analysisTaskExecutor}) to avoid LLM rate limits and prevent double processing.
  *
  * <p>The service uses prompt versioning via {@code prompt_id} to avoid re-analyzing threads
- * when the prompt hasn't changed. The prompt ID is computed as a SHA-256 hash of the prompt
- * file content, so it auto-updates whenever the prompt changes.
+ * when the prompt hasn't changed. The prompt ID is computed as a SHA-256 hash of the in-use
+ * prompt's text, so it auto-updates whenever the prompt changes.
  */
 @Service
 @ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
@@ -62,6 +61,7 @@ public class AnalysisService {
     private final ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService;
     private final LlmAnalysisService llmAnalysisService;
     private final AnalysisRepository analysisRepository;
+    private final AnalysisPromptRepository analysisPromptRepository;
     private final AnalysisProps analysisProps;
     private final ApplicationContext applicationContext;
 
@@ -234,19 +234,22 @@ public class AnalysisService {
     }
 
     /**
-     * Loads the prompt text from the file specified in {@link AnalysisProps#prompt()}.
+     * Loads the text of the prompt version currently marked as in use.
      *
      * @return The prompt text content
-     * @throws AnalysisPromptLoadException if the file cannot be read
+     * @throws AnalysisPromptLoadException if no prompt version is marked as in use
      */
     public String loadPrompt() {
+        AnalysisPrompt prompt;
         try {
-            String promptFile = analysisProps.prompt().file();
-            return Files.readString(Path.of(promptFile));
-        } catch (Exception e) {
-            throw new AnalysisPromptLoadException(
-                    "Failed to load prompt file: " + analysisProps.prompt().file(), e);
+            prompt = analysisPromptRepository.findInUse();
+        } catch (DataAccessException e) {
+            throw new AnalysisPromptLoadException("Failed to read the analysis prompt from the database", e);
         }
+        if (prompt == null) {
+            throw new AnalysisPromptLoadException("No analysis prompt version is marked as in use");
+        }
+        return prompt.content();
     }
 
     /**

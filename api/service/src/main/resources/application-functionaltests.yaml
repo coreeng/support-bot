@@ -239,4 +239,3 @@ analysis:
     request-delay: 10ms
   prompt:
     enabled: true
-    file: ${ANALYSIS_PROMPT_FILE:service/analysis/prompt.md}
