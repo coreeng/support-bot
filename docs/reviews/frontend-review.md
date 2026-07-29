@@ -6,7 +6,7 @@ Find frontend regressions in Next.js, React, TypeScript, UI behavior, API usage,
 
 ## Change Context
 
-Review the supplied change context: changed files, changed modules, Jira ticket context, module guidance, relevant ADRs, and other repository evidence. Use Jira context to check that the changed UI and frontend behavior match the intended user workflow and acceptance criteria.
+Review the supplied change context: changed files, changed modules, change intent, module guidance, relevant ADRs, and other repository evidence. Use the change intent to check that the changed UI and frontend behavior match the intended user workflow and acceptance criteria.
 
 ## Scope Detection
 
@@ -34,4 +34,4 @@ Approve when changed frontend behavior is correct, authorized, maintainable, and
 
 ## Request Changes Rules
 
-Request changes for broken user flows, missing auth boundary checks, unsafe data exposure, contract mismatches, unhandled critical states, implementation that does not satisfy the Jira ticket's intended user workflow, missing required tests for changed behavior, or confusing frontend design that materially increases maintenance risk.
+Request changes for broken user flows, missing auth boundary checks, unsafe data exposure, contract mismatches, unhandled critical states, implementation that does not satisfy the intended user workflow in the change context, missing required tests for changed behavior, or confusing frontend design that materially increases maintenance risk.

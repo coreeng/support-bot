@@ -6,7 +6,7 @@ Find security regressions in a change, especially around APIs, authentication, a
 
 ## Change Context
 
-Review the supplied change context: changed files, changed modules, Jira ticket context, module guidance, relevant ADRs, and other repository evidence. Use that context to decide whether the security posture matches the intended users, permissions, and scope.
+Review the supplied change context: changed files, changed modules, change intent, module guidance, relevant ADRs, and other repository evidence. Use that context to decide whether the security posture matches the intended users, permissions, and scope.
 
 ## Auth, Permissions, And Data ADRs
 
@@ -44,4 +44,4 @@ Approve when the change does not show a blocking security concern, even if defer
 
 ## Request Changes Rules
 
-Request changes for missing auth/RBAC on new APIs, view-permission bypass, unsanitised or over-broad data export, sensitive data exposure, hard-coded secrets, unsafe token/session handling, or auth behavior that conflicts with accepted ADRs or the Jira ticket's intended access model.
+Request changes for missing auth/RBAC on new APIs, view-permission bypass, unsanitised or over-broad data export, sensitive data exposure, hard-coded secrets, unsafe token/session handling, or auth behavior that conflicts with accepted ADRs or the intended access model in the change context.

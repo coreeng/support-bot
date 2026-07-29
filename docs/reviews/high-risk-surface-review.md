@@ -6,7 +6,7 @@ Find risks on high-blast-radius surfaces: database schema, APIs, new modules, de
 
 ## Change Context
 
-Review the supplied change context: changed files, changed modules, Jira ticket context, module guidance, relevant ADRs, and other repository evidence. Use Jira context to check whether high-risk changes are necessary for the requested work and whether the ticket's scope justifies their blast radius.
+Review the supplied change context: changed files, changed modules, change intent, module guidance, relevant ADRs, and other repository evidence. Use the change intent to check whether high-risk changes are necessary for the requested work and whether the intended scope justifies their blast radius.
 
 ## Scope Detection
 
@@ -43,8 +43,8 @@ When reviewing integration, end-to-end, or functional tests, explicitly check wh
 
 ## Approval Rules
 
-Approve when changed high-risk surfaces are intentional, bounded, tested or verifiable, consistent with ADRs, and justified by the Jira ticket or change context.
+Approve when changed high-risk surfaces are intentional, bounded, tested or verifiable, consistent with ADRs, and justified by the change context.
 
 ## Request Changes Rules
 
-Request changes for unsafe migrations, under-specified API changes, unjustified dependencies, unowned modules, uncoordinated async/scheduled work, deployment regressions, high-risk changes outside the Jira ticket's intended scope, high-risk changes without adequate verification, or integration tests that can leak persistent resources in shared environments when setup or post-create assertions fail.
+Request changes for unsafe migrations, under-specified API changes, unjustified dependencies, unowned modules, uncoordinated async/scheduled work, deployment regressions, high-risk changes outside the intended scope in the change context, high-risk changes without adequate verification, or integration tests that can leak persistent resources in shared environments when setup or post-create assertions fail.

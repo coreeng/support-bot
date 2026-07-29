@@ -224,30 +224,7 @@ to review the PR within 3 working days.
 
 Use the `support-bot-review` skill when reviewing support-bot PRs or local branches. The skill is in beta: treat its output as reviewer support, not as an automated decision. Reviewers are expected to understand every finding, validate it against the codebase, and make their own judgement before requesting changes or approving a PR.
 
-The review skill requires Atlassian MCP access when a Jira ticket is supplied or inferred. Configure Atlassian MCP with a Jira read-only personal API token before using the skill for ticket-backed work. If the Atlassian MCP server is unavailable, the skill exits early and asks you to set it up rather than reviewing without ticket context.
-
-To configure Atlassian MCP in your MCP client:
-
-1. Create an Atlassian personal API token with only Jira read scopes.
-2. Base64-encode `<email>:<api-token>`.
-3. Add the Atlassian MCP server using this endpoint and authorization header:
-
-   ```json
-   {
-     "atlassian": {
-       "type": "remote",
-       "url": "https://mcp.atlassian.com/v1/mcp",
-       "headers": {
-         "Authorization": "Basic <base64-email-colon-token>"
-       }
-     }
-   }
-   ```
-
-4. Restart your MCP client if it does not hot-reload MCP configuration.
-5. Verify read access by asking your agent to read a known EL issue.
-
-The Jira cloud ID used by the review skill is `33d26043-7c2e-4336-9417-5b2f478506e7`. Do not grant write scopes for review-skill usage.
+The review skill needs no external issue-tracker access. It derives change intent from the PR title and body, the branch name, commit messages, and repository documents such as plans, issue documents, and ADRs. Give the skill a short statement of intent when that evidence is thin.
 
 During beta, improve the review system when it produces an invalid, unclear, duplicated, or missing finding. Depending on where the issue came from, update the relevant guidance in `AGENTS.md`, `.agents/skills/support-bot-review`, or `docs/reviews/`. The goal is to iterate until the review process is reliable enough to become automated.
 

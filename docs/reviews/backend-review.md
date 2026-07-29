@@ -6,7 +6,7 @@ Find backend regressions in the Spring Boot service under `api/` — controllers
 
 ## Change Context
 
-Review the supplied change context: changed files, changed modules, Jira ticket context, module guidance, relevant ADRs, and other repository evidence. Use Jira context to check that backend behavior, data model changes, auth behavior, and API semantics match the intended workflow and acceptance criteria.
+Review the supplied change context: changed files, changed modules, change intent, module guidance, relevant ADRs, and other repository evidence. Use the change intent to check that backend behavior, data model changes, auth behavior, and API semantics match the intended workflow and acceptance criteria.
 
 ## Scope Detection
 
@@ -42,8 +42,8 @@ Run this review when the change includes files under `api/`. If no backend files
 
 ## Approval Rules
 
-Approve when backend behavior is correct, authorized, maintainable, consistent with module and ADR guidance, and aligned with the Jira ticket's intended behavior.
+Approve when backend behavior is correct, authorized, maintainable, consistent with module and ADR guidance, and aligned with the intended behavior in the change context.
 
 ## Request Changes Rules
 
-Request changes for missing authorization, unsafe migrations, broken transaction semantics, incorrect API/auth behavior, implementation that does not satisfy the Jira ticket's intended backend behavior, missing required behavioral tests, confusing backend design that materially increases maintenance risk, or a `fix now` finding for custom logic that duplicates likely built-in Spring functionality after the reviewer verifies the current Spring/Spring Boot feature and the built-in would reduce maintenance risk without violating repo requirements.
+Request changes for missing authorization, unsafe migrations, broken transaction semantics, incorrect API/auth behavior, implementation that does not satisfy the intended backend behavior in the change context, missing required behavioral tests, confusing backend design that materially increases maintenance risk, or a `fix now` finding for custom logic that duplicates likely built-in Spring functionality after the reviewer verifies the current Spring/Spring Boot feature and the built-in would reduce maintenance risk without violating repo requirements.
