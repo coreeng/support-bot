@@ -277,8 +277,8 @@ Print the final moderated review as GitHub-flavored Markdown. Use a compact meta
 | Base | <base branch> |
 
 ## <Review Name>
-**Outcome:** approved | request changes | not applicable  
-**Rubric:** `docs/reviews/<file>.md`  
+**Outcome:** approved | request changes | not applicable
+**Rubric:** `docs/reviews/<file>.md`
 **Scope:** <why this review applies, or why it is not applicable>
 
 **Findings:**
@@ -338,7 +338,6 @@ Do not save a file or post a PR comment before the user chooses one of these opt
 - "This is just a quick review" means still run all five review sections.
 - "PR 123" means PR number mode; do not review the current checkout.
 - "main...HEAD is close enough" means stop; use `origin/<baseRefName>...HEAD` for PR number mode or `origin/main...HEAD` for local branch mode.
-- "Check the ticket" means there is no ticket lookup; review against the diff, module guidance, and accepted ADRs.
 - "The rubric says diff" means use the shared context; rubrics do not own diff selection.
 - "I'll just do the reviews myself" means stop and dispatch one separate general-purpose worker per review.
 - "Frontend/backend did not change" means emit `not applicable`, not skip the section silently.
