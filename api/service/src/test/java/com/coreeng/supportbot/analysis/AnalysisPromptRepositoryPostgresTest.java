@@ -90,10 +90,7 @@ class AnalysisPromptRepositoryPostgresTest {
 
     private void insertPrompt(int version, String content, boolean inUse) {
         jdbcTemplate.update(
-                "INSERT INTO analysis_prompt (version, content, is_in_use) VALUES (?, ?, ?)",
-                version,
-                content,
-                inUse);
+                "INSERT INTO analysis_prompt (version, content, is_in_use) VALUES (?, ?, ?)", version, content, inUse);
     }
 
     @Configuration(proxyBeanMethods = false)
