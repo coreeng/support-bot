@@ -7,6 +7,7 @@ import javax.sql.DataSource;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
@@ -46,9 +47,18 @@ class AnalysisPromptRepositoryPostgresTest {
         return Boolean.getBoolean("docker") || "true".equals(System.getenv("SUPPORTBOT_USE_LOCAL_DB"));
     }
 
-    /** Restores the seeded baseline without deleting it — every other test and the running app read it. */
+    /**
+     * Restores the seeded baseline without deleting it — every other test and the running app read it.
+     *
+     * <p>Runs after each test as well as before: this is the same database {@code make run-local} uses,
+     * and Flyway will not re-seed an applied V37, so a test that left no version in use would leave the
+     * local app with a broken prompt until someone fixed it by hand. Running before each test as well
+     * recovers a database left dirty by a crashed run.
+     */
     @BeforeEach
+    @AfterEach
     void restoreSeededBaseline() {
+        // Delete first: flagging version 1 while a later version is still in use trips the unique index.
         jdbcTemplate.update("DELETE FROM analysis_prompt WHERE version > 1");
         jdbcTemplate.update("UPDATE analysis_prompt SET is_in_use = TRUE WHERE version = 1");
     }
