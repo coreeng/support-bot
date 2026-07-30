@@ -1,4 +1,26 @@
-Platform Support Knowledge Gap & Intent Analysis Prompt
+-- The analysis prompt used to be a file baked into the image (api/service/analysis/prompt.md, located
+-- at runtime by ANALYSIS_PROMPT_FILE). It lives here instead so it can be versioned and, later, edited
+-- without a release. Edits are new rows with a higher version; is_in_use marks the one AnalysisService
+-- reads, and the partial unique index below allows at most one at a time.
+--
+-- Seeded with the prompt.md text verbatim so its SHA-256 stays
+-- a306429c1eea579c033108c4c70ff859e9fc02e91fb1dffd643d1f209b16dde5. That hash is analysis.prompt_id,
+-- the key that lets ADR-002 skip already-analysed threads — any drift here re-analyses everything.
+CREATE TABLE IF NOT EXISTS analysis_prompt
+(
+    id         BIGSERIAL PRIMARY KEY,
+    version    INTEGER     NOT NULL,
+    content    TEXT        NOT NULL,
+    is_in_use  BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT analysis_prompt_version_unique UNIQUE (version)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS analysis_prompt_in_use_idx ON analysis_prompt (is_in_use) WHERE is_in_use;
+
+INSERT INTO analysis_prompt (version, content, is_in_use)
+VALUES (1, $prompt$Platform Support Knowledge Gap & Intent Analysis Prompt
 
 You are an expert Platform Enablement analyst.
 Your task is to analyse a Slack support thread and determine why the tenant is asking the question,
@@ -170,3 +192,5 @@ Primary Driver: <one of: Knowledge Gap, Product Usability Problem, Product Tempo
 Category: <category describing the support topic>
 Platform Feature: <the platform feature involved>
 Reason: <one sentence explaining why the user raised the ticket>
+$prompt$, TRUE)
+ON CONFLICT (version) DO NOTHING;
