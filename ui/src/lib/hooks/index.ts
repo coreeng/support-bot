@@ -541,7 +541,8 @@ export function useAnalysisPrompt(enabled: boolean) {
     enabled,
     // Fail fast: the dialog renders the error state; default retries only prolong the spinner.
     retry: false,
-    // GlobalProviders defaults staleTime to 5 minutes; reopening the dialog must show the live file
+    // GlobalProviders defaults staleTime to 5 minutes; reopening the dialog must show the prompt
+    // version currently in use, which can change without a reload
     staleTime: 0,
     gcTime: 0,
   });

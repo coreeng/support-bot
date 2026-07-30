@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS analysis_prompt
     CONSTRAINT analysis_prompt_version_unique UNIQUE (version)
 );
 
-CREATE UNIQUE INDEX analysis_prompt_in_use_idx ON analysis_prompt (is_in_use) WHERE is_in_use;
+CREATE UNIQUE INDEX IF NOT EXISTS analysis_prompt_in_use_idx ON analysis_prompt (is_in_use) WHERE is_in_use;
 
 INSERT INTO analysis_prompt (version, content, is_in_use)
 VALUES (1, $prompt$Platform Support Knowledge Gap & Intent Analysis Prompt
@@ -192,4 +192,5 @@ Primary Driver: <one of: Knowledge Gap, Product Usability Problem, Product Tempo
 Category: <category describing the support topic>
 Platform Feature: <the platform feature involved>
 Reason: <one sentence explaining why the user raised the ticket>
-$prompt$, TRUE);
+$prompt$, TRUE)
+ON CONFLICT (version) DO NOTHING;

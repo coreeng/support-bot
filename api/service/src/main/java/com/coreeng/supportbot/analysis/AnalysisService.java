@@ -142,7 +142,7 @@ public class AnalysisService {
      *
      * <p>This method:
      * <ol>
-     *   <li>Loads the prompt text from the configured file</li>
+     *   <li>Loads the prompt text from the version marked as in use</li>
      *   <li>Computes the prompt ID as a SHA-256 hash of the prompt content</li>
      *   <li>Finds all threads that need analysis (closed tickets without analysis for this prompt ID)</li>
      *   <li>Analyzes each thread using the LLM</li>
