@@ -99,16 +99,20 @@ p2p-prod:          publish-prod        publish-chart                            
 
 ##@ Lint targets
 
+# Pinned: an untagged image resolves to :latest, so a new hadolint release
+# breaks main with no commit to this repo (2.15.0 did exactly that).
+HADOLINT_IMAGE ?= docker.io/hadolint/hadolint:v2.15.0
+
 .PHONY: lint-api
 lint-api: ## Lint API Dockerfiles
-	docker run --rm -i docker.io/hadolint/hadolint < api/Dockerfile
-	docker run --rm -i docker.io/hadolint/hadolint < api/functional/Dockerfile
-	docker run --rm -i docker.io/hadolint/hadolint < api/integration-tests/Dockerfile
-	docker run --rm -i docker.io/hadolint/hadolint < api/nft/Dockerfile
+	docker run --rm -i $(HADOLINT_IMAGE) < api/Dockerfile
+	docker run --rm -i $(HADOLINT_IMAGE) < api/functional/Dockerfile
+	docker run --rm -i $(HADOLINT_IMAGE) < api/integration-tests/Dockerfile
+	docker run --rm -i $(HADOLINT_IMAGE) < api/nft/Dockerfile
 
 .PHONY: lint-ui
 lint-ui: ## Lint UI Dockerfiles
-	docker run --rm -i docker.io/hadolint/hadolint < ui/Dockerfile
+	docker run --rm -i $(HADOLINT_IMAGE) < ui/Dockerfile
 
 .PHONY: lint-app
 lint-app: lint-api lint-ui ## Lint all Dockerfiles
