@@ -126,6 +126,8 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "requires-codeowners": { "type": "boolean" },
+        "dynamic-approvals": { "type": "boolean" },
         "sla": {
           "type": "object",
           "additionalProperties": false,
@@ -148,7 +150,9 @@
             "approved": { "type": "string" },
             "changes-requested": { "type": "string" },
             "merged": { "type": "string" },
-            "closed": { "type": "string" }
+            "closed": { "type": "string" },
+            "awaiting-merge": { "type": "string" },
+            "merge-escalated": { "type": "string" }
           }
         }
       }
