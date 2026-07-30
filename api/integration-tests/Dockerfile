@@ -1,10 +1,13 @@
 FROM gradle:9.3.1-jdk25 AS builder
 WORKDIR /home/gradle/project
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # Install Helm and kubectl with pinned versions and checksum verification
 ARG HELM_VERSION=3.19.0
 ARG KUBECTL_VERSION=v1.33.5
+
+# Must sit below the ARGs: hadolint 2.15.0 resets its tracked shell to POSIX sh
+# on ARG/ENV, which makes it flag `set -o pipefail` below as SC3040.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN set -euxo pipefail; \
   curl -fsSLO "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" && \
