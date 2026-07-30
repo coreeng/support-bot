@@ -109,8 +109,6 @@ public class AnalysisApiTests {
     @Test
     @Order(5)
     void analysisPrompt_returnsPromptText() {
-        // Anchors on the title of the baked-in service/analysis/prompt.md to prove the
-        // response comes from a real read of that file, not just any non-empty string.
         assertThat(supportBotClient.analysis().prompt().prompt())
                 .contains("Platform Support Knowledge Gap & Intent Analysis Prompt");
     }

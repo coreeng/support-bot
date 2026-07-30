@@ -37,7 +37,6 @@ ARG P2P_VERSION=dev
 ENV SUPPORT_BOT_VERSION=${P2P_VERSION}
 WORKDIR /app
 COPY --from=build /build/service/build/libs/service.jar /app/service.jar
-COPY service/analysis analysis
 
 CMD ["java", "-jar", "/app/service.jar"]
 

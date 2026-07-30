@@ -15,7 +15,6 @@ import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
-import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -99,8 +98,7 @@ class AnalysisPromptAuthorizationTest {
     @Test
     void promptEndpoint_returns500ProblemWhenPromptCannotBeLoaded() throws Exception {
         when(analysisService.loadPrompt())
-                .thenThrow(new AnalysisPromptLoadException(
-                        "Failed to load prompt file: /missing.md", new IOException("missing")));
+                .thenThrow(new AnalysisPromptLoadException("No analysis prompt version is marked as in use"));
 
         mockMvc.perform(get("/analysis/prompt")
                         .with(authentication(authTokenWithRoles(Role.USER, Role.SUPPORT_ENGINEER))))

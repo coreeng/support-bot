@@ -406,4 +406,3 @@ analysis:
     path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip}
   prompt:
     enabled: ${ANALYSIS_PROMPT_ENABLED:false}
-    file: ${ANALYSIS_PROMPT_FILE:/app/analysis/prompt.md}
