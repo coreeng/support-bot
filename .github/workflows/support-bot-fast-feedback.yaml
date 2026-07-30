@@ -38,7 +38,7 @@ jobs:
 
   fastfeedback:
     needs: [version]
-    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
+    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@8f22fd6371bce32e4a353541d02ebff51d512dfc
     secrets:
       slack_webhook_url: ${{ secrets.P2P_SLACK_WEBHOOK_URL }}
       env_vars: |
@@ -53,6 +53,9 @@ jobs:
         LDAP_BOOTSTRAP_USER_PASSWORD=${{ secrets.LDAP_BOOTSTRAP_USER_PASSWORD }}
     with:
       app-name: support-bot
+      repository-runner-setup: true
+      run-fastfeedback-integration-on-prs: true
+      runner-label: blacksmith-2vcpu-ubuntu-2404
       tenant-name: support-bot
       version: ${{ needs.version.outputs.version }}
       working-directory: ./

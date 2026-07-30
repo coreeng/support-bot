@@ -5,6 +5,12 @@ HELM_CHART_PATH ?= helm-chart
 
 P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui $(P2P_APP_NAME)-dex
 
+# Keep P2P's external GHA cache arguments unless a pilot runner supplies an override.
+P2P_DOCKER_BUILD_ARGS ?=
+p2p_docker_build_args = $(if $(P2P_DOCKER_BUILD_ARGS),$(P2P_DOCKER_BUILD_ARGS),$(p2p_image_cache))
+p2p_docker_build_args_for = $(if $(P2P_DOCKER_BUILD_ARGS),$(P2P_DOCKER_BUILD_ARGS),$(call p2p_image_cache,$(1)))
+p2p_integration_docker_build_args = $(if $(P2P_DOCKER_BUILD_ARGS),$(P2P_DOCKER_BUILD_ARGS),$(p2p_image_cache) --load)
+
 # Download and include p2p makefile
 $(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/v1/p2p.mk" -o ".p2p.mk")
 include .p2p.mk
@@ -178,44 +184,44 @@ check-chart: lint-chart test-chart validate-chart-values ## Run all Helm chart c
 
 .PHONY: build-api-app
 build-api-app: lint-api ## Build API
-	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --build-arg P2P_VERSION="$(p2p_version)" api
+	docker buildx build $(p2p_docker_build_args) --tag "$(p2p_image_tag)" --build-arg P2P_VERSION="$(p2p_version)" api
 
 .PHONY: build-ui-app
 build-ui-app: lint-ui ## Build UI
-	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" ui
+	docker buildx build $(call p2p_docker_build_args_for,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" ui
 
 .PHONY: build-dex-app
 build-dex-app: ## Build Dex (upstream dexidp/dex + Support Bot login theme)
-	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-dex) --tag "$(call p2p_image_tag,$(p2p_app_name)-dex)" dex
+	docker buildx build $(call p2p_docker_build_args_for,$(p2p_app_name)-dex) --tag "$(call p2p_image_tag,$(p2p_app_name)-dex)" dex
 
 .PHONY: build-app
 build-app: check-chart build-api-app build-ui-app build-dex-app ## Build all apps
 
 .PHONY: build-api-functional
 build-api-functional: ## Build API functional test docker image
-	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file api/functional/Dockerfile api
+	docker buildx build $(p2p_docker_build_args) --tag "$(p2p_image_tag)" --file api/functional/Dockerfile api
 
 .PHONY: build-ui-functional
 build-ui-functional: ## Build UI functional test docker image
-	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" ui/p2p/tests/functional/
+	docker buildx build $(call p2p_docker_build_args_for,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" ui/p2p/tests/functional/
 
 .PHONY: build-functional
 build-functional: build-api-functional build-ui-functional ## Build functional test docker images
 
 .PHONY: build-api-nft
 build-api-nft: ## Build API nft test docker image
-	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file api/nft/Dockerfile api
+	docker buildx build $(p2p_docker_build_args) --tag "$(p2p_image_tag)" --file api/nft/Dockerfile api
 
 .PHONY: build-ui-nft
 build-ui-nft: ## Build UI nft test docker image
-	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" ui/p2p/tests/nft/
+	docker buildx build $(call p2p_docker_build_args_for,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" ui/p2p/tests/nft/
 
 .PHONY: build-nft
 build-nft: build-api-nft build-ui-nft ## Build nft test docker images
 
 .PHONY: build-integration
 build-integration:
-	docker buildx build --platform linux/amd64 $(p2p_image_cache) --tag "$(p2p_image_tag)" --file api/integration-tests/Dockerfile . --load
+	docker buildx build --platform linux/amd64 $(p2p_integration_docker_build_args) --tag "$(p2p_image_tag)" --file api/integration-tests/Dockerfile .
 
 .PHONY: build-extended-test
 build-extended-test:
