@@ -10,9 +10,9 @@ RUN apk add --no-cache --upgrade \
     alpine-baselayout=3.7.2-r0 \
     alpine-baselayout-data=3.7.2-r0 \
     alpine-release=3.23.5-r0 \
-    apk-tools=3.0.6-r0 \
+    apk-tools=3.0.7-r0 \
     ca-certificates-bundle=20260611-r0 \
-    libapk=3.0.6-r0 \
+    libapk=3.0.7-r0 \
     libcrypto3=3.5.7-r0 \
     libssl3=3.5.7-r0 \
     musl=1.2.5-r23 \
