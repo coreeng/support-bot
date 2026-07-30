@@ -18,7 +18,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.task.TaskRejectedException;
-import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -243,7 +242,7 @@ public class AnalysisService {
         AnalysisPrompt prompt;
         try {
             prompt = analysisPromptRepository.findInUse();
-        } catch (DataAccessException e) {
+        } catch (RuntimeException e) {
             throw new AnalysisPromptLoadException("Failed to read the analysis prompt", e);
         }
         if (prompt == null) {
