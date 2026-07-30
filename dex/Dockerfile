@@ -6,7 +6,7 @@ ARG DEX_BASE_TAG=v2.45.1
 FROM ghcr.io/dexidp/dex:${DEX_BASE_TAG}
 
 USER root
-RUN apk add --no-cache \
+RUN apk add --no-cache --upgrade \
     alpine-baselayout=3.7.2-r0 \
     alpine-baselayout-data=3.7.2-r0 \
     alpine-release=3.23.5-r0 \
