@@ -38,7 +38,7 @@ jobs:
 
   fastfeedback:
     needs: [version]
-    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@0b21e9b80d7da5bba79b56cce118f14c103baf22
+    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@8f22fd6371bce32e4a353541d02ebff51d512dfc
     secrets:
       slack_webhook_url: ${{ secrets.P2P_SLACK_WEBHOOK_URL }}
       env_vars: |
@@ -55,7 +55,6 @@ jobs:
       app-name: support-bot
       repository-runner-setup: true
       runner-label: blacksmith-2vcpu-ubuntu-2404
-      skip-fastfeedback-integration-on-prs: true
       tenant-name: support-bot
       version: ${{ needs.version.outputs.version }}
       working-directory: ./
