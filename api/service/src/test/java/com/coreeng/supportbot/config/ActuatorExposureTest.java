@@ -40,7 +40,7 @@ class ActuatorExposureTest {
 
         assertThat(violations)
                 .as("Only the health and prometheus actuator endpoints may be exposed. Endpoints such as env,"
-                        + " configprops, beans and heapdump can leak secrets (gateway basic-auth token, DB and"
+                        + " configprops, beans and heapdump can leak secrets (LLM proxy basic-auth token, DB and"
                         + " Slack credentials); review any addition for secret exposure before allowing it here.")
                 .isEmpty();
     }

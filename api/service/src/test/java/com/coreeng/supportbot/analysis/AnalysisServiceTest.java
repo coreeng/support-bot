@@ -12,10 +12,9 @@ import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository.AsyncJob;
 import com.coreeng.supportbot.config.AnalysisProps;
 import com.coreeng.supportbot.config.AnalysisProps.Bundle;
-import com.coreeng.supportbot.config.AnalysisProps.Gateway;
 import com.coreeng.supportbot.config.AnalysisProps.Llm;
-import com.coreeng.supportbot.config.AnalysisProps.LlmProvider;
 import com.coreeng.supportbot.config.AnalysisProps.Prompt;
+import com.coreeng.supportbot.config.AnalysisProps.Proxy;
 import com.coreeng.supportbot.config.AnalysisProps.Vertex;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
@@ -59,12 +58,10 @@ class AnalysisServiceTest {
     @BeforeEach
     void setUp() {
         Llm llm = new Llm(
-                LlmProvider.VERTEX,
                 "gemini-2.5-flash",
                 Duration.ofMillis(100),
-                new Vertex("test-project", "europe-west2"),
-                new Gateway(
-                        new Gateway.Proxy(new Gateway.GoogleVertex("")), new Gateway.Auth(""), Duration.ofSeconds(30)));
+                new Vertex(true, "test-project", "europe-west2"),
+                new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)));
         Bundle bundle = new Bundle("classpath:placeholder-analysis-bundle.zip");
         Prompt prompt = new Prompt(true);
         analysisProps = new AnalysisProps(llm, bundle, prompt);

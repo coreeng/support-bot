@@ -16,7 +16,11 @@ import org.springframework.context.annotation.Configuration;
 public class LlmConfig {
 
     @Bean
-    @ConditionalOnProperty(prefix = "analysis.llm", name = "provider", havingValue = "vertex", matchIfMissing = true)
+    @ConditionalOnProperty(
+            prefix = "analysis.llm.vertex",
+            name = "enabled",
+            havingValue = "true",
+            matchIfMissing = true)
     public ChatModel vertexChatModel(AnalysisProps analysisProps) {
         AnalysisProps.Llm llm = analysisProps.llm();
         log.info(
@@ -33,23 +37,23 @@ public class LlmConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(prefix = "analysis.llm", name = "provider", havingValue = "gateway")
-    public ChatModel gatewayChatModel(AnalysisProps analysisProps) {
+    @ConditionalOnProperty(prefix = "analysis.llm.proxy", name = "enabled", havingValue = "true")
+    public ChatModel proxyChatModel(AnalysisProps analysisProps) {
         AnalysisProps.Llm llm = analysisProps.llm();
         log.info(
-                "Configuring AI gateway Gemini model: baseUrl={}, model={}, timeout={}",
-                llm.gateway().proxy().googleVertex().baseUrl(),
+                "Configuring proxied Gemini model: baseUrl={}, model={}, timeout={}",
+                llm.proxy().baseUrl(),
                 llm.modelName(),
-                llm.gateway().timeout());
+                llm.proxy().timeout());
 
-        // No apiKey: the gateway authenticates via the Basic header, and the client
+        // No apiKey: the proxy authenticates via the Basic header, and the client
         // only sends x-goog-api-key when an apiKey is set.
         return GoogleAiGeminiChatModel.builder()
-                .baseUrl(llm.gateway().proxy().googleVertex().baseUrl())
+                .baseUrl(llm.proxy().baseUrl())
                 .modelName(llm.modelName())
                 .customHeaders(
-                        Map.of("Authorization", "Basic " + llm.gateway().auth().basicAuthToken()))
-                .timeout(llm.gateway().timeout())
+                        Map.of("Authorization", "Basic " + llm.proxy().auth().basicAuthToken()))
+                .timeout(llm.proxy().timeout())
                 .build();
     }
 }

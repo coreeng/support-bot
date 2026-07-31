@@ -25,7 +25,7 @@ class LlmConfigTest {
     }
 
     @Test
-    void defaultsToVertexModelWhenProviderOmitted() {
+    void defaultsToVertexModelWhenProxyNotEnabled() {
         contextRunner
                 .withPropertyValues(vertexProperties())
                 .withPropertyValues("analysis.prompt.enabled=true")
@@ -36,10 +36,10 @@ class LlmConfigTest {
     }
 
     @Test
-    void createsOnlyGatewayModelWhenProviderGateway() {
-        // Vertex settings deliberately absent: gateway mode must not need them.
+    void createsOnlyProxyModelWhenProxyEnabled() {
+        // Vertex settings deliberately absent: proxy mode must not need them.
         contextRunner
-                .withPropertyValues(gatewayProperties())
+                .withPropertyValues(proxyProperties())
                 .withPropertyValues("analysis.prompt.enabled=true")
                 .run(context -> {
                     assertThat(context).hasSingleBean(ChatModel.class);
@@ -48,18 +48,19 @@ class LlmConfigTest {
     }
 
     @Test
-    void failsStartupWhenGatewayModeMissingBaseUrl() {
+    void failsStartupWhenProxyModeMissingBaseUrl() {
         contextRunner
                 .withPropertyValues(
                         "analysis.prompt.enabled=true",
-                        "analysis.llm.provider=gateway",
+                        "analysis.llm.vertex.enabled=false",
+                        "analysis.llm.proxy.enabled=true",
                         "analysis.llm.model-name=gemini-2.5-flash",
-                        "analysis.llm.gateway.auth.basic-auth-token=dXNlcjpwYXNz")
+                        "analysis.llm.proxy.auth.basic-auth-token=dXNlcjpwYXNz")
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .rootCause()
-                            .hasMessageContaining("analysis.llm.gateway.proxy.google-vertex.base-url");
+                            .hasMessageContaining("analysis.llm.proxy.base-url");
                 });
     }
 
@@ -79,10 +80,24 @@ class LlmConfigTest {
     }
 
     @Test
-    void failsStartupOnUnknownProvider() {
+    void failsStartupWhenBothProvidersEnabled() {
         contextRunner
                 .withPropertyValues(vertexProperties())
-                .withPropertyValues("analysis.prompt.enabled=true", "analysis.llm.provider=azure")
+                .withPropertyValues("analysis.prompt.enabled=true", "analysis.llm.proxy.enabled=true")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .rootCause()
+                            .hasMessageContaining(
+                                    "exactly one of analysis.llm.vertex.enabled and analysis.llm.proxy.enabled");
+                });
+    }
+
+    @Test
+    void failsStartupWhenNeitherProviderEnabled() {
+        contextRunner
+                .withPropertyValues(vertexProperties())
+                .withPropertyValues("analysis.prompt.enabled=true", "analysis.llm.vertex.enabled=false")
                 .run(context -> assertThat(context).hasFailed());
     }
 
@@ -94,12 +109,13 @@ class LlmConfigTest {
         };
     }
 
-    private static String[] gatewayProperties() {
+    private static String[] proxyProperties() {
         return new String[] {
-            "analysis.llm.provider=gateway",
+            "analysis.llm.vertex.enabled=false",
+            "analysis.llm.proxy.enabled=true",
             "analysis.llm.model-name=gemini-2.5-flash",
-            "analysis.llm.gateway.proxy.google-vertex.base-url=http://localhost:9999/platform/google-vertex/proxy/v1beta",
-            "analysis.llm.gateway.auth.basic-auth-token=dXNlcjpwYXNz"
+            "analysis.llm.proxy.base-url=http://localhost:9999/platform/google-vertex/proxy/v1beta",
+            "analysis.llm.proxy.auth.basic-auth-token=dXNlcjpwYXNz"
         };
     }
 

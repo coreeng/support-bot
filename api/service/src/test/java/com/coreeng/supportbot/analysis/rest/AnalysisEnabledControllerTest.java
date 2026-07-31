@@ -35,14 +35,10 @@ class AnalysisEnabledControllerTest {
 
     private static AnalysisEnabledController controllerWithEnabled(boolean enabled) {
         AnalysisProps.Llm llm = new AnalysisProps.Llm(
-                AnalysisProps.LlmProvider.VERTEX,
                 "gemini-2.5-flash",
                 Duration.ofMillis(100),
-                new AnalysisProps.Vertex("test-project", "europe-west2"),
-                new AnalysisProps.Gateway(
-                        new AnalysisProps.Gateway.Proxy(new AnalysisProps.Gateway.GoogleVertex("")),
-                        new AnalysisProps.Gateway.Auth(""),
-                        Duration.ofSeconds(30)));
+                new AnalysisProps.Vertex(true, "test-project", "europe-west2"),
+                new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)));
         AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
         AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(enabled);
         AnalysisProps analysisProps = new AnalysisProps(llm, bundle, prompt);

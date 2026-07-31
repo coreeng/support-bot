@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.coreeng.supportbot.config.AnalysisProps.Llm;
-import com.coreeng.supportbot.config.AnalysisProps.LlmProvider;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,17 +16,38 @@ class AnalysisPropsTest {
     private static final String BASE64_TOKEN = "dXNlcjpwYXNz";
 
     @Test
-    void defaultsToVertexProviderWithoutRequiringGatewaySettings() {
+    void defaultsToVertexWithoutRequiringProxySettings() {
         Llm llm = bind(vertexValues());
 
-        assertThat(llm.provider()).isEqualTo(LlmProvider.VERTEX);
+        assertThat(llm.vertex().enabled()).isTrue();
+        assertThat(llm.proxy().enabled()).isFalse();
         assertThat(llm.modelName()).isEqualTo("gemini-2.5-flash");
         assertThat(llm.requestDelay()).isEqualTo(Duration.ofMillis(500));
         assertThat(llm.vertex().projectId()).isEqualTo("test-project");
         assertThat(llm.vertex().location()).isEqualTo("europe-west2");
-        assertThat(llm.gateway().proxy().googleVertex().baseUrl()).isEmpty();
-        assertThat(llm.gateway().auth().basicAuthToken()).isEmpty();
-        assertThat(llm.gateway().timeout()).isEqualTo(Duration.ofSeconds(30));
+        assertThat(llm.proxy().baseUrl()).isEmpty();
+        assertThat(llm.proxy().auth().basicAuthToken()).isEmpty();
+        assertThat(llm.proxy().timeout()).isEqualTo(Duration.ofSeconds(30));
+    }
+
+    @Test
+    void rejectsBothProvidersEnabled() {
+        Map<String, Object> values = vertexValues();
+        values.put("analysis.llm.proxy.enabled", "true");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage(
+                        "exactly one of analysis.llm.vertex.enabled and analysis.llm.proxy.enabled must be true");
+    }
+
+    @Test
+    void rejectsNeitherProviderEnabled() {
+        Map<String, Object> values = vertexValues();
+        values.put("analysis.llm.vertex.enabled", "false");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage(
+                        "exactly one of analysis.llm.vertex.enabled and analysis.llm.proxy.enabled must be true");
     }
 
     @Test
@@ -36,7 +56,8 @@ class AnalysisPropsTest {
         values.remove("analysis.llm.vertex.project-id");
 
         assertThatThrownBy(() -> bind(values))
-                .hasRootCauseMessage("analysis.llm.vertex.project-id is required when analysis.llm.provider=vertex");
+                .hasRootCauseMessage(
+                        "analysis.llm.vertex.project-id is required when analysis.llm.vertex.enabled=true");
     }
 
     @Test
@@ -45,7 +66,7 @@ class AnalysisPropsTest {
         values.remove("analysis.llm.vertex.location");
 
         assertThatThrownBy(() -> bind(values))
-                .hasRootCauseMessage("analysis.llm.vertex.location is required when analysis.llm.provider=vertex");
+                .hasRootCauseMessage("analysis.llm.vertex.location is required when analysis.llm.vertex.enabled=true");
     }
 
     @Test
@@ -65,107 +86,94 @@ class AnalysisPropsTest {
     }
 
     @Test
-    void gatewayModeDoesNotRequireVertexSettings() {
-        Llm llm = bind(gatewayValues());
+    void proxyModeDoesNotRequireVertexSettings() {
+        Llm llm = bind(proxyValues());
 
-        assertThat(llm.provider()).isEqualTo(LlmProvider.GATEWAY);
+        assertThat(llm.proxy().enabled()).isTrue();
+        assertThat(llm.vertex().enabled()).isFalse();
         assertThat(llm.vertex().projectId()).isEmpty();
         assertThat(llm.vertex().location()).isEmpty();
-        assertThat(llm.gateway().proxy().googleVertex().baseUrl())
-                .isEqualTo("https://gateway.example.test/platform/google-vertex/proxy/v1beta");
-        assertThat(llm.gateway().auth().basicAuthToken()).isEqualTo(BASE64_TOKEN);
+        assertThat(llm.proxy().baseUrl())
+                .isEqualTo("https://llm-proxy.example.test/platform/google-vertex/proxy/v1beta");
+        assertThat(llm.proxy().auth().basicAuthToken()).isEqualTo(BASE64_TOKEN);
     }
 
     @Test
     void trimsBasicAuthToken() {
-        Map<String, Object> values = gatewayValues();
-        values.put("analysis.llm.gateway.auth.basic-auth-token", " " + BASE64_TOKEN + " ");
+        Map<String, Object> values = proxyValues();
+        values.put("analysis.llm.proxy.auth.basic-auth-token", " " + BASE64_TOKEN + " ");
 
-        assertThat(bind(values).gateway().auth().basicAuthToken()).isEqualTo(BASE64_TOKEN);
+        assertThat(bind(values).proxy().auth().basicAuthToken()).isEqualTo(BASE64_TOKEN);
     }
 
     @Test
-    void gatewayModeRequiresBaseUrl() {
-        Map<String, Object> values = gatewayValues();
-        values.remove("analysis.llm.gateway.proxy.google-vertex.base-url");
+    void proxyModeRequiresBaseUrl() {
+        Map<String, Object> values = proxyValues();
+        values.remove("analysis.llm.proxy.base-url");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage("analysis.llm.proxy.base-url is required when analysis.llm.proxy.enabled=true"
+                        + " (full URL including the /v1beta suffix)");
+    }
+
+    @Test
+    void proxyModeRequiresBasicAuthToken() {
+        Map<String, Object> values = proxyValues();
+        values.remove("analysis.llm.proxy.auth.basic-auth-token");
 
         assertThatThrownBy(() -> bind(values))
                 .hasRootCauseMessage(
-                        "analysis.llm.gateway.proxy.google-vertex.base-url is required when analysis.llm.provider=gateway"
-                                + " (full URL including the /v1beta suffix)");
+                        "analysis.llm.proxy.auth.basic-auth-token is required when analysis.llm.proxy.enabled=true");
     }
 
     @Test
-    void gatewayModeRequiresBasicAuthToken() {
-        Map<String, Object> values = gatewayValues();
-        values.remove("analysis.llm.gateway.auth.basic-auth-token");
+    void proxyModeRejectsNonBase64Token() {
+        Map<String, Object> values = proxyValues();
+        values.put("analysis.llm.proxy.auth.basic-auth-token", "not base64 !!");
 
         assertThatThrownBy(() -> bind(values))
-                .hasRootCauseMessage(
-                        "analysis.llm.gateway.auth.basic-auth-token is required when analysis.llm.provider=gateway");
+                .hasRootCauseMessage("analysis.llm.proxy.auth.basic-auth-token must be a Base64-encoded credential");
     }
 
     @Test
-    void gatewayModeRejectsNonBase64Token() {
-        Map<String, Object> values = gatewayValues();
-        values.put("analysis.llm.gateway.auth.basic-auth-token", "not base64 !!");
+    void proxyModeStripsTrailingSlashes() {
+        Map<String, Object> values = proxyValues();
+        values.put("analysis.llm.proxy.base-url", "https://llm-proxy.example.test/proxy/v1beta/");
+
+        assertThat(bind(values).proxy().baseUrl()).isEqualTo("https://llm-proxy.example.test/proxy/v1beta");
+    }
+
+    @Test
+    void proxyModeAllowsHttp() {
+        Map<String, Object> values = proxyValues();
+        values.put("analysis.llm.proxy.base-url", "http://llm-proxy.example.test/proxy/v1beta");
+
+        assertThat(bind(values).proxy().baseUrl()).isEqualTo("http://llm-proxy.example.test/proxy/v1beta");
+    }
+
+    @Test
+    void proxyModeRejectsQueryAndFragment() {
+        Map<String, Object> values = proxyValues();
+        values.put("analysis.llm.proxy.base-url", "https://llm-proxy.example.test/proxy/v1beta?debug=true");
 
         assertThatThrownBy(() -> bind(values))
-                .hasRootCauseMessage("analysis.llm.gateway.auth.basic-auth-token must be a Base64-encoded credential");
+                .hasRootCauseMessage("analysis.llm.proxy.base-url must not contain a query or fragment");
     }
 
     @Test
-    void gatewayModeStripsTrailingSlashes() {
-        Map<String, Object> values = gatewayValues();
-        values.put("analysis.llm.gateway.proxy.google-vertex.base-url", "https://gateway.example.test/proxy/v1beta/");
+    void proxyModeRejectsNonPositiveTimeout() {
+        Map<String, Object> values = proxyValues();
+        values.put("analysis.llm.proxy.timeout", "0s");
 
-        assertThat(bind(values).gateway().proxy().googleVertex().baseUrl())
-                .isEqualTo("https://gateway.example.test/proxy/v1beta");
+        assertThatThrownBy(() -> bind(values)).hasRootCauseMessage("analysis.llm.proxy.timeout must be positive");
     }
 
     @Test
-    void gatewayModeAllowsHttp() {
-        Map<String, Object> values = gatewayValues();
-        values.put("analysis.llm.gateway.proxy.google-vertex.base-url", "http://gateway.example.test/proxy/v1beta");
+    void proxyToStringNeverIncludesToken() {
+        Llm llm = bind(proxyValues());
 
-        assertThat(bind(values).gateway().proxy().googleVertex().baseUrl())
-                .isEqualTo("http://gateway.example.test/proxy/v1beta");
-    }
-
-    @Test
-    void gatewayModeRejectsQueryAndFragment() {
-        Map<String, Object> values = gatewayValues();
-        values.put(
-                "analysis.llm.gateway.proxy.google-vertex.base-url",
-                "https://gateway.example.test/proxy/v1beta?debug=true");
-
-        assertThatThrownBy(() -> bind(values))
-                .hasRootCauseMessage(
-                        "analysis.llm.gateway.proxy.google-vertex.base-url must not contain a query or fragment");
-    }
-
-    @Test
-    void gatewayModeRejectsNonPositiveTimeout() {
-        Map<String, Object> values = gatewayValues();
-        values.put("analysis.llm.gateway.timeout", "0s");
-
-        assertThatThrownBy(() -> bind(values)).hasRootCauseMessage("analysis.llm.gateway.timeout must be positive");
-    }
-
-    @Test
-    void rejectsUnknownProvider() {
-        Map<String, Object> values = vertexValues();
-        values.put("analysis.llm.provider", "azure");
-
-        assertThatThrownBy(() -> bind(values)).isInstanceOf(RuntimeException.class);
-    }
-
-    @Test
-    void gatewayToStringNeverIncludesToken() {
-        Llm llm = bind(gatewayValues());
-
-        assertThat(llm.gateway().auth().toString()).doesNotContain(BASE64_TOKEN).contains("basicAuthToken=<redacted>");
-        assertThat(llm.gateway().toString()).doesNotContain(BASE64_TOKEN);
+        assertThat(llm.proxy().auth().toString()).doesNotContain(BASE64_TOKEN).contains("basicAuthToken=<redacted>");
+        assertThat(llm.proxy().toString()).doesNotContain(BASE64_TOKEN);
         assertThat(llm.toString()).doesNotContain(BASE64_TOKEN);
     }
 
@@ -183,14 +191,13 @@ class AnalysisPropsTest {
         return values;
     }
 
-    private static Map<String, Object> gatewayValues() {
+    private static Map<String, Object> proxyValues() {
         Map<String, Object> values = new HashMap<>();
-        values.put("analysis.llm.provider", "gateway");
+        values.put("analysis.llm.vertex.enabled", "false");
+        values.put("analysis.llm.proxy.enabled", "true");
         values.put("analysis.llm.model-name", "gemini-2.5-flash");
-        values.put(
-                "analysis.llm.gateway.proxy.google-vertex.base-url",
-                "https://gateway.example.test/platform/google-vertex/proxy/v1beta");
-        values.put("analysis.llm.gateway.auth.basic-auth-token", BASE64_TOKEN);
+        values.put("analysis.llm.proxy.base-url", "https://llm-proxy.example.test/platform/google-vertex/proxy/v1beta");
+        values.put("analysis.llm.proxy.auth.basic-auth-token", BASE64_TOKEN);
         return values;
     }
 }
