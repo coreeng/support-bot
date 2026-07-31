@@ -64,7 +64,7 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
             @DefaultValue("false") boolean enabled,
             @DefaultValue("") String baseUrl,
             @DefaultValue Auth auth,
-            @DefaultValue("30s") Duration timeout) {
+            @DefaultValue("5s") Duration timeout) {
 
         public Proxy {
             baseUrl = stripTrailingSlashes(baseUrl.trim());

@@ -275,7 +275,7 @@ analysis:
       base-url: ${AI_PROXY_BASE_URL:} # Full URL including the /v1beta suffix; required when enabled
       auth:
         basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:} # Base64 user:password — deliver via a Secret
-      timeout: ${AI_PROXY_TIMEOUT:30s} # Connect + read timeout per proxy call
+      timeout: ${AI_PROXY_TIMEOUT:5s} # Connect + read timeout per proxy call
   bundle:
     path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip served by the summary-data download endpoint
   prompt:
@@ -449,7 +449,7 @@ Set these on the **API**:
 | `VERTEX_LOCATION` | Vertex AI region, e.g. `europe-west2`. Required when the vertex provider is enabled. |
 | `AI_PROXY_BASE_URL` | Proxy base URL **including the `/v1beta` suffix**, e.g. `https://<proxy-host>/platform/google-vertex/proxy/v1beta`; the client appends `/models/<model>:generateContent`. Must be an absolute HTTP(S) URL without query or fragment; trailing slashes are stripped. Plain `http` is accepted for in-cluster proxies — note the Basic credential then travels unencrypted. Required when the proxy provider is enabled. |
 | `AI_PROXY_BASIC_AUTH_TOKEN` | Base64-encoded `user:password` proxy credential, sent as `Authorization: Basic <token>`. Deliver it via a Kubernetes Secret (`secretKeyRef`, like `DEX_CLIENT_SECRET`), never a plain values entry. It is never logged and the config object redacts it; remember Base64 is an encoding, not encryption. Required when the proxy provider is enabled. |
-| `AI_PROXY_TIMEOUT` | Connect and read timeout applied to each proxy HTTP call. Defaults to `30s`; a breach fails the request (the client may retry before the batch records an error). |
+| `AI_PROXY_TIMEOUT` | Connect and read timeout applied to each proxy HTTP call. Defaults to `5s`; a breach fails the request (the client may retry before the batch records an error). |
 | `ANALYSIS_BUNDLE_PATH` | Analysis bundle zip (or directory to zip on the fly) served by the summary-data download endpoint. Defaults to a bundled placeholder. |
 
 ## Single Sign-On (SSO)

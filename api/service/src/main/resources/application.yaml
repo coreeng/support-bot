@@ -409,7 +409,7 @@ analysis:
       base-url: ${AI_PROXY_BASE_URL:}
       auth:
         basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:}
-      timeout: ${AI_PROXY_TIMEOUT:30s}
+      timeout: ${AI_PROXY_TIMEOUT:5s}
   bundle:
     path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip}
   prompt:

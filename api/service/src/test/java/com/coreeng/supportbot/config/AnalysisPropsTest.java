@@ -27,7 +27,7 @@ class AnalysisPropsTest {
         assertThat(llm.vertex().location()).isEqualTo("europe-west2");
         assertThat(llm.proxy().baseUrl()).isEmpty();
         assertThat(llm.proxy().auth().basicAuthToken()).isEmpty();
-        assertThat(llm.proxy().timeout()).isEqualTo(Duration.ofSeconds(30));
+        assertThat(llm.proxy().timeout()).isEqualTo(Duration.ofSeconds(5));
     }
 
     @Test
