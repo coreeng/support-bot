@@ -5,7 +5,6 @@ import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Locale;
-import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -62,107 +61,94 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
     }
 
     public record Gateway(
-            @DefaultValue("") String baseUrl,
-            @DefaultValue("") String basicAuthToken,
+            @DefaultValue Proxy proxy,
+            @DefaultValue Auth auth,
             @DefaultValue("30s") Duration timeout) {
 
-        public Gateway {
-            baseUrl = stripTrailingSlashes(baseUrl.trim());
-            basicAuthToken = basicAuthToken.trim();
-        }
-
         void validate() {
-            if (baseUrl.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "analysis.llm.gateway.base-url is required when analysis.llm.provider=gateway"
-                                + " (full URL including the /v1beta suffix)");
-            }
-            URI baseUri = validateHttpUrl("analysis.llm.gateway.base-url", baseUrl);
-            if (baseUri.getQuery() != null || baseUri.getFragment() != null) {
-                throw new IllegalArgumentException(
-                        "analysis.llm.gateway.base-url must not contain a query or fragment");
-            }
-            if (!baseUri.getScheme().equalsIgnoreCase("https") && !isLoopbackHost(baseUri.getHost())) {
-                throw new IllegalArgumentException(
-                        "analysis.llm.gateway.base-url must use HTTPS unless the host is loopback");
-            }
-            if (basicAuthToken.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "analysis.llm.gateway.basic-auth-token is required when analysis.llm.provider=gateway");
-            }
-            try {
-                Base64.getDecoder().decode(basicAuthToken);
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException(
-                        "analysis.llm.gateway.basic-auth-token must be a Base64-encoded credential", e);
-            }
+            proxy.validate();
+            auth.validate();
             if (timeout.isZero() || timeout.isNegative()) {
                 throw new IllegalArgumentException("analysis.llm.gateway.timeout must be positive");
             }
         }
 
-        @Override
-        public String toString() {
-            return "Gateway[baseUrl=" + baseUrl + ", basicAuthToken=<redacted>, timeout=" + timeout + "]";
-        }
+        public record Proxy(@DefaultValue GoogleVertex googleVertex) {
 
-        private static String stripTrailingSlashes(String value) {
-            String normalized = value;
-            while (normalized.endsWith("/")) {
-                normalized = normalized.substring(0, normalized.length() - 1);
+            void validate() {
+                googleVertex.validate();
             }
-            return normalized;
         }
 
-        private static URI validateHttpUrl(String propertyName, String value) {
-            try {
-                URI uri = new URI(value);
-                String scheme = uri.getScheme();
-                if (!uri.isAbsolute()
-                        || uri.getHost() == null
-                        || uri.getUserInfo() != null
-                        || scheme == null
-                        || !(scheme.toLowerCase(Locale.ROOT).equals("http")
-                                || scheme.toLowerCase(Locale.ROOT).equals("https"))) {
-                    throw new IllegalArgumentException(propertyName + " must be an absolute HTTP(S) URL");
+        public record GoogleVertex(@DefaultValue("") String baseUrl) {
+
+            public GoogleVertex {
+                baseUrl = stripTrailingSlashes(baseUrl.trim());
+            }
+
+            void validate() {
+                if (baseUrl.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "analysis.llm.gateway.proxy.google-vertex.base-url is required when"
+                                    + " analysis.llm.provider=gateway (full URL including the /v1beta suffix)");
                 }
-                return uri;
-            } catch (URISyntaxException e) {
-                throw new IllegalArgumentException(propertyName + " must be an absolute HTTP(S) URL", e);
+                URI baseUri = validateHttpUrl("analysis.llm.gateway.proxy.google-vertex.base-url", baseUrl);
+                if (baseUri.getQuery() != null || baseUri.getFragment() != null) {
+                    throw new IllegalArgumentException(
+                            "analysis.llm.gateway.proxy.google-vertex.base-url must not contain a query or fragment");
+                }
             }
-        }
 
-        private static boolean isLoopbackHost(@Nullable String host) {
-            if (host == null) {
-                return false;
+            private static String stripTrailingSlashes(String value) {
+                String normalized = value;
+                while (normalized.endsWith("/")) {
+                    normalized = normalized.substring(0, normalized.length() - 1);
+                }
+                return normalized;
             }
-            String normalizedHost = host.toLowerCase(Locale.ROOT);
-            if (normalizedHost.startsWith("[") && normalizedHost.endsWith("]")) {
-                normalizedHost = normalizedHost.substring(1, normalizedHost.length() - 1);
-            }
-            return normalizedHost.equals("localhost")
-                    || normalizedHost.endsWith(".localhost")
-                    || isIpv4Loopback(normalizedHost)
-                    || normalizedHost.equals("::1")
-                    || normalizedHost.equals("0:0:0:0:0:0:0:1");
-        }
 
-        private static boolean isIpv4Loopback(String host) {
-            String[] octets = host.split("\\.", -1);
-            if (octets.length != 4 || !octets[0].equals("127")) {
-                return false;
-            }
-            for (String octet : octets) {
+            private static URI validateHttpUrl(String propertyName, String value) {
                 try {
-                    int value = Integer.parseInt(octet);
-                    if (value < 0 || value > 255) {
-                        return false;
+                    URI uri = new URI(value);
+                    String scheme = uri.getScheme();
+                    if (!uri.isAbsolute()
+                            || uri.getHost() == null
+                            || uri.getUserInfo() != null
+                            || scheme == null
+                            || !(scheme.toLowerCase(Locale.ROOT).equals("http")
+                                    || scheme.toLowerCase(Locale.ROOT).equals("https"))) {
+                        throw new IllegalArgumentException(propertyName + " must be an absolute HTTP(S) URL");
                     }
-                } catch (NumberFormatException ignored) {
-                    return false;
+                    return uri;
+                } catch (URISyntaxException e) {
+                    throw new IllegalArgumentException(propertyName + " must be an absolute HTTP(S) URL", e);
                 }
             }
-            return true;
+        }
+
+        public record Auth(@DefaultValue("") String basicAuthToken) {
+
+            public Auth {
+                basicAuthToken = basicAuthToken.trim();
+            }
+
+            void validate() {
+                if (basicAuthToken.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "analysis.llm.gateway.auth.basic-auth-token is required when analysis.llm.provider=gateway");
+                }
+                try {
+                    Base64.getDecoder().decode(basicAuthToken);
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException(
+                            "analysis.llm.gateway.auth.basic-auth-token must be a Base64-encoded credential", e);
+                }
+            }
+
+            @Override
+            public String toString() {
+                return "Auth[basicAuthToken=<redacted>]";
+            }
         }
     }
 

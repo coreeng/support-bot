@@ -38,16 +38,17 @@ public class LlmConfig {
         AnalysisProps.Llm llm = analysisProps.llm();
         log.info(
                 "Configuring AI gateway Gemini model: baseUrl={}, model={}, timeout={}",
-                llm.gateway().baseUrl(),
+                llm.gateway().proxy().googleVertex().baseUrl(),
                 llm.modelName(),
                 llm.gateway().timeout());
 
         // No apiKey: the gateway authenticates via the Basic header, and the client
         // only sends x-goog-api-key when an apiKey is set.
         return GoogleAiGeminiChatModel.builder()
-                .baseUrl(llm.gateway().baseUrl())
+                .baseUrl(llm.gateway().proxy().googleVertex().baseUrl())
                 .modelName(llm.modelName())
-                .customHeaders(Map.of("Authorization", "Basic " + llm.gateway().basicAuthToken()))
+                .customHeaders(
+                        Map.of("Authorization", "Basic " + llm.gateway().auth().basicAuthToken()))
                 .timeout(llm.gateway().timeout())
                 .build();
     }

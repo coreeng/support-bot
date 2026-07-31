@@ -166,7 +166,7 @@ class SummaryDataControllerTest {
     void download_shouldReturnNotFound_whenClasspathResourceDoesNotExist() {
         // given
         analysisProps = new AnalysisProps(
-                testLlm(), new AnalysisProps.Bundle("classpath:nonexistent.zip"), new AnalysisProps.Prompt(true, ""));
+                testLlm(), new AnalysisProps.Bundle("classpath:nonexistent.zip"), new AnalysisProps.Prompt(true));
         controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
 
         // when
@@ -184,7 +184,7 @@ class SummaryDataControllerTest {
         Files.writeString(tempDir.resolve("script.sh"), "#!/bin/bash\necho 'test'");
 
         analysisProps = new AnalysisProps(
-                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true, ""));
+                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true));
         controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
 
         // when
@@ -218,7 +218,7 @@ class SummaryDataControllerTest {
     void download_shouldReturnEmptyZip_whenDirectoryIsEmpty(@TempDir Path tempDir) throws IOException {
         // given - empty directory
         analysisProps = new AnalysisProps(
-                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true, ""));
+                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true));
         controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
 
         // when
@@ -244,7 +244,7 @@ class SummaryDataControllerTest {
         Files.writeString(subDir.resolve("file2.txt"), "Content 2");
 
         analysisProps = new AnalysisProps(
-                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true, ""));
+                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true));
         controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
 
         // when
@@ -271,7 +271,7 @@ class SummaryDataControllerTest {
     void download_shouldReturnNotFound_whenDirectoryDoesNotExist() {
         // given
         analysisProps = new AnalysisProps(
-                testLlm(), new AnalysisProps.Bundle("/nonexistent/directory"), new AnalysisProps.Prompt(true, ""));
+                testLlm(), new AnalysisProps.Bundle("/nonexistent/directory"), new AnalysisProps.Prompt(true));
         controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
 
         // when
@@ -287,6 +287,9 @@ class SummaryDataControllerTest {
                 "gemini-2.5-flash",
                 Duration.ofSeconds(1),
                 new AnalysisProps.Vertex("test-project", "europe-west2"),
-                new AnalysisProps.Gateway("", "", Duration.ofSeconds(30)));
+                new AnalysisProps.Gateway(
+                        new AnalysisProps.Gateway.Proxy(new AnalysisProps.Gateway.GoogleVertex("")),
+                        new AnalysisProps.Gateway.Auth(""),
+                        Duration.ofSeconds(30)));
     }
 }

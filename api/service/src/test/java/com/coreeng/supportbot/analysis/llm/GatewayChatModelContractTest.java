@@ -85,11 +85,15 @@ class GatewayChatModelContractTest {
                 "gemini-2.5-flash",
                 Duration.ofMillis(1),
                 new AnalysisProps.Vertex("", ""),
-                new AnalysisProps.Gateway(server.baseUrl() + GATEWAY_PATH, BASE64_TOKEN, timeout));
+                new AnalysisProps.Gateway(
+                        new AnalysisProps.Gateway.Proxy(
+                                new AnalysisProps.Gateway.GoogleVertex(server.baseUrl() + GATEWAY_PATH)),
+                        new AnalysisProps.Gateway.Auth(BASE64_TOKEN),
+                        timeout));
         AnalysisProps analysisProps = new AnalysisProps(
                 llm,
                 new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip"),
-                new AnalysisProps.Prompt(true, ""));
+                new AnalysisProps.Prompt(true));
         return new LlmConfig().gatewayChatModel(analysisProps);
     }
 }

@@ -54,12 +54,12 @@ class LlmConfigTest {
                         "analysis.prompt.enabled=true",
                         "analysis.llm.provider=gateway",
                         "analysis.llm.model-name=gemini-2.5-flash",
-                        "analysis.llm.gateway.basic-auth-token=dXNlcjpwYXNz")
+                        "analysis.llm.gateway.auth.basic-auth-token=dXNlcjpwYXNz")
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .rootCause()
-                            .hasMessageContaining("analysis.llm.gateway.base-url");
+                            .hasMessageContaining("analysis.llm.gateway.proxy.google-vertex.base-url");
                 });
     }
 
@@ -98,8 +98,8 @@ class LlmConfigTest {
         return new String[] {
             "analysis.llm.provider=gateway",
             "analysis.llm.model-name=gemini-2.5-flash",
-            "analysis.llm.gateway.base-url=http://localhost:9999/platform/google-vertex/proxy/v1beta",
-            "analysis.llm.gateway.basic-auth-token=dXNlcjpwYXNz"
+            "analysis.llm.gateway.proxy.google-vertex.base-url=http://localhost:9999/platform/google-vertex/proxy/v1beta",
+            "analysis.llm.gateway.auth.basic-auth-token=dXNlcjpwYXNz"
         };
     }
 

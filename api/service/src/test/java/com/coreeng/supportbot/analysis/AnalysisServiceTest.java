@@ -57,16 +57,18 @@ class AnalysisServiceTest {
     private AnalysisService service;
 
     @BeforeEach
-    void setUp() throws IOException {
+    void setUp() {
         Llm llm = new Llm(
                 LlmProvider.VERTEX,
                 "gemini-2.5-flash",
                 Duration.ofMillis(100),
                 new Vertex("test-project", "europe-west2"),
-                new Gateway("", "", Duration.ofSeconds(30)));
+                new Gateway(
+                        new Gateway.Proxy(new Gateway.GoogleVertex("")), new Gateway.Auth(""), Duration.ofSeconds(30)));
         Bundle bundle = new Bundle("classpath:placeholder-analysis-bundle.zip");
         Prompt prompt = new Prompt(true);
         analysisProps = new AnalysisProps(llm, bundle, prompt);
+
         service = new AnalysisService(
                 asyncJobRepository,
                 threadsAwaitingAnalysisService,
