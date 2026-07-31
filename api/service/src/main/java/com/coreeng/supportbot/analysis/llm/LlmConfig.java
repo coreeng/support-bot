@@ -24,7 +24,7 @@ public class LlmConfig {
     public ChatModel vertexChatModel(AnalysisProps analysisProps) {
         AnalysisProps.Llm llm = analysisProps.llm();
         log.info(
-                "Configuring Vertex AI Gemini model: project={}, location={}, model={}",
+                "Configuring Vertex AI model: project={}, location={}, model={}",
                 llm.vertex().projectId(),
                 llm.vertex().location(),
                 llm.modelName());
@@ -41,7 +41,7 @@ public class LlmConfig {
     public ChatModel proxyChatModel(AnalysisProps analysisProps) {
         AnalysisProps.Llm llm = analysisProps.llm();
         log.info(
-                "Configuring proxied Gemini model: baseUrl={}, model={}, timeout={}",
+                "Configuring proxied model: baseUrl={}, model={}, timeout={}",
                 llm.proxy().baseUrl(),
                 llm.modelName(),
                 llm.proxy().timeout());
