@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -67,7 +68,7 @@ class ActuatorExposureTest {
         }
     }
 
-    private static List<String> endpointNames(Object includeValue) {
+    private static List<String> endpointNames(@Nullable Object includeValue) {
         if (includeValue == null) {
             return List.of();
         }

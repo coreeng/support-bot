@@ -131,8 +131,10 @@ class AnalysisPropsTest {
         Map<String, Object> values = proxyValues();
         values.put("analysis.llm.proxy.auth.basic-auth-token", "not base64 !!");
 
+        // The decoder's exception is chained as the cause, so the friendly message is mid-chain, not root.
         assertThatThrownBy(() -> bind(values))
-                .hasRootCauseMessage("analysis.llm.proxy.auth.basic-auth-token must be a Base64-encoded credential");
+                .hasStackTraceContaining(
+                        "analysis.llm.proxy.auth.basic-auth-token must be a Base64-encoded credential");
     }
 
     @Test
