@@ -398,8 +398,8 @@ knowledge-gaps:
 # Analysis configuration
 analysis:
   llm:
-    model-name: ${MODEL_NAME:gemini-2.5-flash}
-    request-delay: ${REQUEST_DELAY:500ms}
+    model-name: ${ANALYSIS_MODEL_NAME:gemini-2.5-flash}
+    request-delay: ${ANALYSIS_REQUEST_DELAY:500ms}
     vertex:
       enabled: ${VERTEX_ENABLED:true}
       project-id: ${VERTEX_PROJECT_ID:support-bot-cecg-efb3c84c}
@@ -409,7 +409,7 @@ analysis:
       base-url: ${AI_PROXY_BASE_URL:}
       auth:
         basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:}
-      timeout: ${AI_PROXY_TIMEOUT:5s}
+      timeout: ${AI_PROXY_TIMEOUT:20s}
   bundle:
     path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip}
   prompt:

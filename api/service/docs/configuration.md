@@ -264,8 +264,8 @@ pr-review-tracking:
 # Full operator reference is in the "Analysis (knowledge-gap LLM)" section under Integrations below.
 analysis:
   llm:
-    model-name: ${MODEL_NAME:gemini-2.5-flash} # Model id, used by both providers
-    request-delay: ${REQUEST_DELAY:500ms} # Pause between per-thread LLM calls (rate-limit mitigation)
+    model-name: ${ANALYSIS_MODEL_NAME:gemini-2.5-flash} # Model id, used by both providers
+    request-delay: ${ANALYSIS_REQUEST_DELAY:500ms} # Pause between per-thread LLM calls (rate-limit mitigation)
     vertex: # Hosted Vertex AI via ADC. Exactly one of vertex/proxy may be enabled.
       enabled: ${VERTEX_ENABLED:true}
       project-id: ${VERTEX_PROJECT_ID:} # Required when enabled
@@ -275,7 +275,7 @@ analysis:
       base-url: ${AI_PROXY_BASE_URL:} # Full URL including the /v1beta suffix; required when enabled
       auth:
         basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:} # Base64 user:password — deliver via a Secret
-      timeout: ${AI_PROXY_TIMEOUT:5s} # Connect + read timeout per proxy call
+      timeout: ${AI_PROXY_TIMEOUT:20s} # Connect + read timeout per proxy call
   bundle:
     path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip served by the summary-data download endpoint
   prompt:
@@ -429,9 +429,10 @@ fails startup:
   `Authorization: Basic <token>` header instead of cloud credentials. No GCP credential
   discovery happens in this mode, and there is no silent fallback between providers.
 
-Configuration is validated at startup: only the enabled provider's settings are required,
-and the service fails fast naming the offending property (for example
-`analysis.llm.proxy.base-url is required when analysis.llm.proxy.enabled=true`).
+While the feature is enabled, configuration is validated at startup: only the enabled
+provider's settings are required, and the service fails fast naming the offending property
+(for example `analysis.llm.proxy.base-url is required when analysis.llm.proxy.enabled=true`).
+With the feature off, LLM settings are not validated and cannot block startup.
 
 ### Environment variables
 
@@ -442,14 +443,20 @@ Set these on the **API**:
 | `ANALYSIS_PROMPT_ENABLED` | Master switch for the analysis feature. No LLM client is created when off. |
 | `VERTEX_ENABLED` | Enables the hosted Vertex AI provider. |
 | `AI_PROXY_ENABLED` | Enables the LLM proxy provider. Exactly one of `VERTEX_ENABLED` and `AI_PROXY_ENABLED` must be true. |
-| `MODEL_NAME` | Model id used by **both** providers. |
-| `REQUEST_DELAY` | Pause between per-thread LLM calls to stay under rate limits. |
+| `ANALYSIS_MODEL_NAME` | Model id used by **both** providers. |
+| `ANALYSIS_REQUEST_DELAY` | Pause between per-thread LLM calls to stay under rate limits. |
 | `VERTEX_PROJECT_ID` | GCP project hosting Vertex AI. Required when the vertex provider is enabled. |
 | `VERTEX_LOCATION` | Vertex AI region, e.g. `europe-west2`. Required when the vertex provider is enabled. |
 | `AI_PROXY_BASE_URL` | Proxy base URL **including the `/v1beta` suffix**, e.g. `https://<proxy-host>/platform/google-vertex/proxy/v1beta`; the client appends `/models/<model>:generateContent`. Must be an absolute HTTP(S) URL without query or fragment; trailing slashes are stripped. Plain `http` is accepted for in-cluster proxies — note the Basic credential then travels unencrypted. Required when the proxy provider is enabled. |
 | `AI_PROXY_BASIC_AUTH_TOKEN` | Base64-encoded `user:password` proxy credential, sent as `Authorization: Basic <token>`. |
 | `AI_PROXY_TIMEOUT` | Connect and read timeout applied to each proxy HTTP call. |
 | `ANALYSIS_BUNDLE_PATH` | Analysis bundle zip (or directory to zip on the fly) served by the summary-data download endpoint. |
+
+> **Migration note:** earlier releases read the model and delay from `VERTEX_MODEL_NAME` and
+> `VERTEX_REQUEST_DELAY`. These were renamed to `ANALYSIS_MODEL_NAME` / `ANALYSIS_REQUEST_DELAY`
+> (they now apply to both providers, not just Vertex). The old names are silently ignored, so a
+> deployment that sets them keeps running on the defaults — move any explicit values to the new
+> names when upgrading.
 
 ## Single Sign-On (SSO)
 

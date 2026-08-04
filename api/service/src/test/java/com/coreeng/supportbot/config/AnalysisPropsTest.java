@@ -27,7 +27,7 @@ class AnalysisPropsTest {
         assertThat(llm.vertex().location()).isEqualTo("europe-west2");
         assertThat(llm.proxy().baseUrl()).isEmpty();
         assertThat(llm.proxy().auth().basicAuthToken()).isEmpty();
-        assertThat(llm.proxy().timeout()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(llm.proxy().timeout()).isEqualTo(Duration.ofSeconds(20));
     }
 
     @Test
@@ -216,14 +216,33 @@ class AnalysisPropsTest {
         assertThat(llm.toString()).doesNotContain(BASE64_TOKEN);
     }
 
+    @Test
+    void skipsLlmValidationWhenPromptDisabled() {
+        // Neither provider enabled and no model name: invalid for the feature, but the feature is
+        // off, so binding must not block startup.
+        Map<String, Object> values = new HashMap<>();
+        values.put("analysis.prompt.enabled", "false");
+        values.put("analysis.llm.vertex.enabled", "false");
+
+        Llm llm = bind(values);
+
+        assertThat(llm.vertex().enabled()).isFalse();
+        assertThat(llm.proxy().enabled()).isFalse();
+        assertThat(llm.modelName()).isEmpty();
+    }
+
     private static Llm bind(Map<String, Object> properties) {
+        // Bound at the analysis root, not analysis.llm: validation runs in the AnalysisProps
+        // constructor because it is gated on analysis.prompt.enabled.
         return new Binder(new MapConfigurationPropertySource(properties))
-                .bind("analysis.llm", Llm.class)
-                .get();
+                .bind("analysis", AnalysisProps.class)
+                .get()
+                .llm();
     }
 
     private static Map<String, Object> vertexValues() {
         Map<String, Object> values = new HashMap<>();
+        values.put("analysis.prompt.enabled", "true");
         values.put("analysis.llm.model-name", "gemini-2.5-flash");
         values.put("analysis.llm.vertex.project-id", "test-project");
         values.put("analysis.llm.vertex.location", "europe-west2");
@@ -232,6 +251,7 @@ class AnalysisPropsTest {
 
     private static Map<String, Object> proxyValues() {
         Map<String, Object> values = new HashMap<>();
+        values.put("analysis.prompt.enabled", "true");
         values.put("analysis.llm.vertex.enabled", "false");
         values.put("analysis.llm.proxy.enabled", "true");
         values.put("analysis.llm.model-name", "gemini-2.5-flash");

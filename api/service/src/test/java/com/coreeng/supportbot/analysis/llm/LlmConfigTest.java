@@ -25,6 +25,18 @@ class LlmConfigTest {
     }
 
     @Test
+    void startsCleanlyWhenPromptDisabledDespiteInvalidLlmConfig() {
+        // No model name and neither provider enabled: rejected when the feature is on, but with
+        // the feature off this config is never used and must not block startup.
+        contextRunner
+                .withPropertyValues("analysis.prompt.enabled=false", "analysis.llm.vertex.enabled=false")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean(ChatModel.class);
+                });
+    }
+
+    @Test
     void defaultsToVertexModelWhenProxyNotEnabled() {
         contextRunner
                 .withPropertyValues(vertexProperties())

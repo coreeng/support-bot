@@ -15,6 +15,7 @@ import com.coreeng.supportbot.config.AnalysisProps;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
+import dev.langchain4j.exception.TimeoutException;
 import dev.langchain4j.model.chat.ChatModel;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
@@ -75,8 +76,10 @@ class ProxyChatModelContractTest {
 
         ChatModel model = proxyModel(Duration.ofMillis(200));
 
-        // Assert only on failure, not request count: the client may retry before giving up.
-        assertThatThrownBy(() -> model.chat("slow")).isInstanceOf(RuntimeException.class);
+        // Assert the failure kind, not just any exception: an unconfigured timeout would still
+        // throw here (the "{}" body has no candidates), but only as a mapping failure after the
+        // full 2s delay. No assertion on request count: the client may retry before giving up.
+        assertThatThrownBy(() -> model.chat("slow")).isInstanceOf(TimeoutException.class);
     }
 
     private ChatModel proxyModel(Duration timeout) {

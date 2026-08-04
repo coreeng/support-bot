@@ -11,6 +11,14 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties(prefix = "analysis")
 public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
 
+    public AnalysisProps {
+        // LLM settings are only consulted when the analysis feature is on; a deployment with the
+        // feature off must not be blocked from starting by provider config it never uses.
+        if (prompt.enabled()) {
+            llm.validate();
+        }
+    }
+
     public record Llm(
             @DefaultValue("") String modelName,
             @DefaultValue("500ms") Duration requestDelay,
@@ -19,6 +27,9 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
 
         public Llm {
             modelName = modelName.trim();
+        }
+
+        void validate() {
             if (modelName.isEmpty()) {
                 throw new IllegalArgumentException("analysis.llm.model-name must not be blank");
             }
@@ -64,7 +75,7 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
             @DefaultValue("false") boolean enabled,
             @DefaultValue("") String baseUrl,
             @DefaultValue Auth auth,
-            @DefaultValue("5s") Duration timeout) {
+            @DefaultValue("20s") Duration timeout) {
 
         public Proxy {
             baseUrl = stripTrailingSlashes(baseUrl.trim());
