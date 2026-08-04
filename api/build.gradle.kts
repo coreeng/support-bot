@@ -43,10 +43,10 @@ val safeDependencyVersions =
         "org.eclipse.jetty:jetty-util" to "12.0.36",
         "org.postgresql:postgresql" to "42.7.12",
         "org.springframework.security:spring-security-web" to "6.5.11",
-        "org.springframework:spring-context" to "6.2.18",
-        "org.springframework:spring-core" to "6.2.18",
-        "org.springframework:spring-web" to "6.2.18",
-        "org.springframework:spring-webmvc" to "6.2.18",
+        "org.springframework:spring-context" to "6.2.19",
+        "org.springframework:spring-core" to "6.2.19",
+        "org.springframework:spring-web" to "6.2.19",
+        "org.springframework:spring-webmvc" to "6.2.19",
     )
 val managedDependencyVersions =
     mapOf(
