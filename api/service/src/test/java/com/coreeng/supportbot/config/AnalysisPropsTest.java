@@ -163,6 +163,43 @@ class AnalysisPropsTest {
     }
 
     @Test
+    void proxyModeRejectsNonHttpScheme() {
+        Map<String, Object> values = proxyValues();
+        values.put("analysis.llm.proxy.base-url", "ftp://llm-proxy.example.test/v1beta");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage("analysis.llm.proxy.base-url must be an absolute HTTP(S) URL");
+    }
+
+    @Test
+    void proxyModeRejectsRelativeUrl() {
+        Map<String, Object> values = proxyValues();
+        values.put("analysis.llm.proxy.base-url", "llm-proxy.example.test/v1beta");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage("analysis.llm.proxy.base-url must be an absolute HTTP(S) URL");
+    }
+
+    @Test
+    void proxyModeRejectsUserInfoInUrl() {
+        Map<String, Object> values = proxyValues();
+        values.put("analysis.llm.proxy.base-url", "https://user:pass@llm-proxy.example.test/v1beta");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage("analysis.llm.proxy.base-url must be an absolute HTTP(S) URL");
+    }
+
+    @Test
+    void proxyModeRejectsUnparseableUrl() {
+        Map<String, Object> values = proxyValues();
+        values.put("analysis.llm.proxy.base-url", "https://llm-proxy.example.test/v1 beta");
+
+        // The URISyntaxException is chained as the cause, so the friendly message is mid-chain, not root.
+        assertThatThrownBy(() -> bind(values))
+                .hasStackTraceContaining("analysis.llm.proxy.base-url must be an absolute HTTP(S) URL");
+    }
+
+    @Test
     void proxyModeRejectsNonPositiveTimeout() {
         Map<String, Object> values = proxyValues();
         values.put("analysis.llm.proxy.timeout", "0s");

@@ -3,19 +3,18 @@ package com.coreeng.supportbot.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
-import org.yaml.snakeyaml.Yaml;
 
 class ActuatorExposureTest {
 
@@ -46,38 +45,14 @@ class ActuatorExposureTest {
                 .isEmpty();
     }
 
+    // Binds through Spring's own yaml loading, so every notation Spring accepts at runtime is guarded.
     private static List<String> exposedEndpoints(Resource configFile) throws IOException {
         List<String> endpoints = new ArrayList<>();
-        try (InputStream input = configFile.getInputStream()) {
-            for (Object document : new Yaml().loadAll(input)) {
-                Map<String, Object> flattened = new HashMap<>();
-                flatten("", document, flattened);
-                endpoints.addAll(endpointNames(flattened.get(EXPOSURE_KEY)));
-            }
+        for (PropertySource<?> source : new YamlPropertySourceLoader().load(configFile.getFilename(), configFile)) {
+            new Binder(ConfigurationPropertySources.from(source))
+                    .bind(EXPOSURE_KEY, Bindable.of(String[].class))
+                    .ifBound(values -> endpoints.addAll(List.of(values)));
         }
         return endpoints;
-    }
-
-    // Treats nested maps and literal dotted keys identically, like Spring's yaml binding does.
-    private static void flatten(String prefix, Object node, Map<String, Object> target) {
-        if (node instanceof Map<?, ?> map) {
-            map.forEach((key, value) ->
-                    flatten(prefix.isEmpty() ? String.valueOf(key) : prefix + "." + key, value, target));
-        } else if (!prefix.isEmpty()) {
-            target.put(prefix, node);
-        }
-    }
-
-    private static List<String> endpointNames(@Nullable Object includeValue) {
-        if (includeValue == null) {
-            return List.of();
-        }
-        if (includeValue instanceof List<?> list) {
-            return list.stream().map(String::valueOf).map(String::trim).toList();
-        }
-        return Arrays.stream(String.valueOf(includeValue).split(","))
-                .map(String::trim)
-                .filter(name -> !name.isEmpty())
-                .toList();
     }
 }
