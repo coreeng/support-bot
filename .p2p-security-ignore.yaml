@@ -42,6 +42,11 @@ images:
 
 source:
   secrets:
+    - id: 38fa3e746d6e664a65484a44df7d4bbb2f913784ca977835df9801d6cc8f6b69
+      path: .agents/skills/support-bot-review/SKILL.md
+      reason: >-
+        False positive: the Atlassian detector matched the review template placeholder
+        "Diff Range: <base>...HEAD", not a credential.
     - id: 6926d3ba9e59e8bfa458b82d3109c3ac1da0723b32eee6a4f391794f58ac5d3d
       reason: "False positive: historical FlatIO detector match in removed support-bot-ui/yarn.lock dependency metadata."
     - id: 1b8e8972627e7ef0db02f63678f41989887dec6064d7cb0e1a4d505207f619c4
