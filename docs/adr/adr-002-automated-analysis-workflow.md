@@ -38,7 +38,6 @@ Compare current analysis to current prompt, if the same prompt was used for the 
 
 ### 4. Use database for concurrency control
 
-### 5. Use database for progress
 
 ---
 
@@ -48,7 +47,6 @@ Compare current analysis to current prompt, if the same prompt was used for the 
 
 - **No new infrastructure.** The pipeline runs inside the existing Spring Boot pod; no queues, workers, or caches are needed.
 - **No new secrets.** Workload Identity Federation means Vertex AI credentials are handled by GKE, consistent with the existing GCP integration pattern.
-- **Safe concurrency.** regardless of replica count.
 - **Incremental — existing import/export flows unchanged.** The offline workflow continues to work; this is an additive change.
 - **Progress is durable.** Counters in PostgreSQL survive pod restarts; the UI will resume polling the correct state after any disruption.
 - **Incremental persistence.** Each thread is persisted immediately after LLM analysis, so partial progress is never lost.
