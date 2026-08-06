@@ -259,6 +259,27 @@ pr-review-tracking:
   gitlab: # Required only if any repo uses provider: gitlab
     api-base-url: ${GITLAB_API_BASE_URL:https://gitlab.com/api/v4} # must include /api/v4, no trailing slash
     token: ${GITLAB_TOKEN:}
+
+# Knowledge-gap analysis of support threads via an LLM.
+# Full operator reference is in the "Analysis (knowledge-gap LLM)" section under Integrations below.
+analysis:
+  llm:
+    model-name: ${ANALYSIS_MODEL_NAME:gemini-2.5-flash} # Model id, used by both providers
+    request-delay: ${ANALYSIS_REQUEST_DELAY:500ms} # Pause between per-thread LLM calls (rate-limit mitigation)
+    vertex: # Hosted Vertex AI via ADC. Exactly one of vertex/proxy may be enabled.
+      enabled: ${VERTEX_ENABLED:true}
+      project-id: ${VERTEX_PROJECT_ID:} # Required when enabled
+      location: ${VERTEX_LOCATION:europe-west2} # Required when enabled
+    proxy: # Internal LLM proxy speaking the native Gemini REST API
+      enabled: ${AI_PROXY_ENABLED:false}
+      base-url: ${AI_PROXY_BASE_URL:} # Full URL including the /v1beta suffix; required when enabled
+      auth:
+        basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:} # Base64 user:password — deliver via a Secret
+      timeout: ${AI_PROXY_TIMEOUT:20s} # Connect + read timeout per proxy call
+  bundle:
+    path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip served by the summary-data download endpoint
+  prompt:
+    enabled: ${ANALYSIS_PROMPT_ENABLED:false} # Master switch for the analysis feature
 ```
 
 For deployment versatility across different secret delivery mechanisms, you can base64-encode the PEM file into a single line before storing it:
@@ -387,6 +408,55 @@ The snapshot keeps each source JSON object while also normalising the fields and
 Substring search deliberately uses extension-free `LIKE` scans instead of `pg_trgm`, so migrations work in restricted database schemas; the snapshot limits bound the scanned dataset.
 
 Leadership and support-engineer users can inspect the connection, last attempts, last successes, errors, and locally stored collections on the **Elevate** page under **Integrations**.
+
+## Analysis (knowledge-gap LLM)
+
+Support Bot can analyse closed support threads with an LLM to identify knowledge gaps
+(the **Run Analysis** flow in the UI). The feature is off by default; enable it with
+`ANALYSIS_PROMPT_ENABLED=true`. The analysis prompt itself is stored in the database
+(versioned, with one version marked in use) and managed from the UI — there is no prompt
+file or environment variable.
+
+When enabled, the service builds exactly one LLM client at startup. Each provider block
+has an `enabled` flag and exactly one of them must be true — enabling both or neither
+fails startup:
+
+- **`analysis.llm.vertex.enabled`** (default `true`) — calls Vertex AI directly using
+  Application Default Credentials. No credential is configured in the app: on GKE the
+  pod's ServiceAccount must be correctly configured.
+- **`analysis.llm.proxy.enabled`** (default `false`) — sends native Gemini REST requests
+  through an internal LLM proxy and authenticates with a static
+  `Authorization: Basic <token>` header instead of cloud credentials. No GCP credential
+  discovery happens in this mode, and there is no silent fallback between providers.
+
+While the feature is enabled, configuration is validated at startup: only the enabled
+provider's settings are required, and the service fails fast naming the offending property
+(for example `analysis.llm.proxy.base-url is required when analysis.llm.proxy.enabled=true`).
+With the feature off, LLM settings are not validated and cannot block startup.
+
+### Environment variables
+
+Set these on the **API**:
+
+| Variable | Description |
+|----------|-------------|
+| `ANALYSIS_PROMPT_ENABLED` | Master switch for the analysis feature. No LLM client is created when off. |
+| `VERTEX_ENABLED` | Enables the hosted Vertex AI provider. |
+| `AI_PROXY_ENABLED` | Enables the LLM proxy provider. Exactly one of `VERTEX_ENABLED` and `AI_PROXY_ENABLED` must be true. |
+| `ANALYSIS_MODEL_NAME` | Model id used by **both** providers. |
+| `ANALYSIS_REQUEST_DELAY` | Pause between per-thread LLM calls to stay under rate limits. |
+| `VERTEX_PROJECT_ID` | GCP project hosting Vertex AI. Required when the vertex provider is enabled. |
+| `VERTEX_LOCATION` | Vertex AI region, e.g. `europe-west2`. Required when the vertex provider is enabled. |
+| `AI_PROXY_BASE_URL` | Proxy base URL **including the `/v1beta` suffix**, e.g. `https://<proxy-host>/platform/google-vertex/proxy/v1beta`; the client appends `/models/<model>:generateContent`. Must be an absolute HTTP(S) URL without query or fragment; trailing slashes are stripped. Plain `http` is accepted for in-cluster proxies — note the Basic credential then travels unencrypted. Required when the proxy provider is enabled. |
+| `AI_PROXY_BASIC_AUTH_TOKEN` | Base64-encoded `user:password` proxy credential, sent as `Authorization: Basic <token>`. |
+| `AI_PROXY_TIMEOUT` | Connect and read timeout applied to each proxy HTTP call. |
+| `ANALYSIS_BUNDLE_PATH` | Analysis bundle zip (or directory to zip on the fly) served by the summary-data download endpoint. |
+
+> **Migration note:** earlier releases read the model and delay from `VERTEX_MODEL_NAME` and
+> `VERTEX_REQUEST_DELAY`. These were renamed to `ANALYSIS_MODEL_NAME` / `ANALYSIS_REQUEST_DELAY`
+> (they now apply to both providers, not just Vertex). The old names are silently ignored, so a
+> deployment that sets them keeps running on the defaults — move any explicit values to the new
+> names when upgrading.
 
 ## Single Sign-On (SSO)
 
