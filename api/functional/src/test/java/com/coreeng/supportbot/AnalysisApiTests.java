@@ -3,6 +3,8 @@ package com.coreeng.supportbot;
 import static com.coreeng.supportbot.testkit.UserRole.tenant;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.testkit.SlackWiremock;
@@ -81,6 +83,16 @@ public class AnalysisApiTests {
                     assertThat(status.running()).isFalse();
                     assertThat(status.error()).isNull();
                 });
+
+        // The functionaltests profile runs the LLM in proxy mode against WireMock, so the wire
+        // contract is asserted against a booted app: native Gemini path, the configured Basic
+        // credential delivered through config binding, and no API-key header.
+        var llmRequests = slackWiremock.findAll(
+                postRequestedFor(urlPathMatching("/llm-proxy/v1beta/models/[^/]+:generateContent")));
+        assertThat(llmRequests).isNotEmpty();
+        var llmRequest = llmRequests.getFirst();
+        assertThat(llmRequest.header("Authorization").values()).containsExactly("Basic ZnVuY3Rpb25hbDpwcm94eQ==");
+        assertThat(llmRequest.header("x-goog-api-key").isPresent()).isFalse();
 
         slackWiremock.cleanupTestStubs();
     }

@@ -34,11 +34,14 @@ class AnalysisEnabledControllerTest {
     }
 
     private static AnalysisEnabledController controllerWithEnabled(boolean enabled) {
-        AnalysisProps.Vertex vertex =
-                new AnalysisProps.Vertex("test-project", "europe-west2", "gemini-2.5-flash", Duration.ofMillis(100));
+        AnalysisProps.Llm llm = new AnalysisProps.Llm(
+                "gemini-2.5-flash",
+                Duration.ofMillis(100),
+                new AnalysisProps.Vertex(true, "test-project", "europe-west2"),
+                new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)));
         AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
         AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(enabled);
-        AnalysisProps analysisProps = new AnalysisProps(vertex, bundle, prompt);
+        AnalysisProps analysisProps = new AnalysisProps(llm, bundle, prompt);
         return new AnalysisEnabledController(analysisProps);
     }
 }

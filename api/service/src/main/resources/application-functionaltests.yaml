@@ -233,9 +233,18 @@ platform-integration:
         - name: pr-author-excluded
           groupRef: group-ref-pr-author-excluded
 
+# Proxy mode against the functional-test WireMock: the real proxy ChatModel is exercised
+# end-to-end (native Gemini REST + Basic auth). The generateContent stub is registered as a
+# permanent stub in the testkit's SlackWiremock.
 analysis:
-  vertex:
-    project-id: "false"
+  llm:
     request-delay: 10ms
+    vertex:
+      enabled: false
+    proxy:
+      enabled: true
+      base-url: ${AI_PROXY_BASE_URL:http://localhost:8000/llm-proxy/v1beta}
+      auth:
+        basic-auth-token: ZnVuY3Rpb25hbDpwcm94eQ== # functional:proxy
   prompt:
     enabled: true

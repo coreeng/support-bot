@@ -125,6 +125,7 @@ dependencies {
     implementation(platform("dev.langchain4j:langchain4j-bom:1.18.0"))
     implementation("dev.langchain4j:langchain4j")
     implementation("dev.langchain4j:langchain4j-vertex-ai-gemini")
+    implementation("dev.langchain4j:langchain4j-google-ai-gemini")
 
     implementation("net.logstash.logback:logstash-logback-encoder:8.0")
     implementation("org.springframework.boot:spring-boot-starter-validation")

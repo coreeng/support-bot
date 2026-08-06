@@ -198,7 +198,7 @@ public class AnalysisService {
                     }
 
                     // Rate limiting delay to avoid hitting LLM API limits
-                    Thread.sleep(analysisProps.vertex().requestDelay().toMillis());
+                    Thread.sleep(analysisProps.llm().requestDelay().toMillis());
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();

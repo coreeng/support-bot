@@ -7,6 +7,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -164,6 +165,23 @@ public class SlackWiremock implements WireMockBackend {
         givenThat(get(urlMatching("/api/v4/groups/[^/]+/members/all.*"))
                 .withName("GitLab group members catch-all")
                 .willReturn(okJson("[]")));
+        // The functionaltests profile runs the analysis LLM in proxy mode pointed at this server
+        // (application-functionaltests.yaml), so the real proxy ChatModel lands generateContent
+        // calls here. Permanent rather than per-test: analysis runs asynchronously, so a batch can
+        // still be in flight after the triggering test's stubs are cleaned up. Matching the Basic
+        // credential makes a missing or wrong Authorization header an unhandled request.
+        givenThat(post(urlPathMatching("/llm-proxy/v1beta/models/[^/]+:generateContent"))
+                .withName("LLM proxy generateContent")
+                .withHeader("Authorization", equalTo("Basic ZnVuY3Rpb25hbDpwcm94eQ=="))
+                .willReturn(okJson("""
+                        {
+                          "candidates": [{
+                            "content": {"role": "model", "parts": [{"text": "Ticket: 0\\nPrimary Driver: Knowledge Gap\\nCategory: Monitoring & Troubleshooting Tenant Applications\\nPlatform Feature: workload compute\\nReason: Functional test analysis result\\n"}]},
+                            "finishReason": "STOP"
+                          }],
+                          "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1, "totalTokenCount": 2}
+                        }
+                        """)));
     }
 
     private void capturePermanentStubs() {
