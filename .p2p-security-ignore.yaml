@@ -64,3 +64,5 @@ source:
       reason: "False positive: GitLab detector matched functional-test repository fixture names, not a credential."
     - id: 47cc33af5d9b098bb6d6f2effbf1b51150b5e11eec627d9fd41a8ad8ce4a343f
       reason: "False positive: URI detector matched a redirect URI validation test case for userinfo injection, not a secret."
+    - id: d869995f7dd57416d313b3248ccceb0f83dbff528c844eed5958ab757ba8960a
+      reason: "False positive: detected a test URL for a test case with a fake user password for basic auth."
