@@ -33,6 +33,9 @@ RUN service postgresql start && sleep 6 && \
 
 ## Final stage
 FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24-3.1785873418
+USER 0
+RUN microdnf update -y libarchive-3.5.3-11.el9_8 && microdnf clean all
+USER 185
 ARG P2P_VERSION=dev
 ENV SUPPORT_BOT_VERSION=${P2P_VERSION}
 WORKDIR /app
