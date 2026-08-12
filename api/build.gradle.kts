@@ -55,6 +55,7 @@ val managedDependencyVersions =
         "commons-lang3.version" to safeDependencyVersions.getValue("org.apache.commons:commons-lang3"),
         "jetty.version" to safeDependencyVersions.getValue("org.eclipse.jetty:jetty-server"),
         "logback.version" to safeDependencyVersions.getValue("ch.qos.logback:logback-core"),
+        "micrometer.version" to "1.15.12",
         "mockito.version" to "5.21.0",
         "netty.version" to safeDependencyVersions.getValue("io.netty:netty-common"),
         "opentelemetry.version" to safeDependencyVersions.getValue("io.opentelemetry:opentelemetry-api"),
