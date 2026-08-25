@@ -32,7 +32,7 @@ RUN service postgresql start && sleep 6 && \
         :service:jooqCodegen :service:build -Pversion="${P2P_VERSION}" --no-daemon
 
 ## Final stage
-FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24-3.1787219877
+FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
 ARG P2P_VERSION=dev
 ENV SUPPORT_BOT_VERSION=${P2P_VERSION}
 WORKDIR /app
