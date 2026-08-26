@@ -241,7 +241,7 @@ public class AnalysisService {
     public String loadPrompt() {
         AnalysisPrompt prompt;
         try {
-            prompt = analysisPromptRepository.findInUse();
+            prompt = analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION);
         } catch (RuntimeException e) {
             throw new AnalysisPromptLoadException("Failed to read the analysis prompt", e);
         }

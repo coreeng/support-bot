@@ -77,7 +77,8 @@ class AnalysisServiceTest {
     }
 
     private void givenPromptInUse() {
-        when(analysisPromptRepository.findInUse()).thenReturn(new AnalysisPrompt(1, PROMPT_TEXT));
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenReturn(new AnalysisPrompt(1, PROMPT_TEXT));
     }
 
     @Test
@@ -402,7 +403,8 @@ class AnalysisServiceTest {
     @Test
     void runAsyncAnalysis_setsErrorOnPromptLoadFailure() {
         // given — no prompt version is marked as in use
-        when(analysisPromptRepository.findInUse()).thenReturn(null);
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenReturn(null);
 
         // when
         service.runAsyncAnalysis(7);
@@ -424,7 +426,8 @@ class AnalysisServiceTest {
 
     @Test
     void loadPrompt_throwsWhenNoVersionIsInUse() {
-        when(analysisPromptRepository.findInUse()).thenReturn(null);
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenReturn(null);
 
         assertThatThrownBy(service::loadPrompt)
                 .isInstanceOf(AnalysisPromptLoadException.class)
@@ -434,7 +437,8 @@ class AnalysisServiceTest {
     @Test
     void loadPrompt_wrapsDatabaseFailure() {
         // Keeps the ANALYSIS_PROMPT_LOAD_FAILED contract the UI relies on when the DB is unreachable.
-        when(analysisPromptRepository.findInUse()).thenThrow(new DataAccessResourceFailureException("db down"));
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
 
         assertThatThrownBy(service::loadPrompt)
                 .isInstanceOf(AnalysisPromptLoadException.class)
