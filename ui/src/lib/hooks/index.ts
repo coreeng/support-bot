@@ -26,6 +26,7 @@ import type {
   RepoInsights,
   RequestBreakdown,
 } from "@/lib/types/dashboard";
+import type { SummaryData, SummaryStatus } from "@/lib/types/summary";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getCsrfToken, signOut } from "next-auth/react";
 
@@ -545,6 +546,43 @@ export function useAnalysisPrompt(enabled: boolean) {
     // version currently in use, which can change without a reload
     staleTime: 0,
     gcTime: 0,
+  });
+}
+
+// ===== Support Summary Hooks =====
+
+/** Cadence shared with the knowledge-gaps page's analysis polling. */
+const SUMMARY_POLL_MS = 3000;
+
+export function useSummaryEnabled() {
+  return useQuery<boolean>({
+    queryKey: ["summary", "enabled"],
+    queryFn: async () => {
+      const response = await apiGet<SummaryStatus>("/summary/enabled");
+      return response.enabled;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Loads the Support Summary for a window. The request itself triggers the server-side
+ * backfill and prose generation, so while the summary section reports `generating` we
+ * keep polling until it settles on `ready` or `unavailable`.
+ */
+export function useSummary(from?: string, to?: string) {
+  const params = new URLSearchParams();
+  if (from) params.append("from", from);
+  if (to) params.append("to", to);
+  const query = params.toString();
+
+  return useQuery<SummaryData>({
+    queryKey: ["summary", from ?? null, to ?? null],
+    queryFn: () => apiGet(`/summary${query ? `?${query}` : ""}`),
+    refetchInterval: (query) => (query.state.data?.summary.state === "generating" ? SUMMARY_POLL_MS : false),
+    // The window's figures move as the backfill runs; a stale cache would show the wrong ones.
+    staleTime: 0,
+    placeholderData: keepPreviousData,
   });
 }
 
