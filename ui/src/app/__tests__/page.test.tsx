@@ -1,6 +1,6 @@
 import { useTeamFilter } from "@/contexts/TeamFilterContext";
 import { useAuth } from "@/hooks/useAuth";
-import { useElevateEnabled, useKnowledgeGapsEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
+import { useElevateEnabled, useKnowledgeGapsEnabled, useSummaryEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
 import { render, screen, waitFor } from "@testing-library/react";
 import { useRouter } from "next/navigation";
 import DashboardLayoutComponent from "../(dashboard)/layout";
@@ -22,6 +22,7 @@ jest.mock("../../contexts/TeamFilterContext", () => ({
 
 jest.mock("../../lib/hooks", () => ({
   useKnowledgeGapsEnabled: jest.fn(),
+  useSummaryEnabled: jest.fn(),
   useTenantInsightsEnabled: jest.fn(),
   useElevateEnabled: jest.fn(),
 }));
@@ -77,6 +78,7 @@ const mockRouter = {
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseTeamFilter = useTeamFilter as jest.MockedFunction<typeof useTeamFilter>;
 const mockUseKnowledgeGapsEnabled = useKnowledgeGapsEnabled as jest.MockedFunction<typeof useKnowledgeGapsEnabled>;
+const mockUseSummaryEnabled = useSummaryEnabled as jest.MockedFunction<typeof useSummaryEnabled>;
 const mockUseTenantInsightsEnabled = useTenantInsightsEnabled as jest.MockedFunction<typeof useTenantInsightsEnabled>;
 const mockUseElevateEnabled = useElevateEnabled as jest.MockedFunction<typeof useElevateEnabled>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
@@ -94,6 +96,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseRouter.mockReturnValue(mockRouter as any);
+    mockUseSummaryEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseElevateEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTeamFilter.mockReturnValue({
@@ -448,6 +451,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
         isLoading: false,
         error: null,
       } as any);
+      mockUseSummaryEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
       mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
       mockUseElevateEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
 
@@ -579,6 +583,7 @@ describe("Dashboard - Elevate nav item visibility", () => {
     jest.clearAllMocks();
     mockUseRouter.mockReturnValue(mockRouter as any);
     mockUseKnowledgeGapsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+    mockUseSummaryEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTeamFilter.mockReturnValue({
       hasUnrestrictedDataScope: true,

@@ -1,6 +1,6 @@
 "use client";
 
-import { type LucideIcon, Activity, AlertCircle, BookOpen, Cable, GaugeCircle, GitPullRequest, Home, Ticket } from "lucide-react";
+import { type LucideIcon, Activity, AlertCircle, BookOpen, Cable, GaugeCircle, GitPullRequest, Home, Sparkles, Ticket } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { type UiCapability, hasUiCapability, UI_CAPABILITIES } from "@/lib/auth/capabilities";
-import { useElevateEnabled, useKnowledgeGapsEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
+import { useElevateEnabled, useKnowledgeGapsEnabled, useSummaryEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
 
 type NavItem = {
   title: string;
@@ -33,7 +33,7 @@ type NavItem = {
 
 type TabVisibility = {
   requiredCapability?: UiCapability;
-  requiresFeatureFlag?: "knowledgeGaps" | "tenantInsights" | "elevate";
+  requiresFeatureFlag?: "knowledgeGaps" | "summary" | "tenantInsights" | "elevate";
 };
 
 type SupportTab = {
@@ -52,6 +52,12 @@ const SUPPORT_TABS: SupportTab[] = [
     title: "Support Area Summary",
     icon: BookOpen,
     visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS, requiresFeatureFlag: "knowledgeGaps" },
+  },
+  {
+    path: "/summary",
+    title: "Support Summary",
+    icon: Sparkles,
+    visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS, requiresFeatureFlag: "summary" },
   },
   {
     path: "/health",
@@ -87,11 +93,13 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { state } = useSidebar();
   const { user, isLoading } = useAuth();
   const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled();
+  const { data: isSummaryEnabled } = useSummaryEnabled();
   const { data: isTenantInsightsEnabled } = useTenantInsightsEnabled();
   const { data: isElevateEnabled } = useElevateEnabled();
 
   const flags: Record<NonNullable<TabVisibility["requiresFeatureFlag"]>, boolean | undefined> = {
     knowledgeGaps: isKnowledgeGapsEnabled,
+    summary: isSummaryEnabled,
     tenantInsights: isTenantInsightsEnabled,
     elevate: isElevateEnabled,
   };
