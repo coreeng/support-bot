@@ -60,7 +60,9 @@ public class SecurityConfig {
                         // Feature-enabled checks are open to any authenticated user (not just leadership/
                         // support engineers) so the UI sidebar can safely query them for everyone to decide
                         // whether to show the nav item, without a 403 for users lacking that role.
-                        .requestMatchers("/elevate/enabled")
+                        // Listed ahead of the role-gated rules below so the check keeps working if
+                        // one of those is ever widened to a wildcard.
+                        .requestMatchers("/elevate/enabled", "/summary/enabled")
                         .authenticated()
                         // Dashboard restricted to leadership or support engineers
                         .requestMatchers("/dashboard/**", "/summary-data/results", "/elevate/**")
