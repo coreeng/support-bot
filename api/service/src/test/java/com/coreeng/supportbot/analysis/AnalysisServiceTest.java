@@ -19,12 +19,14 @@ import com.coreeng.supportbot.config.AnalysisProps.Vertex;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -50,6 +52,9 @@ class AnalysisServiceTest {
     @Mock
     private ApplicationContext applicationContext;
 
+    @Mock
+    private ObjectProvider<WindowAnalysisRunner> windowAnalysisRunner;
+
     private static final String PROMPT_TEXT = "Test prompt content";
 
     private AnalysisProps analysisProps;
@@ -73,7 +78,8 @@ class AnalysisServiceTest {
                 analysisRepository,
                 analysisPromptRepository,
                 analysisProps,
-                applicationContext);
+                applicationContext,
+                windowAnalysisRunner);
     }
 
     private void givenPromptInUse() {
@@ -138,6 +144,34 @@ class AnalysisServiceTest {
         // then
         verify(asyncJobRepository).findJob("analysis");
         verifyNoInteractions(applicationContext);
+    }
+
+    @Test
+    void resumeAnalysisOnStartup_shouldHandOffAWindowJobToItsRunner() {
+        // A window job belongs to the Support Summary feature; the analysis service only holds the
+        // shared lock row and must not try to resume it as a days-based run.
+        AsyncJob windowJob = new AsyncJob("analysis", "window:2026-03-10:2026-03-23", Instant.now());
+        when(asyncJobRepository.findJob("analysis")).thenReturn(windowJob);
+        WindowAnalysisRunner runner = mock(WindowAnalysisRunner.class);
+        when(windowAnalysisRunner.getIfAvailable()).thenReturn(runner);
+
+        service.resumeAnalysisOnStartup();
+
+        verify(runner).runWindowRefresh(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23));
+        verify(asyncJobRepository, never()).deleteJob("analysis");
+        verifyNoInteractions(applicationContext);
+    }
+
+    @Test
+    void resumeAnalysisOnStartup_shouldDeleteAWindowJobWhenTheSummaryFeatureIsOff() {
+        // Nothing can run it, and leaving the row behind would hold the shared lock forever.
+        AsyncJob windowJob = new AsyncJob("analysis", "window:2026-03-10:2026-03-23", Instant.now());
+        when(asyncJobRepository.findJob("analysis")).thenReturn(windowJob);
+        when(windowAnalysisRunner.getIfAvailable()).thenReturn(null);
+
+        service.resumeAnalysisOnStartup();
+
+        verify(asyncJobRepository).deleteJob("analysis");
     }
 
     @Test

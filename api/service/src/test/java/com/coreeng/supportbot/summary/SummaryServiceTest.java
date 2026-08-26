@@ -1,0 +1,200 @@
+package com.coreeng.supportbot.summary;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.coreeng.supportbot.analysis.AnalysisPrompt;
+import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
+import com.coreeng.supportbot.analysis.AnalysisPromptType;
+import com.coreeng.supportbot.analysis.AnalysisService;
+import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
+import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisService;
+import com.coreeng.supportbot.config.SlackChannelRegistry;
+import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.google.common.collect.ImmutableList;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class SummaryServiceTest {
+
+    private static final LocalDate FROM = LocalDate.of(2026, 3, 10);
+    private static final LocalDate TO = LocalDate.of(2026, 3, 23);
+    private static final SummaryWindow WINDOW = new SummaryWindow(FROM, TO);
+    private static final String CHANNEL = "C123456";
+    private static final String CLASSIFICATION_PROMPT = "classify this";
+    private static final String SUMMARY_PROMPT = "summarise this";
+    private static final String FINGERPRINT = "2@2026-03-23T10:00";
+
+    private static final String CLASSIFICATION_PROMPT_ID = AnalysisService.computePromptId(CLASSIFICATION_PROMPT);
+    private static final String SUMMARY_PROMPT_ID = AnalysisService.computePromptId(SUMMARY_PROMPT);
+
+    @Mock
+    private AnalysisService analysisService;
+
+    @Mock
+    private AnalysisPromptRepository analysisPromptRepository;
+
+    @Mock
+    private ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService;
+
+    @Mock
+    private SummaryReadRepository summaryReadRepository;
+
+    @Mock
+    private SummarySnapshotRepository summarySnapshotRepository;
+
+    @Mock
+    private SummaryRefreshService summaryRefreshService;
+
+    private SummaryService service;
+
+    @BeforeEach
+    void setUp() {
+        SlackChannelRegistry channelRegistry = new SlackChannelRegistry(
+                new SlackTicketsProps(CHANNEL, List.of(), "eyes", "ticket", "white_check_mark", "rocket"));
+        service = new SummaryService(
+                analysisService,
+                analysisPromptRepository,
+                threadsAwaitingAnalysisService,
+                summaryReadRepository,
+                summarySnapshotRepository,
+                summaryRefreshService,
+                channelRegistry);
+
+        lenient().when(analysisService.loadPrompt()).thenReturn(CLASSIFICATION_PROMPT);
+        lenient()
+                .when(analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY))
+                .thenReturn(new AnalysisPrompt(1, SUMMARY_PROMPT));
+        lenient()
+                .when(summaryReadRepository.breakdowns(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(breakdowns());
+        lenient()
+                .when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(new SummaryFingerprint(2, LocalDate.of(2026, 3, 23).atTime(10, 0)));
+        lenient().when(summaryRefreshService.status()).thenReturn(idle());
+        lenient()
+                .when(analysisService.getStatus())
+                .thenReturn(new AnalysisService.AnalysisStatus(null, null, null, false, null));
+    }
+
+    @Test
+    void servesTheCachedSummaryWhenTheFingerprintMatchesAndThereAreNoGaps() {
+        givenNoGaps();
+        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
+                .thenReturn(new SummarySnapshot(
+                        WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "the prose", "model-a", Instant.EPOCH));
+
+        SummaryService.SummaryResult result = service.get(FROM, TO);
+
+        assertThat(result.summary()).isEqualTo(new SummaryState.Ready("the prose", "model-a", Instant.EPOCH));
+        verify(summaryRefreshService, never()).start(any());
+    }
+
+    @Test
+    void regeneratesWhenTheFingerprintNoLongerMatches() {
+        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
+                .thenReturn(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, "1@older", "stale", "model-a", null));
+        when(summaryRefreshService.start(WINDOW)).thenReturn(true);
+
+        assertThat(service.get(FROM, TO).summary())
+                .isEqualTo(new SummaryState.Generating(SummaryState.Phase.CLASSIFYING, null, null));
+    }
+
+    @Test
+    void backfillsWhenTheWindowHasUnclassifiedTickets() {
+        // Fingerprint and cache both match, but tickets in the window still need classifying — serving
+        // the cached prose here would describe an incomplete window.
+        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
+                .thenReturn(ImmutableList.of(new ThreadToAnalyze(1L, "1.2", CHANNEL)));
+        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
+                .thenReturn(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "prose", "model-a", null));
+        when(summaryRefreshService.start(WINDOW)).thenReturn(true);
+        when(analysisService.getStatus()).thenReturn(new AnalysisService.AnalysisStatus("analysis", 5, 2, true, null));
+
+        assertThat(service.get(FROM, TO).summary())
+                .isEqualTo(new SummaryState.Generating(SummaryState.Phase.CLASSIFYING, 2, 5));
+    }
+
+    @Test
+    void reportsTheRunningRefreshWithoutStartingASecondOne() {
+        when(summaryRefreshService.status())
+                .thenReturn(new SummaryRefreshService.RefreshStatus(WINDOW, SummaryState.Phase.SUMMARISING, true));
+
+        assertThat(service.get(FROM, TO).summary())
+                .isEqualTo(new SummaryState.Generating(SummaryState.Phase.SUMMARISING, null, null));
+        verify(summaryRefreshService, never()).start(any());
+    }
+
+    @Test
+    void reportsAFailedAttemptInsteadOfRetryingItEveryPoll() {
+        when(summaryRefreshService.failureFor(WINDOW, FINGERPRINT)).thenReturn("the model timed out");
+
+        assertThat(service.get(FROM, TO).summary()).isEqualTo(new SummaryState.Unavailable("the model timed out"));
+        verify(summaryRefreshService, never()).start(any());
+    }
+
+    @Test
+    void reportsUnavailableWhenNoSummaryPromptIsInUse() {
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY)).thenReturn(null);
+
+        SummaryService.SummaryResult result = service.get(FROM, TO);
+
+        assertThat(result.summary()).isInstanceOf(SummaryState.Unavailable.class);
+        // The breakdowns are unaffected: a broken summary must never cost the caller the rest of the page.
+        assertThat(result.breakdowns().totalTickets()).isEqualTo(3);
+    }
+
+    @Test
+    void reportsGeneratingWhenAnotherVisitorWinsTheLockRace() {
+        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID)).thenReturn(null);
+        when(summaryRefreshService.start(WINDOW)).thenReturn(false);
+        when(summaryRefreshService.status())
+                .thenReturn(
+                        idle(), new SummaryRefreshService.RefreshStatus(WINDOW, SummaryState.Phase.SUMMARISING, true));
+
+        assertThat(service.get(FROM, TO).summary())
+                .isEqualTo(new SummaryState.Generating(SummaryState.Phase.SUMMARISING, null, null));
+    }
+
+    @Test
+    void alwaysReturnsTheBreakdownsForTheRequestedWindow() {
+        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID)).thenReturn(null);
+        when(summaryRefreshService.start(WINDOW)).thenReturn(true);
+
+        SummaryBreakdowns result = service.get(FROM, TO).breakdowns();
+
+        assertThat(result.window()).isEqualTo(WINDOW);
+        assertThat(result.unclassifiedTickets()).isEqualTo(1);
+    }
+
+    private void givenNoGaps() {
+        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
+                .thenReturn(ImmutableList.of());
+    }
+
+    private static SummaryRefreshService.RefreshStatus idle() {
+        return new SummaryRefreshService.RefreshStatus(null, SummaryState.Phase.CLASSIFYING, false);
+    }
+
+    private static SummaryBreakdowns breakdowns() {
+        return new SummaryBreakdowns(
+                WINDOW,
+                3,
+                2,
+                ImmutableList.of(new SummaryCount("Knowledge Gap", 2)),
+                ImmutableList.of(new SummaryCount("Build & CI", 2)),
+                ImmutableList.of(new SummaryCount("pipelines", 2)),
+                ImmutableList.of(new SummaryCount("team-a", 3)));
+    }
+}

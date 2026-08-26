@@ -8,11 +8,13 @@ import com.google.common.collect.ImmutableList;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationContext;
@@ -64,6 +66,13 @@ public class AnalysisService {
     private final AnalysisProps analysisProps;
     private final ApplicationContext applicationContext;
 
+    /**
+     * Optional: only present when the Support Summary feature is enabled. Resolved lazily through a
+     * provider because the implementation lives downstream of this service and injecting it directly
+     * would be a construction cycle.
+     */
+    private final ObjectProvider<WindowAnalysisRunner> windowAnalysisRunner;
+
     private static final AnalysisStatus IDLE_STATUS = new AnalysisStatus(null, null, null, false, null);
     private final AtomicReference<AnalysisStatus> currentStatus = new AtomicReference<>(IDLE_STATUS);
 
@@ -95,17 +104,19 @@ public class AnalysisService {
             AsyncJobRepository.AsyncJob existingJob = asyncJobRepository.findJob(ASYNC_ID);
             if (existingJob == null) return;
 
-            int days;
-            try {
-                days = Integer.parseInt(existingJob.data());
-            } catch (NumberFormatException e) {
+            AnalysisJobData.Parsed job = AnalysisJobData.parse(existingJob.data());
+            if (job == null) {
                 log.error("Corrupt async job data '{}', deleting job", existingJob.data());
                 asyncJobRepository.deleteJob(ASYNC_ID);
                 return;
             }
 
             log.info("Found pending async job on startup: {}, resuming...", ASYNC_ID);
-            applicationContext.getBean(AnalysisService.class).runAsyncAnalysis(days);
+            switch (job) {
+                case AnalysisJobData.DaysRun daysRun ->
+                    applicationContext.getBean(AnalysisService.class).runAsyncAnalysis(daysRun.days());
+                case AnalysisJobData.WindowRun windowRun -> resumeWindowRun(windowRun);
+            }
         } catch (TaskRejectedException e) {
             log.error("Executor rejected resume of analysis job, cleaning up DB record", e);
             asyncJobRepository.deleteJob(ASYNC_ID);
@@ -115,13 +126,31 @@ public class AnalysisService {
     }
 
     /**
+     * Hands a windowed job back to whoever owns it (the Support Summary feature). With that feature
+     * off there is no owner, and the row has to go: it holds the shared lock, so leaving it would
+     * block every future analysis run.
+     */
+    private void resumeWindowRun(AnalysisJobData.WindowRun windowRun) {
+        WindowAnalysisRunner runner = windowAnalysisRunner.getIfAvailable();
+        if (runner == null) {
+            log.warn(
+                    "Pending windowed analysis job {}..{} has no runner (summary feature disabled), deleting job",
+                    windowRun.from(),
+                    windowRun.to());
+            asyncJobRepository.deleteJob(ASYNC_ID);
+            return;
+        }
+        runner.runWindowRefresh(windowRun.from(), windowRun.to());
+    }
+
+    /**
      * Attempts to start a new analysis job for the specified time range.
      *
      * @param days Number of days to look back for closed tickets to analyze
      * @return true if the job was started successfully, false if a job is already running
      */
     public boolean start(int days) {
-        if (asyncJobRepository.tryStartJob(ASYNC_ID, Integer.toString(days))) {
+        if (asyncJobRepository.tryStartJob(ASYNC_ID, AnalysisJobData.days(days))) {
             try {
                 log.info("Started new async job: id={}, days={}", ASYNC_ID, days);
                 applicationContext.getBean(AnalysisService.class).runAsyncAnalysis(days);
@@ -156,79 +185,100 @@ public class AnalysisService {
      */
     @Async("analysisTaskExecutor")
     public void runAsyncAnalysis(int days) {
-
         try {
             String prompt = loadPrompt();
             String promptId = computePromptId(prompt);
             log.info("Computed prompt ID (SHA-256): {}", promptId);
 
             // Find threads that need analysis (no analysis record with this prompt ID)
-            ImmutableList<ThreadToAnalyze> threads = threadsAwaitingAnalysisService.find(days, promptId);
-
-            currentStatus.set(new AnalysisStatus(ASYNC_ID, threads.size(), 0, true, null));
-
-            int analyzedCount = 0;
-            boolean interrupted = false;
-
-            // Analyze each thread
-            for (ThreadToAnalyze thread : threads) {
-                try {
-                    AnalysisRecord record = llmAnalysisService.analyzeThread(
-                            thread.channelId(), thread.threadTs(), thread.ticketId(), prompt);
-
-                    if (record == null || !record.isValid()) {
-                        log.warn("Skipping invalid analysis result for ticket {}", thread.ticketId());
-                    } else {
-                        // Add prompt ID to record
-                        AnalysisRecord recordWithPromptId = new AnalysisRecord(
-                                record.ticketId(),
-                                record.driver(),
-                                record.category(),
-                                record.feature(),
-                                record.summary(),
-                                promptId);
-
-                        // Persist immediately
-                        analysisRepository.upsert(recordWithPromptId);
-
-                        analyzedCount++;
-                        currentStatus.set(new AnalysisStatus(ASYNC_ID, threads.size(), analyzedCount, true, null));
-
-                        log.info("Analyzed thread {}/{}: ticket={}", analyzedCount, threads.size(), thread.ticketId());
-                    }
-
-                    // Rate limiting delay to avoid hitting LLM API limits
-                    Thread.sleep(analysisProps.llm().requestDelay().toMillis());
-
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    log.warn("Analysis interrupted at ticket {}", thread.ticketId());
-                    interrupted = true;
-                    break;
-                } catch (Exception e) {
-                    log.error("Failed to analyze thread for ticket {}: {}", thread.ticketId(), e.getMessage(), e);
-                    // Continue with next thread
-                }
-            }
-
-            if (interrupted) {
-                log.warn("Async job {} interrupted: analyzed {}/{} threads", ASYNC_ID, analyzedCount, threads.size());
-                currentStatus.set(new AnalysisStatus(
-                        ASYNC_ID,
-                        threads.size(),
-                        analyzedCount,
-                        false,
-                        "Analysis interrupted after " + analyzedCount + "/" + threads.size() + " threads"));
-            } else {
-                log.info("Async job {} completed: analyzed {}/{} threads", ASYNC_ID, analyzedCount, threads.size());
-                currentStatus.set(new AnalysisStatus(ASYNC_ID, threads.size(), analyzedCount, false, null));
-            }
-
+            classify(threadsAwaitingAnalysisService.find(days, promptId), prompt, promptId);
         } catch (Exception e) {
             log.error("Analysis job {} failed: {}", ASYNC_ID, e.getMessage(), e);
             currentStatus.set(new AnalysisStatus(ASYNC_ID, 0, 0, false, e.toString()));
         } finally {
             asyncJobRepository.deleteJob(ASYNC_ID);
+        }
+    }
+
+    /**
+     * Classifies the tickets raised in the given window that have no analysis for the current prompt.
+     *
+     * <p>Runs on the caller's thread and deliberately neither takes nor releases the {@code async_job}
+     * lock: the Support Summary refresh that calls this already holds it and goes on to generate the
+     * prose summary afterwards, so releasing here would let a second run start mid-refresh. Failures
+     * propagate for the same reason — the caller decides what a failed backfill means for the page.
+     *
+     * @param from First day of the window (inclusive), on ticket-creation time
+     * @param to Last day of the window (inclusive)
+     */
+    public void backfillWindow(LocalDate from, LocalDate to) {
+        String prompt = loadPrompt();
+        String promptId = computePromptId(prompt);
+        log.info("Backfilling analysis for window {}..{} with prompt ID {}", from, to, promptId);
+        classify(threadsAwaitingAnalysisService.find(from, to, promptId), prompt, promptId);
+    }
+
+    /**
+     * Analyses each thread and persists the result immediately, so an interrupted run keeps whatever
+     * it already produced. A thread that fails is logged and skipped rather than aborting the run.
+     */
+    private void classify(ImmutableList<ThreadToAnalyze> threads, String prompt, String promptId) {
+        currentStatus.set(new AnalysisStatus(ASYNC_ID, threads.size(), 0, true, null));
+
+        int analyzedCount = 0;
+        boolean interrupted = false;
+
+        for (ThreadToAnalyze thread : threads) {
+            try {
+                AnalysisRecord record = llmAnalysisService.analyzeThread(
+                        thread.channelId(), thread.threadTs(), thread.ticketId(), prompt);
+
+                if (record == null || !record.isValid()) {
+                    log.warn("Skipping invalid analysis result for ticket {}", thread.ticketId());
+                } else {
+                    // Add prompt ID to record
+                    AnalysisRecord recordWithPromptId = new AnalysisRecord(
+                            record.ticketId(),
+                            record.driver(),
+                            record.category(),
+                            record.feature(),
+                            record.summary(),
+                            promptId);
+
+                    // Persist immediately
+                    analysisRepository.upsert(recordWithPromptId);
+
+                    analyzedCount++;
+                    currentStatus.set(new AnalysisStatus(ASYNC_ID, threads.size(), analyzedCount, true, null));
+
+                    log.info("Analyzed thread {}/{}: ticket={}", analyzedCount, threads.size(), thread.ticketId());
+                }
+
+                // Rate limiting delay to avoid hitting LLM API limits
+                Thread.sleep(analysisProps.llm().requestDelay().toMillis());
+
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Analysis interrupted at ticket {}", thread.ticketId());
+                interrupted = true;
+                break;
+            } catch (Exception e) {
+                log.error("Failed to analyze thread for ticket {}: {}", thread.ticketId(), e.getMessage(), e);
+                // Continue with next thread
+            }
+        }
+
+        if (interrupted) {
+            log.warn("Async job {} interrupted: analyzed {}/{} threads", ASYNC_ID, analyzedCount, threads.size());
+            currentStatus.set(new AnalysisStatus(
+                    ASYNC_ID,
+                    threads.size(),
+                    analyzedCount,
+                    false,
+                    "Analysis interrupted after " + analyzedCount + "/" + threads.size() + " threads"));
+        } else {
+            log.info("Async job {} completed: analyzed {}/{} threads", ASYNC_ID, analyzedCount, threads.size());
+            currentStatus.set(new AnalysisStatus(ASYNC_ID, threads.size(), analyzedCount, false, null));
         }
     }
 
@@ -257,10 +307,14 @@ public class AnalysisService {
      * <p>This ensures the prompt ID automatically changes whenever the prompt content changes,
      * triggering re-analysis of threads with the updated prompt.
      *
+     * <p>Public because the same identity rule applies to the summary prompt: its hash keys the
+     * cached snapshots, so a prompt edit produces a new cache entry rather than silently reusing prose
+     * written by the previous version.
+     *
      * @param promptContent The prompt text to hash
      * @return A 64-character lowercase hex string (SHA-256 digest)
      */
-    static String computePromptId(String promptContent) {
+    public static String computePromptId(String promptContent) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(promptContent.getBytes(StandardCharsets.UTF_8));

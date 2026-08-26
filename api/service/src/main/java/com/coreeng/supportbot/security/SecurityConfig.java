@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -63,6 +64,11 @@ public class SecurityConfig {
                         .authenticated()
                         // Dashboard restricted to leadership or support engineers
                         .requestMatchers("/dashboard/**", "/summary-data/results", "/elevate/**")
+                        .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
+                        // Support Summary page. Deliberately NOT support-engineer-only: serving it
+                        // triggers the backfill server-side, so leadership viewers must be able to
+                        // reach it without being granted the /analysis/run permission.
+                        .requestMatchers(HttpMethod.GET, "/summary")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Summary data export/import is restricted to support engineers
                         .requestMatchers("/summary-data/**")
