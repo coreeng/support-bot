@@ -36,11 +36,9 @@ import org.springframework.stereotype.Service;
 @ConditionalOnProperty(name = "summary.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
-public class SummaryRefreshService implements WindowAnalysisRunner {
+public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRunner {
 
     private static final String ASYNC_ID = "analysis";
-
-    private static final RefreshStatus IDLE = new RefreshStatus(null, SummaryState.Phase.CLASSIFYING, false);
 
     private final AsyncJobRepository asyncJobRepository;
     private final AnalysisService analysisService;
@@ -52,11 +50,8 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
     private final SummaryProps summaryProps;
     private final ApplicationContext applicationContext;
 
-    private final AtomicReference<RefreshStatus> status = new AtomicReference<>(IDLE);
+    private final AtomicReference<SummaryRefreshStatus> status = new AtomicReference<>(SummaryRefreshStatus.IDLE);
     private final AtomicReference<@Nullable Failure> lastFailure = new AtomicReference<>();
-
-    /** What the in-flight refresh, if any, is doing. */
-    public record RefreshStatus(@Nullable SummaryWindow window, SummaryState.Phase phase, boolean running) {}
 
     /**
      * A failed attempt, remembered so the page reports the error instead of retrying on every poll.
@@ -65,11 +60,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
      */
     private record Failure(SummaryWindow window, String fingerprint, String error) {}
 
-    /**
-     * Claims the shared lock and kicks off a refresh.
-     *
-     * @return false when another run already holds the lock, or the executor is saturated
-     */
+    @Override
     public boolean start(SummaryWindow window) {
         if (!asyncJobRepository.tryStartJob(ASYNC_ID, AnalysisJobData.window(window.from(), window.to()))) {
             log.debug(
@@ -78,8 +69,10 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
         }
         try {
             log.info("Started summary refresh for window {}..{}", window.from(), window.to());
-            // Through the context so the @Async proxy applies — a direct call would run inline.
-            applicationContext.getBean(SummaryRefreshService.class).runWindowRefresh(window.from(), window.to());
+            // Through the context so the @Async proxy applies — a direct call would run inline. Asked
+            // for by interface: the proxy is a JDK one (this class implements interfaces), so no bean
+            // of the concrete type exists to look up.
+            applicationContext.getBean(WindowAnalysisRunner.class).runWindowRefresh(window.from(), window.to());
             return true;
         } catch (TaskRejectedException e) {
             log.error("Executor rejected summary refresh, cleaning up DB record", e);
@@ -99,10 +92,10 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
     public void runWindowRefresh(LocalDate from, LocalDate to) {
         SummaryWindow window = new SummaryWindow(from, to);
         try {
-            status.set(new RefreshStatus(window, SummaryState.Phase.CLASSIFYING, true));
+            status.set(new SummaryRefreshStatus(window, SummaryState.Phase.CLASSIFYING, true));
             analysisService.backfillWindow(from, to);
 
-            status.set(new RefreshStatus(window, SummaryState.Phase.SUMMARISING, true));
+            status.set(new SummaryRefreshStatus(window, SummaryState.Phase.SUMMARISING, true));
             generate(window);
 
             clearFailure(window);
@@ -111,20 +104,17 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
             log.error("Summary refresh for window {}..{} failed: {}", from, to, e.getMessage(), e);
             recordFailure(window, e);
         } finally {
-            status.set(IDLE);
+            status.set(SummaryRefreshStatus.IDLE);
             asyncJobRepository.deleteJob(ASYNC_ID);
         }
     }
 
-    /** The current refresh state; {@code running=false} when nothing is in flight. */
-    public RefreshStatus status() {
+    @Override
+    public SummaryRefreshStatus status() {
         return status.get();
     }
 
-    /**
-     * @return the recorded error for this window and data fingerprint, or null when the last attempt
-     *     did not fail or the data has moved on since it did
-     */
+    @Override
     public @Nullable String failureFor(SummaryWindow window, String fingerprint) {
         Failure failure = lastFailure.get();
         if (failure == null

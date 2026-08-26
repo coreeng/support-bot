@@ -35,7 +35,7 @@ public class SummaryService {
     private final ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService;
     private final SummaryReadRepository summaryReadRepository;
     private final SummarySnapshotRepository summarySnapshotRepository;
-    private final SummaryRefreshService summaryRefreshService;
+    private final SummaryRefresher summaryRefresher;
     private final SlackChannelRegistry channelRegistry;
 
     /** Breakdowns plus whatever can be said about the prose summary right now. */
@@ -62,7 +62,7 @@ public class SummaryService {
         // A run in flight may be for a different window — the lock is global. Reporting `generating`
         // either way is honest (nothing can start until it finishes) and converges: the next poll
         // after it ends starts this window's refresh if it still needs one.
-        SummaryRefreshService.RefreshStatus refresh = summaryRefreshService.status();
+        SummaryRefreshStatus refresh = summaryRefresher.status();
         if (refresh.running()) {
             return generating(refresh.phase());
         }
@@ -71,7 +71,7 @@ public class SummaryService {
                 .fingerprint(window, classificationPromptId, channelIds)
                 .value();
 
-        String failure = summaryRefreshService.failureFor(window, fingerprint);
+        String failure = summaryRefresher.failureFor(window, fingerprint);
         if (failure != null) {
             // Retrying on every poll would hammer the LLM with the same failing input; the failure is
             // released as soon as the window's data changes.
@@ -85,11 +85,11 @@ public class SummaryService {
             return new SummaryState.Ready(snapshot.content(), snapshot.model(), snapshot.generatedAt());
         }
 
-        if (summaryRefreshService.start(window)) {
+        if (summaryRefresher.start(window)) {
             return generating(SummaryState.Phase.CLASSIFYING);
         }
         // Someone claimed the lock between the check above and here; report their run.
-        return generating(summaryRefreshService.status().phase());
+        return generating(summaryRefresher.status().phase());
     }
 
     private boolean hasClassificationGaps(SummaryWindow window, String classificationPromptId) {

@@ -55,7 +55,7 @@ class SummaryServiceTest {
     private SummarySnapshotRepository summarySnapshotRepository;
 
     @Mock
-    private SummaryRefreshService summaryRefreshService;
+    private SummaryRefresher summaryRefresher;
 
     private SummaryService service;
 
@@ -69,7 +69,7 @@ class SummaryServiceTest {
                 threadsAwaitingAnalysisService,
                 summaryReadRepository,
                 summarySnapshotRepository,
-                summaryRefreshService,
+                summaryRefresher,
                 channelRegistry);
 
         lenient().when(analysisService.loadPrompt()).thenReturn(CLASSIFICATION_PROMPT);
@@ -82,7 +82,7 @@ class SummaryServiceTest {
         lenient()
                 .when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(new SummaryFingerprint(2, LocalDate.of(2026, 3, 23).atTime(10, 0)));
-        lenient().when(summaryRefreshService.status()).thenReturn(idle());
+        lenient().when(summaryRefresher.status()).thenReturn(idle());
         lenient()
                 .when(analysisService.getStatus())
                 .thenReturn(new AnalysisService.AnalysisStatus(null, null, null, false, null));
@@ -98,14 +98,14 @@ class SummaryServiceTest {
         SummaryService.SummaryResult result = service.get(FROM, TO);
 
         assertThat(result.summary()).isEqualTo(new SummaryState.Ready("the prose", "model-a", Instant.EPOCH));
-        verify(summaryRefreshService, never()).start(any());
+        verify(summaryRefresher, never()).start(any());
     }
 
     @Test
     void regeneratesWhenTheFingerprintNoLongerMatches() {
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
                 .thenReturn(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, "1@older", "stale", "model-a", null));
-        when(summaryRefreshService.start(WINDOW)).thenReturn(true);
+        when(summaryRefresher.start(WINDOW)).thenReturn(true);
 
         assertThat(service.get(FROM, TO).summary())
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.CLASSIFYING, null, null));
@@ -119,7 +119,7 @@ class SummaryServiceTest {
                 .thenReturn(ImmutableList.of(new ThreadToAnalyze(1L, "1.2", CHANNEL)));
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
                 .thenReturn(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "prose", "model-a", null));
-        when(summaryRefreshService.start(WINDOW)).thenReturn(true);
+        when(summaryRefresher.start(WINDOW)).thenReturn(true);
         when(analysisService.getStatus()).thenReturn(new AnalysisService.AnalysisStatus("analysis", 5, 2, true, null));
 
         assertThat(service.get(FROM, TO).summary())
@@ -128,20 +128,20 @@ class SummaryServiceTest {
 
     @Test
     void reportsTheRunningRefreshWithoutStartingASecondOne() {
-        when(summaryRefreshService.status())
-                .thenReturn(new SummaryRefreshService.RefreshStatus(WINDOW, SummaryState.Phase.SUMMARISING, true));
+        when(summaryRefresher.status())
+                .thenReturn(new SummaryRefreshStatus(WINDOW, SummaryState.Phase.SUMMARISING, true));
 
         assertThat(service.get(FROM, TO).summary())
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.SUMMARISING, null, null));
-        verify(summaryRefreshService, never()).start(any());
+        verify(summaryRefresher, never()).start(any());
     }
 
     @Test
     void reportsAFailedAttemptInsteadOfRetryingItEveryPoll() {
-        when(summaryRefreshService.failureFor(WINDOW, FINGERPRINT)).thenReturn("the model timed out");
+        when(summaryRefresher.failureFor(WINDOW, FINGERPRINT)).thenReturn("the model timed out");
 
         assertThat(service.get(FROM, TO).summary()).isEqualTo(new SummaryState.Unavailable("the model timed out"));
-        verify(summaryRefreshService, never()).start(any());
+        verify(summaryRefresher, never()).start(any());
     }
 
     @Test
@@ -158,10 +158,9 @@ class SummaryServiceTest {
     @Test
     void reportsGeneratingWhenAnotherVisitorWinsTheLockRace() {
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID)).thenReturn(null);
-        when(summaryRefreshService.start(WINDOW)).thenReturn(false);
-        when(summaryRefreshService.status())
-                .thenReturn(
-                        idle(), new SummaryRefreshService.RefreshStatus(WINDOW, SummaryState.Phase.SUMMARISING, true));
+        when(summaryRefresher.start(WINDOW)).thenReturn(false);
+        when(summaryRefresher.status())
+                .thenReturn(idle(), new SummaryRefreshStatus(WINDOW, SummaryState.Phase.SUMMARISING, true));
 
         assertThat(service.get(FROM, TO).summary())
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.SUMMARISING, null, null));
@@ -170,7 +169,7 @@ class SummaryServiceTest {
     @Test
     void alwaysReturnsTheBreakdownsForTheRequestedWindow() {
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID)).thenReturn(null);
-        when(summaryRefreshService.start(WINDOW)).thenReturn(true);
+        when(summaryRefresher.start(WINDOW)).thenReturn(true);
 
         SummaryBreakdowns result = service.get(FROM, TO).breakdowns();
 
@@ -183,8 +182,8 @@ class SummaryServiceTest {
                 .thenReturn(ImmutableList.of());
     }
 
-    private static SummaryRefreshService.RefreshStatus idle() {
-        return new SummaryRefreshService.RefreshStatus(null, SummaryState.Phase.CLASSIFYING, false);
+    private static SummaryRefreshStatus idle() {
+        return SummaryRefreshStatus.IDLE;
     }
 
     private static SummaryBreakdowns breakdowns() {

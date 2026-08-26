@@ -13,6 +13,7 @@ import com.coreeng.supportbot.analysis.AnalysisPrompt;
 import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
 import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.analysis.AnalysisService;
+import com.coreeng.supportbot.analysis.WindowAnalysisRunner;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
@@ -98,7 +99,7 @@ class SummaryRefreshServiceTest {
     void start_claimsTheSharedLockWithAWindowPayload() {
         when(asyncJobRepository.tryStartJob("analysis", "window:2026-03-10:2026-03-23"))
                 .thenReturn(true);
-        when(applicationContext.getBean(SummaryRefreshService.class)).thenReturn(service);
+        when(applicationContext.getBean(WindowAnalysisRunner.class)).thenReturn(service);
         when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");
 
         assertThat(service.start(WINDOW)).isTrue();
