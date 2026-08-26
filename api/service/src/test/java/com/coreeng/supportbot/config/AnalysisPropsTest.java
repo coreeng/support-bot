@@ -8,12 +8,17 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
 class AnalysisPropsTest {
 
     private static final String BASE64_TOKEN = "dXNlcjpwYXNz";
+    private static final String API_KEY = "AIzaSyTestKeyNotReal";
+    private static final String EXACTLY_ONE_PROVIDER = "exactly one of analysis.llm.vertex.enabled,"
+            + " analysis.llm.proxy.enabled and analysis.llm.google-ai.enabled must be true";
 
     @Test
     void defaultsToVertexWithoutRequiringProxySettings() {
@@ -30,14 +35,46 @@ class AnalysisPropsTest {
         assertThat(llm.proxy().timeout()).isEqualTo(Duration.ofSeconds(20));
     }
 
+    /** Every combination of the three provider flags; exactly one enabled is the only legal shape. */
+    @ParameterizedTest(name = "vertex={0}, proxy={1}, googleAi={2} -> valid={3}")
+    @CsvSource({
+        "true,  false, false, true",
+        "false, true,  false, true",
+        "false, false, true,  true",
+        "false, false, false, false",
+        "true,  true,  false, false",
+        "true,  false, true,  false",
+        "false, true,  true,  false",
+        "true,  true,  true,  false",
+    })
+    void acceptsExactlyOneEnabledProvider(boolean vertex, boolean proxy, boolean googleAi, boolean valid) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("analysis.prompt.enabled", "true");
+        values.put("analysis.llm.model-name", "gemini-2.5-flash");
+        // Each provider's own settings are supplied throughout, so the only thing under test is the
+        // mutual-exclusion rule rather than an incidental missing-field failure.
+        values.put("analysis.llm.vertex.enabled", Boolean.toString(vertex));
+        values.put("analysis.llm.vertex.project-id", "test-project");
+        values.put("analysis.llm.vertex.location", "europe-west2");
+        values.put("analysis.llm.proxy.enabled", Boolean.toString(proxy));
+        values.put("analysis.llm.proxy.base-url", "https://llm-proxy.example.test/proxy/v1beta");
+        values.put("analysis.llm.proxy.auth.basic-auth-token", BASE64_TOKEN);
+        values.put("analysis.llm.google-ai.enabled", Boolean.toString(googleAi));
+        values.put("analysis.llm.google-ai.api-key", "test-api-key");
+
+        if (valid) {
+            assertThat(bind(values)).isNotNull();
+        } else {
+            assertThatThrownBy(() -> bind(values)).hasRootCauseMessage(EXACTLY_ONE_PROVIDER);
+        }
+    }
+
     @Test
     void rejectsBothProvidersEnabled() {
         Map<String, Object> values = vertexValues();
         values.put("analysis.llm.proxy.enabled", "true");
 
-        assertThatThrownBy(() -> bind(values))
-                .hasRootCauseMessage(
-                        "exactly one of analysis.llm.vertex.enabled and analysis.llm.proxy.enabled must be true");
+        assertThatThrownBy(() -> bind(values)).hasRootCauseMessage(EXACTLY_ONE_PROVIDER);
     }
 
     @Test
@@ -45,9 +82,55 @@ class AnalysisPropsTest {
         Map<String, Object> values = vertexValues();
         values.put("analysis.llm.vertex.enabled", "false");
 
+        assertThatThrownBy(() -> bind(values)).hasRootCauseMessage(EXACTLY_ONE_PROVIDER);
+    }
+
+    @Test
+    void googleAiModeDoesNotRequireVertexOrProxySettings() {
+        Llm llm = bind(googleAiValues());
+
+        assertThat(llm.googleAi().enabled()).isTrue();
+        assertThat(llm.vertex().enabled()).isFalse();
+        assertThat(llm.proxy().enabled()).isFalse();
+        assertThat(llm.googleAi().apiKey()).isEqualTo(API_KEY);
+        assertThat(llm.vertex().projectId()).isEmpty();
+        assertThat(llm.proxy().baseUrl()).isEmpty();
+    }
+
+    @Test
+    void googleAiModeRequiresApiKey() {
+        Map<String, Object> values = googleAiValues();
+        values.remove("analysis.llm.google-ai.api-key");
+
         assertThatThrownBy(() -> bind(values))
                 .hasRootCauseMessage(
-                        "exactly one of analysis.llm.vertex.enabled and analysis.llm.proxy.enabled must be true");
+                        "analysis.llm.google-ai.api-key is required when analysis.llm.google-ai.enabled=true");
+    }
+
+    @Test
+    void googleAiModeRejectsBlankApiKey() {
+        Map<String, Object> values = googleAiValues();
+        values.put("analysis.llm.google-ai.api-key", "   ");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage(
+                        "analysis.llm.google-ai.api-key is required when analysis.llm.google-ai.enabled=true");
+    }
+
+    @Test
+    void trimsGoogleAiApiKey() {
+        Map<String, Object> values = googleAiValues();
+        values.put("analysis.llm.google-ai.api-key", " " + API_KEY + " ");
+
+        assertThat(bind(values).googleAi().apiKey()).isEqualTo(API_KEY);
+    }
+
+    @Test
+    void googleAiToStringNeverIncludesApiKey() {
+        Llm llm = bind(googleAiValues());
+
+        assertThat(llm.googleAi().toString()).doesNotContain(API_KEY).contains("apiKey=<redacted>");
+        assertThat(llm.toString()).doesNotContain(API_KEY);
     }
 
     @Test
@@ -228,6 +311,7 @@ class AnalysisPropsTest {
 
         assertThat(llm.vertex().enabled()).isFalse();
         assertThat(llm.proxy().enabled()).isFalse();
+        assertThat(llm.googleAi().enabled()).isFalse();
         assertThat(llm.modelName()).isEmpty();
     }
 
@@ -246,6 +330,16 @@ class AnalysisPropsTest {
         values.put("analysis.llm.model-name", "gemini-2.5-flash");
         values.put("analysis.llm.vertex.project-id", "test-project");
         values.put("analysis.llm.vertex.location", "europe-west2");
+        return values;
+    }
+
+    private static Map<String, Object> googleAiValues() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("analysis.prompt.enabled", "true");
+        values.put("analysis.llm.vertex.enabled", "false");
+        values.put("analysis.llm.google-ai.enabled", "true");
+        values.put("analysis.llm.model-name", "gemini-2.5-flash");
+        values.put("analysis.llm.google-ai.api-key", API_KEY);
         return values;
     }
 

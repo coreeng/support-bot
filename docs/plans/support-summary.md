@@ -142,3 +142,46 @@ iterate together and update this doc as decisions land.
 - Relationship to the existing `/knowledge-gaps` page long-term (coexist?
   eventually merge?).
 - Summary prompt content (seeded v1) — draft, then iterate against real data.
+
+### `google-ai` LLM provider mode — ships or gets reverted?
+
+**What it is.** A third provider mode alongside `vertex` and `proxy`, in
+`AnalysisProps.Llm` / `LlmConfig`. It uses the same
+`GoogleAiGeminiChatModel` the proxy mode uses, but against Gemini's default
+public endpoint (`generativelanguage.googleapis.com`) with a plain
+[AI Studio](https://aistudio.google.com/apikey) API key. Setting `apiKey` on
+the builder is what makes the client send `x-goog-api-key`; the proxy mode
+deliberately omits it and authenticates with a Basic header instead.
+
+**Why it exists.** Both existing modes need credentials a developer may not
+have: `vertex` needs GCP IAM on the project, `proxy` needs the internal LLM
+proxy's Basic token. A free AI Studio key needs neither, so the analysis and
+Support Summary features can be exercised end-to-end on a laptop.
+
+**How to enable it** (local `application.yaml` only — never commit a key):
+
+```yaml
+analysis:
+  llm:
+    model-name: ${ANALYSIS_MODEL_NAME:gemini-2.5-flash}
+    vertex:
+      enabled: ${VERTEX_ENABLED:false}   # must be off: vertex defaults to true
+    google-ai:
+      enabled: ${GOOGLE_AI_ENABLED:false}
+      api-key: ${GOOGLE_AI_API_KEY:}
+  prompt:
+    enabled: ${ANALYSIS_PROMPT_ENABLED:true}
+```
+
+Exactly one of `vertex.enabled` / `proxy.enabled` / `google-ai.enabled` must be
+true, validated fail-fast at startup (only when `analysis.prompt.enabled`).
+Because `vertex.enabled` defaults to `true`, selecting this mode means turning
+vertex off explicitly — the same step proxy mode has always needed.
+
+**Decision pending.** This is a local-development convenience with no
+production use: it sends thread content to a public Google endpoint under a
+personal key, which is exactly what the internal proxy exists to avoid. Either
+it ships as a documented dev-only mode, or it is dropped before merge. It is
+deliberately confined to a **single commit** (`feat(api): add google-ai LLM
+provider mode for local dev`), so reverting is dropping that one commit — no
+untangling.

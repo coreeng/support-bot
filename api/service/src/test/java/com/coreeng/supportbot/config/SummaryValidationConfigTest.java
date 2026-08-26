@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.coreeng.supportbot.config.AnalysisProps.Bundle;
+import com.coreeng.supportbot.config.AnalysisProps.GoogleAi;
 import com.coreeng.supportbot.config.AnalysisProps.Llm;
 import com.coreeng.supportbot.config.AnalysisProps.Prompt;
 import com.coreeng.supportbot.config.AnalysisProps.Proxy;
@@ -43,7 +44,8 @@ class SummaryValidationConfigTest {
                 "gemini-2.5-flash",
                 Duration.ofMillis(100),
                 new Vertex(true, "test-project", "europe-west2"),
-                new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)));
+                new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)),
+                new GoogleAi(false, ""));
         return new AnalysisProps(
                 llm, new Bundle("classpath:placeholder-analysis-bundle.zip"), new Prompt(promptEnabled));
     }

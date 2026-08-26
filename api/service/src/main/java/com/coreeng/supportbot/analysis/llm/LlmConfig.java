@@ -38,6 +38,27 @@ public class LlmConfig {
                 .build();
     }
 
+    /**
+     * Local-development provider: the same Gemini client as the proxy mode, but pointed at its
+     * default public endpoint with a plain AI Studio API key. Setting {@code apiKey} is what makes
+     * the client send {@code x-goog-api-key} — the proxy mode deliberately omits it.
+     *
+     * <p>Exists so a developer without GCP IAM access can run the analysis feature locally. May be
+     * dropped before merge — see {@code docs/plans/support-summary.md}.
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "analysis.llm.google-ai", name = "enabled", havingValue = "true")
+    public ChatModel googleAiChatModel(AnalysisProps analysisProps) {
+        AnalysisProps.Llm llm = analysisProps.llm();
+        // The key is never logged: AnalysisProps.GoogleAi#toString redacts it.
+        log.info("Configuring Google AI Studio model: model={}", llm.modelName());
+
+        return GoogleAiGeminiChatModel.builder()
+                .apiKey(llm.googleAi().apiKey())
+                .modelName(llm.modelName())
+                .build();
+    }
+
     @Bean
     @ConditionalOnProperty(prefix = "analysis.llm.proxy", name = "enabled", havingValue = "true")
     public ChatModel proxyChatModel(AnalysisProps analysisProps) {
