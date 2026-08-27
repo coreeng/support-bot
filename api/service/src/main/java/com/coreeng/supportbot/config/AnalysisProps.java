@@ -5,7 +5,6 @@ import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Locale;
-import java.util.stream.Stream;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -24,8 +23,7 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
             @DefaultValue("") String modelName,
             @DefaultValue("500ms") Duration requestDelay,
             @DefaultValue Vertex vertex,
-            @DefaultValue Proxy proxy,
-            @DefaultValue GoogleAi googleAi) {
+            @DefaultValue Proxy proxy) {
 
         public Llm {
             modelName = modelName.trim();
@@ -38,22 +36,15 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
             if (requestDelay.isNegative()) {
                 throw new IllegalArgumentException("analysis.llm.request-delay must not be negative");
             }
-            // Only the enabled provider's settings are required; the others may stay blank. Note that
-            // vertex defaults to enabled, so selecting another provider means turning vertex off
-            // explicitly — the same step proxy mode has always needed.
-            long enabledProviders = Stream.of(vertex.enabled(), proxy.enabled(), googleAi.enabled())
-                    .filter(Boolean::booleanValue)
-                    .count();
-            if (enabledProviders != 1) {
-                throw new IllegalArgumentException("exactly one of analysis.llm.vertex.enabled,"
-                        + " analysis.llm.proxy.enabled and analysis.llm.google-ai.enabled must be true");
+            // Only the enabled provider's settings are required; the other side may stay blank.
+            if (vertex.enabled() == proxy.enabled()) {
+                throw new IllegalArgumentException(
+                        "exactly one of analysis.llm.vertex.enabled and analysis.llm.proxy.enabled must be true");
             }
             if (vertex.enabled()) {
                 vertex.validate();
-            } else if (proxy.enabled()) {
-                proxy.validate();
             } else {
-                googleAi.validate();
+                proxy.validate();
             }
         }
     }
@@ -155,34 +146,6 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
             public String toString() {
                 return "Auth[basicAuthToken=<redacted>]";
             }
-        }
-    }
-
-    /**
-     * Local-development provider: Gemini on its public endpoint
-     * ({@code generativelanguage.googleapis.com}) with a plain AI Studio API key, so a developer with
-     * no GCP IAM access can still run the analysis feature.
-     *
-     * <p>May be dropped before merge — see {@code docs/plans/support-summary.md}.
-     */
-    public record GoogleAi(
-            @DefaultValue("false") boolean enabled,
-            @DefaultValue("") String apiKey) {
-
-        public GoogleAi {
-            apiKey = apiKey.trim();
-        }
-
-        void validate() {
-            if (apiKey.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "analysis.llm.google-ai.api-key is required when analysis.llm.google-ai.enabled=true");
-            }
-        }
-
-        @Override
-        public String toString() {
-            return "GoogleAi[enabled=" + enabled + ", apiKey=<redacted>]";
         }
     }
 

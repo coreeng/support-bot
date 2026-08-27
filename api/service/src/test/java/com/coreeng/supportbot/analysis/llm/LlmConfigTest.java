@@ -100,53 +100,8 @@ class LlmConfigTest {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .rootCause()
-                            .hasMessageContaining("exactly one of analysis.llm.vertex.enabled,");
-                });
-    }
-
-    @Test
-    void createsOnlyGoogleAiModelWhenGoogleAiEnabled() {
-        // Vertex and proxy settings deliberately absent: the local-dev mode must need neither GCP
-        // project nor proxy credentials — that is the whole point of it.
-        contextRunner
-                .withPropertyValues(googleAiProperties())
-                .withPropertyValues("analysis.prompt.enabled=true")
-                .run(context -> {
-                    assertThat(context).hasSingleBean(ChatModel.class);
-                    assertThat(context.getBean(ChatModel.class)).isInstanceOf(GoogleAiGeminiChatModel.class);
-                });
-    }
-
-    @Test
-    void failsStartupWhenGoogleAiModeMissingApiKey() {
-        contextRunner
-                .withPropertyValues(
-                        "analysis.prompt.enabled=true",
-                        "analysis.llm.vertex.enabled=false",
-                        "analysis.llm.google-ai.enabled=true",
-                        "analysis.llm.model-name=gemini-2.5-flash")
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .rootCause()
-                            .hasMessageContaining("analysis.llm.google-ai.api-key");
-                });
-    }
-
-    @Test
-    void failsStartupWhenGoogleAiAndProxyBothEnabled() {
-        contextRunner
-                .withPropertyValues(googleAiProperties())
-                .withPropertyValues(
-                        "analysis.prompt.enabled=true",
-                        "analysis.llm.proxy.enabled=true",
-                        "analysis.llm.proxy.base-url=https://llm-proxy.example.test/proxy/v1beta",
-                        "analysis.llm.proxy.auth.basic-auth-token=dXNlcjpwYXNz")
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .rootCause()
-                            .hasMessageContaining("exactly one of analysis.llm.vertex.enabled,");
+                            .hasMessageContaining(
+                                    "exactly one of analysis.llm.vertex.enabled and analysis.llm.proxy.enabled");
                 });
     }
 
@@ -156,15 +111,6 @@ class LlmConfigTest {
                 .withPropertyValues(vertexProperties())
                 .withPropertyValues("analysis.prompt.enabled=true", "analysis.llm.vertex.enabled=false")
                 .run(context -> assertThat(context).hasFailed());
-    }
-
-    private static String[] googleAiProperties() {
-        return new String[] {
-            "analysis.llm.vertex.enabled=false",
-            "analysis.llm.google-ai.enabled=true",
-            "analysis.llm.model-name=gemini-2.5-flash",
-            "analysis.llm.google-ai.api-key=AIzaSyTestKeyNotReal"
-        };
     }
 
     private static String[] vertexProperties() {
