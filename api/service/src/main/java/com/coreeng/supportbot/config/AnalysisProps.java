@@ -5,6 +5,7 @@ import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Locale;
+import java.util.stream.Stream;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -23,7 +24,8 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
             @DefaultValue("") String modelName,
             @DefaultValue("500ms") Duration requestDelay,
             @DefaultValue Vertex vertex,
-            @DefaultValue Proxy proxy) {
+            @DefaultValue Proxy proxy,
+            @DefaultValue Stub stub) {
 
         public Llm {
             modelName = modelName.trim();
@@ -36,16 +38,22 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
             if (requestDelay.isNegative()) {
                 throw new IllegalArgumentException("analysis.llm.request-delay must not be negative");
             }
-            // Only the enabled provider's settings are required; the other side may stay blank.
-            if (vertex.enabled() == proxy.enabled()) {
-                throw new IllegalArgumentException(
-                        "exactly one of analysis.llm.vertex.enabled and analysis.llm.proxy.enabled must be true");
+            // Only the enabled provider's settings are required; the others may stay blank. Note that
+            // vertex defaults to enabled, so selecting another provider means turning vertex off
+            // explicitly — the same step proxy mode has always needed.
+            long enabledProviders = Stream.of(vertex.enabled(), proxy.enabled(), stub.enabled())
+                    .filter(Boolean::booleanValue)
+                    .count();
+            if (enabledProviders != 1) {
+                throw new IllegalArgumentException("exactly one of analysis.llm.vertex.enabled,"
+                        + " analysis.llm.proxy.enabled and analysis.llm.stub.enabled must be true");
             }
             if (vertex.enabled()) {
                 vertex.validate();
-            } else {
+            } else if (proxy.enabled()) {
                 proxy.validate();
             }
+            // The stub has nothing to validate: it takes no credentials and reaches no network.
         }
     }
 
@@ -148,6 +156,15 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
             }
         }
     }
+
+    /**
+     * Local development and demo provider: canned, deterministic responses and no network calls at
+     * all. Takes no credentials, which is the point — neither GCP IAM nor the internal proxy's token
+     * is needed to exercise the analysis and Support Summary features end to end.
+     *
+     * <p>May be dropped before merge — see {@code docs/plans/support-summary.md}.
+     */
+    public record Stub(@DefaultValue("false") boolean enabled) {}
 
     public record Bundle(String path) {}
 

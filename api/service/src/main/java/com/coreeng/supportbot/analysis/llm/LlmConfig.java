@@ -38,6 +38,20 @@ public class LlmConfig {
                 .build();
     }
 
+    /**
+     * Local development and demo provider: canned deterministic responses, no network, no
+     * credentials, no spend. See {@link StubChatModel} for what it returns and how it tells the two
+     * callers apart.
+     *
+     * <p>May be dropped before merge — see {@code docs/plans/support-summary.md}.
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "analysis.llm.stub", name = "enabled", havingValue = "true")
+    public ChatModel stubChatModel() {
+        log.warn("Using the STUB LLM provider: responses are canned and describe no real data");
+        return new StubChatModel();
+    }
+
     @Bean
     @ConditionalOnProperty(prefix = "analysis.llm.proxy", name = "enabled", havingValue = "true")
     public ChatModel proxyChatModel(AnalysisProps analysisProps) {

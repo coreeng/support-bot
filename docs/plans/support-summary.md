@@ -142,3 +142,63 @@ iterate together and update this doc as decisions land.
 - Relationship to the existing `/knowledge-gaps` page long-term (coexist?
   eventually merge?).
 - Summary prompt content (seeded v1) — draft, then iterate against real data.
+
+### `stub` LLM provider mode — ships or gets reverted?
+
+**What it is.** A third provider mode alongside `vertex` and `proxy`, in
+`AnalysisProps.Llm` / `LlmConfig`. `StubChatModel` implements LangChain4j's
+`ChatModel` but makes no network call: it returns canned text that is a pure
+function of the request. Classification requests get the strict
+`Ticket` / `Primary Driver` / `Category` / `Platform Feature` / `Reason` block
+the real parser expects, with values drawn from the seeded prompt's controlled
+taxonomy and varied by a hash of the thread so the breakdowns spread across
+buckets instead of collapsing into one bar. Summary requests get a short canned
+paragraph that says it is stubbed.
+
+It tells the two apart by the `--- BEGIN WINDOW REPORT ---` delimiter that
+`LlmSummaryService` wraps its report in — a string owned by our code rather than
+by prompt text stored in the database, since prompts get rewritten by migration
+and delimiters do not. Anything without that marker is treated as a
+classification request, which is the safer default: unparseable classification
+output would silently skip every ticket, whereas an unrecognised summary only
+produces odd prose. `StubChatModelTest` drives the real `LlmAnalysisService` and
+`LlmSummaryService` rather than hand-built strings, so a change to either
+delimiter fails the build instead of quietly degrading.
+
+**Why it exists.** Both real modes need credentials a developer may not have:
+`vertex` needs GCP IAM on the project, `proxy` needs the internal LLM proxy's
+Basic token. The stub needs neither, and costs nothing, so the analysis run and
+the Support Summary page can be exercised end to end — including the backfill,
+the fingerprint cache and the progress states — on a laptop or in a demo.
+
+**How to enable it** (local `application.yaml` only):
+
+```yaml
+analysis:
+  llm:
+    model-name: ${ANALYSIS_MODEL_NAME:stub-local}
+    vertex:
+      enabled: ${VERTEX_ENABLED:false}   # must be off: vertex defaults to true
+    stub:
+      enabled: ${STUB_LLM_ENABLED:false}
+  prompt:
+    enabled: ${ANALYSIS_PROMPT_ENABLED:true}
+```
+
+Exactly one of `vertex.enabled` / `proxy.enabled` / `stub.enabled` must be true,
+validated fail-fast at startup (only when `analysis.prompt.enabled`). Because
+`vertex.enabled` defaults to `true`, selecting this mode means turning vertex
+off explicitly — the same step proxy mode has always needed. Set `model-name`
+to something obviously fake: it is recorded verbatim in
+`summary_snapshot.model`, so leaving it as `gemini-2.5-flash` would label
+stubbed prose as if a real model had written it.
+
+**Decision pending.** The risk is not the code — it reaches no network and holds
+no credentials — but the data: stubbed classifications and summaries are written
+to `analysis` and `summary_snapshot` exactly like real ones, and nothing in the
+schema marks them as synthetic. Point a stub-enabled instance at a shared
+database and the fake rows are indistinguishable from real ones. Either it ships
+with that caveat understood (local-only, never against shared data), or it is
+dropped before merge. It is deliberately confined to a **single commit**
+(`feat(api): add stub LLM provider mode for local dev`), so reverting is
+dropping that one commit — no untangling.

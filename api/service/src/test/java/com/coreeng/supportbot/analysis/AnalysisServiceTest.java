@@ -15,6 +15,7 @@ import com.coreeng.supportbot.config.AnalysisProps.Bundle;
 import com.coreeng.supportbot.config.AnalysisProps.Llm;
 import com.coreeng.supportbot.config.AnalysisProps.Prompt;
 import com.coreeng.supportbot.config.AnalysisProps.Proxy;
+import com.coreeng.supportbot.config.AnalysisProps.Stub;
 import com.coreeng.supportbot.config.AnalysisProps.Vertex;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
@@ -66,7 +67,8 @@ class AnalysisServiceTest {
                 "gemini-2.5-flash",
                 Duration.ofMillis(100),
                 new Vertex(true, "test-project", "europe-west2"),
-                new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)));
+                new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)),
+                new Stub(false));
         Bundle bundle = new Bundle("classpath:placeholder-analysis-bundle.zip");
         Prompt prompt = new Prompt(true);
         analysisProps = new AnalysisProps(llm, bundle, prompt);

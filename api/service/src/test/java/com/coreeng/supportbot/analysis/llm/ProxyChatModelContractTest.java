@@ -89,7 +89,8 @@ class ProxyChatModelContractTest {
                 "gemini-2.5-flash",
                 Duration.ofMillis(1),
                 new AnalysisProps.Vertex(false, "", ""),
-                new AnalysisProps.Proxy(true, BASE_URL, new AnalysisProps.Proxy.Auth(BASE64_TOKEN), timeout));
+                new AnalysisProps.Proxy(true, BASE_URL, new AnalysisProps.Proxy.Auth(BASE64_TOKEN), timeout),
+                new AnalysisProps.Stub(false));
         AnalysisProps analysisProps = new AnalysisProps(
                 llm,
                 new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip"),

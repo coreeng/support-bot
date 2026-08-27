@@ -38,7 +38,8 @@ class AnalysisEnabledControllerTest {
                 "gemini-2.5-flash",
                 Duration.ofMillis(100),
                 new AnalysisProps.Vertex(true, "test-project", "europe-west2"),
-                new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)));
+                new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)),
+                new AnalysisProps.Stub(false));
         AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
         AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(enabled);
         AnalysisProps analysisProps = new AnalysisProps(llm, bundle, prompt);

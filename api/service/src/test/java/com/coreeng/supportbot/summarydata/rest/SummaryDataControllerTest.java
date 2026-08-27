@@ -286,6 +286,7 @@ class SummaryDataControllerTest {
                 "gemini-2.5-flash",
                 Duration.ofSeconds(1),
                 new AnalysisProps.Vertex(true, "test-project", "europe-west2"),
-                new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)));
+                new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)),
+                new AnalysisProps.Stub(false));
     }
 }
