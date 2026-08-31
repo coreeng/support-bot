@@ -45,6 +45,21 @@ const ACCENTS = {
 
 type Accent = keyof typeof ACCENTS;
 
+/** Distinct colours for the ranked drivers, matching the stacked bar to its rows. */
+const DRIVER_COLORS = [
+  "bg-emerald-700",
+  "bg-amber-600",
+  "bg-teal-600",
+  "bg-red-700",
+  "bg-violet-500",
+  "bg-sky-600",
+  "bg-pink-600",
+] as const;
+
+const sumCounts = (counts: SummaryCount[]): number => counts.reduce((sum, count) => sum + count.count, 0);
+
+const sharePercent = (count: number, total: number): number => (total > 0 ? Math.round((count / total) * 100) : 0);
+
 function formatGeneratedAt(timestamp: string): string {
   const parsed = new Date(timestamp);
   if (isNaN(parsed.getTime())) return timestamp;
@@ -113,7 +128,7 @@ function AtAGlanceCard({ data }: { data: SummaryData }) {
   const topCategory = top(data.categories);
   const topFeature = top(data.features);
   const topTeam = top(data.teams);
-  const driverShare = topDriver && data.totalTickets > 0 ? Math.round((topDriver.count / data.totalTickets) * 100) : null;
+  const driverShare = topDriver ? sharePercent(topDriver.count, sumCounts(data.drivers)) : null;
   const lastUpdated = data.summary.generatedAt;
 
   return (
@@ -162,8 +177,19 @@ function AtAGlanceCard({ data }: { data: SummaryData }) {
   );
 }
 
+function CountWithShare({ count, share }: { count: number; share: number }) {
+  return (
+    <span className="flex shrink-0 items-baseline gap-1.5">
+      <span className="text-foreground font-mono text-base font-semibold tabular-nums">{count.toLocaleString()}</span>
+      <span className="text-muted-foreground w-8 text-right font-mono text-xs tabular-nums">{share}%</span>
+    </span>
+  );
+}
+
+/** A ranked list with a bar per row, each row showing its count and share of the breakdown. */
 function BreakdownCard({ title, counts, accent }: { title: string; counts: SummaryCount[]; accent: Accent }) {
   const colors = ACCENTS[accent];
+  const total = sumCounts(counts);
   const max = counts.reduce((highest, count) => Math.max(highest, count.count), 0) || 1;
 
   return (
@@ -183,7 +209,7 @@ function BreakdownCard({ title, counts, accent }: { title: string; counts: Summa
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-foreground truncate text-sm font-medium">{count.label}</h3>
-                  <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">{count.count.toLocaleString()}</span>
+                  <CountWithShare count={count.count} share={sharePercent(count.count, total)} />
                 </div>
                 <div className={`mt-2 h-1.5 rounded-full ${colors.track} overflow-hidden`}>
                   <div
@@ -195,6 +221,60 @@ function BreakdownCard({ title, counts, accent }: { title: string; counts: Summa
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The drivers breakdown: a stacked bar showing how the window splits across drivers, then one
+ * colour-matched row per driver.
+ */
+function DriverBreakdownCard({ title, counts }: { title: string; counts: SummaryCount[] }) {
+  const total = sumCounts(counts);
+  const max = counts.reduce((highest, count) => Math.max(highest, count.count), 0) || 1;
+  const colorFor = (index: number) => DRIVER_COLORS[index % DRIVER_COLORS.length];
+
+  return (
+    <div className="bg-card rounded-xl border p-6" data-testid="summary-drivers">
+      <h2 className="text-foreground mb-4 text-base font-semibold">{title}</h2>
+      {counts.length === 0 ? (
+        <p className="text-muted-foreground p-16 text-center text-sm">No data for this period</p>
+      ) : (
+        <>
+          <div className="mb-6 flex h-8 w-full overflow-hidden rounded-md" role="img" aria-label="Share of tickets by driver">
+            {counts.map((count, index) => {
+              const share = sharePercent(count.count, total);
+              return (
+                <div
+                  key={count.label}
+                  className={`flex items-center justify-center ${colorFor(index)} font-mono text-xs font-semibold text-white tabular-nums transition-all duration-500 ease-out`}
+                  style={{ width: `${total > 0 ? (count.count / total) * 100 : 0}%` }}
+                  title={`${count.label}: ${count.count.toLocaleString()} (${share}%)`}
+                >
+                  {share >= 8 && `${share}%`}
+                </div>
+              );
+            })}
+          </div>
+          <div className="divide-y">
+            {counts.map((count, index) => (
+              <div key={count.label} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
+                <div className="flex w-56 shrink-0 items-center gap-2.5">
+                  <span className={`h-3 w-3 shrink-0 rounded-sm ${colorFor(index)}`} />
+                  <h3 className="text-foreground truncate text-sm font-semibold">{count.label}</h3>
+                </div>
+                <div className="bg-muted h-2 flex-1 overflow-hidden rounded-full">
+                  <div
+                    className={`h-full rounded-full ${colorFor(index)} transition-all duration-500 ease-out`}
+                    style={{ width: `${Math.round((count.count / max) * 100)}%` }}
+                  />
+                </div>
+                <CountWithShare count={count.count} share={sharePercent(count.count, total)} />
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -356,9 +436,11 @@ export default function SupportSummaryPage() {
 
           <AtAGlanceCard data={data} />
 
+          <DriverBreakdownCard title="Why tenants got in touch" counts={data.drivers} />
+
+          <BreakdownCard title="Top categories" counts={data.categories} accent="info" />
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <BreakdownCard title="Why tenants got in touch" counts={data.drivers} accent="primary" />
-            <BreakdownCard title="Top categories" counts={data.categories} accent="info" />
             <BreakdownCard title="Platform features asked about" counts={data.features} accent="success" />
             <BreakdownCard title="Teams raising the most" counts={data.teams} accent="purple" />
           </div>
