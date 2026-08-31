@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.summary;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.google.common.collect.ImmutableList;
 import java.time.LocalDate;
@@ -69,12 +70,18 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(breakdowns.classifiedTickets()).isEqualTo(2);
         assertThat(breakdowns.unclassifiedTickets()).isEqualTo(1);
         assertThat(breakdowns.drivers())
-                .containsExactly(
-                        new SummaryCount("Knowledge Gap", 1), new SummaryCount("Product Usability Problem", 1));
-        assertThat(breakdowns.categories()).containsExactly(new SummaryCount("Build & CI", 2));
-        assertThat(breakdowns.features()).containsExactly(new SummaryCount("pipelines", 2));
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("Knowledge Gap", 1L), tuple("Product Usability Problem", 1L));
+        assertThat(breakdowns.categories())
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("Build & CI", 2L));
+        assertThat(breakdowns.features())
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("pipelines", 2L));
         // Teams cover every ticket raised, classified or not, so they sum to the window total.
-        assertThat(breakdowns.teams()).containsExactly(new SummaryCount("team-a", 2), new SummaryCount("team-b", 1));
+        assertThat(breakdowns.teams())
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("team-a", 2L), tuple("team-b", 1L));
         assertThat(sum(breakdowns.drivers())).isEqualTo(breakdowns.classifiedTickets());
         assertThat(sum(breakdowns.teams())).isEqualTo(breakdowns.totalTickets());
     }
@@ -104,7 +111,7 @@ class SummaryReadRepositoryPostgresTest {
     }
 
     @Test
-    void recentTicketsPerDriverAreNewestFirstAndCapped() {
+    void recentTicketsPerRowAreNewestFirstAndCapped() {
         // Six Knowledge Gap tickets: only the newest five come back, newest first.
         for (int hour = 1; hour <= 6; hour++) {
             classify(
@@ -119,23 +126,50 @@ class SummaryReadRepositoryPostgresTest {
         // Blank driver lands in the explicit bucket and still gets its example.
         long blank = ticket("2026-03-12T10:00:00", "ts-blank", "team-b");
         classify(blank, " ", "Build & CI", "ci", "No driver.");
+        // Raised but never classified: absent from the analysis breakdowns, still a team example.
+        long open = ticket("2026-03-12T11:00:00", "ts-open", "team-c");
 
         SummaryBreakdowns breakdowns = repository.breakdowns(WINDOW, PROMPT_ID, List.of(CHANNEL));
 
-        assertThat(breakdowns.recentFor("Knowledge Gap"))
-                .hasSize(JdbcSummaryReadRepository.RECENT_PER_DRIVER)
+        assertThat(recentFor(breakdowns.drivers(), "Knowledge Gap"))
+                .hasSize(JdbcSummaryReadRepository.RECENT_PER_ROW)
                 .extracting(SummaryTicketExample::text)
                 .containsExactly("Reason 6", "Reason 5", "Reason 4", "Reason 3", "Reason 2");
-        assertThat(breakdowns.recentFor("Product Usability Problem"))
+        assertThat(recentFor(breakdowns.drivers(), "Product Usability Problem"))
                 .extracting(SummaryTicketExample::ticketId)
                 .containsExactly(usability);
-        assertThat(breakdowns.recentFor("Unclassified"))
+        assertThat(recentFor(breakdowns.drivers(), "Unclassified"))
                 .extracting(SummaryTicketExample::ticketId)
                 .containsExactly(blank);
-        assertThat(breakdowns.recentFor("Feature Request")).isEmpty();
-        // Every driver row has a matching example list.
-        assertThat(breakdowns.drivers()).allSatisfy(count -> assertThat(breakdowns.recentFor(count.label()))
-                .isNotEmpty());
+
+        // The same tickets hang off the category and feature rows.
+        assertThat(recentFor(breakdowns.categories(), "Build & CI"))
+                .hasSize(JdbcSummaryReadRepository.RECENT_PER_ROW)
+                .extracting(SummaryTicketExample::ticketId)
+                .startsWith(blank, usability);
+        assertThat(recentFor(breakdowns.features(), "ci")).hasSize(JdbcSummaryReadRepository.RECENT_PER_ROW);
+
+        // Teams include not-yet-classified tickets, whose reason is blank.
+        assertThat(recentFor(breakdowns.teams(), "team-c"))
+                .extracting(SummaryTicketExample::ticketId, SummaryTicketExample::text)
+                .containsExactly(tuple(open, ""));
+        assertThat(recentFor(breakdowns.teams(), "team-b"))
+                .extracting(SummaryTicketExample::ticketId)
+                .containsExactly(blank, usability);
+
+        // Every row of every breakdown has at least one example.
+        for (ImmutableList<SummaryCount> counts :
+                List.of(breakdowns.drivers(), breakdowns.categories(), breakdowns.features(), breakdowns.teams())) {
+            assertThat(counts).allSatisfy(count -> assertThat(count.recent()).isNotEmpty());
+        }
+    }
+
+    private static ImmutableList<SummaryTicketExample> recentFor(ImmutableList<SummaryCount> counts, String label) {
+        return counts.stream()
+                .filter(count -> count.label().equals(label))
+                .findFirst()
+                .map(SummaryCount::recent)
+                .orElse(ImmutableList.of());
     }
 
     @Test

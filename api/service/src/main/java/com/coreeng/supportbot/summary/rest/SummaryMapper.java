@@ -26,27 +26,19 @@ public class SummaryMapper {
                 breakdowns.totalTickets(),
                 breakdowns.classifiedTickets(),
                 breakdowns.unclassifiedTickets(),
-                drivers(breakdowns),
+                counts(breakdowns.drivers()),
                 counts(breakdowns.categories()),
                 counts(breakdowns.features()),
                 counts(breakdowns.teams()),
                 section(result.summary()));
     }
 
-    private static List<SummaryCountUI> drivers(SummaryBreakdowns breakdowns) {
-        return breakdowns.drivers().stream()
+    private static List<SummaryCountUI> counts(ImmutableList<SummaryCount> counts) {
+        return counts.stream()
                 .map(count -> new SummaryCountUI(
                         count.label(),
                         count.count(),
-                        breakdowns.recentFor(count.label()).stream()
-                                .map(SummaryMapper::ticket)
-                                .toList()))
-                .toList();
-    }
-
-    private static List<SummaryCountUI> counts(ImmutableList<SummaryCount> counts) {
-        return counts.stream()
-                .map(count -> new SummaryCountUI(count.label(), count.count(), List.of()))
+                        count.recent().stream().map(SummaryMapper::ticket).toList()))
                 .toList();
     }
 

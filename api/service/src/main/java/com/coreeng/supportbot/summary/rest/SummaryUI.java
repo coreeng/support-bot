@@ -34,14 +34,13 @@ public record SummaryUI(
     /**
      * One bar of a ranked breakdown.
      *
-     * @param recent up to five of the newest tickets carrying this value, newest first — populated
-     *     for {@code drivers} only; empty for the other breakdowns
+     * @param recent up to five of the newest tickets carrying this value, newest first
      */
     public record SummaryCountUI(String label, long count, List<SummaryTicketUI> recent) {}
 
     /**
      * @param ticketId the ticket, as a string to match the rest of the UI's ticket handling
-     * @param text the classifier's one-line reason for the ticket
+     * @param text the classifier's one-line reason for the ticket; empty for a ticket not yet classified
      * @param timestamp when the ticket was raised
      */
     public record SummaryTicketUI(String ticketId, String text, Instant timestamp) {}

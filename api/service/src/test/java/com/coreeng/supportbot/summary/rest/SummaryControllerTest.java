@@ -28,7 +28,6 @@ import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -187,14 +186,14 @@ class SummaryControllerTest {
                 window,
                 3,
                 2,
-                ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("Knowledge Gap", 2)),
-                ImmutableList.of(),
-                ImmutableList.of(),
-                ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("team-a", 3)),
-                ImmutableMap.of(
+                ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount(
                         "Knowledge Gap",
+                        2,
                         ImmutableList.of(new com.coreeng.supportbot.summary.SummaryTicketExample(
-                                42L, "Did not know pipelines existed.", Instant.EPOCH))));
+                                42L, "Did not know pipelines existed.", Instant.EPOCH)))),
+                ImmutableList.of(),
+                ImmutableList.of(),
+                ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("team-a", 3)));
         when(summaryService.get(any(), any()))
                 .thenReturn(new SummaryService.SummaryResult(
                         breakdowns, new SummaryState.Ready("the prose", "model-a", Instant.EPOCH)));
