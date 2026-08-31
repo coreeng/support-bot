@@ -100,12 +100,18 @@ iterate together and update this doc as decisions land.
 - **Summary freshness = data fingerprint, no timers.** Since the visit
   classifies gaps anyway, regenerate the prose summary in the same wait
   whenever the window's data changed. Concretely: cache validity is a cheap
-  fingerprint of the window's `analysis` rows (e.g. `count +
-  max(updated_at)`); match → serve cached summary instantly, mismatch or no
-  cache → regenerate. This also covers cross-window drift (a run triggered
-  from one window classifying tickets that fall in another cached window)
-  and late-closing tickets. If summary generation fails, breakdowns still
-  render; the summary section shows an error/retry.
+  fingerprint of the window's `analysis` rows (`count + max(updated_at)`)
+  **plus its classification gaps** (count and id-sum of closed tickets with
+  no analysis row for the current prompt); match → serve cached summary
+  instantly, mismatch or no cache → regenerate. This also covers
+  cross-window drift (a run triggered from one window classifying tickets
+  that fall in another cached window) and late-closing tickets. Including
+  the gaps matters for the failure case: a ticket the backfill can never
+  classify (deleted Slack thread, persistently unparseable model output)
+  would otherwise keep the window in a refresh loop on every poll; instead
+  the snapshot is stored under a fingerprint that carries the gap and is
+  served until the gap set changes. If summary generation fails,
+  breakdowns still render; the summary section shows an error/retry.
 
 ## Backend decisions (agreed 2026-08-26)
 

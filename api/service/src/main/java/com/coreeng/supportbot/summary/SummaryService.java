@@ -4,7 +4,6 @@ import com.coreeng.supportbot.analysis.AnalysisPrompt;
 import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
 import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.analysis.AnalysisService;
-import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisService;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.google.common.collect.ImmutableList;
 import java.time.LocalDate;
@@ -32,7 +31,6 @@ public class SummaryService {
 
     private final AnalysisService analysisService;
     private final AnalysisPromptRepository analysisPromptRepository;
-    private final ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService;
     private final SummaryReadRepository summaryReadRepository;
     private final SummarySnapshotRepository summarySnapshotRepository;
     private final SummaryRefresher summaryRefresher;
@@ -78,10 +76,11 @@ public class SummaryService {
             return new SummaryState.Unavailable(failure);
         }
 
+        // The fingerprint covers the classification gaps too, so a snapshot generated after a backfill
+        // that could not classify everything is still served: regenerating would only re-run the same
+        // failing classifications and the same summary on every poll.
         SummarySnapshot snapshot = summarySnapshotRepository.find(window, summaryPromptId);
-        if (snapshot != null
-                && snapshot.fingerprint().equals(fingerprint)
-                && !hasClassificationGaps(window, classificationPromptId)) {
+        if (snapshot != null && snapshot.fingerprint().equals(fingerprint)) {
             return new SummaryState.Ready(snapshot.content(), snapshot.model(), snapshot.generatedAt());
         }
 
@@ -90,12 +89,6 @@ public class SummaryService {
         }
         // Someone claimed the lock between the check above and here; report their run.
         return generating(summaryRefresher.status().phase());
-    }
-
-    private boolean hasClassificationGaps(SummaryWindow window, String classificationPromptId) {
-        return !threadsAwaitingAnalysisService
-                .find(window.from(), window.to(), classificationPromptId)
-                .isEmpty();
     }
 
     private SummaryState.Generating generating(SummaryState.Phase phase) {

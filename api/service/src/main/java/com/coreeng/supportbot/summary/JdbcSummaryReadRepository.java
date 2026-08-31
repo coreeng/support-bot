@@ -10,14 +10,19 @@ import static org.jooq.impl.DSL.countDistinct;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.max;
 import static org.jooq.impl.DSL.name;
+import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.nullif;
 import static org.jooq.impl.DSL.partitionBy;
 import static org.jooq.impl.DSL.rowNumber;
+import static org.jooq.impl.DSL.selectOne;
+import static org.jooq.impl.DSL.sum;
 import static org.jooq.impl.DSL.trim;
 import static org.jooq.impl.DSL.val;
 
+import com.coreeng.supportbot.dbschema.enums.TicketStatus;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -117,8 +122,24 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .where(inWindow(window, channelIds))
                 .fetchSingle();
 
+        // Closed tickets with no analysis for this prompt: what the backfill would try to classify.
+        Record2<Integer, BigDecimal> gaps = dsl.select(count(), coalesce(sum(TICKET.ID), BigDecimal.ZERO))
+                .from(QUERY)
+                .join(TICKET)
+                .on(TICKET.QUERY_ID.eq(QUERY.ID))
+                .where(inWindow(window, channelIds))
+                .and(TICKET.STATUS.eq(TicketStatus.closed))
+                .and(notExists(selectOne().from(ANALYSIS).where(analysisJoin(promptId))))
+                .fetchSingle();
+
         Integer rowCount = row.value1();
-        return new SummaryFingerprint(rowCount == null ? 0L : rowCount.longValue(), row.value2());
+        Integer gapCount = gaps.value1();
+        BigDecimal gapIdSum = gaps.value2();
+        return new SummaryFingerprint(
+                rowCount == null ? 0L : rowCount.longValue(),
+                row.value2(),
+                gapCount == null ? 0L : gapCount.longValue(),
+                gapIdSum == null ? 0L : gapIdSum.longValue());
     }
 
     @Override

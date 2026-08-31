@@ -197,6 +197,35 @@ class SummaryReadRepositoryPostgresTest {
     }
 
     @Test
+    void fingerprintTracksClosedTicketsAwaitingClassification() {
+        long classified = ticket("2026-03-11T09:00:00", "ts-done", "team-a");
+        classify(classified, "Knowledge Gap", "Build & CI", "ci", "Done.", LocalDateTime.parse("2026-03-11T12:00:00"));
+        SummaryFingerprint complete = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        assertThat(complete.gapCount()).isZero();
+        assertThat(complete.value()).isEqualTo("1@2026-03-11T12:00");
+
+        // An open ticket is not a gap — it will be classified once it closes.
+        SummaryTestFixtures.insertTicket(
+                jdbcTemplate, CHANNEL, "ts-open", LocalDateTime.parse("2026-03-11T10:00:00"), "opened", "team-a");
+        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL)).value())
+                .isEqualTo(complete.value());
+
+        // A closed, unclassified ticket is: the fingerprint moves even though no analysis row changed.
+        long gap = ticket("2026-03-12T09:00:00", "ts-gap", "team-a");
+        SummaryFingerprint withGap = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        assertThat(withGap.analysisCount()).isEqualTo(1);
+        assertThat(withGap.gapCount()).isEqualTo(1);
+        assertThat(withGap.gapIdSum()).isEqualTo(gap);
+        assertThat(withGap.value()).isEqualTo("1@2026-03-11T12:00#1:" + gap);
+
+        // Classifying it closes the gap and moves the analysis half instead.
+        classify(gap, "Task Request", "Build & CI", "ci", "Later.", LocalDateTime.parse("2026-03-12T12:00:00"));
+        SummaryFingerprint after = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        assertThat(after.gapCount()).isZero();
+        assertThat(after.value()).isEqualTo("2@2026-03-12T12:00");
+    }
+
+    @Test
     void fingerprintOfAnEmptyWindowIsStable() {
         SummaryFingerprint fingerprint = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
 

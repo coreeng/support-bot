@@ -140,6 +140,15 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
 
         SummaryBreakdowns breakdowns = summaryReadRepository.breakdowns(window, classificationPromptId, channelIds);
         SummaryFingerprint fingerprint = summaryReadRepository.fingerprint(window, classificationPromptId, channelIds);
+        if (fingerprint.gapCount() > 0) {
+            // Not an error: the summary is generated from what could be classified, and stored under a
+            // fingerprint that includes these gaps so the page does not retry them on every poll.
+            log.warn(
+                    "{} closed ticket(s) in window {}..{} could not be classified; summarising without them",
+                    fingerprint.gapCount(),
+                    window.from(),
+                    window.to());
+        }
         ImmutableList<String> reasons =
                 summaryReadRepository.reasons(window, classificationPromptId, channelIds, summaryProps.maxReasons());
 

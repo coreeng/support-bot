@@ -11,8 +11,6 @@ import com.coreeng.supportbot.analysis.AnalysisPrompt;
 import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
 import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.analysis.AnalysisService;
-import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
-import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisService;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.google.common.collect.ImmutableList;
@@ -46,9 +44,6 @@ class SummaryServiceTest {
     private AnalysisPromptRepository analysisPromptRepository;
 
     @Mock
-    private ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService;
-
-    @Mock
     private SummaryReadRepository summaryReadRepository;
 
     @Mock
@@ -66,7 +61,6 @@ class SummaryServiceTest {
         service = new SummaryService(
                 analysisService,
                 analysisPromptRepository,
-                threadsAwaitingAnalysisService,
                 summaryReadRepository,
                 summarySnapshotRepository,
                 summaryRefresher,
@@ -89,8 +83,7 @@ class SummaryServiceTest {
     }
 
     @Test
-    void servesTheCachedSummaryWhenTheFingerprintMatchesAndThereAreNoGaps() {
-        givenNoGaps();
+    void servesTheCachedSummaryWhenTheFingerprintMatches() {
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
                 .thenReturn(new SummarySnapshot(
                         WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "the prose", "model-a", Instant.EPOCH));
@@ -112,11 +105,11 @@ class SummaryServiceTest {
     }
 
     @Test
-    void backfillsWhenTheWindowHasUnclassifiedTickets() {
-        // Fingerprint and cache both match, but tickets in the window still need classifying — serving
-        // the cached prose here would describe an incomplete window.
-        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
-                .thenReturn(ImmutableList.of(new ThreadToAnalyze(1L, "1.2", CHANNEL)));
+    void backfillsWhenAClosedTicketAwaitsClassification() {
+        // The analysis rows are unchanged since the snapshot, but a ticket has since closed unclassified:
+        // the gap is part of the fingerprint, so the cached prose describes an incomplete window.
+        when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(new SummaryFingerprint(2, LocalDate.of(2026, 3, 23).atTime(10, 0), 1, 74));
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
                 .thenReturn(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "prose", "model-a", null));
         when(summaryRefresher.start(WINDOW)).thenReturn(true);
@@ -124,6 +117,23 @@ class SummaryServiceTest {
 
         assertThat(service.get(FROM, TO).summary())
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.CLASSIFYING, 2, 5));
+    }
+
+    @Test
+    void servesTheCachedSummaryWhenTheOnlyGapsAreOnesTheBackfillAlreadyGaveUpOn() {
+        // A ticket whose thread is gone can never be classified. The snapshot was generated after
+        // attempting it, so its fingerprint already carries the gap — regenerating would loop forever.
+        SummaryFingerprint withGap =
+                new SummaryFingerprint(2, LocalDate.of(2026, 3, 23).atTime(10, 0), 1, 74);
+        when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(withGap);
+        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
+                .thenReturn(new SummarySnapshot(
+                        WINDOW, SUMMARY_PROMPT_ID, withGap.value(), "the prose", "model-a", Instant.EPOCH));
+
+        assertThat(service.get(FROM, TO).summary())
+                .isEqualTo(new SummaryState.Ready("the prose", "model-a", Instant.EPOCH));
+        verify(summaryRefresher, never()).start(any());
     }
 
     @Test
@@ -175,11 +185,6 @@ class SummaryServiceTest {
 
         assertThat(result.window()).isEqualTo(WINDOW);
         assertThat(result.unclassifiedTickets()).isEqualTo(1);
-    }
-
-    private void givenNoGaps() {
-        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
-                .thenReturn(ImmutableList.of());
     }
 
     private static SummaryRefreshStatus idle() {
