@@ -92,9 +92,15 @@ class SummaryReadRepositoryPostgresTest {
 
         SummaryBreakdowns breakdowns = repository.breakdowns(WINDOW, PROMPT_ID, List.of(CHANNEL));
 
-        assertThat(breakdowns.categories()).containsExactly(new SummaryCount("Unclassified", 1));
-        assertThat(breakdowns.features()).containsExactly(new SummaryCount("None", 1));
-        assertThat(breakdowns.teams()).containsExactly(new SummaryCount("Unknown", 1));
+        assertThat(breakdowns.categories())
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("Unclassified", 1L));
+        assertThat(breakdowns.features())
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("None", 1L));
+        assertThat(breakdowns.teams())
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("Unknown", 1L));
     }
 
     @Test
