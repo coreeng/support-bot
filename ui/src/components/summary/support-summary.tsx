@@ -126,6 +126,9 @@ function AtAGlanceCard({ data }: { data: SummaryData }) {
           </p>
         )}
       </div>
+      <div className="border-b px-6 py-4">
+        <SummarySectionBody section={data.summary} />
+      </div>
       <div className="flex flex-wrap gap-2 px-6 py-4">
         <GlanceChip label="Raised">{data.totalTickets.toLocaleString()} tickets</GlanceChip>
         {topDriver && (
@@ -198,10 +201,10 @@ function BreakdownCard({ title, counts, accent }: { title: string; counts: Summa
 }
 
 /**
- * The prose section. It carries its own state, so a failure here degrades to an inline
- * message and never hides the breakdowns.
+ * The prose section, rendered inside the "At a glance" card. It carries its own state, so a
+ * failure here degrades to an inline message and never hides the headline chips or breakdowns.
  */
-function SummarySectionCard({ section }: { section: SummarySection }) {
+function SummarySectionBody({ section }: { section: SummarySection }) {
   if (section.state === "generating") {
     const analysed = section.progress?.analysedThreads ?? null;
     const total = section.progress?.totalThreads ?? null;
@@ -214,8 +217,7 @@ function SummarySectionCard({ section }: { section: SummarySection }) {
           : "Checking for threads to analyse...";
 
     return (
-      <div className="bg-card rounded-xl border p-6">
-        <h2 className="text-foreground mb-4 text-base font-semibold">Summary</h2>
+      <div>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="border-secondary inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-b-2"></div>
@@ -234,8 +236,7 @@ function SummarySectionCard({ section }: { section: SummarySection }) {
 
   if (section.state === "unavailable") {
     return (
-      <div className="bg-card rounded-xl border p-6">
-        <h2 className="text-foreground mb-4 text-base font-semibold">Summary</h2>
+      <div>
         <div className="text-destructive flex items-center gap-2 text-sm">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{section.error ?? "The summary could not be generated."}</span>
@@ -246,8 +247,7 @@ function SummarySectionCard({ section }: { section: SummarySection }) {
   }
 
   return (
-    <div className="bg-card rounded-xl border p-6">
-      <h2 className="text-foreground mb-4 text-base font-semibold">Summary</h2>
+    <div>
       <p className="text-foreground text-sm whitespace-pre-wrap">{section.content}</p>
       {(section.model || section.generatedAt) && (
         <p className="text-muted-foreground mt-4 text-xs">
@@ -355,8 +355,6 @@ export default function SupportSummaryPage() {
           <WindowStrip preset={dateFilter} from={data.from} to={data.to} totalTickets={data.totalTickets} />
 
           <AtAGlanceCard data={data} />
-
-          <SummarySectionCard section={data.summary} />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <BreakdownCard title="Why tenants got in touch" counts={data.drivers} accent="primary" />
