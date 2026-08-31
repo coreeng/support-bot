@@ -2,6 +2,7 @@ package com.coreeng.supportbot.security;
 
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.TeamService;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.LinkedHashMap;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,12 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Unhandled exceptions are re-dispatched by the container to Spring Boot's
+                        // /error handler. JwtAuthenticationFilter is a OncePerRequestFilter, which skips
+                        // ERROR dispatches, so without this rule every 5xx would be reported to the
+                        // caller as a 401 — and the UI signs the user out on 401.
+                        .dispatcherTypeMatchers(DispatcherType.ERROR)
+                        .permitAll()
                         // Public endpoints
                         .requestMatchers("/oauth2/**", "/login/**")
                         .permitAll()
