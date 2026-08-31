@@ -3,10 +3,20 @@
  * Mirrors `com.coreeng.supportbot.summary.rest.SummaryUI`.
  */
 
+/** One of the newest tickets carrying a breakdown value; opens the ticket when clicked. */
+export interface SummaryTicket {
+  ticketId: string;
+  /** The classifier's one-line reason for the ticket; may be empty. */
+  text: string;
+  timestamp: string;
+}
+
 /** One bar of a ranked breakdown. */
 export interface SummaryCount {
   label: string;
   count: number;
+  /** Up to five of the newest tickets, newest first — populated for drivers only. */
+  recent: SummaryTicket[];
 }
 
 /** Progress while the backfill classifies threads, then while the prose is generated. */

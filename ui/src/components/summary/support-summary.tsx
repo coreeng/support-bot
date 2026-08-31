@@ -1,13 +1,15 @@
 "use client";
 
+import EditTicketModal from "@/components/tickets/EditTicketModal";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PRESET_DAYS } from "@/lib/dateRange";
 import { useSummary } from "@/lib/hooks";
 import { enumValidator, isoDateValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
-import type { SummaryCount, SummaryData, SummarySection } from "@/lib/types/summary";
-import { AlertCircle } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import type { SummaryCount, SummaryData, SummarySection, SummaryTicket } from "@/lib/types/summary";
+import { useQueryClient } from "@tanstack/react-query";
+import { AlertCircle, ChevronDown } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 
 /** The presets this page offers; the default window is the last 2 weeks ending yesterday. */
 const SUMMARY_PRESETS = ["lastWeek", "last2Weeks", "lastMonth", "custom"] as const;
@@ -226,14 +228,59 @@ function BreakdownCard({ title, counts, accent }: { title: string; counts: Summa
   );
 }
 
+function formatTicketTimestamp(timestamp: string): string {
+  const parsed = new Date(timestamp);
+  if (isNaN(parsed.getTime())) return timestamp;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  }).format(parsed);
+}
+
+function RecentTicketRow({ ticket, onOpen }: { ticket: SummaryTicket; onOpen: (ticketId: string) => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={`View ticket ${ticket.ticketId}`}
+      onClick={() => onOpen(ticket.ticketId)}
+      className="bg-muted/40 hover:bg-muted flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors"
+    >
+      <p className="text-foreground min-w-0 flex-1 text-sm">{ticket.text || `Ticket ${ticket.ticketId}`}</p>
+      <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">{formatTicketTimestamp(ticket.timestamp)}</span>
+    </button>
+  );
+}
+
 /**
  * The drivers breakdown: a stacked bar showing how the window splits across drivers, then one
- * colour-matched row per driver.
+ * colour-matched row per driver. Each row expands to its newest tickets.
  */
-function DriverBreakdownCard({ title, counts }: { title: string; counts: SummaryCount[] }) {
+function DriverBreakdownCard({
+  title,
+  counts,
+  onOpenTicket,
+}: {
+  title: string;
+  counts: SummaryCount[];
+  onOpenTicket: (ticketId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const total = sumCounts(counts);
   const max = counts.reduce((highest, count) => Math.max(highest, count.count), 0) || 1;
   const colorFor = (index: number) => DRIVER_COLORS[index % DRIVER_COLORS.length];
+
+  const toggle = (label: string) =>
+    setExpanded((previous) => {
+      const next = new Set(previous);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
 
   return (
     <div className="bg-card rounded-xl border p-6" data-testid="summary-drivers">
@@ -258,21 +305,50 @@ function DriverBreakdownCard({ title, counts }: { title: string; counts: Summary
             })}
           </div>
           <div className="divide-y">
-            {counts.map((count, index) => (
-              <div key={count.label} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
-                <div className="flex w-56 shrink-0 items-center gap-2.5">
-                  <span className={`h-3 w-3 shrink-0 rounded-sm ${colorFor(index)}`} />
-                  <h3 className="text-foreground truncate text-sm font-semibold">{count.label}</h3>
+            {counts.map((count, index) => {
+              const isExpanded = expanded.has(count.label);
+              const contentId = `driver-${index}-recent`;
+              return (
+                <div key={count.label} className="py-3 first:pt-0 last:pb-0">
+                  <button
+                    type="button"
+                    onClick={() => toggle(count.label)}
+                    aria-expanded={isExpanded}
+                    aria-controls={contentId}
+                    className="hover:bg-muted/40 -mx-2 flex w-[calc(100%+1rem)] cursor-pointer items-center gap-4 rounded-md px-2 py-1 text-left transition-colors"
+                  >
+                    <div className="flex w-56 shrink-0 items-center gap-2.5">
+                      <span className={`h-3 w-3 shrink-0 rounded-sm ${colorFor(index)}`} />
+                      <h3 className="text-foreground truncate text-sm font-semibold">{count.label}</h3>
+                    </div>
+                    <div className="bg-muted h-2 flex-1 overflow-hidden rounded-full">
+                      <div
+                        className={`h-full rounded-full ${colorFor(index)} transition-all duration-500 ease-out`}
+                        style={{ width: `${Math.round((count.count / max) * 100)}%` }}
+                      />
+                    </div>
+                    <CountWithShare count={count.count} share={sharePercent(count.count, total)} />
+                    <ChevronDown
+                      className={`text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-[400ms] ${isExpanded ? "" : "-rotate-90"}`}
+                    />
+                  </button>
+                  {isExpanded && (
+                    <div id={contentId} className="animate-in fade-in slide-in-from-top-1 mt-3 duration-[400ms]">
+                      <p className="text-muted-foreground mb-2 text-xs">Up to 5 most recent tickets</p>
+                      {count.recent.length === 0 ? (
+                        <p className="text-muted-foreground text-sm">No tickets to show</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {count.recent.map((ticket) => (
+                            <RecentTicketRow key={ticket.ticketId} ticket={ticket} onOpen={onOpenTicket} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="bg-muted h-2 flex-1 overflow-hidden rounded-full">
-                  <div
-                    className={`h-full rounded-full ${colorFor(index)} transition-all duration-500 ease-out`}
-                    style={{ width: `${Math.round((count.count / max) * 100)}%` }}
-                  />
-                </div>
-                <CountWithShare count={count.count} share={sharePercent(count.count, total)} />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
@@ -366,6 +442,24 @@ export default function SupportSummaryPage() {
 
   const { data, isLoading, error } = useSummary(summaryWindow.from, summaryWindow.to);
 
+  const queryClient = useQueryClient();
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+
+  const openTicket = (ticketId: string) => {
+    setSelectedTicketId(ticketId);
+    setIsTicketModalOpen(true);
+  };
+
+  const handleTicketSaved = () => {
+    if (selectedTicketId) {
+      queryClient.invalidateQueries({ queryKey: ["ticket", selectedTicketId] });
+    }
+    queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    // A team or status change moves the ticket between breakdown buckets.
+    queryClient.invalidateQueries({ queryKey: ["summary"] });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -436,7 +530,7 @@ export default function SupportSummaryPage() {
 
           <AtAGlanceCard data={data} />
 
-          <DriverBreakdownCard title="Why tenants got in touch" counts={data.drivers} />
+          <DriverBreakdownCard title="Why tenants got in touch" counts={data.drivers} onOpenTicket={openTicket} />
 
           <BreakdownCard title="Top categories" counts={data.categories} accent="info" />
 
@@ -446,6 +540,16 @@ export default function SupportSummaryPage() {
           </div>
         </>
       )}
+
+      <EditTicketModal
+        ticketId={selectedTicketId}
+        open={isTicketModalOpen}
+        onOpenChange={(open) => {
+          setIsTicketModalOpen(open);
+          if (!open) setSelectedTicketId(null);
+        }}
+        onSuccess={handleTicketSaved}
+      />
     </div>
   );
 }
