@@ -6,7 +6,7 @@
 /** One of the newest tickets carrying a breakdown value; opens the ticket when clicked. */
 export interface SummaryTicket {
   ticketId: string;
-  /** The classifier's one-line reason for the ticket; may be empty. */
+  /** The classifier's one-line reason for the ticket; empty when not yet classified. */
   text: string;
   timestamp: string;
 }
@@ -15,7 +15,7 @@ export interface SummaryTicket {
 export interface SummaryCount {
   label: string;
   count: number;
-  /** Up to five of the newest tickets, newest first — populated for drivers only. */
+  /** Up to five of the newest tickets carrying this value, newest first. */
   recent: SummaryTicket[];
 }
 

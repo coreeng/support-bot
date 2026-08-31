@@ -188,46 +188,6 @@ function CountWithShare({ count, share }: { count: number; share: number }) {
   );
 }
 
-/** A ranked list with a bar per row, each row showing its count and share of the breakdown. */
-function BreakdownCard({ title, counts, accent }: { title: string; counts: SummaryCount[]; accent: Accent }) {
-  const colors = ACCENTS[accent];
-  const total = sumCounts(counts);
-  const max = counts.reduce((highest, count) => Math.max(highest, count.count), 0) || 1;
-
-  return (
-    <div className="bg-card rounded-xl border p-6">
-      <h2 className="text-foreground mb-4 text-base font-semibold">{title}</h2>
-      {counts.length === 0 ? (
-        <p className="text-muted-foreground p-16 text-center text-sm">No data for this period</p>
-      ) : (
-        <div className="space-y-3">
-          {counts.map((count, index) => (
-            <div key={count.label} className="flex items-center gap-3">
-              <div
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${colors.badge} font-mono text-xs font-semibold tabular-nums`}
-              >
-                {index + 1}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-foreground truncate text-sm font-medium">{count.label}</h3>
-                  <CountWithShare count={count.count} share={sharePercent(count.count, total)} />
-                </div>
-                <div className={`mt-2 h-1.5 rounded-full ${colors.track} overflow-hidden`}>
-                  <div
-                    className={`h-full rounded-full ${colors.bar} transition-all duration-500 ease-out`}
-                    style={{ width: `${Math.round((count.count / max) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function formatTicketTimestamp(timestamp: string): string {
   const parsed = new Date(timestamp);
   if (isNaN(parsed.getTime())) return timestamp;
@@ -240,6 +200,45 @@ function formatTicketTimestamp(timestamp: string): string {
     hour12: false,
     timeZone: "UTC",
   }).format(parsed);
+}
+
+/** Tracks which row labels are expanded within one card; everything starts collapsed. */
+function useExpandedRows() {
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const toggle = (label: string) =>
+    setExpanded((previous) => {
+      const next = new Set(previous);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  return { isExpanded: (label: string) => expanded.has(label), toggle };
+}
+
+/** The expanded body of a breakdown row: its newest tickets. */
+function RecentTicketsPanel({
+  id,
+  tickets,
+  onOpenTicket,
+}: {
+  id: string;
+  tickets: SummaryTicket[];
+  onOpenTicket: (ticketId: string) => void;
+}) {
+  return (
+    <div id={id} className="animate-in fade-in slide-in-from-top-1 mt-3 duration-[400ms]">
+      <p className="text-muted-foreground mb-2 text-xs">Up to 5 most recent tickets</p>
+      {tickets.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No tickets to show</p>
+      ) : (
+        <div className="space-y-1.5">
+          {tickets.map((ticket) => (
+            <RecentTicketRow key={ticket.ticketId} ticket={ticket} onOpen={onOpenTicket} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function RecentTicketRow({ ticket, onOpen }: { ticket: SummaryTicket; onOpen: (ticketId: string) => void }) {
@@ -257,6 +256,77 @@ function RecentTicketRow({ ticket, onOpen }: { ticket: SummaryTicket; onOpen: (t
 }
 
 /**
+ * A ranked list with a bar per row, each row showing its count and share of the breakdown. Rows
+ * expand to their newest tickets.
+ */
+function BreakdownCard({
+  title,
+  counts,
+  accent,
+  onOpenTicket,
+}: {
+  title: string;
+  counts: SummaryCount[];
+  accent: Accent;
+  onOpenTicket: (ticketId: string) => void;
+}) {
+  const colors = ACCENTS[accent];
+  const total = sumCounts(counts);
+  const max = counts.reduce((highest, count) => Math.max(highest, count.count), 0) || 1;
+  const { isExpanded, toggle } = useExpandedRows();
+  const idPrefix = title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+  return (
+    <div className="bg-card rounded-xl border p-6">
+      <h2 className="text-foreground mb-4 text-base font-semibold">{title}</h2>
+      {counts.length === 0 ? (
+        <p className="text-muted-foreground p-16 text-center text-sm">No data for this period</p>
+      ) : (
+        <div className="space-y-1">
+          {counts.map((count, index) => {
+            const expanded = isExpanded(count.label);
+            const contentId = `${idPrefix}-${index}-recent`;
+            return (
+              <div key={count.label}>
+                <button
+                  type="button"
+                  onClick={() => toggle(count.label)}
+                  aria-expanded={expanded}
+                  aria-controls={contentId}
+                  className="hover:bg-muted/40 -mx-2 flex w-[calc(100%+1rem)] cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-left transition-colors"
+                >
+                  <div
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${colors.badge} font-mono text-xs font-semibold tabular-nums`}
+                  >
+                    {index + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-foreground truncate text-sm font-medium">{count.label}</h3>
+                      <CountWithShare count={count.count} share={sharePercent(count.count, total)} />
+                    </div>
+                    <div className={`mt-2 h-1.5 rounded-full ${colors.track} overflow-hidden`}>
+                      <div
+                        className={`h-full rounded-full ${colors.bar} transition-all duration-500 ease-out`}
+                        style={{ width: `${Math.round((count.count / max) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <ChevronDown
+                    className={`text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-[400ms] ${expanded ? "" : "-rotate-90"}`}
+                  />
+                </button>
+                {expanded && <RecentTicketsPanel id={contentId} tickets={count.recent} onOpenTicket={onOpenTicket} />}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * The drivers breakdown: a stacked bar showing how the window splits across drivers, then one
  * colour-matched row per driver. Each row expands to its newest tickets.
  */
@@ -269,18 +339,10 @@ function DriverBreakdownCard({
   counts: SummaryCount[];
   onOpenTicket: (ticketId: string) => void;
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const total = sumCounts(counts);
   const max = counts.reduce((highest, count) => Math.max(highest, count.count), 0) || 1;
   const colorFor = (index: number) => DRIVER_COLORS[index % DRIVER_COLORS.length];
-
-  const toggle = (label: string) =>
-    setExpanded((previous) => {
-      const next = new Set(previous);
-      if (next.has(label)) next.delete(label);
-      else next.add(label);
-      return next;
-    });
+  const { isExpanded, toggle } = useExpandedRows();
 
   return (
     <div className="bg-card rounded-xl border p-6" data-testid="summary-drivers">
@@ -306,14 +368,14 @@ function DriverBreakdownCard({
           </div>
           <div className="divide-y">
             {counts.map((count, index) => {
-              const isExpanded = expanded.has(count.label);
+              const expanded = isExpanded(count.label);
               const contentId = `driver-${index}-recent`;
               return (
                 <div key={count.label} className="py-3 first:pt-0 last:pb-0">
                   <button
                     type="button"
                     onClick={() => toggle(count.label)}
-                    aria-expanded={isExpanded}
+                    aria-expanded={expanded}
                     aria-controls={contentId}
                     className="hover:bg-muted/40 -mx-2 flex w-[calc(100%+1rem)] cursor-pointer items-center gap-4 rounded-md px-2 py-1 text-left transition-colors"
                   >
@@ -329,23 +391,10 @@ function DriverBreakdownCard({
                     </div>
                     <CountWithShare count={count.count} share={sharePercent(count.count, total)} />
                     <ChevronDown
-                      className={`text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-[400ms] ${isExpanded ? "" : "-rotate-90"}`}
+                      className={`text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-[400ms] ${expanded ? "" : "-rotate-90"}`}
                     />
                   </button>
-                  {isExpanded && (
-                    <div id={contentId} className="animate-in fade-in slide-in-from-top-1 mt-3 duration-[400ms]">
-                      <p className="text-muted-foreground mb-2 text-xs">Up to 5 most recent tickets</p>
-                      {count.recent.length === 0 ? (
-                        <p className="text-muted-foreground text-sm">No tickets to show</p>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {count.recent.map((ticket) => (
-                            <RecentTicketRow key={ticket.ticketId} ticket={ticket} onOpen={onOpenTicket} />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {expanded && <RecentTicketsPanel id={contentId} tickets={count.recent} onOpenTicket={onOpenTicket} />}
                 </div>
               );
             })}
@@ -532,11 +581,11 @@ export default function SupportSummaryPage() {
 
           <DriverBreakdownCard title="Why tenants got in touch" counts={data.drivers} onOpenTicket={openTicket} />
 
-          <BreakdownCard title="Top categories" counts={data.categories} accent="info" />
+          <BreakdownCard title="Top categories" counts={data.categories} accent="info" onOpenTicket={openTicket} />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <BreakdownCard title="Platform features asked about" counts={data.features} accent="success" />
-            <BreakdownCard title="Teams raising the most" counts={data.teams} accent="purple" />
+            <BreakdownCard title="Platform features asked about" counts={data.features} accent="success" onOpenTicket={openTicket} />
+            <BreakdownCard title="Teams raising the most" counts={data.teams} accent="purple" onOpenTicket={openTicket} />
           </div>
         </>
       )}
