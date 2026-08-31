@@ -280,6 +280,12 @@ analysis:
     path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip served by the summary-data download endpoint
   prompt:
     enabled: ${ANALYSIS_PROMPT_ENABLED:false} # Master switch for the analysis feature
+
+# Support Summary page (/summary). Requires analysis.prompt.enabled.
+# Full operator reference is in the "Support Summary" section under Integrations below.
+summary:
+  enabled: ${SUMMARY_ENABLED:false}
+  max-reasons: ${SUMMARY_MAX_REASONS:400} # Newest per-ticket reasons fed to the summary model
 ```
 
 For deployment versatility across different secret delivery mechanisms, you can base64-encode the PEM file into a single line before storing it:
@@ -457,6 +463,32 @@ Set these on the **API**:
 > (they now apply to both providers, not just Vertex). The old names are silently ignored, so a
 > deployment that sets them keeps running on the defaults — move any explicit values to the new
 > names when upgrading.
+
+## Support Summary
+
+The **Support Summary** page (`/summary`) shows, for a chosen date window, how many tickets
+were raised and how they break down by driver, category, platform feature and team, plus a
+short LLM-written narrative. It reuses the analysis feature above: visiting the page classifies
+any closed-but-unclassified tickets in the window (the same job the **Run Analysis** button
+triggers), then asks the model for the narrative. Results are cached per window and prompt
+version, and recomputed only when the window's classifications change.
+
+The feature is off by default. Enabling it requires the analysis feature to be enabled as well
+— `SUMMARY_ENABLED=true` with `ANALYSIS_PROMPT_ENABLED=false` fails startup. The summary
+prompt is stored in the database alongside the classification prompt (`analysis_prompt.type`).
+
+Access: the page and `GET /summary` are open to the `LEADERSHIP` and `SUPPORT_ENGINEER` roles;
+`GET /summary/enabled` is open to any authenticated user so the sidebar can decide whether to
+show the entry.
+
+### Environment variables
+
+Set these on the **API**:
+
+| Variable | Description |
+|----------|-------------|
+| `SUMMARY_ENABLED` | Master switch for the Support Summary page. Requires `ANALYSIS_PROMPT_ENABLED=true`. |
+| `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons (newest first) included in the report sent to the model, so a very wide window cannot overflow its context. Default `400`. |
 
 ## Single Sign-On (SSO)
 
