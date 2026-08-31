@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.summary;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * The live aggregations for one window. Computed from SQL on every request — unlike the prose
@@ -17,6 +18,10 @@ import com.google.common.collect.ImmutableList;
  *
  * <p>{@code teams} comes from {@code ticket.team}, which is known for every ticket, so it sums to
  * {@code totalTickets}.
+ *
+ * <p>{@code recentByDriver} holds, per driver label in {@code drivers}, the newest few tickets that
+ * carry it — the examples shown when a driver row is expanded. It is keyed by the bucketed label, so
+ * the "Unclassified" bucket has examples too.
  */
 public record SummaryBreakdowns(
         SummaryWindow window,
@@ -25,7 +30,25 @@ public record SummaryBreakdowns(
         ImmutableList<SummaryCount> drivers,
         ImmutableList<SummaryCount> categories,
         ImmutableList<SummaryCount> features,
-        ImmutableList<SummaryCount> teams) {
+        ImmutableList<SummaryCount> teams,
+        ImmutableMap<String, ImmutableList<SummaryTicketExample>> recentByDriver) {
+
+    /** Breakdowns with no driver examples — for callers that only need the counts. */
+    public SummaryBreakdowns(
+            SummaryWindow window,
+            long totalTickets,
+            long classifiedTickets,
+            ImmutableList<SummaryCount> drivers,
+            ImmutableList<SummaryCount> categories,
+            ImmutableList<SummaryCount> features,
+            ImmutableList<SummaryCount> teams) {
+        this(window, totalTickets, classifiedTickets, drivers, categories, features, teams, ImmutableMap.of());
+    }
+
+    /** The examples for one driver row, empty when the label has none. */
+    public ImmutableList<SummaryTicketExample> recentFor(String driver) {
+        return recentByDriver.getOrDefault(driver, ImmutableList.of());
+    }
 
     /** Tickets in the window with no analysis for the current prompt: still open, or not yet backfilled. */
     public long unclassifiedTickets() {

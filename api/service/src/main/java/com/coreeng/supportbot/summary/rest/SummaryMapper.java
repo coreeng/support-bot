@@ -4,9 +4,11 @@ import com.coreeng.supportbot.summary.SummaryBreakdowns;
 import com.coreeng.supportbot.summary.SummaryCount;
 import com.coreeng.supportbot.summary.SummaryService.SummaryResult;
 import com.coreeng.supportbot.summary.SummaryState;
+import com.coreeng.supportbot.summary.SummaryTicketExample;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryCountUI;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryProgressUI;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummarySectionUI;
+import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryTicketUI;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Locale;
@@ -24,17 +26,32 @@ public class SummaryMapper {
                 breakdowns.totalTickets(),
                 breakdowns.classifiedTickets(),
                 breakdowns.unclassifiedTickets(),
-                counts(breakdowns.drivers()),
+                drivers(breakdowns),
                 counts(breakdowns.categories()),
                 counts(breakdowns.features()),
                 counts(breakdowns.teams()),
                 section(result.summary()));
     }
 
+    private static List<SummaryCountUI> drivers(SummaryBreakdowns breakdowns) {
+        return breakdowns.drivers().stream()
+                .map(count -> new SummaryCountUI(
+                        count.label(),
+                        count.count(),
+                        breakdowns.recentFor(count.label()).stream()
+                                .map(SummaryMapper::ticket)
+                                .toList()))
+                .toList();
+    }
+
     private static List<SummaryCountUI> counts(ImmutableList<SummaryCount> counts) {
         return counts.stream()
-                .map(count -> new SummaryCountUI(count.label(), count.count()))
+                .map(count -> new SummaryCountUI(count.label(), count.count(), List.of()))
                 .toList();
+    }
+
+    private static SummaryTicketUI ticket(SummaryTicketExample example) {
+        return new SummaryTicketUI(String.valueOf(example.ticketId()), example.text(), example.raisedAt());
     }
 
     private static SummarySectionUI section(SummaryState state) {

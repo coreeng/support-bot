@@ -7,20 +7,30 @@ import static org.jooq.impl.DSL.cast;
 import static org.jooq.impl.DSL.coalesce;
 import static org.jooq.impl.DSL.count;
 import static org.jooq.impl.DSL.countDistinct;
+import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.max;
+import static org.jooq.impl.DSL.name;
 import static org.jooq.impl.DSL.nullif;
+import static org.jooq.impl.DSL.partitionBy;
+import static org.jooq.impl.DSL.rowNumber;
 import static org.jooq.impl.DSL.trim;
 import static org.jooq.impl.DSL.val;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record2;
+import org.jooq.Record5;
 import org.jooq.Result;
+import org.jooq.Table;
 import org.jooq.TableField;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
@@ -52,6 +62,9 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
 
     /** Bucket for a ticket with no team recorded on it. */
     private static final String UNKNOWN_TEAM_LABEL = "Unknown";
+
+    /** How many example tickets each driver row carries — the same cap the knowledge-gaps page uses. */
+    static final int RECENT_PER_DRIVER = 5;
 
     private final DSLContext dsl;
 
@@ -85,7 +98,8 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 countByAnalysisField(ANALYSIS.DRIVER, UNCLASSIFIED_LABEL, window, promptId, channelIds),
                 countByAnalysisField(ANALYSIS.CATEGORY, UNCLASSIFIED_LABEL, window, promptId, channelIds),
                 countByAnalysisField(ANALYSIS.FEATURE, NO_FEATURE_LABEL, window, promptId, channelIds),
-                countByTeam(window, channelIds));
+                countByTeam(window, channelIds),
+                recentByDriver(window, promptId, channelIds));
     }
 
     @Override
@@ -150,6 +164,57 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .fetch();
 
         return toCounts(rows);
+    }
+
+    /**
+     * The newest {@value #RECENT_PER_DRIVER} tickets per driver, newest first. One query: rank the
+     * window's classified tickets within each driver bucket, then keep the top of each partition.
+     */
+    private ImmutableMap<String, ImmutableList<SummaryTicketExample>> recentByDriver(
+            SummaryWindow window, String promptId, Collection<String> channelIds) {
+        Field<String> driver = bucketed(ANALYSIS.DRIVER, UNCLASSIFIED_LABEL).as("driver");
+        Field<Long> ticketId = TICKET.ID.as("ticket_id");
+        Field<String> reason = ANALYSIS.SUMMARY.as("reason");
+        Field<Instant> raisedAt = QUERY.DATE.as("raised_at");
+        Field<Integer> rank = rowNumber()
+                .over(partitionBy(bucketed(ANALYSIS.DRIVER, UNCLASSIFIED_LABEL))
+                        .orderBy(QUERY.DATE.desc(), TICKET.ID.desc()))
+                .as("rank");
+
+        Table<Record5<String, Long, String, Instant, Integer>> ranked = dsl.select(
+                        driver, ticketId, reason, raisedAt, rank)
+                .from(QUERY)
+                .join(TICKET)
+                .on(TICKET.QUERY_ID.eq(QUERY.ID))
+                .join(ANALYSIS)
+                .on(analysisJoin(promptId))
+                .where(inWindow(window, channelIds))
+                .asTable("ranked");
+
+        Map<String, ImmutableList.Builder<SummaryTicketExample>> byDriver = new LinkedHashMap<>();
+        dsl.selectFrom(ranked)
+                // Unqualified names resolve against the derived table; jOOQ's typed field(...) lookup is
+                // nullable, which NullAway would reject.
+                .where(field(name("rank"), Integer.class).le(RECENT_PER_DRIVER))
+                .orderBy(
+                        field(name("driver"), String.class).asc(),
+                        field(name("rank"), Integer.class).asc())
+                .fetch()
+                .forEach(row -> {
+                    String label = row.get(driver);
+                    Long id = row.get(ticketId);
+                    Instant at = row.get(raisedAt);
+                    if (label == null || id == null || at == null) {
+                        return;
+                    }
+                    String text = row.get(reason);
+                    byDriver.computeIfAbsent(label, _ -> ImmutableList.builder())
+                            .add(new SummaryTicketExample(id, text == null ? "" : text, at));
+                });
+
+        ImmutableMap.Builder<String, ImmutableList<SummaryTicketExample>> result = ImmutableMap.builder();
+        byDriver.forEach((label, examples) -> result.put(label, examples.build()));
+        return result.build();
     }
 
     private ImmutableList<SummaryCount> countByTeam(SummaryWindow window, Collection<String> channelIds) {

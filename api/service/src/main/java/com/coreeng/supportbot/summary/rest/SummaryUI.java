@@ -31,8 +31,20 @@ public record SummaryUI(
         List<SummaryCountUI> teams,
         SummarySectionUI summary) {
 
-    /** One bar of a ranked breakdown. */
-    public record SummaryCountUI(String label, long count) {}
+    /**
+     * One bar of a ranked breakdown.
+     *
+     * @param recent up to five of the newest tickets carrying this value, newest first — populated
+     *     for {@code drivers} only; empty for the other breakdowns
+     */
+    public record SummaryCountUI(String label, long count, List<SummaryTicketUI> recent) {}
+
+    /**
+     * @param ticketId the ticket, as a string to match the rest of the UI's ticket handling
+     * @param text the classifier's one-line reason for the ticket
+     * @param timestamp when the ticket was raised
+     */
+    public record SummaryTicketUI(String ticketId, String text, Instant timestamp) {}
 
     /**
      * @param state one of {@code ready}, {@code generating}, {@code unavailable}

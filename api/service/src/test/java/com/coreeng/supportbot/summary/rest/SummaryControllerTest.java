@@ -28,6 +28,7 @@ import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -137,6 +138,11 @@ class SummaryControllerTest {
                 .andExpect(jsonPath("$.totalTickets").value(3))
                 .andExpect(jsonPath("$.unclassifiedTickets").value(1))
                 .andExpect(jsonPath("$.teams[0].label").value("team-a"))
+                .andExpect(jsonPath("$.teams[0].recent").isEmpty())
+                .andExpect(jsonPath("$.drivers[0].label").value("Knowledge Gap"))
+                .andExpect(jsonPath("$.drivers[0].recent[0].ticketId").value("42"))
+                .andExpect(jsonPath("$.drivers[0].recent[0].text").value("Did not know pipelines existed."))
+                .andExpect(jsonPath("$.drivers[0].recent[0].timestamp").value("1970-01-01T00:00:00Z"))
                 .andExpect(jsonPath("$.summary.state").value("ready"))
                 .andExpect(jsonPath("$.summary.content").value("the prose"))
                 .andExpect(jsonPath("$.summary.progress").doesNotExist());
@@ -181,10 +187,14 @@ class SummaryControllerTest {
                 window,
                 3,
                 2,
+                ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("Knowledge Gap", 2)),
                 ImmutableList.of(),
                 ImmutableList.of(),
-                ImmutableList.of(),
-                ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("team-a", 3)));
+                ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("team-a", 3)),
+                ImmutableMap.of(
+                        "Knowledge Gap",
+                        ImmutableList.of(new com.coreeng.supportbot.summary.SummaryTicketExample(
+                                42L, "Did not know pipelines existed.", Instant.EPOCH))));
         when(summaryService.get(any(), any()))
                 .thenReturn(new SummaryService.SummaryResult(
                         breakdowns, new SummaryState.Ready("the prose", "model-a", Instant.EPOCH)));

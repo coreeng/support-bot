@@ -104,6 +104,41 @@ class SummaryReadRepositoryPostgresTest {
     }
 
     @Test
+    void recentTicketsPerDriverAreNewestFirstAndCapped() {
+        // Six Knowledge Gap tickets: only the newest five come back, newest first.
+        for (int hour = 1; hour <= 6; hour++) {
+            classify(
+                    ticket("2026-03-11T0" + hour + ":00:00", "ts-kg-" + hour, "team-a"),
+                    "Knowledge Gap",
+                    "Build & CI",
+                    "ci",
+                    "Reason " + hour);
+        }
+        long usability = ticket("2026-03-12T09:00:00", "ts-up", "team-b");
+        classify(usability, "Product Usability Problem", "Build & CI", "ci", "Confusing.");
+        // Blank driver lands in the explicit bucket and still gets its example.
+        long blank = ticket("2026-03-12T10:00:00", "ts-blank", "team-b");
+        classify(blank, " ", "Build & CI", "ci", "No driver.");
+
+        SummaryBreakdowns breakdowns = repository.breakdowns(WINDOW, PROMPT_ID, List.of(CHANNEL));
+
+        assertThat(breakdowns.recentFor("Knowledge Gap"))
+                .hasSize(JdbcSummaryReadRepository.RECENT_PER_DRIVER)
+                .extracting(SummaryTicketExample::text)
+                .containsExactly("Reason 6", "Reason 5", "Reason 4", "Reason 3", "Reason 2");
+        assertThat(breakdowns.recentFor("Product Usability Problem"))
+                .extracting(SummaryTicketExample::ticketId)
+                .containsExactly(usability);
+        assertThat(breakdowns.recentFor("Unclassified"))
+                .extracting(SummaryTicketExample::ticketId)
+                .containsExactly(blank);
+        assertThat(breakdowns.recentFor("Feature Request")).isEmpty();
+        // Every driver row has a matching example list.
+        assertThat(breakdowns.drivers()).allSatisfy(count -> assertThat(breakdowns.recentFor(count.label()))
+                .isNotEmpty());
+    }
+
+    @Test
     void fingerprintChangesWhenTheWindowsAnalysisChanges() {
         long first = ticket("2026-03-11T09:00:00", "ts-1", "team-a");
         classify(first, "Knowledge Gap", "Build & CI", "pipelines", "One.", LocalDateTime.parse("2026-03-11T12:00:00"));
