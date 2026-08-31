@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PRESET_DAYS } from "@/lib/dateRange";
@@ -85,12 +84,7 @@ function WindowStrip({ preset, from, to, totalTickets }: { preset: SummaryPreset
       className="bg-card inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-2 text-sm"
       data-testid="summary-window"
     >
-      <Badge variant="outline" className="border-success/30 bg-success/10 text-success font-semibold tracking-wider uppercase">
-        {preset === "custom" ? "Custom" : "Fixed"}
-      </Badge>
-      {preset !== "custom" && (
-        <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{PRESET_LABELS[preset]}</span>
-      )}
+      <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{PRESET_LABELS[preset]}</span>
       <span className="text-foreground font-semibold">{formatWindow(from, to)}</span>
       <span className="text-muted-foreground">
         · <span className="text-foreground font-semibold tabular-nums">{totalTickets.toLocaleString()}</span> tickets raised
