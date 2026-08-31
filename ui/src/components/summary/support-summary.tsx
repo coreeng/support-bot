@@ -1,19 +1,27 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PRESET_DAYS } from "@/lib/dateRange";
 import { useSummary } from "@/lib/hooks";
 import { enumValidator, isoDateValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
-import type { SummaryCount, SummarySection } from "@/lib/types/summary";
+import type { SummaryCount, SummaryData, SummarySection } from "@/lib/types/summary";
 import { AlertCircle } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 /** The presets this page offers; the default window is the last 2 weeks ending yesterday. */
 const SUMMARY_PRESETS = ["lastWeek", "last2Weeks", "lastMonth", "custom"] as const;
 type SummaryPreset = (typeof SUMMARY_PRESETS)[number];
 
 const DEFAULT_PRESET: Exclude<SummaryPreset, "custom"> = "last2Weeks";
+
+const PRESET_LABELS: Record<SummaryPreset, string> = {
+  lastWeek: "Last week",
+  last2Weeks: "Last 2 weeks",
+  lastMonth: "Last month",
+  custom: "Custom range",
+};
 
 const toDateString = (date: Date): string => date.toISOString().split("T")[0];
 
@@ -41,44 +49,117 @@ type Accent = keyof typeof ACCENTS;
 function formatGeneratedAt(timestamp: string): string {
   const parsed = new Date(timestamp);
   if (isNaN(parsed.getTime())) return timestamp;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
+  return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
+    month: "short",
     year: "numeric",
-    hour: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
-    hour12: true,
+    hour12: false,
     timeZone: "UTC",
   }).format(parsed);
 }
 
+/**
+ * Formats an inclusive date window compactly, sharing whatever the two ends have in common:
+ * "12 – 25 Aug 2026", "28 Jul – 25 Aug 2026", "28 Dec 2025 – 10 Jan 2026".
+ */
 function formatWindow(from: string, to: string): string {
-  const format = (value: string) => {
-    const parsed = new Date(`${value}T12:00:00Z`);
-    if (isNaN(parsed.getTime())) return value;
-    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(parsed);
-  };
-  return `${format(from)} – ${format(to)}`;
+  const start = new Date(`${from}T12:00:00Z`);
+  const end = new Date(`${to}T12:00:00Z`);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return `${from} – ${to}`;
+
+  const part = (date: Date, options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("en-GB", { ...options, timeZone: "UTC" }).format(date);
+  const full = { day: "numeric", month: "short", year: "numeric" } as const;
+
+  if (start.getUTCFullYear() !== end.getUTCFullYear()) return `${part(start, full)} – ${part(end, full)}`;
+  if (start.getUTCMonth() !== end.getUTCMonth()) return `${part(start, { day: "numeric", month: "short" })} – ${part(end, full)}`;
+  return `${part(start, { day: "numeric" })} – ${part(end, full)}`;
 }
 
-function StatCard({
-  label,
-  value,
-  accent,
-  valueClass = "text-foreground",
-}: {
-  label: string;
-  value: number;
-  accent: string;
-  valueClass?: string;
-}) {
+/** The strip above the cards: which window is shown, and how many tickets it holds. */
+function WindowStrip({ preset, from, to, totalTickets }: { preset: SummaryPreset; from: string; to: string; totalTickets: number }) {
   return (
-    <div className="bg-card relative overflow-hidden rounded-xl border p-6">
-      <div className={`${accent} absolute -top-4 -right-4 h-24 w-24 rounded-full`} />
-      <div className={`${accent} absolute -right-6 -bottom-6 h-20 w-20 rounded-full`} />
-      <div className="relative">
-        <p className="text-muted-foreground mb-2 text-sm font-medium">{label}</p>
-        <p className={`${valueClass} font-mono text-3xl font-semibold tracking-tight tabular-nums`}>{value.toLocaleString()}</p>
+    <div
+      className="bg-card inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-2 text-sm"
+      data-testid="summary-window"
+    >
+      <Badge variant="outline" className="border-success/30 bg-success/10 text-success font-semibold tracking-wider uppercase">
+        {preset === "custom" ? "Custom" : "Fixed"}
+      </Badge>
+      {preset !== "custom" && (
+        <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{PRESET_LABELS[preset]}</span>
+      )}
+      <span className="text-foreground font-semibold">{formatWindow(from, to)}</span>
+      <span className="text-muted-foreground">
+        · <span className="text-foreground font-semibold tabular-nums">{totalTickets.toLocaleString()}</span> tickets raised
+      </span>
+    </div>
+  );
+}
+
+function GlanceChip({ label, children, muted = false }: { label: string; children: ReactNode; muted?: boolean }) {
+  return (
+    <div
+      className={`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${
+        muted ? "bg-muted/40 border-border" : "bg-success/5 border-success/20"
+      }`}
+    >
+      <span className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">{label}</span>
+      <span className="text-foreground font-semibold">{children}</span>
+    </div>
+  );
+}
+
+/** Headline numbers for the window: total raised plus the top item of each breakdown. */
+function AtAGlanceCard({ data }: { data: SummaryData }) {
+  const top = (counts: SummaryCount[]): SummaryCount | undefined => counts[0];
+  const topDriver = top(data.drivers);
+  const topCategory = top(data.categories);
+  const topFeature = top(data.features);
+  const topTeam = top(data.teams);
+  const driverShare = topDriver && data.totalTickets > 0 ? Math.round((topDriver.count / data.totalTickets) * 100) : null;
+  const lastUpdated = data.summary.generatedAt;
+
+  return (
+    <div className="bg-card rounded-xl border" data-testid="summary-at-a-glance">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
+        <h2 className="text-foreground text-base font-semibold">At a glance</h2>
+        {lastUpdated && (
+          <p className="text-muted-foreground text-sm">
+            Last updated <span className="text-foreground font-semibold">{formatGeneratedAt(lastUpdated)}</span>
+          </p>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2 px-6 py-4">
+        <GlanceChip label="Raised">{data.totalTickets.toLocaleString()} tickets</GlanceChip>
+        {topDriver && (
+          <GlanceChip label="Top driver">
+            {topDriver.label} · {topDriver.count.toLocaleString()}
+            {driverShare !== null && ` (${driverShare}%)`}
+          </GlanceChip>
+        )}
+        {topCategory && (
+          <GlanceChip label="Top subject">
+            {topCategory.label} · {topCategory.count.toLocaleString()}
+          </GlanceChip>
+        )}
+        {topFeature && (
+          <GlanceChip label="Top feature">
+            {topFeature.label} · {topFeature.count.toLocaleString()}
+          </GlanceChip>
+        )}
+        {topTeam && (
+          <GlanceChip label="Top tenant">
+            {topTeam.label} · {topTeam.count.toLocaleString()}
+          </GlanceChip>
+        )}
+        {data.unclassifiedTickets > 0 && (
+          <GlanceChip label="Awaiting classification" muted>
+            {data.unclassifiedTickets.toLocaleString()}
+          </GlanceChip>
+        )}
       </div>
     </div>
   );
@@ -216,9 +297,7 @@ export default function SupportSummaryPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-foreground text-2xl font-bold">Support Summary</h1>
-          <p className="text-muted-foreground text-sm">
-            What tenants raised between {formatWindow(summaryWindow.from, summaryWindow.to)}, and why
-          </p>
+          <p className="text-muted-foreground text-sm">What tenants raised in the selected period, and why</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select
@@ -279,16 +358,9 @@ export default function SupportSummaryPage() {
 
       {data && (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <StatCard label="Tickets raised" value={data.totalTickets} accent="bg-primary/15" />
-            <StatCard label="Classified" value={data.classifiedTickets} accent="bg-info/15" />
-            <StatCard
-              label="Awaiting classification"
-              value={data.unclassifiedTickets}
-              accent="bg-warning/15"
-              valueClass={data.unclassifiedTickets > 0 ? "text-warning" : "text-foreground"}
-            />
-          </div>
+          <WindowStrip preset={dateFilter} from={data.from} to={data.to} totalTickets={data.totalTickets} />
+
+          <AtAGlanceCard data={data} />
 
           <SummarySectionCard section={data.summary} />
 
