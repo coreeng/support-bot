@@ -68,6 +68,8 @@ iterate together and update this doc as decisions land.
      summary + primary-driver split).
    - Subjects/categories ranked by frequency (against the controlled taxonomy).
    - Platform features with the most questions.
+   - Top knowledge gaps: the knowledge-gaps page's widget (categories of
+     `Knowledge Gap` tickets) scoped to the window, so both pages agree.
    - Tenant leaderboard (which teams raise the most issues). Requested
      extension (epic comment): per team also show issue count and the most
      frequent product/feature they ask about.

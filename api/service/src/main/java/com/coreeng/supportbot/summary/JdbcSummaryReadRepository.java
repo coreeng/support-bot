@@ -10,6 +10,7 @@ import static org.jooq.impl.DSL.countDistinct;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.max;
 import static org.jooq.impl.DSL.name;
+import static org.jooq.impl.DSL.noCondition;
 import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.nullif;
 import static org.jooq.impl.DSL.partitionBy;
@@ -69,6 +70,12 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
     /** Bucket for a ticket with no team recorded on it. */
     private static final String UNKNOWN_TEAM_LABEL = "Unknown";
 
+    /**
+     * The driver label the classification prompt assigns to "tenant did not know the platform already
+     * does this" tickets; the same literal the knowledge-gaps page filters on.
+     */
+    static final String KNOWLEDGE_GAP_DRIVER = "Knowledge Gap";
+
     /** How many example tickets each breakdown row carries — the same cap the knowledge-gaps page uses. */
     static final int RECENT_PER_ROW = 5;
 
@@ -78,7 +85,14 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
     public SummaryBreakdowns breakdowns(SummaryWindow window, String promptId, Collection<String> channelIds) {
         if (channelIds.isEmpty()) {
             return new SummaryBreakdowns(
-                    window, 0L, 0L, ImmutableList.of(), ImmutableList.of(), ImmutableList.of(), ImmutableList.of());
+                    window,
+                    0L,
+                    0L,
+                    ImmutableList.of(),
+                    ImmutableList.of(),
+                    ImmutableList.of(),
+                    ImmutableList.of(),
+                    ImmutableList.of());
         }
 
         long totalTickets = orZero(dsl.selectCount()
@@ -101,9 +115,17 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 window,
                 totalTickets,
                 classifiedTickets,
-                countByAnalysisField(ANALYSIS.DRIVER, UNCLASSIFIED_LABEL, window, promptId, channelIds),
-                countByAnalysisField(ANALYSIS.CATEGORY, UNCLASSIFIED_LABEL, window, promptId, channelIds),
-                countByAnalysisField(ANALYSIS.FEATURE, NO_FEATURE_LABEL, window, promptId, channelIds),
+                countByAnalysisField(ANALYSIS.DRIVER, UNCLASSIFIED_LABEL, noCondition(), window, promptId, channelIds),
+                countByAnalysisField(
+                        ANALYSIS.CATEGORY, UNCLASSIFIED_LABEL, noCondition(), window, promptId, channelIds),
+                countByAnalysisField(
+                        ANALYSIS.CATEGORY,
+                        UNCLASSIFIED_LABEL,
+                        trim(ANALYSIS.DRIVER).eq(KNOWLEDGE_GAP_DRIVER),
+                        window,
+                        promptId,
+                        channelIds),
+                countByAnalysisField(ANALYSIS.FEATURE, NO_FEATURE_LABEL, noCondition(), window, promptId, channelIds),
                 countByTeam(window, promptId, channelIds));
     }
 
@@ -165,9 +187,14 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .collect(ImmutableList.toImmutableList());
     }
 
+    /**
+     * @param filter narrows the classified tickets being counted (e.g. to one driver);
+     *     {@link DSL#noCondition()} for the whole window
+     */
     private ImmutableList<SummaryCount> countByAnalysisField(
             TableField<?, String> field,
             String blankLabel,
+            Condition filter,
             SummaryWindow window,
             String promptId,
             Collection<String> channelIds) {
@@ -180,11 +207,12 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .join(ANALYSIS)
                 .on(analysisJoin(promptId))
                 .where(inWindow(window, channelIds))
+                .and(filter)
                 .groupBy(label)
                 .orderBy(count().desc(), label.asc())
                 .fetch();
 
-        return toCounts(rows, recentBy(label, true, window, promptId, channelIds));
+        return toCounts(rows, recentBy(label, true, filter, window, promptId, channelIds));
     }
 
     private ImmutableList<SummaryCount> countByTeam(
@@ -200,7 +228,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .orderBy(count().desc(), label.asc())
                 .fetch();
 
-        return toCounts(rows, recentBy(label, false, window, promptId, channelIds));
+        return toCounts(rows, recentBy(label, false, noCondition(), window, promptId, channelIds));
     }
 
     /**
@@ -210,10 +238,12 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
      * @param classifiedOnly true for the analysis-derived breakdowns, whose rows only exist for
      *     classified tickets; false for teams, where a not-yet-classified ticket is still an example
      *     (with a blank reason)
+     * @param filter the same narrowing applied to the counts, so the examples match the rows
      */
     private ImmutableMap<String, ImmutableList<SummaryTicketExample>> recentBy(
             Field<String> label,
             boolean classifiedOnly,
+            Condition filter,
             SummaryWindow window,
             String promptId,
             Collection<String> channelIds) {
@@ -234,6 +264,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                         ? joined.join(ANALYSIS).on(analysisJoin(promptId))
                         : joined.leftJoin(ANALYSIS).on(analysisJoin(promptId)))
                 .where(inWindow(window, channelIds))
+                .and(filter)
                 .asTable("ranked");
 
         Map<String, ImmutableList.Builder<SummaryTicketExample>> byBucket = new LinkedHashMap<>();

@@ -16,6 +16,8 @@ import org.jspecify.annotations.Nullable;
  * @param unclassifiedTickets the remainder — still open, or awaiting backfill; exposed so the
  *     breakdowns visibly reconcile against the total instead of silently under-counting
  * @param drivers, categories, features breakdowns over the classified tickets
+ * @param knowledgeGaps the categories breakdown restricted to {@code Knowledge Gap} tickets — the
+ *     knowledge-gaps page's widget, scoped to the window
  * @param teams breakdown over every ticket raised, so it sums to {@code totalTickets}
  * @param summary the prose section, which carries its own state and never blocks the rest
  */
@@ -27,6 +29,7 @@ public record SummaryUI(
         long unclassifiedTickets,
         List<SummaryCountUI> drivers,
         List<SummaryCountUI> categories,
+        List<SummaryCountUI> knowledgeGaps,
         List<SummaryCountUI> features,
         List<SummaryCountUI> teams,
         SummarySectionUI summary) {

@@ -15,6 +15,10 @@ import com.google.common.collect.ImmutableList;
  *       {@code unclassifiedTickets()} is the explicit remainder (still open, or awaiting backfill).
  * </ul>
  *
+ * <p>{@code knowledgeGaps} is the categories breakdown restricted to tickets whose driver is
+ * {@code Knowledge Gap} — the same widget the knowledge-gaps page shows, scoped to the window — so
+ * it sums to that driver's count.
+ *
  * <p>{@code teams} comes from {@code ticket.team}, which is known for every ticket, so it sums to
  * {@code totalTickets}.
  *
@@ -27,6 +31,7 @@ public record SummaryBreakdowns(
         long classifiedTickets,
         ImmutableList<SummaryCount> drivers,
         ImmutableList<SummaryCount> categories,
+        ImmutableList<SummaryCount> knowledgeGaps,
         ImmutableList<SummaryCount> features,
         ImmutableList<SummaryCount> teams) {
 

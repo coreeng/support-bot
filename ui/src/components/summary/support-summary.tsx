@@ -43,6 +43,7 @@ const ACCENTS = {
   info: { bar: "bg-info", track: "bg-info/10", badge: "bg-info/10 text-info" },
   success: { bar: "bg-success", track: "bg-success/10", badge: "bg-success/10 text-success" },
   purple: { bar: "bg-chart-4", track: "bg-chart-4/10", badge: "bg-chart-4/10 text-chart-4" },
+  warning: { bar: "bg-warning", track: "bg-warning/10", badge: "bg-warning/10 text-warning" },
 } as const;
 
 type Accent = keyof typeof ACCENTS;
@@ -582,6 +583,8 @@ export default function SupportSummaryPage() {
           <DriverBreakdownCard title="Why tenants got in touch" counts={data.drivers} onOpenTicket={openTicket} />
 
           <BreakdownCard title="Top categories" counts={data.categories} accent="info" onOpenTicket={openTicket} />
+
+          <BreakdownCard title="Top knowledge gaps" counts={data.knowledgeGaps} accent="warning" onOpenTicket={openTicket} />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <BreakdownCard title="Platform features asked about" counts={data.features} accent="success" onOpenTicket={openTicket} />

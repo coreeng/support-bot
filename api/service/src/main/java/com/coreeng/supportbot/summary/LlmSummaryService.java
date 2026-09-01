@@ -65,6 +65,7 @@ public class LlmSummaryService {
 
         appendCounts(report, "Primary support drivers", breakdowns.drivers());
         appendCounts(report, "Categories", breakdowns.categories());
+        appendCounts(report, "Knowledge gaps by category", breakdowns.knowledgeGaps());
         appendCounts(report, "Platform features", breakdowns.features());
         appendCounts(report, "Tenant teams", breakdowns.teams());
 

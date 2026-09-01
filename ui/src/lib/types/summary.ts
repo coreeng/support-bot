@@ -44,6 +44,8 @@ export interface SummaryData {
   unclassifiedTickets: number;
   drivers: SummaryCount[];
   categories: SummaryCount[];
+  /** Categories of the window's Knowledge Gap tickets — the knowledge-gaps page's widget, scoped to the window. */
+  knowledgeGaps: SummaryCount[];
   features: SummaryCount[];
   teams: SummaryCount[];
   summary: SummarySection;

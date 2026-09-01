@@ -78,6 +78,13 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(breakdowns.features())
                 .extracting(SummaryCount::label, SummaryCount::count)
                 .containsExactly(tuple("pipelines", 2L));
+        // Knowledge gaps are the categories of Knowledge Gap tickets only, so the usability ticket is absent.
+        assertThat(breakdowns.knowledgeGaps())
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("Build & CI", 1L));
+        assertThat(recentFor(breakdowns.knowledgeGaps(), "Build & CI"))
+                .extracting(SummaryTicketExample::ticketId)
+                .containsExactly(knowledge);
         // Teams cover every ticket raised, classified or not, so they sum to the window total.
         assertThat(breakdowns.teams())
                 .extracting(SummaryCount::label, SummaryCount::count)
@@ -164,8 +171,12 @@ class SummaryReadRepositoryPostgresTest {
                 .containsExactly(blank, usability);
 
         // Every row of every breakdown has at least one example.
-        for (ImmutableList<SummaryCount> counts :
-                List.of(breakdowns.drivers(), breakdowns.categories(), breakdowns.features(), breakdowns.teams())) {
+        for (ImmutableList<SummaryCount> counts : List.of(
+                breakdowns.drivers(),
+                breakdowns.categories(),
+                breakdowns.knowledgeGaps(),
+                breakdowns.features(),
+                breakdowns.teams())) {
             assertThat(counts).allSatisfy(count -> assertThat(count.recent()).isNotEmpty());
         }
     }

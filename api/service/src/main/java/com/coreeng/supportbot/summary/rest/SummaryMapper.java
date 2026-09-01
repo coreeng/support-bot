@@ -28,6 +28,7 @@ public class SummaryMapper {
                 breakdowns.unclassifiedTickets(),
                 counts(breakdowns.drivers()),
                 counts(breakdowns.categories()),
+                counts(breakdowns.knowledgeGaps()),
                 counts(breakdowns.features()),
                 counts(breakdowns.teams()),
                 section(result.summary()));

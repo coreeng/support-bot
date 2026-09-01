@@ -188,6 +188,7 @@ class SummaryRefreshServiceTest {
                 2,
                 ImmutableList.of(new SummaryCount("Knowledge Gap", 2)),
                 ImmutableList.of(new SummaryCount("Build & CI", 2)),
+                ImmutableList.of(new SummaryCount("Build & CI", 2)),
                 ImmutableList.of(new SummaryCount("pipelines", 2)),
                 ImmutableList.of(new SummaryCount("team-a", 3)));
     }
