@@ -78,9 +78,28 @@ public final class SummaryTestFixtures {
                 """, Math.toIntExact(ticketId), driver, category, feature, summary, promptId, updatedAt);
     }
 
+    /** Prefix of every tag code this fixture creates, so {@link #clear} can find them. */
+    public static final String TAG_CODE_PREFIX = "summary-test-";
+
+    /** Tags a ticket, creating the tag (with the given label) if it does not exist yet. */
+    public static void tagTicket(JdbcTemplate jdbcTemplate, long ticketId, String code, String label) {
+        jdbcTemplate.update(
+                "INSERT INTO tag (code, label) VALUES (?, ?) ON CONFLICT (code) DO UPDATE SET label = EXCLUDED.label",
+                TAG_CODE_PREFIX + code,
+                label);
+        jdbcTemplate.update(
+                "INSERT INTO ticket_to_tag (ticket_id, tag_code) VALUES (?, ?)", ticketId, TAG_CODE_PREFIX + code);
+    }
+
     /** Removes every fixture row belonging to the given synthetic channels. */
     public static void clear(JdbcTemplate jdbcTemplate, String... channelIds) {
         for (String channelId : channelIds) {
+            jdbcTemplate.update("""
+                    DELETE FROM ticket_to_tag
+                     WHERE ticket_id IN (
+                        SELECT t.id FROM ticket t JOIN query q ON q.id = t.query_id WHERE q.channel_id = ?
+                     )
+                    """, channelId);
             jdbcTemplate.update("""
                     DELETE FROM analysis
                      WHERE ticket_id IN (
@@ -91,5 +110,6 @@ public final class SummaryTestFixtures {
                     "DELETE FROM ticket WHERE query_id IN (SELECT id FROM query WHERE channel_id = ?)", channelId);
             jdbcTemplate.update("DELETE FROM query WHERE channel_id = ?", channelId);
         }
+        jdbcTemplate.update("DELETE FROM tag WHERE code LIKE ?", TAG_CODE_PREFIX + "%");
     }
 }

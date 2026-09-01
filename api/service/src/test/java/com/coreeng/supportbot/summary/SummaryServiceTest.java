@@ -200,6 +200,7 @@ class SummaryServiceTest {
                 ImmutableList.of(new SummaryCount("Build & CI", 2)),
                 ImmutableList.of(new SummaryCount("Build & CI", 2)),
                 ImmutableList.of(new SummaryCount("pipelines", 2)),
-                ImmutableList.of(new SummaryCount("team-a", 3)));
+                ImmutableList.of(new SummaryCount("team-a", 3)),
+                ImmutableList.of(new SummaryCount("Alpha", 1)));
     }
 }

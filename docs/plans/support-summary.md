@@ -70,6 +70,8 @@ iterate together and update this doc as decisions land.
    - Platform features with the most questions.
    - Top knowledge gaps: the knowledge-gaps page's widget (categories of
      `Knowledge Gap` tickets) scoped to the window, so both pages agree.
+   - Top products, from product tags (`Product - <name>`), using the Products
+     View's rules; hidden, like that tab, when no product tags are configured.
    - Tenant leaderboard (which teams raise the most issues). Requested
      extension (epic comment): per team also show issue count and the most
      frequent product/feature they ask about.

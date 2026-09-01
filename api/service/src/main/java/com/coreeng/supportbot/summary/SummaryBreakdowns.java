@@ -22,6 +22,11 @@ import com.google.common.collect.ImmutableList;
  * <p>{@code teams} comes from {@code ticket.team}, which is known for every ticket, so it sums to
  * {@code totalTickets}.
  *
+ * <p>{@code products} comes from the product tags on each ticket (labels prefixed "Product - "),
+ * counted once per ticket per distinct product. Untagged tickets have no row there, so it reconciles
+ * against neither total; it mirrors the UI's Products View, which the page hides when no product
+ * tags are configured.
+ *
  * <p>Every row of every breakdown carries its newest few example tickets ({@link SummaryCount#recent}),
  * including the explicit blank buckets.
  */
@@ -33,7 +38,8 @@ public record SummaryBreakdowns(
         ImmutableList<SummaryCount> categories,
         ImmutableList<SummaryCount> knowledgeGaps,
         ImmutableList<SummaryCount> features,
-        ImmutableList<SummaryCount> teams) {
+        ImmutableList<SummaryCount> teams,
+        ImmutableList<SummaryCount> products) {
 
     /** Tickets in the window with no analysis for the current prompt: still open, or not yet backfilled. */
     public long unclassifiedTickets() {

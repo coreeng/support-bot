@@ -68,6 +68,7 @@ public class LlmSummaryService {
         appendCounts(report, "Knowledge gaps by category", breakdowns.knowledgeGaps());
         appendCounts(report, "Platform features", breakdowns.features());
         appendCounts(report, "Tenant teams", breakdowns.teams());
+        appendCounts(report, "Products (from product tags)", breakdowns.products());
 
         report.append("\nPer-ticket reasons (").append(reasons.size()).append("):\n");
         for (String reason : reasons) {

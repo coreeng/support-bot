@@ -2,18 +2,22 @@ package com.coreeng.supportbot.summary;
 
 import static com.coreeng.supportbot.dbschema.Tables.ANALYSIS;
 import static com.coreeng.supportbot.dbschema.Tables.QUERY;
+import static com.coreeng.supportbot.dbschema.Tables.TAG;
 import static com.coreeng.supportbot.dbschema.Tables.TICKET;
+import static com.coreeng.supportbot.dbschema.Tables.TICKET_TO_TAG;
 import static org.jooq.impl.DSL.cast;
 import static org.jooq.impl.DSL.coalesce;
 import static org.jooq.impl.DSL.count;
 import static org.jooq.impl.DSL.countDistinct;
 import static org.jooq.impl.DSL.field;
+import static org.jooq.impl.DSL.inline;
 import static org.jooq.impl.DSL.max;
 import static org.jooq.impl.DSL.name;
 import static org.jooq.impl.DSL.noCondition;
 import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.nullif;
 import static org.jooq.impl.DSL.partitionBy;
+import static org.jooq.impl.DSL.regexpReplaceFirst;
 import static org.jooq.impl.DSL.rowNumber;
 import static org.jooq.impl.DSL.selectOne;
 import static org.jooq.impl.DSL.sum;
@@ -27,8 +31,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.UnaryOperator;
 import lombok.RequiredArgsConstructor;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -76,6 +83,14 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
      */
     static final String KNOWLEDGE_GAP_DRIVER = "Knowledge Gap";
 
+    /**
+     * Product tags are recognised by their label prefix ("Product - &lt;name&gt;"), exactly as the
+     * Products View does in the UI: case-insensitive, any dash, and a label that is only the prefix
+     * is not a product. Postgres ARE syntax, with the case flag embedded so the same literal serves
+     * both the match and the strip.
+     */
+    static final String PRODUCT_TAG_PREFIX = "(?i)^\\s*product\\s*[-\u2013\u2014]\\s*";
+
     /** How many example tickets each breakdown row carries — the same cap the knowledge-gaps page uses. */
     static final int RECENT_PER_ROW = 5;
 
@@ -88,6 +103,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                     window,
                     0L,
                     0L,
+                    ImmutableList.of(),
                     ImmutableList.of(),
                     ImmutableList.of(),
                     ImmutableList.of(),
@@ -126,7 +142,8 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                         promptId,
                         channelIds),
                 countByAnalysisField(ANALYSIS.FEATURE, NO_FEATURE_LABEL, noCondition(), window, promptId, channelIds),
-                countByTeam(window, promptId, channelIds));
+                countByTeam(window, promptId, channelIds),
+                countByProduct(window, promptId, channelIds));
     }
 
     @Override
@@ -212,7 +229,8 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .orderBy(count().desc(), label.asc())
                 .fetch();
 
-        return toCounts(rows, recentBy(label, true, filter, window, promptId, channelIds));
+        return toCounts(
+                rows, recentBy(label, j -> j.join(ANALYSIS).on(analysisJoin(promptId)), filter, window, channelIds));
     }
 
     private ImmutableList<SummaryCount> countByTeam(
@@ -228,25 +246,70 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .orderBy(count().desc(), label.asc())
                 .fetch();
 
-        return toCounts(rows, recentBy(label, false, noCondition(), window, promptId, channelIds));
+        return toCounts(
+                rows,
+                recentBy(
+                        label,
+                        j -> j.leftJoin(ANALYSIS).on(analysisJoin(promptId)),
+                        noCondition(),
+                        window,
+                        channelIds));
     }
+
+    /**
+     * Tickets per product, read from the product tags on each ticket. A ticket counts once per distinct
+     * product however many of its tags name it; a ticket with no product tag has no row, so this
+     * breakdown reconciles against neither total. Tags are matched whether or not they have since been
+     * retired, so history stays attributed — the same rules as the UI's Products View.
+     */
+    private ImmutableList<SummaryCount> countByProduct(
+            SummaryWindow window, String promptId, Collection<String> channelIds) {
+        Field<String> label = productName();
+        Condition isProduct = TAG.LABEL.likeRegex(inline(PRODUCT_TAG_PREFIX)).and(label.ne(inline("")));
+
+        Result<Record2<String, Integer>> rows = dsl.select(label, countDistinct(TICKET.ID))
+                .from(QUERY)
+                .join(TICKET)
+                .on(TICKET.QUERY_ID.eq(QUERY.ID))
+                .join(TICKET_TO_TAG)
+                .on(TICKET_TO_TAG.TICKET_ID.eq(TICKET.ID))
+                .join(TAG)
+                .on(TAG.CODE.eq(TICKET_TO_TAG.TAG_CODE))
+                .where(inWindow(window, channelIds))
+                .and(isProduct)
+                .groupBy(label)
+                .orderBy(countDistinct(TICKET.ID).desc(), label.asc())
+                .fetch();
+
+        Joins viaProductTag = j -> j.join(TICKET_TO_TAG)
+                .on(TICKET_TO_TAG.TICKET_ID.eq(TICKET.ID))
+                .join(TAG)
+                .on(TAG.CODE.eq(TICKET_TO_TAG.TAG_CODE))
+                .leftJoin(ANALYSIS)
+                .on(analysisJoin(promptId));
+        return toCounts(rows, recentBy(label, viaProductTag, isProduct, window, channelIds));
+    }
+
+    /** The product a tag names: its label with the "Product - " prefix removed. Inlined for GROUP BY, as in {@link #bucketed}. */
+    private static Field<String> productName() {
+        return trim(regexpReplaceFirst(TAG.LABEL, inline(PRODUCT_TAG_PREFIX), inline("")));
+    }
+
+    /** How a breakdown reaches its examples from {@code query ⋈ ticket}: which tables to add and whether analysis is required. */
+    private interface Joins
+            extends UnaryOperator<SelectOnConditionStep<Record5<String, Long, String, Instant, Integer>>> {}
 
     /**
      * The newest {@value #RECENT_PER_ROW} tickets per bucket of {@code label}, newest first. One
      * query: rank the window's tickets within each bucket, then keep the top of each partition.
      *
-     * @param classifiedOnly true for the analysis-derived breakdowns, whose rows only exist for
-     *     classified tickets; false for teams, where a not-yet-classified ticket is still an example
-     *     (with a blank reason)
+     * @param joins the breakdown's own joins beyond {@code query ⋈ ticket}; an inner join on
+     *     {@code analysis} limits examples to classified tickets, a left join lets a not-yet-classified
+     *     ticket appear with a blank reason
      * @param filter the same narrowing applied to the counts, so the examples match the rows
      */
     private ImmutableMap<String, ImmutableList<SummaryTicketExample>> recentBy(
-            Field<String> label,
-            boolean classifiedOnly,
-            Condition filter,
-            SummaryWindow window,
-            String promptId,
-            Collection<String> channelIds) {
+            Field<String> label, Joins joins, Condition filter, SummaryWindow window, Collection<String> channelIds) {
         Field<String> bucket = label.as("bucket");
         Field<Long> ticketId = TICKET.ID.as("ticket_id");
         Field<String> reason = ANALYSIS.SUMMARY.as("reason");
@@ -260,14 +323,14 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .from(QUERY)
                 .join(TICKET)
                 .on(TICKET.QUERY_ID.eq(QUERY.ID));
-        Table<Record5<String, Long, String, Instant, Integer>> ranked = (classifiedOnly
-                        ? joined.join(ANALYSIS).on(analysisJoin(promptId))
-                        : joined.leftJoin(ANALYSIS).on(analysisJoin(promptId)))
+        Table<Record5<String, Long, String, Instant, Integer>> ranked = joins.apply(joined)
                 .where(inWindow(window, channelIds))
                 .and(filter)
                 .asTable("ranked");
 
         Map<String, ImmutableList.Builder<SummaryTicketExample>> byBucket = new LinkedHashMap<>();
+        // A ticket can reach the same bucket twice (two tags naming one product); show it once.
+        Set<String> seen = new HashSet<>();
         dsl.selectFrom(ranked)
                 // Unqualified names resolve against the derived table; jOOQ's typed field(...) lookup is
                 // nullable, which NullAway would reject.
@@ -281,6 +344,9 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                     Long id = row.get(ticketId);
                     Instant at = row.get(raisedAt);
                     if (key == null || id == null || at == null) {
+                        return;
+                    }
+                    if (!seen.add(key + '\u0000' + id)) {
                         return;
                     }
                     String text = row.get(reason);

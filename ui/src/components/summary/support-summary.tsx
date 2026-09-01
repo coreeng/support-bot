@@ -1,10 +1,11 @@
 "use client";
 
+import { hasActiveProductTags } from "@/components/products/products";
 import EditTicketModal from "@/components/tickets/EditTicketModal";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PRESET_DAYS } from "@/lib/dateRange";
-import { useSummary } from "@/lib/hooks";
+import { useRegistry, useSummary } from "@/lib/hooks";
 import { enumValidator, isoDateValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
 import type { SummaryCount, SummaryData, SummarySection, SummaryTicket } from "@/lib/types/summary";
 import { useQueryClient } from "@tanstack/react-query";
@@ -491,6 +492,10 @@ export default function SupportSummaryPage() {
   }, [dateFilter, params.dateFrom, params.dateTo]);
 
   const { data, isLoading, error } = useSummary(summaryWindow.from, summaryWindow.to);
+  // Same rule as the Products View tab: only shown once the registry confirms product tags exist,
+  // so it never flashes in and out while the registry loads.
+  const { data: registryData } = useRegistry();
+  const productTagsConfigured = hasActiveProductTags(registryData);
 
   const queryClient = useQueryClient();
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -590,6 +595,10 @@ export default function SupportSummaryPage() {
             <BreakdownCard title="Platform features asked about" counts={data.features} accent="success" onOpenTicket={openTicket} />
             <BreakdownCard title="Teams raising the most" counts={data.teams} accent="purple" onOpenTicket={openTicket} />
           </div>
+
+          {productTagsConfigured && (
+            <BreakdownCard title="Top products" counts={data.products} accent="primary" onOpenTicket={openTicket} />
+          )}
         </>
       )}
 

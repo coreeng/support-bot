@@ -144,6 +144,7 @@ class SummaryControllerTest {
                 .andExpect(jsonPath("$.drivers[0].recent[0].timestamp").value("1970-01-01T00:00:00Z"))
                 .andExpect(jsonPath("$.knowledgeGaps[0].label").value("Build & CI"))
                 .andExpect(jsonPath("$.knowledgeGaps[0].count").value(2))
+                .andExpect(jsonPath("$.products[0].label").value("Alpha"))
                 .andExpect(jsonPath("$.summary.state").value("ready"))
                 .andExpect(jsonPath("$.summary.content").value("the prose"))
                 .andExpect(jsonPath("$.summary.progress").doesNotExist());
@@ -196,7 +197,8 @@ class SummaryControllerTest {
                 ImmutableList.of(),
                 ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("Build & CI", 2)),
                 ImmutableList.of(),
-                ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("team-a", 3)));
+                ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("team-a", 3)),
+                ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("Alpha", 1)));
         when(summaryService.get(any(), any()))
                 .thenReturn(new SummaryService.SummaryResult(
                         breakdowns, new SummaryState.Ready("the prose", "model-a", Instant.EPOCH)));

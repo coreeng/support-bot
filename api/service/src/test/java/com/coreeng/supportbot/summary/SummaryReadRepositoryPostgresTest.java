@@ -176,7 +176,8 @@ class SummaryReadRepositoryPostgresTest {
                 breakdowns.categories(),
                 breakdowns.knowledgeGaps(),
                 breakdowns.features(),
-                breakdowns.teams())) {
+                breakdowns.teams(),
+                breakdowns.products())) {
             assertThat(counts).allSatisfy(count -> assertThat(count.recent()).isNotEmpty());
         }
     }
@@ -187,6 +188,32 @@ class SummaryReadRepositoryPostgresTest {
                 .findFirst()
                 .map(SummaryCount::recent)
                 .orElse(ImmutableList.of());
+    }
+
+    @Test
+    void productsComeFromProductTagsCountedOncePerTicket() {
+        long alphaOnly = ticket("2026-03-10T09:00:00", "ts-alpha", "team-a");
+        long both = ticket("2026-03-11T09:00:00", "ts-both", "team-a");
+        long vaultOnly = ticket("2026-03-12T09:00:00", "ts-vault", "team-a");
+        classify(alphaOnly, "Knowledge Gap", "Build & CI", "ci", "Alpha reason.");
+        SummaryTestFixtures.tagTicket(jdbcTemplate, alphaOnly, "alpha", "Product - Alpha");
+        // Prefix matching is case-insensitive and accepts an en dash; two tags naming Alpha count once.
+        SummaryTestFixtures.tagTicket(jdbcTemplate, both, "alpha", "Product - Alpha");
+        SummaryTestFixtures.tagTicket(jdbcTemplate, both, "alpha-legacy", "product \u2013 Alpha");
+        SummaryTestFixtures.tagTicket(jdbcTemplate, both, "beta", "PRODUCT - Beta");
+        // Not products: an ordinary tag, and a label that is only the prefix.
+        SummaryTestFixtures.tagTicket(jdbcTemplate, vaultOnly, "vault", "Vault");
+        SummaryTestFixtures.tagTicket(jdbcTemplate, vaultOnly, "empty", "Product - ");
+
+        SummaryBreakdowns breakdowns = repository.breakdowns(WINDOW, PROMPT_ID, List.of(CHANNEL));
+
+        assertThat(breakdowns.products())
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("Alpha", 2L), tuple("Beta", 1L));
+        // Newest first, unclassified tickets included with a blank reason, no duplicate for the double tag.
+        assertThat(recentFor(breakdowns.products(), "Alpha"))
+                .extracting(SummaryTicketExample::ticketId, SummaryTicketExample::text)
+                .containsExactly(tuple(both, ""), tuple(alphaOnly, "Alpha reason."));
     }
 
     @Test

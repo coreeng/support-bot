@@ -31,6 +31,7 @@ public class SummaryMapper {
                 counts(breakdowns.knowledgeGaps()),
                 counts(breakdowns.features()),
                 counts(breakdowns.teams()),
+                counts(breakdowns.products()),
                 section(result.summary()));
     }
 

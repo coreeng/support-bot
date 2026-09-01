@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
  * @param knowledgeGaps the categories breakdown restricted to {@code Knowledge Gap} tickets — the
  *     knowledge-gaps page's widget, scoped to the window
  * @param teams breakdown over every ticket raised, so it sums to {@code totalTickets}
+ * @param products tickets per product tag ("Product - &lt;name&gt;"), one count per ticket per
+ *     product; empty when no ticket in the window carries one
  * @param summary the prose section, which carries its own state and never blocks the rest
  */
 public record SummaryUI(
@@ -32,6 +34,7 @@ public record SummaryUI(
         List<SummaryCountUI> knowledgeGaps,
         List<SummaryCountUI> features,
         List<SummaryCountUI> teams,
+        List<SummaryCountUI> products,
         SummarySectionUI summary) {
 
     /**
