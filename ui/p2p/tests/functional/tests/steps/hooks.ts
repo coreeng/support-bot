@@ -133,6 +133,16 @@ Before(async function (this: CustomWorld) {
     });
   });
 
+  // The sidebar asks for this on every page; unmocked it reaches the real backend, whose 401
+  // signs the mocked session out and bounces the scenario to /login.
+  await this.page.route("**/api/summary/enabled", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ enabled: false }),
+    });
+  });
+
   await this.page.route("**/api/registry", async (route) => {
     await route.fulfill({
       status: 200,
