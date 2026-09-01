@@ -585,7 +585,7 @@ export default function SupportSummaryPage() {
 
           <AtAGlanceCard data={data} />
 
-          <DriverBreakdownCard title="Why tenants got in touch" counts={data.drivers} onOpenTicket={openTicket} />
+          <DriverBreakdownCard title="Top Support Areas" counts={data.drivers} onOpenTicket={openTicket} />
 
           <BreakdownCard title="Top categories" counts={data.categories} accent="info" onOpenTicket={openTicket} />
 
@@ -598,8 +598,8 @@ export default function SupportSummaryPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <BreakdownCard title="Platform features asked about" counts={data.features} accent="success" onOpenTicket={openTicket} />
-            <BreakdownCard title="Teams raising the most" counts={data.teams} accent="purple" onOpenTicket={openTicket} />
+            <BreakdownCard title="Top Platform Features" counts={data.features} accent="success" onOpenTicket={openTicket} />
+            <BreakdownCard title="Top Teams" counts={data.teams} accent="purple" onOpenTicket={openTicket} />
           </div>
         </>
       )}
