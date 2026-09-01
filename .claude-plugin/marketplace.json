@@ -1,0 +1,20 @@
+{
+  "name": "coreeng",
+  "owner": {
+    "name": "coreeng",
+    "url": "https://github.com/coreeng"
+  },
+  "metadata": {
+    "description": "Claude Code plugins published from coreeng/support-bot"
+  },
+  "plugins": [
+    {
+      "name": "doc-tools",
+      "source": "./plugins/doc-tools",
+      "description": "doc-journeys and doc-run: consolidate scattered documentation into Diátaxis-typed site pages, with unattended reviewed runs. Repository specifics come from the consumer's .doc-settings/.",
+      "version": "0.1.0",
+      "category": "documentation",
+      "keywords": ["documentation", "diataxis", "docs-as-code"]
+    }
+  ]
+}
