@@ -29,7 +29,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache libstdc++=15.2.0-r2 \
+RUN apk add --no-cache libcrypto3=3.5.8-r0 \
+    libssl3=3.5.8-r0 \
+    libstdc++=15.2.0-r2 \
  && addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nextjs
 
