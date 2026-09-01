@@ -589,16 +589,18 @@ export default function SupportSummaryPage() {
 
           <BreakdownCard title="Top categories" counts={data.categories} accent="info" onOpenTicket={openTicket} />
 
-          <BreakdownCard title="Top knowledge gaps" counts={data.knowledgeGaps} accent="warning" onOpenTicket={openTicket} />
+          {/* Products sit beside knowledge gaps when configured; otherwise knowledge gaps take the row. */}
+          <div className={`grid grid-cols-1 gap-6 ${productTagsConfigured ? "lg:grid-cols-2" : ""}`}>
+            <BreakdownCard title="Top knowledge gaps" counts={data.knowledgeGaps} accent="warning" onOpenTicket={openTicket} />
+            {productTagsConfigured && (
+              <BreakdownCard title="Top products" counts={data.products} accent="primary" onOpenTicket={openTicket} />
+            )}
+          </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <BreakdownCard title="Platform features asked about" counts={data.features} accent="success" onOpenTicket={openTicket} />
             <BreakdownCard title="Teams raising the most" counts={data.teams} accent="purple" onOpenTicket={openTicket} />
           </div>
-
-          {productTagsConfigured && (
-            <BreakdownCard title="Top products" counts={data.products} accent="primary" onOpenTicket={openTicket} />
-          )}
         </>
       )}
 
