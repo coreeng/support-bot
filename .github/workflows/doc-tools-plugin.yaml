@@ -1,0 +1,35 @@
+---
+name: doc-tools plugin checks
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'plugins/doc-tools/**'
+      - '.claude-plugin/**'
+      - '.github/workflows/doc-tools-plugin.yaml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'plugins/doc-tools/**'
+      - '.claude-plugin/**'
+      - '.github/workflows/doc-tools-plugin.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: agnostic + layout
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Denylist — nothing consumer- or estate-specific in the plugin
+        run: plugins/doc-tools/scripts/check-agnostic.sh
+
+      - name: Layout — plugin-root paths resolve, agent names match, manifests valid
+        run: plugins/doc-tools/scripts/check-layout.sh
