@@ -17,6 +17,8 @@ export interface SummaryCount {
   count: number;
   /** Up to five of the newest tickets carrying this value, newest first. */
   recent: SummaryTicket[];
+  /** Teams only: the product (by product tag) this team's tickets most often carry. */
+  topProduct?: string;
 }
 
 /** Progress while the backfill classifies threads, then while the prose is generated. */

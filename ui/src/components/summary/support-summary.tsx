@@ -307,6 +307,7 @@ function BreakdownCard({
                       <h3 className="text-foreground truncate text-sm font-medium">{count.label}</h3>
                       <CountWithShare count={count.count} share={sharePercent(count.count, total)} />
                     </div>
+                    {count.topProduct && <p className="text-muted-foreground mt-0.5 truncate text-xs">Top product: {count.topProduct}</p>}
                     <div className={`mt-2 h-1.5 rounded-full ${colors.track} overflow-hidden`}>
                       <div
                         className={`h-full rounded-full ${colors.bar} transition-all duration-500 ease-out`}

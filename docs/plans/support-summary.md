@@ -74,7 +74,8 @@ iterate together and update this doc as decisions land.
      View's rules; hidden, like that tab, when no product tags are configured.
    - Tenant leaderboard (which teams raise the most issues). Requested
      extension (epic comment): per team also show issue count and the most
-     frequent product/feature they ask about.
+     frequent product they ask about — done as a sub-line under each team,
+     from product tags.
 4. **Open question:** which widgets are part of the LLM "Analysis" output vs.
    plain aggregations rendered directly from classifier data. Not decided —
    likely only the prose summary/trends needs the LLM; the ranked breakdowns

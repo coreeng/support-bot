@@ -40,7 +40,8 @@ public class SummaryMapper {
                 .map(count -> new SummaryCountUI(
                         count.label(),
                         count.count(),
-                        count.recent().stream().map(SummaryMapper::ticket).toList()))
+                        count.recent().stream().map(SummaryMapper::ticket).toList(),
+                        count.topProduct()))
                 .toList();
     }
 

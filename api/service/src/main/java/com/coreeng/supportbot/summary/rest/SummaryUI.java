@@ -41,8 +41,14 @@ public record SummaryUI(
      * One bar of a ranked breakdown.
      *
      * @param recent up to five of the newest tickets carrying this value, newest first
+     * @param topProduct teams only: the product this team's tickets most often carry; absent otherwise
      */
-    public record SummaryCountUI(String label, long count, List<SummaryTicketUI> recent) {}
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record SummaryCountUI(
+            String label,
+            long count,
+            List<SummaryTicketUI> recent,
+            @Nullable String topProduct) {}
 
     /**
      * @param ticketId the ticket, as a string to match the rest of the UI's ticket handling

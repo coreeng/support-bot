@@ -248,6 +248,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
 
         return toCounts(
                 rows,
+                topProductByTeam(label, window, channelIds),
                 recentBy(
                         label,
                         j -> j.leftJoin(ANALYSIS).on(analysisJoin(promptId)),
@@ -265,7 +266,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
     private ImmutableList<SummaryCount> countByProduct(
             SummaryWindow window, String promptId, Collection<String> channelIds) {
         Field<String> label = productName();
-        Condition isProduct = TAG.LABEL.likeRegex(inline(PRODUCT_TAG_PREFIX)).and(label.ne(inline("")));
+        Condition isProduct = isProductTag(label);
 
         Result<Record2<String, Integer>> rows = dsl.select(label, countDistinct(TICKET.ID))
                 .from(QUERY)
@@ -290,9 +291,47 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
         return toCounts(rows, recentBy(label, viaProductTag, isProduct, window, channelIds));
     }
 
+    /**
+     * Each team's most-tagged product in the window, for the sub-line under the team's name. Ties
+     * break alphabetically; a team none of whose tickets carries a product tag is absent.
+     */
+    private ImmutableMap<String, String> topProductByTeam(
+            Field<String> team, SummaryWindow window, Collection<String> channelIds) {
+        Field<String> product = productName();
+        Field<Integer> tickets = countDistinct(TICKET.ID);
+
+        Map<String, String> top = new LinkedHashMap<>();
+        dsl.select(team, product, tickets)
+                .from(QUERY)
+                .join(TICKET)
+                .on(TICKET.QUERY_ID.eq(QUERY.ID))
+                .join(TICKET_TO_TAG)
+                .on(TICKET_TO_TAG.TICKET_ID.eq(TICKET.ID))
+                .join(TAG)
+                .on(TAG.CODE.eq(TICKET_TO_TAG.TAG_CODE))
+                .where(inWindow(window, channelIds))
+                .and(isProductTag(product))
+                .groupBy(team, product)
+                .orderBy(team.asc(), tickets.desc(), product.asc())
+                .fetch()
+                .forEach(row -> {
+                    String key = row.value1();
+                    String name = row.value2();
+                    if (key != null && name != null) {
+                        top.putIfAbsent(key, name);
+                    }
+                });
+        return ImmutableMap.copyOf(top);
+    }
+
     /** The product a tag names: its label with the "Product - " prefix removed. Inlined for GROUP BY, as in {@link #bucketed}. */
     private static Field<String> productName() {
         return trim(regexpReplaceFirst(TAG.LABEL, inline(PRODUCT_TAG_PREFIX), inline("")));
+    }
+
+    /** Whether the joined tag is a product tag: prefixed label with a non-empty product name. */
+    private static Condition isProductTag(Field<String> productName) {
+        return TAG.LABEL.likeRegex(inline(PRODUCT_TAG_PREFIX)).and(productName.ne(inline("")));
     }
 
     /** How a breakdown reaches its examples from {@code query ⋈ ticket}: which tables to add and whether analysis is required. */
@@ -361,12 +400,23 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
 
     private static ImmutableList<SummaryCount> toCounts(
             Result<Record2<String, Integer>> rows, ImmutableMap<String, ImmutableList<SummaryTicketExample>> recent) {
+        return toCounts(rows, ImmutableMap.of(), recent);
+    }
+
+    private static ImmutableList<SummaryCount> toCounts(
+            Result<Record2<String, Integer>> rows,
+            ImmutableMap<String, String> topProduct,
+            ImmutableMap<String, ImmutableList<SummaryTicketExample>> recent) {
         ImmutableList.Builder<SummaryCount> counts = ImmutableList.builder();
         for (Record2<String, Integer> row : rows) {
             String label = row.value1();
             Integer count = row.value2();
             if (label != null && count != null) {
-                counts.add(new SummaryCount(label, count.longValue(), recent.getOrDefault(label, ImmutableList.of())));
+                counts.add(new SummaryCount(
+                        label,
+                        count.longValue(),
+                        recent.getOrDefault(label, ImmutableList.of()),
+                        topProduct.get(label)));
             }
         }
         return counts.build();

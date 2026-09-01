@@ -145,6 +145,8 @@ class SummaryControllerTest {
                 .andExpect(jsonPath("$.knowledgeGaps[0].label").value("Build & CI"))
                 .andExpect(jsonPath("$.knowledgeGaps[0].count").value(2))
                 .andExpect(jsonPath("$.products[0].label").value("Alpha"))
+                .andExpect(jsonPath("$.teams[0].topProduct").value("Alpha"))
+                .andExpect(jsonPath("$.drivers[0].topProduct").doesNotExist())
                 .andExpect(jsonPath("$.summary.state").value("ready"))
                 .andExpect(jsonPath("$.summary.content").value("the prose"))
                 .andExpect(jsonPath("$.summary.progress").doesNotExist());
@@ -197,7 +199,8 @@ class SummaryControllerTest {
                 ImmutableList.of(),
                 ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("Build & CI", 2)),
                 ImmutableList.of(),
-                ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("team-a", 3)),
+                ImmutableList.of(
+                        new com.coreeng.supportbot.summary.SummaryCount("team-a", 3, ImmutableList.of(), "Alpha")),
                 ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("Alpha", 1)));
         when(summaryService.get(any(), any()))
                 .thenReturn(new SummaryService.SummaryResult(

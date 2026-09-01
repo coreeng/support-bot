@@ -84,11 +84,11 @@ public class LlmSummaryService {
             return;
         }
         for (SummaryCount count : counts) {
-            report.append("- ")
-                    .append(count.label())
-                    .append(": ")
-                    .append(count.count())
-                    .append('\n');
+            report.append("- ").append(count.label()).append(": ").append(count.count());
+            if (count.topProduct() != null) {
+                report.append(" (top product: ").append(count.topProduct()).append(')');
+            }
+            report.append('\n');
         }
     }
 }

@@ -194,7 +194,7 @@ class SummaryReadRepositoryPostgresTest {
     void productsComeFromProductTagsCountedOncePerTicket() {
         long alphaOnly = ticket("2026-03-10T09:00:00", "ts-alpha", "team-a");
         long both = ticket("2026-03-11T09:00:00", "ts-both", "team-a");
-        long vaultOnly = ticket("2026-03-12T09:00:00", "ts-vault", "team-a");
+        long vaultOnly = ticket("2026-03-12T09:00:00", "ts-vault", "team-b");
         classify(alphaOnly, "Knowledge Gap", "Build & CI", "ci", "Alpha reason.");
         SummaryTestFixtures.tagTicket(jdbcTemplate, alphaOnly, "alpha", "Product - Alpha");
         // Prefix matching is case-insensitive and accepts an en dash; two tags naming Alpha count once.
@@ -214,6 +214,11 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(recentFor(breakdowns.products(), "Alpha"))
                 .extracting(SummaryTicketExample::ticketId, SummaryTicketExample::text)
                 .containsExactly(tuple(both, ""), tuple(alphaOnly, "Alpha reason."));
+        // Each team's most-tagged product (Alpha 2 vs Beta 1 for team-a); none for a team without product tags.
+        assertThat(breakdowns.teams())
+                .extracting(SummaryCount::label, SummaryCount::topProduct)
+                .containsExactly(tuple("team-a", "Alpha"), tuple("team-b", null));
+        assertThat(breakdowns.products()).extracting(SummaryCount::topProduct).containsOnlyNulls();
     }
 
     @Test
