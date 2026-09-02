@@ -11,6 +11,7 @@ import { PRESET_DAYS } from "@/lib/dateRange";
 import { useRegistry, useSummary } from "@/lib/hooks";
 import { enumValidator, isoDateValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
 import type { SummaryCount, SummaryData, SummarySection } from "@/lib/types/summary";
+import { windowEndingYesterday } from "@/lib/utils/summary-window";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Eye } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
@@ -27,20 +28,6 @@ const PRESET_LABELS: Record<SummaryPreset, string> = {
   lastMonth: "Last month",
   custom: "Custom range",
 };
-
-const toDateString = (date: Date): string => date.toISOString().split("T")[0];
-
-/**
- * A window of `days` inclusive days ending yesterday — today is unfinished, and excluding it
- * keeps the window (and so the cached summary) stable for the whole day.
- */
-function windowEndingYesterday(days: number): { from: string; to: string } {
-  const end = new Date();
-  end.setDate(end.getDate() - 1);
-  const start = new Date(end);
-  start.setDate(end.getDate() - (days - 1));
-  return { from: toDateString(start), to: toDateString(end) };
-}
 
 function formatGeneratedAt(timestamp: string): string {
   const parsed = new Date(timestamp);

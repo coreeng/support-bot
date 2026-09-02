@@ -1,4 +1,5 @@
-import { backendFetch, errorResponse, unauthorizedResponse } from "../_lib/backend-fetch";
+import { backendErrorResponse } from "../_lib/backend-error";
+import { backendFetch, unauthorizedResponse } from "../_lib/backend-fetch";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {
-    return errorResponse(`Backend error: ${response.status}`, response.status);
+    return backendErrorResponse(response);
   }
 
   const data = await response.json();
