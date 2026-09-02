@@ -31,5 +31,15 @@ jobs:
       - name: Denylist — nothing consumer- or estate-specific in the plugin
         run: plugins/doc-tools/scripts/check-agnostic.sh
 
-      - name: Layout — plugin-root paths resolve, agent names match, manifests valid
+      - name: Layout — skill-relative paths resolve, agent prompts match, manifests and frontmatter valid
         run: plugins/doc-tools/scripts/check-layout.sh
+
+      - name: Agent Skills spec — gh skill publish dry run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh skill --help >/dev/null 2>&1; then
+            gh skill publish --dry-run .
+          else
+            echo "gh skill not available in this gh version; skipping"
+          fi

@@ -5,7 +5,7 @@ description: Where authored pages are written, the directory and section structu
 
 # Output layout
 
-Authored pages are written into the consumer's documentation site. This file is authoritative on the **shape** of the output — structure, invariants, provenance schema, report rules. The **site facts** — where the output root is, what the site's frontmatter fields are called, which template tags exist, the numeric Weight table, how the site builds — live in the consumer's **site adapter**, the file named by `output` in `.doc-settings/settings.md` (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/settings.md`). Load both together; neither is complete alone.
+Authored pages are written into the consumer's documentation site. This file is authoritative on the **shape** of the output — structure, invariants, provenance schema, report rules. The **site facts** — where the output root is, what the site's frontmatter fields are called, which template tags exist, the numeric Weight table, how the site builds — live in the consumer's **site adapter**, the file named by `output` in `.doc-settings/settings.md` (`${CLAUDE_SKILL_DIR}/references/settings.md`). Load both together; neither is complete alone.
 
 It replaces three sections of `SKILL.md`: *Output root resolution*, *Naming and collisions*, and Step 5 *Frontmatter injection rules*.
 
@@ -28,9 +28,9 @@ Their titles and Weights are in the site adapter. Products sort first because a 
 
 Run reports go **inside** the content directory, to `reports_dir` (under the output root). See *The reports section* below — it renders them as pages, deliberately, so they can be read alongside the output they describe. This reverses an earlier rule that kept them outside the content directory; the reasoning for the reversal, and the constraints it brings, are in that section.
 
-Sidecar proposals are the exception and stay **outside** the content tree, at `proposals_root`. A proposal is draft page content rather than a diagnostic, so publishing one would put a second version of a real page on the site with nothing to distinguish it. See `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/refresh.md`.
+Sidecar proposals are the exception and stay **outside** the content tree, at `proposals_root`. A proposal is draft page content rather than a diagnostic, so publishing one would put a second version of a real page on the site with nothing to distinguish it. See `${CLAUDE_SKILL_DIR}/references/refresh.md`.
 
-Nothing outside `write_locations` is created, edited, moved, or deleted — including everything under `prior_art_roots`, which the skill reads for prior art (per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md`) but never touches.
+Nothing outside `write_locations` is created, edited, moved, or deleted — including everything under `prior_art_roots`, which the skill reads for prior art (per `${CLAUDE_SKILL_DIR}/references/source-discovery.md`) but never touches.
 
 ### Site constraints to be aware of
 
@@ -81,10 +81,10 @@ The four type sections are the **Diátaxis buckets**: every page a product carri
 Rules:
 
   * Every directory that contains pages **must** have an `_index.md`. A section without one renders with an empty title and breaks the navigation.
-  * **A bucket is created only when there are pages to put in it.** Never create an empty section with a placeholder index. An unfilled bucket is reported as a gap per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/gap-analysis.md`, and that is the correct outcome — a stub would look like coverage and would be flagged as `hollow` by the skill's own quality check.
+  * **A bucket is created only when there are pages to put in it.** Never create an empty section with a placeholder index. An unfilled bucket is reported as a gap per `${CLAUDE_SKILL_DIR}/references/gap-analysis.md`, and that is the correct outcome — a stub would look like coverage and would be flagged as `hollow` by the skill's own quality check.
   * Journey directories are always created — every journey in the product definition gets one, even if only `_index.md` and one how-to land in it.
-  * If a journey produced no pages at all because no evidence was found (per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`), create **no directory** for it. Record it as `missing` in the report instead.
-  * A product with no brief still gets `<product>/_index.md`, navigation-only. See `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`.
+  * If a journey produced no pages at all because no evidence was found (per `${CLAUDE_SKILL_DIR}/references/authoring.md`), create **no directory** for it. Record it as `missing` in the report instead.
+  * A product with no brief still gets `<product>/_index.md`, navigation-only. See `${CLAUDE_SKILL_DIR}/references/authoring.md`.
   * **`cross-product-journeys/` is created only when at least one cross-product journey produced pages.** A definition with no such journeys, or whose journeys all found too little evidence to write, gets no section at all — not an empty one. The same no-stub rule that governs buckets governs the whole section.
   * A cross-product journey directory contains exactly two files: `_index.md` and its spine page. It carries **no buckets and no variations**. Buckets are a product-level organising device, and a journey whose job is to route readers to other pages has nothing to put in them. If a cross-product journey seems to need a variation, it is two journeys or it is a product journey.
 
@@ -191,7 +191,7 @@ Check before writing, with the command the site adapter gives (typically a searc
 
 ### What stays outside
 
-**Sidecar proposals** (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/refresh.md`) are written to `proposals_root`, outside the content tree, and are **not** published. A proposal is a draft of a real page, not a diagnostic about one. Publishing it would put a second copy of a page on the site with nothing marking which is current, which is the duplication failure the skill exists to avoid. The report links to a proposal by repository path, not by URL.
+**Sidecar proposals** (`${CLAUDE_SKILL_DIR}/references/refresh.md`) are written to `proposals_root`, outside the content tree, and are **not** published. A proposal is a draft of a real page, not a diagnostic about one. Publishing it would put a second copy of a page on the site with nothing marking which is current, which is the duplication failure the skill exists to avoid. The report links to a proposal by repository path, not by URL.
 
 ## Slugs
 
@@ -202,9 +202,9 @@ Directory and file names are slugged: lowercase, ASCII, dash-separated, punctuat
   * Variation slug — from the variation string verbatim. `cron-job` → `cron-job.md`.
   * Cross-product journey slug — the same rule as a journey slug. `Expose a service to users` → `expose-a-service-to-users`.
 
-Collisions cannot occur, because `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md` rule 6 rejects duplicate journey names **across the whole definition** — every product's journeys and every cross-product journey share one namespace. If two journeys slug to the same value, that is an input defect: stop and report it rather than disambiguating silently.
+Collisions cannot occur, because `${CLAUDE_SKILL_DIR}/references/product-definition.md` rule 6 rejects duplicate journey names **across the whole definition** — every product's journeys and every cross-product journey share one namespace. If two journeys slug to the same value, that is an input defect: stop and report it rather than disambiguating silently.
 
-Note that this guarantees only that no two journeys share a *name*. It says nothing about two journeys covering the same *ground*, which is expected between the two sections and is handled after authoring by `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/duplication.md`.
+Note that this guarantees only that no two journeys share a *name*. It says nothing about two journeys covering the same *ground*, which is expected between the two sections and is handled after authoring by `${CLAUDE_SKILL_DIR}/references/duplication.md`.
 
 ## Weight ordering
 
@@ -219,7 +219,7 @@ The site orders its navigation by a weight field within each section. **Assign i
 
 Two blocks, with the generation notice as the first line of the body **below** them.
 
-The notice must never precede the opening `---`. Most generators only parse front matter that starts on line 1, so a comment above it discards the title, the weight, and the entire `doc_journeys` block. See `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`.
+The notice must never precede the opening `---`. Most generators only parse front matter that starts on line 1, so a comment above it discards the title, the weight, and the entire `doc_journeys` block. See `${CLAUDE_SKILL_DIR}/references/authoring.md`.
 
 The site's standard fields — title, summary, tags, weight, aliases — use **the site's own names and casing**, which the site adapter records (the examples below use one common convention, capitalised `Title`/`Summary`/`Tags`/`Weight`/`Aliases`; use whatever the adapter says). Skill-specific provenance is namespaced under a lowercase `doc_journeys` key so it cannot collide with a site or theme field now or later.
 
@@ -277,16 +277,16 @@ doc_journeys:
 | aliases | No | Only when this page supersedes a known URL. Do not invent aliases. |
 | `doc_journeys.product` | Pages under `products/` | The resolved `product_name`, identical across every page of a product's run. **Omitted entirely on cross-product journey pages**, which carry `products` instead. |
 | `doc_journeys.products` | Cross-product journey pages | The products the journey crosses — in declared order where declared, in descending evidence weight where derived. Never emitted alongside `product` — a page has one or the other, so a consumer can tell the two kinds apart without parsing its path. |
-| `doc_journeys.products_resolution` | Cross-product journey pages | `declared` or `derived`, per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md`. Without it a later run cannot tell whether the list above is a human's editorial decision — which it must preserve — or a computed result it should recompute, and the two demand opposite treatment. |
+| `doc_journeys.products_resolution` | Cross-product journey pages | `declared` or `derived`, per `${CLAUDE_SKILL_DIR}/references/source-discovery.md`. Without it a later run cannot tell whether the list above is a human's editorial decision — which it must preserve — or a computed result it should recompute, and the two demand opposite treatment. |
 | `doc_journeys.products_inclusion` | Cross-product journey pages, when the list was derived | One entry per **included** product carrying `slug`, `confidence`, `share` and `attributed_by`. Excluded products live in the report, not in frontmatter: the page records what it is, and the report records what was considered. |
 | `doc_journeys.cross_product` | Cross-product journey pages | Always `true` where present; omitted rather than set to `false` on product pages. Redundant with `products` by construction, and worth carrying anyway: it is the field a query filters on, and it survives someone later allowing a single-product entry in the list. |
 | `doc_journeys.journey` | Journey pages only | The journey `name`. Present on both product journey and cross-product journey pages; omitted on product-level pages. |
-| `doc_journeys.spine` | Journey pages only | The journey's resolved `spine` — `how-to`, `tutorial`, or `explanation`. Always equal to `diataxis_type` on the spine page itself; recorded separately because `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/gap-analysis.md` counts coverage against the *declared* spine, and a page whose two values disagree is a defect worth being able to see. |
+| `doc_journeys.spine` | Journey pages only | The journey's resolved `spine` — `how-to`, `tutorial`, or `explanation`. Always equal to `diataxis_type` on the spine page itself; recorded separately because `${CLAUDE_SKILL_DIR}/references/gap-analysis.md` counts coverage against the *declared* spine, and a page whose two values disagree is a defect worth being able to see. |
 | `doc_journeys.routes_to` | Cross-product journey pages, when declared | The product journeys this one hands off to. Each entry carries `journey` and the `path` it resolved to, so a later run can detect a target that has since been renamed or removed. |
 | `doc_journeys.variation` | Variation how-tos only | Omitted when the journey has no variations. |
 | `doc_journeys.diataxis_type` | Yes | One of `tutorial`, `how-to`, `reference`, `explanation`. |
-| `doc_journeys.audience_tier` | Yes | `end-user` for journey pages, `builder/maintainer` for product-level pages, per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/audience-tagging.md`. |
-| `doc_journeys.confidence` | Yes | `high` / `medium` / `low`, computed by the rubric in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md`. Never assigned by feel. |
+| `doc_journeys.audience_tier` | Yes | `end-user` for journey pages, `builder/maintainer` for product-level pages, per `${CLAUDE_SKILL_DIR}/references/audience-tagging.md`. |
+| `doc_journeys.confidence` | Yes | `high` / `medium` / `low`, computed by the rubric in `${CLAUDE_SKILL_DIR}/references/source-discovery.md`. Never assigned by feel. |
 | `doc_journeys.generated` | Yes | Always `true`. Records that the skill authored this page originally. It does **not** indicate whether a human has since edited it — `content_hash` is what answers that. |
 | `doc_journeys.generated_at` | Yes | ISO date of the run that last wrote the page. |
 | `doc_journeys.generated_by` | Yes | The model that authored it. Lets a later run force-refresh output produced by an older model. |
@@ -295,7 +295,7 @@ doc_journeys:
 
 Every row above applies to **content pages** — the pages authored from sources. Section furniture carries none of it: the top-level indexes under *Output root*, and the per-product bucket indexes under *Bucket sections* below, carry title, summary and weight alone. A bucket index with no `doc_journeys:` block is correct output, not a page that lost its provenance.
 | `doc_journeys.sources` | Yes | Same files, same order, as the page's `## Sources` section. Never empty — a page with no sources should not have been written. Each entry carries `repo_head`, the source repo's HEAD SHA at generation time, so a later run can ask git exactly what changed. |
-| `doc_journeys.corroborated_by` | When corroboration exists | Code, manifests, CRDs, schemas, Helm values and tests that **confirm** what a prose source claimed. These are not sources — nothing on the page may be written from them — but they are what lifts a page's confidence and what detects a prose source having gone stale. Same `repo`/`path`/`repo_head` shape as `sources`, with `confirms` naming the claim rather than `contributed`. See the strict provenance rule in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`. |
+| `doc_journeys.corroborated_by` | When corroboration exists | Code, manifests, CRDs, schemas, Helm values and tests that **confirm** what a prose source claimed. These are not sources — nothing on the page may be written from them — but they are what lifts a page's confidence and what detects a prose source having gone stale. Same `repo`/`path`/`repo_head` shape as `sources`, with `confirms` naming the claim rather than `contributed`. See the strict provenance rule in `${CLAUDE_SKILL_DIR}/references/authoring.md`. |
 | `doc_journeys.brief` | Product-level pages, when a brief exists | The brief's `source` and `captured` date, so a reader can see how old the product description is. Omitted entirely on an unbriefed product's navigation-only page. |
 | `doc_journeys.prior_art` | When hits exist | Existing pages under `prior_art_roots` covering the same ground, with `overlap` of `full` or `partial`. |
 | `doc_journeys.reviewed` | When a human signs off | `by`, `at`, and `at_content_hash`. Added by a human, never by the skill. When `at_content_hash` no longer matches `content_hash`, the page has been regenerated since review and is reported as needing re-review. |
@@ -310,7 +310,7 @@ title field, so two pages sharing one produces a parent and child with the same 
 cannot tell which is which, and neither page can tell them.
 
 This is the same rule as the global journey-name uniqueness check in
-`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md` rule 6, applied one level down. That check compares journeys
+`${CLAUDE_SKILL_DIR}/references/product-definition.md` rule 6, applied one level down. That check compares journeys
 against each other and passes cleanly here, because there is only one journey; the collision is
 between two pages *of* it.
 
@@ -429,11 +429,11 @@ Note that `routes_to` may point at another **cross-product** journey, as the arc
 
 Bucket sections are **section furniture**, like the top-level indexes above: created when a bucket first has pages, then left alone. They carry title, summary and weight and **no `doc_journeys:` block** — no `content_hash`, no `sources`, no `confidence`. That is deliberate, not an omission. A bucket index has no evidence behind it: its body is one orienting sentence and a template tag, its child list is computed by the site at render time, and there is nothing a refresh could recompute from changed sources. Emitting the block would mean inventing a `sources` list for a page whose own rule is that sources are never empty.
 
-The consequence is that `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/refresh.md`'s missing-`content_hash` rule — absent hash means treat as human-edited and never overwrite — reads as freezing these pages. It is not a defect and needs no repair. Their content is fixed by this template rather than by any source, so a refresh has no reason to touch them. The one case that does need a human is a change to the template itself: if the orienting sentence or the template tag call changes here, existing bucket indexes will not pick it up on any refresh and must be updated deliberately. Say so in the run report when it happens rather than working around the rule.
+The consequence is that `${CLAUDE_SKILL_DIR}/references/refresh.md`'s missing-`content_hash` rule — absent hash means treat as human-edited and never overwrite — reads as freezing these pages. It is not a defect and needs no repair. Their content is fixed by this template rather than by any source, so a refresh has no reason to touch them. The one case that does need a human is a change to the template itself: if the orienting sentence or the template tag call changes here, existing bucket indexes will not pick it up on any refresh and must be updated deliberately. Say so in the run report when it happens rather than working around the rule.
 
 ## Re-runs
 
-Re-running for the same product does **not** blindly overwrite its pages. Which pages change, and how, is decided per page by `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/refresh.md` — load it whenever the target already has pages under `products/<product-slug>/` or under `cross-product-journeys/<journey-slug>/`, in any mode. Cross-product pages are ordinary generated pages: they carry a `content_hash`, they are protected from overwrite once a human edits them, and they are left untouched when their evidence has not changed.
+Re-running for the same product does **not** blindly overwrite its pages. Which pages change, and how, is decided per page by `${CLAUDE_SKILL_DIR}/references/refresh.md` — load it whenever the target already has pages under `products/<product-slug>/` or under `cross-product-journeys/<journey-slug>/`, in any mode. Cross-product pages are ordinary generated pages: they carry a `content_hash`, they are protected from overwrite once a human edits them, and they are left untouched when their evidence has not changed.
 
 The short version:
 

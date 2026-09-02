@@ -16,7 +16,7 @@ If `journeys = []` was resolved during the input step, **skip this entire step**
 - The page's Diátaxis verdict from the classification step.
 
 **Per-run input (cached):**
-- The resolved `journeys` list from `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md`. Each journey has `name`, optional `description`, `users`, `feature`, `variations`.
+- The resolved `journeys` list from `${CLAUDE_SKILL_DIR}/references/product-definition.md`. Each journey has `name`, optional `description`, `users`, `feature`, `variations`.
 
 **Per-page output:** a list of journey-relevance records.
 
@@ -150,7 +150,7 @@ Placed in the exec block of REPORT.md, immediately after Coverage analysis and b
 
 The section contains two parts:
 
-**Part A — Per-journey page counts, weighting comparison, topic coverage, and page index.** The original counts table is now **Part A1**: one row per journey from the input list, columns `journey | tutorial | how-to | reference | explanation | total`. The count includes both strong and weak matches; weak counts may optionally be shown in parentheses, e.g. `5 (2 weak)`. When `product-definition/weightings.md` was resolved per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/weightings.md`, A1 is followed by **Part A2** (per-journey weighting comparison) and **Part A3** (per-type mix within each journey); see that reference file for column specs and the apportionment formula. **Part A4** (per-journey topic coverage) always follows when `journeys` is non-empty, per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/topic-coverage.md` — this part is mandatory and is emitted independently of whether weightings were resolved. **Part A5** (per-journey page index) always follows A4 when `journeys` is non-empty.
+**Part A — Per-journey page counts, weighting comparison, topic coverage, and page index.** The original counts table is now **Part A1**: one row per journey from the input list, columns `journey | tutorial | how-to | reference | explanation | total`. The count includes both strong and weak matches; weak counts may optionally be shown in parentheses, e.g. `5 (2 weak)`. When `product-definition/weightings.md` was resolved per `${CLAUDE_SKILL_DIR}/references/weightings.md`, A1 is followed by **Part A2** (per-journey weighting comparison) and **Part A3** (per-type mix within each journey); see that reference file for column specs and the apportionment formula. **Part A4** (per-journey topic coverage) always follows when `journeys` is non-empty, per `${CLAUDE_SKILL_DIR}/references/topic-coverage.md` — this part is mandatory and is emitted independently of whether weightings were resolved. **Part A5** (per-journey page index) always follows A4 when `journeys` is non-empty.
 
 The counts in Part A1 MUST equal the count of pages in REPORT.md Sections 8 (Copied verbatim) and 9 (Rewritten) tagged with this journey, broken down by Diátaxis type. See the "Cross-section consistency invariants" section in `SKILL.md` — A1 is bound by invariant 2 there, A2/A3 by invariant 5, A5 by invariant 7. Mechanical counting only; no re-judgement of whether a tagged match "really counts".
 

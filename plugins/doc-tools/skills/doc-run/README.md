@@ -9,14 +9,14 @@ The defining property is that the run never stops to ask a question. Every decis
 ## Invocation
 
 ```
-/doc-tools:doc-run <documentation request>
+/doc-run <documentation request>          # /doc-tools:doc-run when installed as the plugin
 ```
 
 The argument is a plain-language documentation request, passed to `doc-journeys` verbatim. It names one of:
 
-  * **a product** — `/doc-tools:doc-run document Foglight`
-  * **a journey under a product** — `/doc-tools:doc-run document the "Archive telemetry" journey for Foglight`
-  * **a cross-product journey** — `/doc-tools:doc-run document the cross-product journey "Observe a service end to end"`
+  * **a product** — `/doc-run document Foglight`
+  * **a journey under a product** — `/doc-run document the "Archive telemetry" journey for Foglight`
+  * **a cross-product journey** — `/doc-run document the cross-product journey "Observe a service end to end"`
 
 The request's wording also carries the intent, using the same keywords `doc-journeys` recognises: `refresh`, `force` / `regenerate anyway`, `extend` / `only what is missing`, `plan`. Where the target already has pages and the wording is ambiguous, the pipeline defaults to **refresh** — the safe reading — and says so in the close-out.
 
@@ -50,20 +50,20 @@ The orchestrator authors nothing itself. It spawns one **builder** agent that ke
 
 2. **Resolve the request** — probe what already exists (declaration files, existing pages) and resolve the intent: author, refresh, force, or only-missing. A pre-run git baseline is captured so the builder's writes can later be told apart from anything pre-existing.
 
-3. **Plan** — spawn `doc-tools:doc-builder`, which runs `doc-journeys` up to its confirm-before-writing gate and returns the resolved inputs, the full page plan with per-page dispositions and confidence, any proposed declaration, and any open questions. It writes nothing yet.
+3. **Plan** — spawn `doc-builder`, which runs `doc-journeys` up to its confirm-before-writing gate and returns the resolved inputs, the full page plan with per-page dispositions and confidence, any proposed declaration, and any open questions. It writes nothing yet.
 
 4. **Plan gate (automatic)** — the orchestrator reviews the plan for internal consistency (mode matches intent, existing pages respected, no journey silently dropped, declarations schema-valid) and confirms it. Open questions get the conservative default answer, recorded for the close-out. Rule overrides are honoured only when the user's original request stated them.
 
 5. **Build** — the builder writes the confirmed declaration first, then pages, reports, and proposals, and returns a run manifest. The orchestrator cross-checks the manifest against `git status`: writes not in the manifest, or manifest entries not on disk, become findings; an unauthorised write under `product-definition/` stops the run.
 
-6. **Structural gate** — spawn `doc-tools:doc-structure-reviewer`: mechanical checks only — a full site build verified at render level, title collisions, stubs, frontmatter sanity, template tag escaping, report self-consistency. It gates the expensive reviews: shipped-severity page defects go back to the builder for one fix round before anything else runs. Report-only defects do not gate; they are batched into the later fix loop while the deep reviews proceed in parallel.
+6. **Structural gate** — spawn `doc-structure-reviewer`: mechanical checks only — a full site build verified at render level, title collisions, stubs, frontmatter sanity, template tag escaping, report self-consistency. It gates the expensive reviews: shipped-severity page defects go back to the builder for one fix round before anything else runs. Report-only defects do not gate; they are batched into the later fix loop while the deep reviews proceed in parallel.
 
 7. **Deep review (parallel)** — three independent, read-only reviewers spawned together:
-     * `doc-tools:doc-gap-auditor` — adversarially audits every claim of absence ("undocumented", "no prose found") by searching the whole source estate to refute it. Absence claims are the pipeline's historically weakest output.
-     * `doc-tools:doc-entity-verifier` — corroborates every entity that lives outside the repositories (Slack channels, group handles, DLs, URLs, named people), since a citation cannot prove such a thing still exists.
-     * `doc-tools:doc-routing-reviewer` — checks that pages route to existing documentation rather than restating it: reproduced commands, field lists, and self-contained duplicates that would drift silently.
+     * `doc-gap-auditor` — adversarially audits every claim of absence ("undocumented", "no prose found") by searching the whole source estate to refute it. Absence claims are the pipeline's historically weakest output.
+     * `doc-entity-verifier` — corroborates every entity that lives outside the repositories (Slack channels, group handles, DLs, URLs, named people), since a citation cannot prove such a thing still exists.
+     * `doc-routing-reviewer` — checks that pages route to existing documentation rather than restating it: reproduced commands, field lists, and self-contained duplicates that would drift silently.
 
-8. **Verify, then triage** — findings that would change published claims (refuted gaps, entity removals, content deletions) go to `doc-tools:doc-finding-verifier`, which tries to **overturn** each one by independent re-derivation. Survivors are triaged: builder-fixable findings, findings only a human can act on (wrong source content, definition gaps — acknowledged in the report, never applied), and overturned findings (kept for transparency).
+8. **Verify, then triage** — findings that would change published claims (refuted gaps, entity removals, content deletions) go to `doc-finding-verifier`, which tries to **overturn** each one by independent re-derivation. Survivors are triaged: builder-fixable findings, findings only a human can act on (wrong source content, definition gaps — acknowledged in the report, never applied), and overturned findings (kept for transparency).
 
 9. **Fix loop** — verified and mechanically-evidenced findings go to the builder, which applies them through the skill's own machinery (refresh rules, recomputed hashes) and records each under the report's `## Post-run corrections`. A delta-scoped structure re-run then spot-checks the fixes; one more round at most, after which anything still standing is named as unresolved rather than looped on.
 
@@ -84,10 +84,11 @@ The orchestrator authors nothing itself. It spawns one **builder** agent that ke
 | File | Role |
 | --- | --- |
 | `SKILL.md` | The orchestration pipeline — steps, gates, agent contracts, recovery paths, and rules |
+| `agents/doc-*.md` | The six agent prompt files, spawned as `general-purpose` subagents with the run context appended |
 
-The agents the pipeline spawns ship in the same plugin and are addressed by their namespaced names: `doc-tools:doc-builder`, `doc-tools:doc-structure-reviewer`, `doc-tools:doc-gap-auditor`, `doc-tools:doc-entity-verifier`, `doc-tools:doc-routing-reviewer`, `doc-tools:doc-finding-verifier`.
+The agents the pipeline spawns are prompt files under `agents/` in this skill, run as `general-purpose` subagents: `doc-builder`, `doc-structure-reviewer`, `doc-gap-auditor`, `doc-entity-verifier`, `doc-routing-reviewer`, `doc-finding-verifier`. Nothing has to be installed beyond the two skills.
 
-The plugin is installed either from a local checkout for development — `claude --plugin-dir <path>/plugins/doc-tools` — or from the `coreeng` marketplace declared in the consumer's `.claude/settings.json` (`extraKnownMarketplaces` + `enabledPlugins`); see the plugin README.
+Install either as the `doc-tools` Claude Code plugin (skills then appear as `/doc-tools:doc-run` and `/doc-tools:doc-journeys`) or as plain skills with `gh skill install coreeng/support-bot doc-run --agent claude-code` plus the same for `doc-journeys`; see the plugin README. doc-run requires `doc-journeys` installed beside it.
 
 ---
 
@@ -101,7 +102,7 @@ The pipeline is a natural fit for CI in one important way: it is already **unatt
 What a CI setup would need to provide:
 
   * **The full source estate on the runner.** The skill's source root is, by default, the parent directory of the consumer checkout, and discovery greps every sibling git repository. The job must clone all source repos side by side (full clones, not shallow — refresh compares recorded SHAs against history, and a shallow clone makes an unreachable SHA read as "evidence changed"). A nightly schedule with a mirror cache is more practical than cloning every repo per webhook.
-  * **A headless agent runtime.** The orchestration is executed by Claude Code, not by a shell script — the job runs something like `claude -p "/doc-tools:doc-run refresh where sources changed"` with API credentials, the skills and agent definitions installed, the consumer's `.doc-settings/` checked out, and the site's dependency directory present at the consumer root for the build. Budget accordingly: a full run with reviews is hours of wall-clock and a nontrivial token spend, which is another argument for the scheduled-refresh invocation that no-ops when nothing changed.
+  * **A headless agent runtime.** The orchestration is executed by Claude Code, not by a shell script — the job runs something like `claude -p "/doc-run refresh where sources changed"` with API credentials, the skills and agent definitions installed, the consumer's `.doc-settings/` checked out, and the site's dependency directory present at the consumer root for the build. Budget accordingly: a full run with reviews is hours of wall-clock and a nontrivial token spend, which is another argument for the scheduled-refresh invocation that no-ops when nothing changed.
   * **Delivery adapted to CI.** The current close-out deliberately does not push or open a PR — the user merges locally. A CI job would invert that: push `doc-run/<run-id>` and open a PR whose description is the close-out summary. The human gate stays exactly where the design puts it — on the merge — it just becomes PR review. The declaration-verbatim and decisions-taken material the close-out carries is precisely what the PR body should contain.
   * **Trigger and concurrency choices.** Per-push triggers across a large estate would stampede; a nightly or weekly schedule fits the change-detection model better. Runs should be serialised (or at least aware of each other): `catalogue.md` and shared section indexes are the known merge-conflict points between concurrent run branches.
   * **Scope control.** A batch refresh across every product is the obvious scheduled job, but per-product jobs (`refresh <product>`) keep diffs smaller and reviews shorter — and a failed product does not hold up the rest.

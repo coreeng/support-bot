@@ -12,7 +12,7 @@ skill or agent says "standing authorisation", it means an entry here. The run's 
 this file wherever it acted on one. `EDIT` every entry: strike what you do not grant, and the
 skills will stop where a run needs it.
 
-1. **Unattended runs.** `/doc-tools:doc-run` never asks the user anything mid-run. The
+1. **Unattended runs.** `/doc-run` never asks the user anything mid-run. The
    orchestrator auto-confirms plans and declarations, applies every verified finding, and records
    every decision in the close-out. **The human gate is reviewing and merging the run's branch.**
 

@@ -4,8 +4,8 @@
 # The plugin must not know who consumes it. Two denylists are grepped, case-insensitively, with a
 # word-boundary prefix so that e.g. "sky" does not match "risky":
 #
-#   estate terms — banned everywhere under plugins/doc-tools/, templates included
-#   site-generator terms — banned in the skill tree; templates/doc-settings/ may carry a clearly
+#   estate terms — banned everywhere under plugins/doc-tools/, the doc-settings starter included
+#   site-generator terms — banned in the skill tree; skills/doc-journeys/assets/doc-settings/ may carry a clearly
 #                          labelled example for one generator
 #
 # scripts/ is excluded: this file necessarily contains the terms. Uses grep and find only (no rg).
@@ -47,8 +47,8 @@ run_check() {
 }
 
 run_check "estate terms (whole plugin)" "$(join_pattern "${estate_terms[@]}")"
-run_check "site-generator terms (skill tree; templates/doc-settings exempt)" \
-  "$(join_pattern "${ssg_terms[@]}")" --exclude-dir=templates
+run_check "site-generator terms (skill tree; assets/doc-settings exempt)" \
+  "$(join_pattern "${ssg_terms[@]}")" --exclude-dir=doc-settings
 
 if [[ $status -ne 0 ]]; then
   echo

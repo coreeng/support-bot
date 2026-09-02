@@ -20,7 +20,7 @@ Four roots, used consistently across every reference file and every agent defini
 
 | Role | Meaning | Used for |
 | --- | --- | --- |
-| **plugin root** | `${CLAUDE_PLUGIN_ROOT}` — the doc-tools plugin's installation directory; in an orchestrated run, pinned verbatim in every spawn prompt | `SKILL.md`, `references/`, agent definitions |
+| **tools root** | the directory holding the `doc-journeys` and `doc-run` skill directories — `${CLAUDE_SKILL_DIR}/..` from either skill (the plugin's `skills/`, or `.claude/skills/` in a vendored install); in an orchestrated run, pinned verbatim in every spawn prompt | `SKILL.md`, `references/`, the agent prompt files under `doc-run/agents/` |
 | **consumer root** | the **main** checkout of the repository being documented | `.doc-settings/`, `node_modules` and anything else that is gitignored and therefore absent from a worktree |
 | **repo root** | the checkout content is read from and written to — in an orchestrated run, a worktree under the consumer's `worktree_dir` | `product-definition/`, every path in `settings.md` |
 | **source root** | per `source_root` in `settings.md` | discovery |
@@ -45,7 +45,7 @@ worktree was created from. When a spawn prompt supplies any of these paths, use 
 not guess an output root from the repository's layout, and do not proceed with defaults. The
 same posture applies as to a missing source root: a run that cannot find its settings would
 write somewhere nobody intended. Tell the user what the file is for and point them at the
-`${CLAUDE_PLUGIN_ROOT}/templates/doc-settings/` starter that ships with the plugin (or at another consumer's
+`${CLAUDE_SKILL_DIR}/assets/doc-settings/` starter that ships with the plugin (or at another consumer's
 `.doc-settings/` as a worked example).
 
 Legacy `audit` mode is the one exception — it classifies markdown in a single repository and
@@ -59,8 +59,8 @@ paths are relative to the **repo root**.
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `source_discovery` | filename | the **estate adapter**, loaded immediately after `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md`: source-root derivation, repo scope, prior-art location, always-add candidates, term-expansion vocabulary, known contact-point traps |
-| `output` | filename | the **site adapter**, loaded alongside `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/output.md`: output section and furniture, frontmatter conventions, template tags and marker syntax, the Weight table, build notes, house style |
+| `source_discovery` | filename | the **estate adapter**, loaded immediately after `${CLAUDE_SKILL_DIR}/references/source-discovery.md`: source-root derivation, repo scope, prior-art location, always-add candidates, term-expansion vocabulary, known contact-point traps |
+| `output` | filename | the **site adapter**, loaded alongside `${CLAUDE_SKILL_DIR}/references/output.md`: output section and furniture, frontmatter conventions, template tags and marker syntax, the Weight table, build notes, house style |
 | `authorisations` | filename | the standing authorisations an unattended run operates under — who granted what, when |
 | `output_root` | path | the one directory pages and reports are written under |
 | `reports_dir` | path | where run reports go; under `output_root` |
@@ -100,5 +100,5 @@ the key named.
 ## Repo-specific examples in this skill
 
 Where the reference files need a worked example they use **Foglight**, a fictional observability
-product introduced in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/examples.md`. Nothing about any real estate is encoded in the
+product introduced in `${CLAUDE_SKILL_DIR}/references/examples.md`. Nothing about any real estate is encoded in the
 skill; if you find something that is, it belongs in `.doc-settings/`.

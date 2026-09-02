@@ -30,7 +30,7 @@ This file defines the input data shape. Downstream steps consume the resolved va
 <repo root>/product-definition/
 ```
 
-That is the **consumer repository** — the one that holds `.doc-settings/` and the output root (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/settings.md`) — not the root of a repository being scanned. This skill draws from many repositories and writes to one, so the definition belongs with the output repository, version-controlled alongside the documentation it produces.
+That is the **consumer repository** — the one that holds `.doc-settings/` and the output root (`${CLAUDE_SKILL_DIR}/references/settings.md`) — not the root of a repository being scanned. This skill draws from many repositories and writes to one, so the definition belongs with the output repository, version-controlled alongside the documentation it produces.
 
 **In legacy `audit` mode**, the original behaviour applies: the skill looks for `product-definition/` at the root of the single repository being scanned.
 
@@ -88,7 +88,7 @@ Batch order is the order given in `catalogue.md` when present, otherwise alphabe
 
 - `product.md` — one file per run. Holds product-level metadata.
 - `journeys/` — a folder of one-file-per-journey markdown files. Slugs are arbitrary; the skill identifies a journey by the `name` field in its frontmatter, not by filename.
-- `weightings.md` — optional. Declares the ideal per-journey content weighting and per-Diátaxis-type mix used by the weighting analysis step. Schema, parsing rules, and behaviour when absent are defined in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/weightings.md`. The skill does not error if this file is missing.
+- `weightings.md` — optional. Declares the ideal per-journey content weighting and per-Diátaxis-type mix used by the weighting analysis step. Schema, parsing rules, and behaviour when absent are defined in `${CLAUDE_SKILL_DIR}/references/weightings.md`. The skill does not error if this file is missing.
 
 The skill MUST exclude `product-definition/**` from the documentation scan, regardless of include globs supplied by the user. Journey files and the weightings file are inputs to the skill, not documentation to classify.
 
@@ -106,7 +106,7 @@ Markdown document with YAML frontmatter. The body is free-text and is not parsed
 | `repos`    | No       | list of strings  | Source repo directory names this product owns. The **repo-to-product mapping**, used to attribute discovered evidence to products. See *Declaring which repos a product owns* below. |
 | `brief`    | No       | string           | Relative path to the brief, when it is not the default `brief.md`. |
 
-**`features` is load-bearing, not decorative.** `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md` Pass 0 builds the journey term set from every entry plus each of its tokens. Absent `features` produces a thinner term set, weaker discovery, and lower-confidence pages across **every journey under that product** — see *When a product has no brief* below. Where a brief exists, copy its feature list here in slug form rather than leaving the field empty; the brief's prose is not a substitute, because the term set needs stable tokens rather than sentences.
+**`features` is load-bearing, not decorative.** `${CLAUDE_SKILL_DIR}/references/source-discovery.md` Pass 0 builds the journey term set from every entry plus each of its tokens. Absent `features` produces a thinner term set, weaker discovery, and lower-confidence pages across **every journey under that product** — see *When a product has no brief* below. Where a brief exists, copy its feature list here in slug form rather than leaving the field empty; the brief's prose is not a substitute, because the term set needs stable tokens rather than sentences.
 
 Example:
 
@@ -122,9 +122,9 @@ brief: brief.md
 
 ## Declaring which repos a product owns
 
-`repos` is the only repo-to-product mapping in the definition, and nothing else can supply it. A product is an umbrella over several repositories; which repositories is a fact a human knows and no file in the estate states. `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/gap-analysis.md` Part D has always refused to infer it — "do not guess which product owns a repo from its name" — and that refusal stands. `repos` does not replace the refusal; it removes the need for it by letting a human declare the answer.
+`repos` is the only repo-to-product mapping in the definition, and nothing else can supply it. A product is an umbrella over several repositories; which repositories is a fact a human knows and no file in the estate states. `${CLAUDE_SKILL_DIR}/references/gap-analysis.md` Part D has always refused to infer it — "do not guess which product owns a repo from its name" — and that refusal stands. `repos` does not replace the refusal; it removes the need for it by letting a human declare the answer.
 
-It is consumed by the **product attribution pass** in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md`, which decides which products a cross-product journey actually crosses and with what confidence. Two consequences follow, and the second is the one that surprises people:
+It is consumed by the **product attribution pass** in `${CLAUDE_SKILL_DIR}/references/source-discovery.md`, which decides which products a cross-product journey actually crosses and with what confidence. Two consequences follow, and the second is the one that surprises people:
 
   * A repo named in no product's `repos` list is **unattributed**, not unassigned to the nearest plausible product. Its evidence still counts toward a page's confidence — it is real evidence — but it contributes to no product's inclusion score, and the run reports it. A large unattributed share is the signal that `repos` is incomplete.
   * Two products may legitimately claim the same repo. A shared config repo genuinely serves several products, and forcing an exclusive assignment would misrepresent it. Evidence from a repo claimed by *n* products contributes to each of them at `1/n` weight, so a shared repo cannot single-handedly pull a product into a journey.
@@ -183,7 +183,7 @@ So a brief may be cited for "Foglight does not store raw request bodies" and mus
 The product is still documented. Three things change:
 
   1. **The product page is navigation-only** — `<product>/_index.md` carries its title and journey index and nothing else. No "what it is", no feature table, no audiences. This follows the existing rule that `_index.md` files are navigation rather than content; the alternative is inventing a description, which the grounding contract forbids.
-  2. **The report records a product-level gap**, per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/gap-analysis.md`.
+  2. **The report records a product-level gap**, per `${CLAUDE_SKILL_DIR}/references/gap-analysis.md`.
   3. **Discovery degrades for every journey under that product**, because a product without a brief usually has no `features` either, and the term set is built from them. This is worth stating plainly in the report: a missing brief is not a cosmetic gap confined to one page, it measurably weakens every page produced for that product.
 
 Do not substitute a repository README for a brief. A README describes a component; a brief describes a product. Using one as the other produces a product page that describes whichever repo happened to rank highest, which is worse than an acknowledged gap because it looks like an answer.
@@ -198,7 +198,7 @@ Each file holds one journey. Markdown document with YAML frontmatter. The body i
 | `description` | No       | string           | One- or two-sentence description of the journey.                                                                                                                   |
 | `users`       | No       | list of strings  | The user(s) who perform this journey. Plain labels — e.g. `[end-user]`, `[platform-engineer, sre]`.                                                                |
 | `feature`     | No       | string           | The product feature this journey belongs to. **Must** match an entry in `product.md`'s `features` list; a mismatch is a warning, not an error — see below. |
-| `spine`       | No       | string           | The Diátaxis type of the journey's end-to-end page: `how-to` (default), `tutorial`, or `explanation`. See *Choosing a spine* in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`. |
+| `spine`       | No       | string           | The Diátaxis type of the journey's end-to-end page: `how-to` (default), `tutorial`, or `explanation`. See *Choosing a spine* in `${CLAUDE_SKILL_DIR}/references/authoring.md`. |
 | `variations`  | No       | list of strings  | Distinct paths through the same journey — e.g. `[dev, staging, prod]`, `[stateless, stateful, cron-job]`, `[linux, macos, windows]`. Variations are paths through one journey, not separate journeys. |
 
 **`feature` mismatches are now warned about.** They were previously ignored. Two things changed: `features` became load-bearing for the term set, and the product/feature split became something a human maintains in a source of record outside this repository. A journey tagged `feature: egress` under a product whose `features` omits `egress` is the visible symptom of a stale `product.md`, and it costs every journey under that product a weaker term set. Warn, record it in the report, and proceed — never reject the journey, and never silently add the feature to the product.
@@ -221,7 +221,7 @@ To deploy a workload the user needs a built image, a target environment, and cre
 
 ## Cross-product journeys
 
-A **cross-product journey** is one a reader completes by using several products together. It lives in `product-definition/cross-product-journeys/`, is owned by no product, and is published to its own top-level section — see `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/output.md`.
+A **cross-product journey** is one a reader completes by using several products together. It lives in `product-definition/cross-product-journeys/`, is owned by no product, and is published to its own top-level section — see `${CLAUDE_SKILL_DIR}/references/output.md`.
 
 It uses the journey schema above, with three differences:
 
@@ -243,7 +243,7 @@ The distinction is worth holding onto, because collapsing it in either direction
 
 ### Deriving the product list
 
-When `products` is absent, `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md` runs its **product attribution pass** and derives the list. The journey is published with the derived products, and the report carries a per-product inclusion confidence with the evidence behind it.
+When `products` is absent, `${CLAUDE_SKILL_DIR}/references/source-discovery.md` runs its **product attribution pass** and derives the list. The journey is published with the derived products, and the report carries a per-product inclusion confidence with the evidence behind it.
 
   * A product reaching inclusion confidence `high` or `medium` is **included**.
   * A product at `low` is **reported but excluded**, with its evidence, so a human can see what was considered and overrule it by declaring `products` explicitly.
@@ -256,7 +256,7 @@ When `products` **is** declared, the derivation still runs, purely to check it. 
 
 Both are findings for a human. The declared list still determines what is published, what `doc_journeys.products` records, and what the route's stages are attributed to.
 
-The skill still reports the evidence for a *scope* change — see *suspected mis-filing* in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/gap-analysis.md` — and still acts on it never.
+The skill still reports the evidence for a *scope* change — see *suspected mis-filing* in `${CLAUDE_SKILL_DIR}/references/gap-analysis.md` — and still acts on it never.
 
 ### These journeys orient; they do not restate
 
@@ -264,11 +264,11 @@ A cross-product journey exists because a reader has a goal and does not know whi
 
 This matters because the two journey lists overlap by design. "Expose a service to users" and "Expose an application to consumers outside the Kubernetes cluster" are the same ground at two levels of abstraction: one is wayfinding, one is the procedure. Written as two end-to-end procedures they compete, drift, and neither ends up authoritative. Written as a route plus a procedure they compose.
 
-The page contract is in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`; `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/duplication.md` checks that the restating failure mode did not happen.
+The page contract is in `${CLAUDE_SKILL_DIR}/references/authoring.md`; `${CLAUDE_SKILL_DIR}/references/duplication.md` checks that the restating failure mode did not happen.
 
 ### Discovery is not narrowed by ownership
 
-Declaring a journey under one product does **not** restrict discovery to that product's repositories. The funnel in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md` runs across every source repo for every journey regardless of ownership, and always has. What ownership affects is the *term set* — which is why a cross-product journey unions the features and briefs of all its declared products.
+Declaring a journey under one product does **not** restrict discovery to that product's repositories. The funnel in `${CLAUDE_SKILL_DIR}/references/source-discovery.md` runs across every source repo for every journey regardless of ownership, and always has. What ownership affects is the *term set* — which is why a cross-product journey unions the features and briefs of all its declared products.
 
 Example:
 
@@ -357,7 +357,7 @@ Nothing else in `catalogue.md` is ever machine-edited: not `exclude`, not the or
 
     Then resolve each journey's `products`:
 
-      * **Absent** — mark the journey `products: derived` and leave the list unresolved until the attribution pass in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md` runs. This is not a defect and is not queried; it is the documented way to declare a cross-product journey without pre-computing its product list.
+      * **Absent** — mark the journey `products: derived` and leave the list unresolved until the attribution pass in `${CLAUDE_SKILL_DIR}/references/source-discovery.md` runs. This is not a defect and is not queried; it is the documented way to declare a cross-product journey without pre-computing its product list.
       * **Declared with two or more entries, all resolving to a directory under `products/`** — accept it as authoritative. Attribution still runs, to corroborate.
       * **Declared with fewer than two entries** — an input defect in the declaration itself, since the author asserted a list and asserted a non-crossing one. Report and skip the journey. Do not fall back to derivation: a one-element list is more likely a mistake than an invitation, and deriving past it would hide the error.
       * **Declared naming a slug with no directory under `products/`** — report and skip the journey. The undeclared product is the actual defect; the run cannot route to a product it knows nothing about, and guessing which checked-out repo was meant is exactly what `repos` exists to avoid.
@@ -368,11 +368,11 @@ Nothing else in `catalogue.md` is ever machine-edited: not `exclude`, not the or
 3. For each journey file, parse the frontmatter. If the file has no frontmatter, or its frontmatter has no non-empty `name`, skip the file and record it in the run summary as a skipped input. Do not error out.
 4. Trim whitespace on every scalar value. Empty strings after trimming are treated as absent.
 5. For list fields, accept both YAML list syntax (`[a, b, c]` or `- a\n- b\n- c`) and a single string (which is normalised to a one-element list).
-6. Reject duplicates. **Journey names are unique across the entire definition**, not merely within a product — every journey under every product, plus every cross-product journey, share one namespace. Two resolving to the same `name`, or to the same slug per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/output.md`, is an input defect: stop and report it. Do not disambiguate silently. The same applies to two products resolving to the same `name`.
+6. Reject duplicates. **Journey names are unique across the entire definition**, not merely within a product — every journey under every product, plus every cross-product journey, share one namespace. Two resolving to the same `name`, or to the same slug per `${CLAUDE_SKILL_DIR}/references/output.md`, is an input defect: stop and report it. Do not disambiguate silently. The same applies to two products resolving to the same `name`.
 
    Uniqueness is global rather than per-product because the two output sections are read together. Two pages titled "Onboard to Foglight" in different sections is the worst available outcome — a reader cannot tell which is authoritative, and neither page can say.
 
-   **This check is necessary and nowhere near sufficient.** It compares names, so it catches only exact collisions. The overlaps that actually matter are semantic and pass it cleanly: "Archive telemetry" against "Forward logs to long-term storage", or "Make the service production-ready" against "Configure the application for production". Those are caught after authoring by `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/duplication.md`, not here. Do not read a clean uniqueness check as evidence that the journey set is non-overlapping.
+   **This check is necessary and nowhere near sufficient.** It compares names, so it catches only exact collisions. The overlaps that actually matter are semantic and pass it cleanly: "Archive telemetry" against "Forward logs to long-term storage", or "Make the service production-ready" against "Configure the application for production". Those are caught after authoring by `${CLAUDE_SKILL_DIR}/references/duplication.md`, not here. Do not read a clean uniqueness check as evidence that the journey set is non-overlapping.
 7. After parsing, print the resolved product (name, owners, features, **brief present or absent with its capture date**) and the journey list (names, counts, and any skipped files) back to the user. In a multi-product batch, print one block per product plus a batch header giving the product count, run order, and **how many products are unbriefed** — that count is the single most useful number in the confirmation, because it predicts where the output will be weakest before any work is done.
 
    Print each product's `repos` declaration too, or `repos: not declared`. It is the input that most directly determines whether product attribution will work, and the cheapest moment to notice it is missing is before discovery rather than after.
@@ -448,7 +448,7 @@ A journey the request names but no file declares is resolved by *declaring* it, 
 
 ### What richer journey prose buys you
 
-In the base audit skill, journey `description` and body prose only affected matching quality. In `author` mode they are load-bearing: the journey term set built in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md` Pass 0 is derived largely from them, and a journey defined by name alone will produce a thin term set, find little evidence, and yield low-confidence pages or none at all.
+In the base audit skill, journey `description` and body prose only affected matching quality. In `author` mode they are load-bearing: the journey term set built in `${CLAUDE_SKILL_DIR}/references/source-discovery.md` Pass 0 is derived largely from them, and a journey defined by name alone will produce a thin term set, find little evidence, and yield low-confidence pages or none at all.
 
 Journeys destined for `author` mode should carry:
 

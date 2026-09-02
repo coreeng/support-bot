@@ -15,11 +15,11 @@ Provenance decides *what may be said at all*; grounding decides *what must be sh
 
 Prose, structure, ordering, headings, and explanatory framing are yours to write. Claims are not.
 
-Load this file once per run, after `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md` has produced an evidence set, and before writing any page.
+Load this file once per run, after `${CLAUDE_SKILL_DIR}/references/source-discovery.md` has produced an evidence set, and before writing any page.
 
 ## What gets written
 
-For each product, each journey under it, and each cross-product journey, produce the page set below. Paths, frontmatter, and site specifics are in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/output.md` and the consumer's site adapter; this section defines the *content contract* for each page.
+For each product, each journey under it, and each cross-product journey, produce the page set below. Paths, frontmatter, and site specifics are in `${CLAUDE_SKILL_DIR}/references/output.md` and the consumer's site adapter; this section defines the *content contract* for each page.
 
 ### Product level
 
@@ -31,7 +31,7 @@ For each product, each journey under it, and each cross-product journey, produce
 | `<product>/reference/*.md` | reference | When prose supports it | Configuration keys, CRD fields, CLI flags, API surfaces, defaults. Tables and field lists, no narrative. **Every field must already be described in prose somewhere** — a schema or CRD may confirm it but may never be the origin of it. A field the code defines and no documentation mentions is reported as undocumented surface area, not written. |
 | `<product>/explanation/*.md` | explanation | When prose supports it | Architecture, key concepts, design decisions, boundaries with adjacent systems. One concept per page. |
 
-These are the **four Diátaxis buckets**. Every one is assessed for every product in the report, whether or not pages landed in it — an empty bucket is a reported gap, never a stub. Do not manufacture a page to fill a bucket; `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/quality-flags.md` will flag it `hollow`, and a hollow page is a defect the skill deletes rather than ships.
+These are the **four Diátaxis buckets**. Every one is assessed for every product in the report, whether or not pages landed in it — an empty bucket is a reported gap, never a stub. Do not manufacture a page to fill a bucket; `${CLAUDE_SKILL_DIR}/references/quality-flags.md` will flag it `hollow`, and a hollow page is a defect the skill deletes rather than ships.
 
 Product-level pages other than `_index.md` serve the **builder/maintainer** audience tier.
 
@@ -57,7 +57,7 @@ Points 1–5 come almost entirely from the brief. That is why an unbriefed produ
 
 When a product has no brief, `<product>/_index.md` carries its title, a one-line statement that no product description is available, and the journey index. Nothing else — no "what it is" assembled from READMEs, no feature table inferred from repository names, no audience list deduced from journey `users`.
 
-The temptation is to reach for the highest-ranked repository README and treat it as a product description. Do not. A README describes a component; using one as a product description produces a page describing whichever repo happened to rank first, which is worse than an acknowledged gap because it looks like an answer. Report the missing brief per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/gap-analysis.md` and move on.
+The temptation is to reach for the highest-ranked repository README and treat it as a product description. Do not. A README describes a component; using one as a product description produces a page describing whichever repo happened to rank first, which is worse than an acknowledged gap because it looks like an answer. Report the missing brief per `${CLAUDE_SKILL_DIR}/references/gap-analysis.md` and move on.
 
 ### Journey level
 
@@ -70,7 +70,7 @@ Journey-level pages serve the **end-user** audience tier. They are the point of 
 
 ### Choosing a spine
 
-The **spine** is the Diátaxis type of a journey's end-to-end page. It is declared in the journey definition (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md`) and defaults to `how-to`. The skill does not choose it, but it must recognise when the declared value is wrong for the material it found, and say so in the report rather than quietly writing the wrong shape.
+The **spine** is the Diátaxis type of a journey's end-to-end page. It is declared in the journey definition (`${CLAUDE_SKILL_DIR}/references/product-definition.md`) and defaults to `how-to`. The skill does not choose it, but it must recognise when the declared value is wrong for the material it found, and say so in the report rather than quietly writing the wrong shape.
 
 | Spine | When it fits | Reader's position |
 | --- | --- | --- |
@@ -143,7 +143,7 @@ Both failures put the writer where the reader should be. The filled hole does it
 
 #### Saying why each product is involved
 
-Both pages must name the products the journey crosses and say why each is there — that is the question a reader arrives with. Where the product list was **derived** rather than declared (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md`), one rule constrains how you write it:
+Both pages must name the products the journey crosses and say why each is there — that is the question a reader arrives with. Where the product list was **derived** rather than declared (`${CLAUDE_SKILL_DIR}/references/source-discovery.md`), one rule constrains how you write it:
 
 > **An attribution score is never a reason on a page.** "Foglight Agent is involved because it contributed 41% of the evidence weight" is a run diagnostic wearing the clothes of an explanation. It tells the reader nothing about their task and it launders a computed number into a factual claim about the estate.
 
@@ -151,11 +151,11 @@ The reason a product is involved must be grounded in prose like any other claim:
 
 The scores belong in the report, where Part E carries them with the rubric that produced them.
 
-**Where a cross-product journey and a product journey cover the same ground**, the product journey is canonical and the cross-product page links to it. That relationship is expected — the two journey lists overlap by design — and it only becomes a defect when the cross-product page restates rather than routes. `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/duplication.md` checks for exactly that.
+**Where a cross-product journey and a product journey cover the same ground**, the product journey is canonical and the cross-product page links to it. That relationship is expected — the two journey lists overlap by design — and it only becomes a defect when the cross-product page restates rather than routes. `${CLAUDE_SKILL_DIR}/references/duplication.md` checks for exactly that.
 
 ### Single-type discipline
 
-Every authored page is exactly one Diátaxis type. Use `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/types.md` for the signals and voice of each type, and `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/compass.md` if you are unsure which type a piece of material belongs in. If a page you are drafting starts to carry two intents, split it into two pages — do not compromise.
+Every authored page is exactly one Diátaxis type. Use `${CLAUDE_SKILL_DIR}/references/types.md` for the signals and voice of each type, and `${CLAUDE_SKILL_DIR}/references/compass.md` if you are unsure which type a piece of material belongs in. If a page you are drafting starts to carry two intents, split it into two pages — do not compromise.
 
 The classification machinery in the base skill (PERFECT / REWRITE / SPLIT / OUTLIER) does **not** apply to authored pages. Those verdicts describe pages you found; these are pages you wrote, and you write them single-type by construction.
 
@@ -173,7 +173,7 @@ Prose written to be read by a human:
   * anything under `docs/`
   * `CONTRIBUTING.md`, handbooks, runbooks, architecture notes, ADRs
   * the existing documentation under the consumer's `prior_art_roots`
-  * a product **brief** (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md`), which is the most authoritative source for product-level claims and among the weakest for technical ones
+  * a product **brief** (`${CLAUDE_SKILL_DIR}/references/product-definition.md`), which is the most authoritative source for product-level claims and among the weakest for technical ones
 
 Rewriting is expected — matching word for word is not required and usually wrong, since the whole point is to restructure. What must hold is that **the claim already existed in prose somewhere**.
 
@@ -264,7 +264,7 @@ Where a version, image tag, or pinned dependency appears in evidence, cite the f
 
 ### Conflicts between sources
 
-When two evidence files disagree, apply the authority order in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md` — deployed configuration beats interface definitions beats code beats tests beats prose. Then:
+When two evidence files disagree, apply the authority order in `${CLAUDE_SKILL_DIR}/references/source-discovery.md` — deployed configuration beats interface definitions beats code beats tests beats prose. Then:
 
 1. Write the fact from the higher-authority source.
 2. Add a quality flag on the page recording the conflict, both paths, and both values.
@@ -346,7 +346,7 @@ Rules:
 - One bullet per evidence file that contributed a fact. Files read but not used are excluded.
 - Order by relevance: `high` first, then `medium`, then `low`.
 - The trailing clause states what the file contributed, not what the file is.
-- The same list, in the same order, goes in the page's `sources:` frontmatter — see `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/output.md`.
+- The same list, in the same order, goes in the page's `sources:` frontmatter — see `${CLAUDE_SKILL_DIR}/references/output.md`.
 
 Do not link source paths. These repositories are private and the rendered site has no resolvable target; a broken link is worse than plain text.
 
@@ -355,7 +355,7 @@ Do not link source paths. These repositories are private and the rendered site h
 Authored pages must read like the rest of the site, not like generated output.
 
 - Follow the consumer's `style_guide`. It is binding, not advisory; the site adapter summarises its rules on list formatting, punctuation and spelling.
-- Use the voice of the page's Diátaxis type per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/types.md` — imperative for how-to, declarative for reference, discursive for explanation.
+- Use the voice of the page's Diátaxis type per `${CLAUDE_SKILL_DIR}/references/types.md` — imperative for how-to, declarative for reference, discursive for explanation.
 - Match the existing site's variety of English.
 - Do not open a page by restating its own title, and do not write "This document describes…".
 - Do not include a changelog, a "last updated" line, or an author byline. Provenance lives in frontmatter.

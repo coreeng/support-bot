@@ -7,11 +7,11 @@ description: How the skill finds, ranks, and scores source material for a produc
 
 This skill authors documentation from source repositories it does not own. Those repositories are large (thousands of files each) and were not written to be documentation inputs. This file specifies how to get from "many large repositories" to "a ranked, scored shortlist of evidence for one journey" without reading everything.
 
-It replaces the single-repo `Source scope` section of `SKILL.md`. Load it once per run, after `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md` has resolved `product_name` and `journeys` — and **immediately afterwards load the consumer's estate adapter**, the file named by `source_discovery` in `.doc-settings/settings.md` (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/settings.md`). This file is the method; the adapter is the estate: source-root derivation, repo scope, prior-art location, always-add candidates, expansion vocabulary and known contact-point traps. Nothing estate-specific lives here.
+It replaces the single-repo `Source scope` section of `SKILL.md`. Load it once per run, after `${CLAUDE_SKILL_DIR}/references/product-definition.md` has resolved `product_name` and `journeys` — and **immediately afterwards load the consumer's estate adapter**, the file named by `source_discovery` in `.doc-settings/settings.md` (`${CLAUDE_SKILL_DIR}/references/settings.md`). This file is the method; the adapter is the estate: source-root derivation, repo scope, prior-art location, always-add candidates, expansion vocabulary and known contact-point traps. Nothing estate-specific lives here.
 
 ## Terminology
 
-- **Source root** — a directory containing repositories to draw from. Resolved per `source_root` in the consumer's `settings.md`: either an absolute path, or the rule `parent-of-consumer-root`, meaning the parent directory of the **main** checkout of the consumer repository — never the parent of the working directory, because orchestrated runs execute in a git **worktree** whose parent is inside the repo. When a source root is supplied in your spawn prompt, use it verbatim. Otherwise derive the consumer root first (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/settings.md`):
+- **Source root** — a directory containing repositories to draw from. Resolved per `source_root` in the consumer's `settings.md`: either an absolute path, or the rule `parent-of-consumer-root`, meaning the parent directory of the **main** checkout of the consumer repository — never the parent of the working directory, because orchestrated runs execute in a git **worktree** whose parent is inside the repo. When a source root is supplied in your spawn prompt, use it verbatim. Otherwise derive the consumer root first (`${CLAUDE_SKILL_DIR}/references/settings.md`):
 
   ```bash
   CONSUMER_ROOT=$(dirname "$(git -C <repo root> rev-parse --path-format=absolute --git-common-dir)")
@@ -28,7 +28,7 @@ It replaces the single-repo `Source scope` section of `SKILL.md`. Load it once p
 - **Relevance** — how strongly a single evidence file relates to a journey. Scored `high` / `medium` / `low`.
 - **Confidence** — how well-grounded an authored page is. Scored `high` / `medium` / `low`. Derived from its evidence set, not judged freehand.
 
-`strong` and `weak` are reserved for journey-match confidence in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/journey-matching.md`. Do not reuse those words here.
+`strong` and `weak` are reserved for journey-match confidence in `${CLAUDE_SKILL_DIR}/references/journey-matching.md`. Do not reuse those words here.
 
 ## Repo scope
 
@@ -70,11 +70,11 @@ Before authoring, additionally scan every `prior_art_roots` entry — **always e
 
   * Cross-link to the covering pages from the body, so a reader can reach the canonical detail while it still exists.
   * Record every overlap in the report's Prior art section with an `overlap` of `full` or `partial`, whether or not you linked to it.
-  * `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/duplication.md` will flag the overlap. Against prior art that flag is **reportable, not a defect** — it does not cause the page to be deleted or shortened. Overlap between two pages this skill authored in the same run is still a defect.
+  * `${CLAUDE_SKILL_DIR}/references/duplication.md` will flag the overlap. Against prior art that flag is **reportable, not a defect** — it does not cause the page to be deleted or shortened. Overlap between two pages this skill authored in the same run is still a defect.
 
 The cost of this choice is drift: two descriptions of the same procedure that can diverge until the original is retired. That is the reason the overlap is reported page by page rather than noted once — a human needs to be able to see exactly which pairs exist, and retire or reconcile the prior-art copy when the time comes.
 
-**Contact points still need corroboration from outside the consumer repo.** Making its documentation a source does not weaken the contact-point rule in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`: a Slack channel, group handle, or DL mentioned only in prior art is still uncorroborated, because the output repository's own prose is exactly the stale-mention risk that rule exists for. Anchor the exclusion to the repo root (`grep -v '^<consumer repo dir>/'`, or `--exclude-dir` at the tool level) when counting corroborations.
+**Contact points still need corroboration from outside the consumer repo.** Making its documentation a source does not weaken the contact-point rule in `${CLAUDE_SKILL_DIR}/references/authoring.md`: a Slack channel, group handle, or DL mentioned only in prior art is still uncorroborated, because the output repository's own prose is exactly the stale-mention risk that rule exists for. Anchor the exclusion to the repo root (`grep -v '^<consumer repo dir>/'`, or `--exclude-dir` at the tool level) when counting corroborations.
 
 Never edit, move, or delete anything under a prior-art root, including content an authored page supersedes. Retiring a prior-art page is a human decision; the report may recommend it, the skill never performs it. The `write_locations` in the consumer's settings are the only things this skill writes.
 
@@ -104,7 +104,7 @@ From the resolved product definition, build a term set for the run and a per-jou
 
 #### When the product list is derived, the term set is built in two stages
 
-A cross-product journey may omit `products` and have it derived (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md`). That creates a circularity: the term set is built from the products, the products are attributed from the evidence, and the evidence is found using the term set. Resolve it by running discovery twice rather than by guessing an entry point.
+A cross-product journey may omit `products` and have it derived (`${CLAUDE_SKILL_DIR}/references/product-definition.md`). That creates a circularity: the term set is built from the products, the products are attributed from the evidence, and the evidence is found using the term set. Resolve it by running discovery twice rather than by guessing an entry point.
 
 **Stage 1 — journey-only term set.** Build the set from the journey's own material alone: `name`, `description`, `variations`, `users`, and every system, tool, resource and artefact named in its body prose. Add the expansion step as normal. Do not include any product's `features` or brief. Run passes 1–4 with this set, then run the attribution pass below to derive the product list.
 
@@ -126,7 +126,7 @@ Two consequences worth expecting rather than discovering:
   * The 40-term cap bites much harder here. Three products' features can exhaust it before the journey's own terms are added, and the journey's terms are the specific ones. **Add the journey's own terms first, then fill the remainder from the products**, dropping product-wide terms before journey-specific ones.
   * An unbriefed product in the list degrades the set **partially**, not fatally — the other products still contribute. Report degradation per product rather than as a single flag for the journey, so a reader can see it was two products out of three and which one is missing.
 
-**Ownership never narrows the scan.** A journey declared under one product is still searched for across every source repo, exactly as a cross-product journey is. What a product declaration changes is the vocabulary the search uses, not its reach — which is why a single-product journey can, and often does, find most of its evidence outside its own product's repositories. `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/gap-analysis.md` Part D reports when it does.
+**Ownership never narrows the scan.** A journey declared under one product is still searched for across every source repo, exactly as a cross-product journey is. What a product declaration changes is the vocabulary the search uses, not its reach — which is why a single-product journey can, and often does, find most of its evidence outside its own product's repositories. `${CLAUDE_SKILL_DIR}/references/gap-analysis.md` Part D reports when it does.
 
 **Expansion.** For each term set, add plausible synonyms, abbreviations, and the concrete technology names the journey implies. This is a judgement step and is expected to be non-deterministic. The shape of the reasoning: a journey mentioning "deploy a workload" expands to `helm`, `chart`, `deployment.yaml`, `argocd`, `kustomize`, `pipeline`; one mentioning "ingress" expands to the estate's ingress controller and proxy names as well as `gateway` and `route`. The estate adapter carries the estate-specific vocabulary — component names a term like "ingress" should expand to here — and is the place to record expansions that proved productive.
 
@@ -210,7 +210,7 @@ Read every shortlisted file in full. While reading, follow one hop outward when 
 4. Tests asserting the behaviour.
 5. Prose in READMEs, `docs/`, the existing site, and product briefs.
 
-**Read what this ordering is and is not for.** Under the strict provenance rule in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`, tiers 1–4 are **corroborators**: nothing may be written from them. Tier 5 is the only tier a page may be written *from*. So this list does not rank what to write — it ranks what confirms what you wrote, and how much weight a confirmation carries.
+**Read what this ordering is and is not for.** Under the strict provenance rule in `${CLAUDE_SKILL_DIR}/references/authoring.md`, tiers 1–4 are **corroborators**: nothing may be written from them. Tier 5 is the only tier a page may be written *from*. So this list does not rank what to write — it ranks what confirms what you wrote, and how much weight a confirmation carries.
 
 The effect is that the ordering runs backwards from how it reads. Prose sits last because it is the most likely to be stale, yet it is the only permitted origin. That tension is the point: prose is where documentation lives, and code is how you find out the documentation has rotted.
 
@@ -220,9 +220,9 @@ Where a disagreement **admits a scoping reading** — the two values could both 
 
 Two related standing rulings, so runs stop re-deriving them: a **generated file whose content blocks are human-written prose** (e.g. assembled from tenant-authored comments) is a permitted tier-5 source — the generation is transport, not authorship — cited as the generated artifact; and the `-10` generated-file rank penalty does not apply to such files.
 
-One exception sits above this ordering: for **product-level claims** — what a product is, who it serves, why it exists, what is GA — a product brief outranks everything, including tier 1. No manifest encodes intent, and the product owner wrote the brief. The same brief is near-worthless for a field list. See `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md`.
+One exception sits above this ordering: for **product-level claims** — what a product is, who it serves, why it exists, what is GA — a product brief outranks everything, including tier 1. No manifest encodes intent, and the product owner wrote the brief. The same brief is near-worthless for a field list. See `${CLAUDE_SKILL_DIR}/references/product-definition.md`.
 
-**One class of fact escapes this ordering entirely.** Slack channels, group handles, distribution lists, and other live external entities are not described by any tier of file — they are merely *mentioned* by them, and a mention survives the thing it names being renamed or deleted. Even a tier 1 manifest only proves the value was well-formed when it was written. These require the separate corroboration rule in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`; do not treat a single prose mention as sufficient evidence for one just because prose was the only place it appeared.
+**One class of fact escapes this ordering entirely.** Slack channels, group handles, distribution lists, and other live external entities are not described by any tier of file — they are merely *mentioned* by them, and a mention survives the thing it names being renamed or deleted. Even a tier 1 manifest only proves the value was well-formed when it was written. These require the separate corroboration rule in `${CLAUDE_SKILL_DIR}/references/authoring.md`; do not treat a single prose mention as sufficient evidence for one just because prose was the only place it appeared.
 
 ## Relevance scoring (per evidence file)
 
@@ -236,9 +236,9 @@ Record relevance per file. Files scored `low` that contributed no facts are drop
 
 ## Product attribution (cross-product journeys)
 
-This pass answers **which products a cross-product journey actually crosses**, and how strongly each belongs. It runs after relevance scoring, on the stage 1 evidence set, for every cross-product journey — whether its `products` list was declared or omitted. When the list was omitted the result *is* the list; when it was declared the result corroborates it and disagreements are reported. See `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md`.
+This pass answers **which products a cross-product journey actually crosses**, and how strongly each belongs. It runs after relevance scoring, on the stage 1 evidence set, for every cross-product journey — whether its `products` list was declared or omitted. When the list was omitted the result *is* the list; when it was declared the result corroborates it and disagreements are reported. See `${CLAUDE_SKILL_DIR}/references/product-definition.md`.
 
-It does not run for journeys under `products/`, which have an owning product by declaration. The related-looking check on those is *suspected mis-filing* (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/gap-analysis.md` Part D), which reports by repo and changes nothing.
+It does not run for journeys under `products/`, which have an owning product by declaration. The related-looking check on those is *suspected mis-filing* (`${CLAUDE_SKILL_DIR}/references/gap-analysis.md` Part D), which reports by repo and changes nothing.
 
 ### Step 1 — Attribute each evidence file to products
 
@@ -251,7 +251,7 @@ A file may be attributed to several products, to one, or to none.
 
 **Weighting.** A file's weight is its relevance — `high` = 3, `medium` = 2, `low` = 1. Where a file is attributed to *n* products, each receives `weight / n`. A config repo claimed by four products contributes a quarter of its weight to each, so no shared repo can pull a product into a journey on its own.
 
-**Never attribute from a repository's name.** A repo called `foglight-agent` looking like it ought to belong to the Foglight product is not evidence that it does. If no `repos` list claims it and its content matches no product's vocabulary, it is unattributed. This is the same refusal `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/gap-analysis.md` Part D makes, for the same reason — an inferred mapping is wrong exactly when it matters, on the shared and oddly-named repositories.
+**Never attribute from a repository's name.** A repo called `foglight-agent` looking like it ought to belong to the Foglight product is not evidence that it does. If no `repos` list claims it and its content matches no product's vocabulary, it is unattributed. This is the same refusal `${CLAUDE_SKILL_DIR}/references/gap-analysis.md` Part D makes, for the same reason — an inferred mapping is wrong exactly when it matters, on the shared and oddly-named repositories.
 
 **Prior art is attributed by vocabulary only.** Evidence from the consumer repo carries its directory name as `repo`, which belongs to no product and must never be added to a product's `repos`. For cross-product journeys the existing documentation is often the largest single contributor, so leaving it unattributed would strand most of the evidence — run the vocabulary mechanism over it and record that this is how those files were attributed.
 
@@ -337,7 +337,7 @@ The corroboration row replaces an earlier condition that awarded points for *cit
 
 The penalty row is deliberately small. A page that had to drop one undocumented field is still a good page; it should sting slightly and be visible in the report, not be pushed to `low`.
 
-Every authored page carries its computed confidence in frontmatter and in the report. A `low`-confidence page is still written — it is a starting point for a human — but it must additionally carry the reviewer banner specified in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`.
+Every authored page carries its computed confidence in frontmatter and in the report. A `low`-confidence page is still written — it is a starting point for a human — but it must additionally carry the reviewer banner specified in `${CLAUDE_SKILL_DIR}/references/authoring.md`.
 
 Per-journey confidence is the **lowest** confidence among its authored pages, not the average. A journey is only as trustworthy as its weakest page.
 

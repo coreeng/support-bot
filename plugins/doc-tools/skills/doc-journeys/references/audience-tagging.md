@@ -5,7 +5,7 @@ description: How the skill tags each scanned page with an audience tier (builder
 
 # Audience tagging
 
-This file specifies how the skill attaches audience signals to each scanned documentation page. It runs after journey matching (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/journey-matching.md`) and before the placement map is built.
+This file specifies how the skill attaches audience signals to each scanned documentation page. It runs after journey matching (`${CLAUDE_SKILL_DIR}/references/journey-matching.md`) and before the placement map is built.
 
 Unlike journey matching, audience tagging **always runs**. When `journeys = []` or a page has no journey match, the tier defaults to `builder/maintainer` and detailed labels are inferred from content. The "Audience mismatches" subsection of REPORT.md will simply be empty when there are no journey-supplied labels to compare against.
 
@@ -14,7 +14,7 @@ Unlike journey matching, audience tagging **always runs**. When `journeys = []` 
 **Per-page input:**
 - The page's title, frontmatter, all headings, and content sample.
 - The page's Diátaxis verdict.
-- The page's journey-relevance list from `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/journey-matching.md` (possibly empty).
+- The page's journey-relevance list from `${CLAUDE_SKILL_DIR}/references/journey-matching.md` (possibly empty).
 
 **Per-run input (cached):**
 - The resolved `journeys` list, including each journey's `users:` field.

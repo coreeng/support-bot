@@ -97,7 +97,7 @@ Three files sit beside it, named in the frontmatter above:
 
 | Role | Meaning | Used for |
 | --- | --- | --- |
-| plugin root | where the doc-tools plugin is installed (`${CLAUDE_PLUGIN_ROOT}`) | `SKILL.md`, `references/`, agent definitions |
+| tools root | the directory holding the `doc-journeys` and `doc-run` skill directories (`${CLAUDE_SKILL_DIR}/..` from either skill) | `SKILL.md`, `references/`, agent prompt files |
 | consumer root | the **main** checkout of this repository: `dirname "$(git -C <repo root> rev-parse --path-format=absolute --git-common-dir)"` | `.doc-settings/`, the site's dependency directory |
 | repo root | the checkout or run worktree content is read from and written to | every path in the frontmatter above; `product-definition/` |
 | source root | per `source_root` above | discovery |

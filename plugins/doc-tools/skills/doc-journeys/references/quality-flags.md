@@ -7,7 +7,7 @@ description: How the skill flags pages with hollow content or explicit stale mar
 
 This file specifies how the skill flags two kinds of problematic pages: **hollow pages** (stubs, mostly empty) and **pages with stale markers** (explicit `deprecated` / `TODO` / `FIXME` content).
 
-It runs after duplication detection (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/duplication.md`) and before the placement map is built.
+It runs after duplication detection (`${CLAUDE_SKILL_DIR}/references/duplication.md`) and before the placement map is built.
 
 This step is **intentionally minimal**, by the same logic as duplication detection. Two deterministic checks, no LLM judgement. Read the "What this does NOT catch" section before interpreting the output — the simplicity comes at a cost and the cost is explicit by design.
 

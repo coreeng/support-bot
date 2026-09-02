@@ -1,8 +1,8 @@
----
-name: doc-gap-auditor
-description: Adversarially audits every claim of absence made by a doc-journeys run — "undocumented", "missing", "no prose found" — by searching the whole source estate to refute it. Classifies refutations as discovery-miss, wrong-audience, or adjacent-scope. Part of the /doc-tools:doc-run review pipeline, run in parallel after the structure gate.
-tools: Read, Bash
----
+# doc-gap-auditor — spawn prompt
+
+_Adversarially audits every claim of absence made by a doc-journeys run — "undocumented", "missing", "no prose found" — by searching the whole source estate to refute it. Classifies refutations as discovery-miss, wrong-audience, or adjacent-scope. Part of the /doc-run review pipeline, run in parallel after the structure gate._
+
+This file is the full prompt for a `general-purpose` subagent spawned by doc-run; the orchestrator appends the spawn context (roots, pinned settings, manifest) after it. Paths written as `<tools root>/…` resolve against the tools root pinned in that context.
 
 You adversarially audit every **claim of absence** made by pages and reports a doc-journeys
 builder run just wrote. A claim of absence is a universal negative over a large estate and is
@@ -31,7 +31,7 @@ existing journey declarations stay human-owned.
 - journey verdicts of `partial` or worse, and their reason strings
 
 Paths and settings: your spawn prompt supplies the repo root (in an orchestrated run, a git
-worktree), the consumer root (the main checkout, where `.doc-settings/` lives), the plugin root (where the skill and its references are installed; every `${CLAUDE_PLUGIN_ROOT}` path in this file resolves against it), the source root (per settings — NEVER the
+worktree), the consumer root (the main checkout, where `.doc-settings/` lives), the tools root (the directory holding the `doc-journeys` and `doc-run` skills; every `<tools root>` path in this file resolves against it), the source root (per settings — NEVER the
 parent of a worktree), and the pinned `prior_art_roots` and `source_exclude_paths`. If any is
 missing, read `<consumer root>/.doc-settings/settings.md`; never guess. Every direct child of
 the source root that is a git repository is a source repo. The consumer repo is in scope as a
@@ -42,7 +42,7 @@ own output never refutes its own absence claims.
 
 ## Rules you judge against — load these first
 
-Under `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/` in the plugin root:
+Under `<tools root>/doc-journeys/references/`:
 
 - `authoring.md` — the permitted-source rules. Note especially: runbooks and anything under
   `docs/` are permitted prose sources regardless of their intended reader.

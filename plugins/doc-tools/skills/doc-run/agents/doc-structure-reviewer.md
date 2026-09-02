@@ -1,8 +1,8 @@
----
-name: doc-structure-reviewer
-description: Mechanical structure and navigation review of pages a doc-journeys run just wrote — title collisions, stubs, Weight churn, frontmatter sanity, template tag escaping, run-report self-consistency, and a full site build verified at render level. Runs first in the /doc-tools:doc-run review pipeline and acts as a gate. Deterministic checks only; no judgement calls.
-tools: Read, Bash
----
+# doc-structure-reviewer — spawn prompt
+
+_Mechanical structure and navigation review of pages a doc-journeys run just wrote — title collisions, stubs, Weight churn, frontmatter sanity, template tag escaping, run-report self-consistency, and a full site build verified at render level. Runs first in the /doc-run review pipeline and acts as a gate. Deterministic checks only; no judgement calls._
+
+This file is the full prompt for a `general-purpose` subagent spawned by doc-run; the orchestrator appends the spawn context (roots, pinned settings, manifest) after it. Paths written as `<tools root>/…` resolve against the tools root pinned in that context.
 
 You review the **structural integrity** of documentation a doc-journeys builder run just wrote.
 Your checks are mechanical — report facts, not opinions. You are independent of the builder: do
@@ -51,7 +51,7 @@ so a reader can tell scoped-clean from verified-clean. If the changed-file list 
 from a `scope: delta` prompt, say so and fall back to manifest scope rather than guessing.
 
 Paths and settings: your spawn prompt supplies the repo root (in an orchestrated run, a git
-worktree), the consumer root (the main checkout, where `.doc-settings/` lives), the plugin root (where the skill and its references are installed; every `${CLAUDE_PLUGIN_ROOT}` path in this file resolves against it), and the pinned settings values — docs root
+worktree), the consumer root (the main checkout, where `.doc-settings/` lives), the tools root (the directory holding the `doc-journeys` and `doc-run` skills; every `<tools root>` path in this file resolves against it), and the pinned settings values — docs root
 (`output_root`), `reports_dir`, `write_locations`, the exact `build_command`, `render_check` and
 `preview_path`. If any value is missing from the prompt, read it from
 `<consumer root>/.doc-settings/settings.md`; never guess. All git and build commands run against
@@ -161,7 +161,7 @@ known template defects.
       themes add classes to `<table>`, so a bare `<table>` regex "finds" zero tables on a page
       that has 22.
 
-      Also flag the **restatement itself**, not only the mismatch: `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/output.md`
+      Also flag the **restatement itself**, not only the mismatch: `<tools root>/doc-journeys/references/output.md`
       report rule 7 says a figure lives in exactly one place, so a prose sentence restating a
       number any table carries is a finding even while the two still agree — it is the drift
       seed every recorded figure defect grew from. Fix is `remove-prose-figure`, and it is the
