@@ -5,7 +5,7 @@ server:
 
 management:
   server:
-    port: 8081
+    port: ${MANAGEMENT_PORT:8082}
   endpoints:
     web:
       base-path: /
@@ -132,24 +132,24 @@ slack:
     socket-token: ${SLACK_SOCKET_TOKEN} # Token like: xapp-1-abc-def-ghi
     signing-secret: ${SLACK_SIGNING_SECRET} # Token like: 1234567890abcdef
   ticket:
-    # Recommended: monitor one or more channels via `channels`, each with its own `track` mode:
+    # Legacy single-channel config. Still supported: when `channels` (below) is empty, this id is
+    # treated as one channel tracking everything (queries + PRs).
+    channel-id: ${SLACK_TICKET_CHANNEL_ID} # Channel ID like: C1234567890
+    # Multi-channel config. One bot can monitor several channels, each with its own `track` mode:
     #   QUERIES - only normal support queries (PR detection disabled)
     #   PRS     - only PR-link tickets (the normal query/reaction flow is suppressed)
     #   BOTH    - both (default when `track` is omitted)
-    # When `channels` is non-empty it takes precedence over the deprecated `channel-id` below.
-    # channels:
-    #   - name: cecg-product-support-local
-    #     id: C0ADA3KLH9P
-    #     track: BOTH
-    #   - name: cecg-product-support-local-pr
-    #     id: C0BAF1KSL4F
-    #     track: PRS
-    #   - name: cecg-product-support-local-queries
-    #     id: C0BBD436YKF
-    #     track: QUERIES
-    # Deprecated: legacy single-channel config, kept for backward compatibility. Equivalent to one
-    # `channels` entry tracking BOTH; prefer `channels` above for new deployments.
-    channel-id: ${SLACK_TICKET_CHANNEL_ID:} # Channel ID like: C1234567890 (optional when slack.ticket.channels is set)
+    # When `channels` is non-empty it takes precedence over `channel-id`.
+    channels:
+      - name: cecg-product-support-local
+        id: C0ADA3KLH9P
+        track: BOTH
+      - name: cecg-product-support-local-pr
+        id: C0BAF1KSL4F
+        track: PRS
+      - name: cecg-product-support-local-queries
+        id: C0BBD436YKF
+        track: QUERIES
     expected-initial-reaction: eyes
     response-initial-reaction: ticket
     resolved-reaction: white_check_mark
@@ -169,20 +169,33 @@ ticket:
       key: ${TICKET_ASSIGNMENT_ENCRYPTION_KEY:}
 
 pr-review-tracking:
-  enabled: false
-  poll-cron: 0 0 9-18 * * 1-5
-  pr-emoji: pr                           # Slack emoji name added to the message when a PR is detected
+  enabled: true
+  poll-cron: "*/15 * * * * *"   # every 15s               # bypass SLA file cache while iterating
+  pr-emoji: mag
   tags: PR                               # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
-  impact: Information Request            # Required when enabled: impact code from enums.impacts, applied when the bot auto-closes a ticket
-  repositories: [ ]
+  impact: bauBlocking             # Required when enabled: impact code from enums.impacts, applied when the bot auto-closes a ticket
+  repositories:
+    - name: coreeng-dev/code-owner
+      owning-team: cecg-product
+      requires-codeowners: true
+      sla:
+        default: PT5M
+    # - name: cecg1/sandbox
+    #   provider: gitlab
+    #   owning-team: wow
+    #   # gitlab-group-path: cecg
+    #   sla:
+    #     default: 10m
+    # - name: coreeng/alex-sandbox
+    #   provider: github
+    #   owning-team: wow
+    #   requires-codeowners: true
+    #   sla:
+    #     default: 5m
   # Example repository entries:
   #   - name: my-org/my-repo
   #     owning-team: <team-code from enums.escalation-teams>
   #     github-team-slug: <slug>  # optional: GitHub team slug for review validation; when absent, falls back to PR requested teams
-  #     exclude-author-teams:     # optional (#285): skip PRs whose Slack poster is in one of these platform teams (deny-list, by team code)
-  #       - <team-code from enums.escalation-teams>
-  #     requires-codeowners: false  # optional: gate the merge on code-owner approval (read from the provider:
-  #                                 # GitHub reviewDecision/asCodeOwner, GitLab approval_state code_owner rules)
   #     sla:
   #       file: ".pr-sla.yaml"  # optional: read SLA from this file in the repo
   #       default: 48h          # default SLA duration (required when file is not configured)
@@ -233,9 +246,6 @@ pr-review-tracking:
   #     provider: gitlab
   #     owning-team: <team-code from enums.escalation-teams>
   #     gitlab-group-path: my-group/reviewers   # group whose members count as owning-team reviewers
-  #     exclude-author-teams:                   # optional (#285): skip MRs whose Slack poster is in one of these platform teams (deny-list, by team code)
-  #       - <team-code from enums.escalation-teams>
-  #     dynamic-approvals: false                # optional: GitLab-only — wait for CI + MR Approval Policies to decide required approvals
   #     sla:
   #       default: 48h
   #   - name: platform/infra/cluster-config
@@ -277,6 +287,16 @@ enums:
       code: dns
     - label: Osprey
       code: osprey
+    - label: PR
+      code: PR
+    - label: Product - Product A
+      code: product-a
+    - label: Product - Product B
+      code: product-b
+    - label: Product - Product C
+      code: product-c
+    - label: Product - Product D
+      code: product-d
   impacts:
     - label: Production Blocking
       code: productionBlocking
@@ -284,6 +304,8 @@ enums:
       code: bauBlocking
     - label: Abnormal Behaviour
       code: abnormalBehaviour
+    - label: Information Request
+      code: informationRequest
 
 platform-integration:
   enabled: true
@@ -398,12 +420,14 @@ knowledge-gaps:
 # Analysis configuration
 analysis:
   llm:
-    model-name: ${ANALYSIS_MODEL_NAME:gemini-2.5-flash}
+    model-name: ${ANALYSIS_MODEL_NAME:stub-local}
     request-delay: ${ANALYSIS_REQUEST_DELAY:500ms}
     vertex:
-      enabled: ${VERTEX_ENABLED:true}
+      enabled: ${VERTEX_ENABLED:false}
       project-id: ${VERTEX_PROJECT_ID:support-bot-cecg-efb3c84c}
       location: ${VERTEX_LOCATION:europe-west2}
+    stub:
+      enabled: ${STUB_LLM_ENABLED:true}
     proxy:
       enabled: ${AI_PROXY_ENABLED:false}
       base-url: ${AI_PROXY_BASE_URL:}
@@ -413,10 +437,7 @@ analysis:
   bundle:
     path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip}
   prompt:
-    enabled: ${ANALYSIS_PROMPT_ENABLED:false}
+    enabled: ${ANALYSIS_PROMPT_ENABLED:true}
 
-# Support Summary page (/summary): windowed breakdowns plus an LLM-written summary.
-# Requires analysis.prompt.enabled. Off by default.
 summary:
-  enabled: ${SUMMARY_ENABLED:false}
-  max-reasons: ${SUMMARY_MAX_REASONS:400} # Newest per-ticket reasons fed to the summary model
+  enabled: ${SUMMARY_ENABLED:true}

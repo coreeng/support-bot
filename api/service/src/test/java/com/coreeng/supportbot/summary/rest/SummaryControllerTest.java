@@ -10,9 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.coreeng.supportbot.analysis.AnalysisPrompt;
-import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
-import com.coreeng.supportbot.analysis.AnalysisPromptType;
+import com.coreeng.supportbot.analysis.AnalysisPromptLoadException;
 import com.coreeng.supportbot.security.AllowListService;
 import com.coreeng.supportbot.security.AuthCodeStore;
 import com.coreeng.supportbot.security.JwtAuthenticationToken;
@@ -66,9 +64,6 @@ class SummaryControllerTest {
 
     @MockitoBean
     private SummaryService summaryService;
-
-    @MockitoBean
-    private AnalysisPromptRepository analysisPromptRepository;
 
     @MockitoBean
     private JwtService jwtService;
@@ -195,8 +190,7 @@ class SummaryControllerTest {
     void returnsTheSummaryPromptToLeadership() throws Exception {
         // The View Prompt dialog is opened from a page leadership can see, so the prompt texts
         // follow the page's roles rather than the support-engineer-only analysis actions.
-        when(analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY))
-                .thenReturn(new AnalysisPrompt(3, "Summarise the window."));
+        when(summaryService.promptContent()).thenReturn("Summarise the window.");
 
         mockMvc.perform(get("/summary/prompt").with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
                 .andExpect(status().isOk())
@@ -205,6 +199,9 @@ class SummaryControllerTest {
 
     @Test
     void reportsAMissingSummaryPromptAsAServerProblem() throws Exception {
+        when(summaryService.promptContent())
+                .thenThrow(new AnalysisPromptLoadException("No summary prompt version is marked as in use"));
+
         mockMvc.perform(get("/summary/prompt")
                         .with(authentication(authTokenWithRoles(Role.USER, Role.SUPPORT_ENGINEER))))
                 .andExpect(status().isInternalServerError())
@@ -216,7 +213,7 @@ class SummaryControllerTest {
         mockMvc.perform(get("/summary/prompt").with(authentication(authTokenWithRoles(Role.USER))))
                 .andExpect(status().isForbidden());
 
-        verify(analysisPromptRepository, never()).findInUse(any());
+        verify(summaryService, never()).promptContent();
     }
 
     private void givenSummary() {

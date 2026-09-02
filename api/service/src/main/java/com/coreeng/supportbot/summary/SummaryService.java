@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.summary;
 
 import com.coreeng.supportbot.analysis.AnalysisPrompt;
+import com.coreeng.supportbot.analysis.AnalysisPromptLoadException;
 import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
 import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.analysis.AnalysisService;
@@ -38,6 +39,19 @@ public class SummaryService {
 
     /** Breakdowns plus whatever can be said about the prose summary right now. */
     public record SummaryResult(SummaryBreakdowns breakdowns, SummaryState summary) {}
+
+    /**
+     * The in-use prompt the summary prose is generated with, for the page's View Prompts dialog.
+     *
+     * @throws AnalysisPromptLoadException when no summary prompt version is marked as in use
+     */
+    public String promptContent() {
+        AnalysisPrompt prompt = analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY);
+        if (prompt == null) {
+            throw new AnalysisPromptLoadException("No summary prompt version is marked as in use");
+        }
+        return prompt.content();
+    }
 
     public SummaryResult get(LocalDate from, LocalDate to) {
         SummaryWindow window = new SummaryWindow(from, to);
