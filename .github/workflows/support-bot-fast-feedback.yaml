@@ -54,8 +54,6 @@ jobs:
     with:
       app-name: support-bot
       tenant-name: support-bot
-      # TEMP: deploy to integration on this PR's runs; remove before merge.
-      run-fastfeedback-integration-on-prs: true
       version: ${{ needs.version.outputs.version }}
       working-directory: ./
       artifacts: |
