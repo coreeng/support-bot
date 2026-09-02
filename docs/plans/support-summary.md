@@ -119,6 +119,19 @@ iterate together and update this doc as decisions land.
   the snapshot is stored under a fingerprint that carries the gap and is
   served until the gap set changes. If summary generation fails,
   breakdowns still render; the summary section shows an error/retry.
+  - **Trade-off, accepted for MVP:** the backfill does not distinguish a
+    transient LLM failure (429, timeout — `LlmAnalysisService` swallows the
+    exception and `AnalysisService` skips the ticket, no retry) from a
+    permanent one, so a ticket skipped on a bad call is baked into the
+    fingerprint as a gap and the snapshot is served, unchanged, until the
+    window's data changes (a new closure, a reclassification, or the gap
+    being filled). Manual recovery is a SUPPORT_ENGINEER running
+    `POST /analysis/run?days=N` from the analysis page: that fills the gap,
+    which changes the fingerprint, and the next visit regenerates.
+  - Follow-up: distinguish "call failed" from "unparseable output" in the
+    backfill and exclude the former from the fingerprint (or age gaps so
+    they are retried after a while), so transient failures self-heal on
+    the next visit instead of waiting for a manual run.
 
 ## Backend decisions (agreed 2026-08-26)
 

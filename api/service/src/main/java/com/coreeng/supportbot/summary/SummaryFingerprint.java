@@ -18,7 +18,10 @@ import org.jspecify.annotations.Nullable;
  *       — the set the backfill targets. A newly closed ticket changes it and triggers a refresh. A
  *       ticket the backfill cannot classify (its Slack thread is gone, or the model keeps returning
  *       an unparseable answer) stays in it, but then it is part of the fingerprint the snapshot was
- *       stored under, so the summary is served rather than regenerated on every visit.
+ *       stored under, so the summary is served rather than regenerated on every visit. The same
+ *       applies to a ticket skipped on a transient LLM failure (rate limit, timeout): the backfill
+ *       does not retry it, so it is a gap like any other and is only revisited when the window's
+ *       data changes — typically a manual {@code /analysis/run} filling it.
  * </ul>
  *
  * @param analysisCount number of analysis rows for the window under the current prompt
