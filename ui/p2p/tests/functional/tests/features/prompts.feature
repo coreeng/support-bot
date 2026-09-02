@@ -8,7 +8,7 @@ Feature: Prompt Visibility
     And the summary page is enabled with classification prompt "You are a support analyst. Classify each thread." and summary prompt "You are a support analyst. Summarise the window."
     When user "engineer@example.com" logs in
     And user navigates directly to "/summary"
-    And user clicks "View Prompt" button
+    And user clicks "View Prompts" button
     Then the prompt dialog should show "You are a support analyst. Classify each thread."
 
   Scenario: The dropdown switches to the summary generation prompt
@@ -16,6 +16,6 @@ Feature: Prompt Visibility
     And the summary page is enabled with classification prompt "You are a support analyst. Classify each thread." and summary prompt "You are a support analyst. Summarise the window."
     When user "engineer@example.com" logs in
     And user navigates directly to "/summary"
-    And user clicks "View Prompt" button
+    And user clicks "View Prompts" button
     And user selects the "Summary generation" prompt
     Then the prompt dialog should show "You are a support analyst. Summarise the window."
