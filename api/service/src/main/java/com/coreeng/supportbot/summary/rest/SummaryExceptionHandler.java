@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class SummaryExceptionHandler {
 
     /** A bad window is the caller's mistake, not a server fault — 400, with the reason. */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ProblemDetail handleInvalidWindow(IllegalArgumentException failure) {
+    @ExceptionHandler(InvalidSummaryWindowException.class)
+    public ProblemDetail handleInvalidWindow(InvalidSummaryWindowException failure) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, failure.getMessage());
         problem.setTitle("Invalid summary window");
         problem.setProperty("code", "SUMMARY_WINDOW_INVALID");

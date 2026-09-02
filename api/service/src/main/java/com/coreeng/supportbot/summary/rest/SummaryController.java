@@ -49,12 +49,12 @@ public class SummaryController {
         LocalDate resolvedFrom = from != null ? from : resolvedTo.minusDays(DEFAULT_WINDOW_DAYS - 1L);
 
         if (resolvedTo.isBefore(resolvedFrom)) {
-            throw new IllegalArgumentException(
+            throw new InvalidSummaryWindowException(
                     "'to' (" + resolvedTo + ") must not be before 'from' (" + resolvedFrom + ")");
         }
         // Both ends are included, so a window of from..to spans (to - from) + 1 days.
         if (ChronoUnit.DAYS.between(resolvedFrom, resolvedTo) + 1 > MAX_WINDOW_DAYS) {
-            throw new IllegalArgumentException("The window must not exceed " + MAX_WINDOW_DAYS + " days");
+            throw new InvalidSummaryWindowException("The window must not exceed " + MAX_WINDOW_DAYS + " days");
         }
 
         return summaryMapper.mapToUI(summaryService.get(resolvedFrom, resolvedTo));
