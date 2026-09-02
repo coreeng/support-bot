@@ -19,7 +19,6 @@ import React from "react";
 import { UserDropdown } from "./user-dropdown";
 
 const SEGMENT_LABELS: Record<string, string> = {
-  tickets: "Tickets",
   escalations: "Escalations",
   "knowledge-gaps": "Support Area Summary",
   summary: "Support Summary",

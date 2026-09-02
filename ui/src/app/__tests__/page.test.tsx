@@ -244,7 +244,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
 
       // Verify basic tabs are still visible
       expect(screen.getByText("Home")).toBeInTheDocument();
-      expect(screen.getByText("Tickets")).toBeInTheDocument();
+      expect(screen.getByText("Escalations")).toBeInTheDocument();
     });
   });
 
@@ -571,7 +571,6 @@ describe("Dashboard - Support Area Summary visibility", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Home")).toBeInTheDocument();
-        expect(screen.getByText("Tickets")).toBeInTheDocument();
         expect(screen.getByText("Escalations")).toBeInTheDocument();
       });
     });

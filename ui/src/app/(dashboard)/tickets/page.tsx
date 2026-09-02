@@ -1,7 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import TicketsPage from "@/components/tickets/tickets";
-
+/** The tickets table now lives on the home page; keep old links and bookmarks working. */
 export default function Tickets() {
-  return <TicketsPage />;
+  redirect("/");
 }

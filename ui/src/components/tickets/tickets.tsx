@@ -19,7 +19,12 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import EditTicketModal from "./EditTicketModal";
 
-export default function TicketsPage() {
+/**
+ * The tickets table with its filters. Standalone it owns the page (its own title and date
+ * filter); embedded on the home page it renders as a section and shares the Support
+ * Dashboard's date filter via the same URL params (hence the wider preset list below).
+ */
+export default function TicketsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const {
     effectiveTeams,
     hasNoTeamScope: contextHasNoTeamScope,
@@ -61,7 +66,12 @@ export default function TicketsPage() {
       page: "0",
     },
     {
-      dateFilter: enumValidator(["all", "lastWeek", "last2Weeks", "lastMonth", "custom"] as const, "lastWeek"),
+      dateFilter: enumValidator(
+        embedded
+          ? (["all", "lastWeek", "last2Weeks", "lastMonth", "lastYear", "custom"] as const)
+          : (["all", "lastWeek", "last2Weeks", "lastMonth", "custom"] as const),
+        "lastWeek"
+      ),
       dateFrom: isoDateValidator,
       dateTo: isoDateValidator,
       status: enumValidator(["", "opened", "closed", "stale"] as const, ""),
@@ -106,11 +116,8 @@ export default function TicketsPage() {
         customValue: "custom",
         fallbackValue: "lastWeek",
         allValue: "all",
-        presetDays: {
-          lastWeek: PRESET_DAYS.lastWeek,
-          last2Weeks: PRESET_DAYS.last2Weeks,
-          lastMonth: PRESET_DAYS.lastMonth,
-        },
+        // The standalone validator blocks lastYear, so listing it here is inert there.
+        presetDays: PRESET_DAYS,
       }),
     [dateFilter, params.dateFrom, params.dateTo]
   );
@@ -321,38 +328,50 @@ export default function TicketsPage() {
   // --- Render ---
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      {embedded ? (
         <div>
-          <h1 className="text-foreground text-2xl font-bold">Tickets</h1>
-          <p className="text-muted-foreground text-sm">Browse, filter, and update support tickets</p>
+          <h2 className="text-foreground text-base font-semibold">Tickets</h2>
+          <p className="text-muted-foreground text-sm">Browse, filter, and update support tickets for the selected period</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Select
-            value={dateFilter}
-            onValueChange={(v: string) => {
-              const next = v as DateFilter;
-              setParams(next !== "custom" ? { dateFilter: next, dateFrom: "", dateTo: "" } : { dateFilter: next });
-            }}
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any Date</SelectItem>
-              <SelectItem value="lastWeek">Last Week</SelectItem>
-              <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
-              <SelectItem value="lastMonth">Last Month</SelectItem>
-              <SelectItem value="custom">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
-          {dateFilter === "custom" && (
-            <>
-              <Input type="date" value={params.dateFrom} onChange={(e) => setParams({ dateFrom: e.target.value })} className="w-[150px]" />
-              <Input type="date" value={params.dateTo} onChange={(e) => setParams({ dateTo: e.target.value })} className="w-[150px]" />
-            </>
-          )}
+      ) : (
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-foreground text-2xl font-bold">Tickets</h1>
+            <p className="text-muted-foreground text-sm">Browse, filter, and update support tickets</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select
+              value={dateFilter}
+              onValueChange={(v: string) => {
+                const next = v as DateFilter;
+                setParams(next !== "custom" ? { dateFilter: next, dateFrom: "", dateTo: "" } : { dateFilter: next });
+              }}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any Date</SelectItem>
+                <SelectItem value="lastWeek">Last Week</SelectItem>
+                <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
+                <SelectItem value="lastMonth">Last Month</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+            {dateFilter === "custom" && (
+              <>
+                <Input
+                  type="date"
+                  value={params.dateFrom}
+                  onChange={(e) => setParams({ dateFrom: e.target.value })}
+                  className="w-[150px]"
+                />
+                <Input type="date" value={params.dateTo} onChange={(e) => setParams({ dateTo: e.target.value })} className="w-[150px]" />
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {hasNoTeamScope && (
         <div className="border-warning/30 bg-warning/10 text-warning rounded-lg border p-4">

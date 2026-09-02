@@ -1,6 +1,6 @@
 "use client";
 
-import { type LucideIcon, Activity, AlertCircle, BookOpen, Cable, GaugeCircle, GitPullRequest, Home, Sparkles, Ticket } from "lucide-react";
+import { type LucideIcon, Activity, AlertCircle, BookOpen, Cable, GaugeCircle, GitPullRequest, Home, Sparkles } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -45,7 +45,6 @@ type SupportTab = {
 
 const SUPPORT_TABS: SupportTab[] = [
   { path: "/", title: "Home", icon: Home },
-  { path: "/tickets", title: "Tickets", icon: Ticket },
   { path: "/escalations", title: "Escalations", icon: AlertCircle },
   {
     path: "/knowledge-gaps",

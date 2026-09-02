@@ -2,6 +2,7 @@
 
 import LoadingSkeleton from "@/components/LoadingSkeleton";
 import StatsPage from "@/components/stats/stats";
+import TicketsPage from "@/components/tickets/tickets";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function Home() {
@@ -11,5 +12,10 @@ export default function Home() {
     return <LoadingSkeleton />;
   }
 
-  return <StatsPage />;
+  return (
+    <div className="space-y-10">
+      <StatsPage />
+      <TicketsPage embedded />
+    </div>
+  );
 }
