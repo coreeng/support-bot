@@ -42,9 +42,22 @@ reset_db_schema() {
   log_success "Database schema reset complete"
 }
 
+# A cancelled CI run kills helm mid-install, leaving the release stuck in a
+# pending-* state that blocks every subsequent install with "another operation
+# (install/upgrade/rollback) is in progress". Clear such wrecks before deploying.
+clear_stuck_release() {
+  local ns="$1" release="$2" status
+  status=$(helm list -n "$ns" -a -f "^${release}\$" -o json 2>/dev/null     | sed -n 's/.*"status":"\([^"]*\)".*/\1/p')
+  if [[ "$status" == pending-* ]]; then
+    log "Release ${release} is stuck in ${status}; uninstalling it first..."
+    helm uninstall "$release" -n "$ns" --wait --timeout=2m || true
+  fi
+}
+
 deploy_db() {
   local ns="$1" release="$2"
   log "Installing PostgreSQL [${release}] in namespace ${ns}..."
+  clear_stuck_release "$ns" "$release"
   helm repo add bitnami https://charts.bitnami.com/bitnami
   helm repo update bitnami
   helm upgrade --install "$release" bitnami/postgresql -n "$ns" \
@@ -86,6 +99,7 @@ deploy_service() {
   local ns="$1" release="$2" chart_path="$3" image_repo="$4" image_tag="$5"
   ensure_chart_deps "$chart_path"
   log "Installing service [${release}] in ${ns} from ${chart_path}..."
+  clear_stuck_release "$ns" "$release"
   local args=(upgrade --install "$release" "$chart_path" -n "$ns" \
     --set image.repository="$image_repo" \
     --set image.tag="$image_tag" \
