@@ -1,5 +1,9 @@
 package com.coreeng.supportbot.summary.rest;
 
+import com.coreeng.supportbot.analysis.AnalysisPrompt;
+import com.coreeng.supportbot.analysis.AnalysisPromptLoadException;
+import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
+import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.summary.SummaryService;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -33,6 +37,7 @@ public class SummaryController {
 
     private final SummaryService summaryService;
     private final SummaryMapper summaryMapper;
+    private final AnalysisPromptRepository analysisPromptRepository;
     private final Clock clock;
 
     /**
@@ -57,4 +62,16 @@ public class SummaryController {
 
         return summaryMapper.mapToUI(summaryService.get(resolvedFrom, resolvedTo));
     }
+
+    /** The in-use prompt the summary prose is generated with, for the page's View Prompt dialog. */
+    @GetMapping("/prompt")
+    public SummaryPromptResponse getPrompt() {
+        AnalysisPrompt prompt = analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY);
+        if (prompt == null) {
+            throw new AnalysisPromptLoadException("No summary prompt version is marked as in use");
+        }
+        return new SummaryPromptResponse(prompt.content());
+    }
+
+    public record SummaryPromptResponse(String prompt) {}
 }

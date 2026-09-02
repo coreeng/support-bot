@@ -2,7 +2,9 @@
 
 import { hasActiveProductTags } from "@/components/products/products";
 import BreakdownCard, { DISTINCT_ROW_COLORS, sharePercent, sumCounts } from "@/components/summary/breakdown-card";
+import PromptDialog from "@/components/summary/prompt-dialog";
 import EditTicketModal from "@/components/tickets/EditTicketModal";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PRESET_DAYS } from "@/lib/dateRange";
@@ -10,7 +12,7 @@ import { useRegistry, useSummary } from "@/lib/hooks";
 import { enumValidator, isoDateValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
 import type { SummaryCount, SummaryData, SummarySection } from "@/lib/types/summary";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Eye } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
 /** The presets this page offers; the default window is the last 2 weeks ending yesterday. */
@@ -250,6 +252,7 @@ export default function SupportSummaryPage() {
   const queryClient = useQueryClient();
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+  const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
 
   const openTicket = (ticketId: string) => {
     setSelectedTicketId(ticketId);
@@ -273,6 +276,10 @@ export default function SupportSummaryPage() {
           <p className="text-muted-foreground text-sm">What tenants raised in the selected period, and why</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="default" onClick={() => setIsPromptDialogOpen(true)}>
+            <Eye className="h-4 w-4" />
+            View Prompt
+          </Button>
           <Select
             value={dateFilter}
             onValueChange={(value) =>
@@ -366,6 +373,8 @@ export default function SupportSummaryPage() {
           </div>
         </>
       )}
+
+      <PromptDialog open={isPromptDialogOpen} onOpenChange={setIsPromptDialogOpen} />
 
       <EditTicketModal
         ticketId={selectedTicketId}

@@ -79,11 +79,16 @@ public class SecurityConfig {
                         // reach it without being granted the /analysis/run permission.
                         .requestMatchers(HttpMethod.GET, "/summary")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
+                        // Prompt texts are read-only and shown by the summary page's View Prompt
+                        // dialog, which leadership can open — so both prompts follow the page's
+                        // roles rather than the support-engineer-only analysis actions.
+                        .requestMatchers(HttpMethod.GET, "/summary/prompt", "/analysis/prompt")
+                        .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Summary data export/import is restricted to support engineers
                         .requestMatchers("/summary-data/**")
                         .hasAnyRole("SUPPORT_ENGINEER")
                         // Analysis endpoints restricted to support engineers
-                        .requestMatchers("/analysis/status", "/analysis/run", "/analysis/prompt")
+                        .requestMatchers("/analysis/status", "/analysis/run")
                         .hasAnyRole("SUPPORT_ENGINEER")
                         // All other endpoints require authentication
                         .anyRequest()
@@ -109,13 +114,13 @@ public class SecurityConfig {
 
     private AccessDeniedHandler accessDeniedHandler() {
         var handlers = new LinkedHashMap<RequestMatcher, AccessDeniedHandler>();
-        handlers.put(
-                PathPatternRequestMatcher.withDefaults().matcher("/analysis/prompt"),
-                (request, response, accessDeniedException) -> {
-                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.setContentType("application/json");
-                    response.getWriter().write("{\"error\":\"Forbidden\"}");
-                });
+        AccessDeniedHandler jsonForbidden = (request, response, accessDeniedException) -> {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Forbidden\"}");
+        };
+        handlers.put(PathPatternRequestMatcher.withDefaults().matcher("/analysis/prompt"), jsonForbidden);
+        handlers.put(PathPatternRequestMatcher.withDefaults().matcher("/summary/prompt"), jsonForbidden);
         return new RequestMatcherDelegatingAccessDeniedHandler(handlers, new AccessDeniedHandlerImpl());
     }
 

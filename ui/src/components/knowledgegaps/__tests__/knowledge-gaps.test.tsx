@@ -26,11 +26,6 @@ jest.mock("../../tickets/EditTicketModal", () => ({
       </div>
     ) : null,
 }));
-jest.mock("../AnalysisPromptDialog", () => ({
-  __esModule: true,
-  default: ({ open }: { open: boolean }) => (open ? <div data-testid="analysis-prompt-dialog" /> : null),
-}));
-
 // Mock next-auth
 jest.mock("next-auth/react", () => ({
   getCsrfToken: jest.fn(() => Promise.resolve("mock-csrf-token")),
@@ -1511,64 +1506,6 @@ describe("KnowledgeGapsPage", () => {
       expect(bundleButton).not.toBeDisabled();
       expect(importButton).toBeInTheDocument();
       expect(importButton).not.toBeDisabled();
-    });
-  });
-
-  describe("View Prompt", () => {
-    beforeEach(() => {
-      mockUseAnalysis.mockReturnValue({
-        data: mockAnalysisData,
-        isLoading: false,
-        error: null,
-      } as any);
-    });
-
-    it("shows the View Prompt button when analysis is enabled and user is a support engineer", async () => {
-      renderWithToast(<KnowledgeGapsPage />);
-
-      expect(await screen.findByRole("button", { name: "View Prompt" })).toBeInTheDocument();
-    });
-
-    it("does not show the View Prompt button when analysis is disabled", async () => {
-      mockApiFetch.mockImplementation((url) => {
-        if (url === "/api/analysis/enabled") {
-          return Promise.resolve({ ok: true, json: () => Promise.resolve({ enabled: false }) } as Response);
-        }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
-      });
-
-      renderWithToast(<KnowledgeGapsPage />);
-      await screen.findByText("Support Area Summary");
-
-      expect(screen.queryByRole("button", { name: "View Prompt" })).not.toBeInTheDocument();
-    });
-
-    it("does not show the View Prompt button for non support engineers", async () => {
-      mockUseAuth.mockReturnValue({
-        user: { id: "1", email: "test@example.com", name: "Test User", teams: [], roles: [] },
-        isLoading: false,
-        isAuthenticated: true,
-        isLeadership: false,
-        isEscalationTeam: false,
-        isSupportEngineer: false,
-        actualEscalationTeams: [],
-        logout: jest.fn(),
-      });
-
-      renderWithToast(<KnowledgeGapsPage />);
-      await screen.findByText("Support Area Summary");
-
-      expect(screen.queryByRole("button", { name: "View Prompt" })).not.toBeInTheDocument();
-    });
-
-    it("opens the prompt dialog when the View Prompt button is clicked", async () => {
-      renderWithToast(<KnowledgeGapsPage />);
-
-      expect(screen.queryByTestId("analysis-prompt-dialog")).not.toBeInTheDocument();
-
-      fireEvent.click(await screen.findByRole("button", { name: "View Prompt" }));
-
-      expect(screen.getByTestId("analysis-prompt-dialog")).toBeInTheDocument();
     });
   });
 });

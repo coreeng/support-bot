@@ -549,6 +549,35 @@ export function useAnalysisPrompt(enabled: boolean) {
   });
 }
 
+/**
+ * The in-use prompt the summary prose is generated with, for the summary page's prompt dialog.
+ * Mirrors {@link useAnalysisPrompt}, including its no-cache behaviour.
+ */
+export function useSummaryPrompt(enabled: boolean) {
+  return useQuery<{ prompt: string }>({
+    queryKey: ["summary", "prompt"],
+    queryFn: async () => {
+      const response = await apiFetch("/api/summary/prompt");
+      if (!response.ok) {
+        let reason: string | undefined;
+        try {
+          const body = (await response.json()) as { code?: string; reason?: string };
+          reason = body.code ?? body.reason;
+        } catch {
+          // The status code remains sufficient when a proxy returns no JSON body.
+        }
+        throw new ApiError(response.status, reason);
+      }
+      return (await response.json()) as { prompt: string };
+    },
+    enabled,
+    retry: false,
+    // The in-use prompt version can change without a reload; always show the current one.
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
 // ===== Support Summary Hooks =====
 
 /** Cadence shared with the knowledge-gaps page's analysis polling. */

@@ -45,8 +45,10 @@ iterate together and update this doc as decisions land.
   join from `analysis` to team today, but `analysis.ticket_id → ticket.team`
   makes a tenant leaderboard a straightforward join.
 - Gating: read path (`/summary-data/results`, `/dashboard/**`) requires
-  LEADERSHIP or SUPPORT_ENGINEER; `/analysis/run|status|prompt` require
-  SUPPORT_ENGINEER (`SecurityConfig:62-75`). Frontend wraps pages in
+  LEADERSHIP or SUPPORT_ENGINEER; `/analysis/run|status` require
+  SUPPORT_ENGINEER (`SecurityConfig:62-75`). `GET /analysis/prompt` and the new
+  `GET /summary/prompt` follow the summary page's roles (LEADERSHIP or
+  SUPPORT_ENGINEER) since its View Prompt dialog shows both prompts. Frontend wraps pages in
   `RequireDashboardAccess` (`VIEW_RESTRICTED_DASHBOARDS` capability) plus a
   sidebar feature flag (`knowledge-gaps.enabled`).
 - Date-range plumbing already exists elsewhere: `ui/src/lib/dateRange.ts` has

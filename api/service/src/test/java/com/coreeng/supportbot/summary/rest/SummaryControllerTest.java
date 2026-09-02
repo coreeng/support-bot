@@ -10,6 +10,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.coreeng.supportbot.analysis.AnalysisPrompt;
+import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
+import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.security.AllowListService;
 import com.coreeng.supportbot.security.AuthCodeStore;
 import com.coreeng.supportbot.security.JwtAuthenticationToken;
@@ -63,6 +66,9 @@ class SummaryControllerTest {
 
     @MockitoBean
     private SummaryService summaryService;
+
+    @MockitoBean
+    private AnalysisPromptRepository analysisPromptRepository;
 
     @MockitoBean
     private JwtService jwtService;
@@ -183,6 +189,34 @@ class SummaryControllerTest {
     @Test
     void rejectsUnauthenticatedRequests() throws Exception {
         mockMvc.perform(get("/summary")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void returnsTheSummaryPromptToLeadership() throws Exception {
+        // The View Prompt dialog is opened from a page leadership can see, so the prompt texts
+        // follow the page's roles rather than the support-engineer-only analysis actions.
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY))
+                .thenReturn(new AnalysisPrompt(3, "Summarise the window."));
+
+        mockMvc.perform(get("/summary/prompt").with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prompt").value("Summarise the window."));
+    }
+
+    @Test
+    void reportsAMissingSummaryPromptAsAServerProblem() throws Exception {
+        mockMvc.perform(get("/summary/prompt")
+                        .with(authentication(authTokenWithRoles(Role.USER, Role.SUPPORT_ENGINEER))))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("ANALYSIS_PROMPT_LOAD_FAILED"));
+    }
+
+    @Test
+    void forbidsTheSummaryPromptWithoutLeadershipOrSupportEngineer() throws Exception {
+        mockMvc.perform(get("/summary/prompt").with(authentication(authTokenWithRoles(Role.USER))))
+                .andExpect(status().isForbidden());
+
+        verify(analysisPromptRepository, never()).findInUse(any());
     }
 
     private void givenSummary() {
