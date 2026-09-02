@@ -120,6 +120,19 @@ class SummaryServiceTest {
     }
 
     @Test
+    void ignoresThePreviousRunsCountsUntilTheNewClassificationStarts() {
+        // The refresh is dispatched asynchronously, so the first poll can land before classify() has
+        // reset the analysis status: it still holds the last run's final counts with running=false.
+        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID)).thenReturn(null);
+        when(summaryRefresher.start(WINDOW)).thenReturn(true);
+        when(analysisService.getStatus())
+                .thenReturn(new AnalysisService.AnalysisStatus("analysis", 40, 40, false, null));
+
+        assertThat(service.get(FROM, TO).summary())
+                .isEqualTo(new SummaryState.Generating(SummaryState.Phase.CLASSIFYING, null, null));
+    }
+
+    @Test
     void servesTheCachedSummaryWhenTheOnlyGapsAreOnesTheBackfillAlreadyGaveUpOn() {
         // A ticket whose thread is gone can never be classified. The snapshot was generated after
         // attempting it, so its fingerprint already carries the gap — regenerating would loop forever.

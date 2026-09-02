@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -76,13 +75,15 @@ public class SecurityConfig {
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Support Summary page. Deliberately NOT support-engineer-only: serving it
                         // triggers the backfill server-side, so leadership viewers must be able to
-                        // reach it without being granted the /analysis/run permission.
-                        .requestMatchers(HttpMethod.GET, "/summary")
+                        // reach it without being granted the /analysis/run permission. Not scoped to
+                        // GET: Spring MVC serves HEAD through @GetMapping handlers, so a method-scoped
+                        // rule would let any authenticated user start the backfill with a HEAD.
+                        .requestMatchers("/summary")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Prompt texts are read-only and shown by the summary page's View Prompt
                         // dialog, which leadership can open — so both prompts follow the page's
                         // roles rather than the support-engineer-only analysis actions.
-                        .requestMatchers(HttpMethod.GET, "/summary/prompt", "/analysis/prompt")
+                        .requestMatchers("/summary/prompt", "/analysis/prompt")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Summary data export/import is restricted to support engineers
                         .requestMatchers("/summary-data/**")

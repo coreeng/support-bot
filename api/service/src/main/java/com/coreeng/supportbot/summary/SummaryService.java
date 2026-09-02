@@ -110,6 +110,11 @@ public class SummaryService {
             return new SummaryState.Generating(phase, null, null);
         }
         AnalysisService.AnalysisStatus status = analysisService.getStatus();
+        if (!status.running()) {
+            // The refresh has been dispatched but classify() has not started yet: the status still
+            // holds the previous run's final counts, which would render as a complete progress bar.
+            return new SummaryState.Generating(phase, null, null);
+        }
         return new SummaryState.Generating(phase, status.analyzedCount(), status.exportedCount());
     }
 }

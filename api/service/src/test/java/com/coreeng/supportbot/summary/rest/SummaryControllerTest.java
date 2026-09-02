@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -172,6 +173,29 @@ class SummaryControllerTest {
     }
 
     @Test
+    void acceptsAWindowOfExactlyTheMaximumWidth() throws Exception {
+        // Both ends are included, so 2025-01-01..2026-01-01 is 366 days: the widest allowed window.
+        givenSummary();
+
+        mockMvc.perform(get("/summary?from=2025-01-01&to=2026-01-01")
+                        .with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
+                .andExpect(status().isOk());
+
+        verify(summaryService).get(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 1, 1));
+    }
+
+    @Test
+    void rejectsAWindowOneDayWiderThanTheMaximum() throws Exception {
+        // 2025-01-01..2026-01-02 is 367 days including both ends, one over the limit.
+        mockMvc.perform(get("/summary?from=2025-01-01&to=2026-01-02")
+                        .with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SUMMARY_WINDOW_INVALID"));
+
+        verify(summaryService, never()).get(any(), any());
+    }
+
+    @Test
     void forbidsAuthenticatedUsersWithoutLeadershipOrSupportEngineer() throws Exception {
         // Serving this triggers a backfill server-side, so the role check is the only gate on that
         // work — a plain user must not be able to start it.
@@ -179,6 +203,26 @@ class SummaryControllerTest {
                 .andExpect(status().isForbidden());
 
         verify(summaryService, never()).get(any(), any());
+    }
+
+    @Test
+    void forbidsHeadRequestsWithoutLeadershipOrSupportEngineer() throws Exception {
+        // Spring MVC serves HEAD through the @GetMapping handler, so a GET-only security rule
+        // would let a plain user start the backfill with a HEAD instead.
+        mockMvc.perform(head("/summary").with(authentication(authTokenWithRoles(Role.USER))))
+                .andExpect(status().isForbidden());
+
+        verify(summaryService, never()).get(any(), any());
+    }
+
+    @Test
+    void allowsHeadRequestsFromLeadership() throws Exception {
+        givenSummary();
+
+        mockMvc.perform(head("/summary").with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
+                .andExpect(status().isOk());
+
+        verify(summaryService).get(any(), any());
     }
 
     @Test

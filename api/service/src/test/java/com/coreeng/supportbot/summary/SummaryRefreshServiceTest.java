@@ -2,6 +2,7 @@ package com.coreeng.supportbot.summary;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -169,6 +170,31 @@ class SummaryRefreshServiceTest {
         verifyNoInteractions(llmSummaryService);
         verify(asyncJobRepository).deleteJob("analysis");
         assertThat(service.failureFor(WINDOW, "2@2026-03-23T10:00")).isEqualTo("slack is down");
+    }
+
+    @Test
+    void anInterruptedBackfillAbortsTheRefreshWithoutSummarising() {
+        doAnswer(invocation -> {
+                    Thread.currentThread().interrupt();
+                    return null;
+                })
+                .when(analysisService)
+                .backfillWindow(FROM, TO);
+
+        try {
+            service.runWindowRefresh(FROM, TO);
+
+            // A partial backfill must not be summarised: the snapshot's fingerprint would mark the
+            // unclassified tickets as gaps and be served as ready after restart.
+            verifyNoInteractions(llmSummaryService, summarySnapshotRepository);
+            verify(asyncJobRepository).deleteJob("analysis");
+            assertThat(service.status().running()).isFalse();
+            // Nothing is pinned, so the next visit starts a fresh refresh.
+            assertThat(service.failureFor(WINDOW, "2@2026-03-23T10:00")).isNull();
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
     }
 
     @Test

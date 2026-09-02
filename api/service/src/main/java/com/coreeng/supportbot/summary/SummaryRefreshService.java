@@ -94,6 +94,15 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
         try {
             status.set(new SummaryRefreshStatus(window, SummaryState.Phase.CLASSIFYING, true));
             analysisService.backfillWindow(from, to);
+            if (Thread.currentThread().isInterrupted()) {
+                // The backfill stops early on interrupt (shutdown) and returns normally. Summarising now
+                // would store a snapshot whose fingerprint marks the unclassified tickets as gaps, and
+                // that snapshot would be served as ready after restart without ever retrying them.
+                // Nothing is recorded, so the next visit starts a fresh refresh. The flag is left set
+                // for the executor.
+                log.warn("Summary refresh for window {}..{} interrupted during backfill; not summarising", from, to);
+                return;
+            }
 
             status.set(new SummaryRefreshStatus(window, SummaryState.Phase.SUMMARISING, true));
             generate(window);

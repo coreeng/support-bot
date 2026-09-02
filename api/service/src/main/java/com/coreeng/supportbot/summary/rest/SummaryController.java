@@ -3,6 +3,7 @@ package com.coreeng.supportbot.summary.rest;
 import com.coreeng.supportbot.summary.SummaryService;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -51,7 +52,8 @@ public class SummaryController {
             throw new IllegalArgumentException(
                     "'to' (" + resolvedTo + ") must not be before 'from' (" + resolvedFrom + ")");
         }
-        if (resolvedFrom.plusDays(MAX_WINDOW_DAYS).isBefore(resolvedTo)) {
+        // Both ends are included, so a window of from..to spans (to - from) + 1 days.
+        if (ChronoUnit.DAYS.between(resolvedFrom, resolvedTo) + 1 > MAX_WINDOW_DAYS) {
             throw new IllegalArgumentException("The window must not exceed " + MAX_WINDOW_DAYS + " days");
         }
 
