@@ -65,19 +65,20 @@ public class SummaryService {
 
     private SummaryState resolveSummaryState(
             SummaryWindow window, String classificationPromptId, ImmutableList<String> channelIds) {
+        // A run in flight may be for a different window — the lock is global. Reporting `generating`
+        // either way is honest (nothing can start until it finishes) and converges: the next poll
+        // after it ends starts this window's refresh if it still needs one. Checked first: every open
+        // tab polls while a run is in flight, and none of them needs the summary prompt read below.
+        SummaryRefreshStatus refresh = summaryRefresher.status();
+        if (refresh.running()) {
+            return generating(refresh.phase());
+        }
+
         AnalysisPrompt summaryPrompt = analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY);
         if (summaryPrompt == null) {
             return new SummaryState.Unavailable("No summary prompt version is marked as in use");
         }
         String summaryPromptId = AnalysisService.computePromptId(summaryPrompt.content());
-
-        // A run in flight may be for a different window — the lock is global. Reporting `generating`
-        // either way is honest (nothing can start until it finishes) and converges: the next poll
-        // after it ends starts this window's refresh if it still needs one.
-        SummaryRefreshStatus refresh = summaryRefresher.status();
-        if (refresh.running()) {
-            return generating(refresh.phase());
-        }
 
         String fingerprint = summaryReadRepository
                 .fingerprint(window, classificationPromptId, channelIds)

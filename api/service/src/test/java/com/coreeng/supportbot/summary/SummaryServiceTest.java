@@ -157,6 +157,9 @@ class SummaryServiceTest {
         assertThat(service.get(FROM, TO).summary())
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.SUMMARISING, null, null));
         verify(summaryRefresher, never()).start(any());
+        // A poll during a run is the hot path: it must not pay for the summary prompt or the fingerprint.
+        verify(analysisPromptRepository, never()).findInUse(any());
+        verify(summaryReadRepository, never()).fingerprint(any(), any(), any());
     }
 
     @Test

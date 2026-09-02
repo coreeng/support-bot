@@ -2,6 +2,7 @@ package com.coreeng.supportbot.summary;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -20,10 +21,10 @@ public final class SummaryTestFixtures {
     /**
      * Inserts a query plus its ticket.
      *
-     * @param raisedAt the ticket-creation wall-clock time in the JVM default zone, stored on
-     *     {@code query.date}. Fixtures are expressed as local time because that is the zone the
-     *     JDBC session runs in, and the window bounds are {@code LocalDate}s cast in that same zone —
-     *     an instant-based fixture would land on the wrong side of a boundary outside UTC.
+     * @param raisedAt the ticket-creation time as a UTC wall-clock time, stored on {@code query.date}.
+     *     The windowed queries bind their day boundaries as UTC instants, so a fixture at
+     *     {@code 23:59:59} on the day before a window is outside it whatever zone the JVM or the
+     *     JDBC session runs in.
      * @return the generated ticket id
      */
     public static long insertTicket(
@@ -38,7 +39,7 @@ public final class SummaryTestFixtures {
                 Long.class,
                 ts,
                 channelId,
-                Timestamp.valueOf(raisedAt));
+                Timestamp.from(raisedAt.toInstant(ZoneOffset.UTC)));
         Long ticketId = jdbcTemplate.queryForObject(
                 "INSERT INTO ticket (query_id, status, team) VALUES (?, ?::ticket_status, ?) RETURNING id",
                 Long.class,
