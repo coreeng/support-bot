@@ -3,15 +3,14 @@ package com.coreeng.supportbot.analysis;
 import static com.coreeng.supportbot.dbschema.Tables.ANALYSIS;
 import static com.coreeng.supportbot.dbschema.Tables.QUERY;
 import static com.coreeng.supportbot.dbschema.Tables.TICKET;
-import static org.jooq.impl.DSL.cast;
 import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.selectOne;
-import static org.jooq.impl.DSL.val;
 
 import com.coreeng.supportbot.dbschema.enums.TicketStatus;
 import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,8 +63,8 @@ public class JdbcThreadsAwaitingAnalysisRepository implements ThreadsAwaitingAna
     /**
      * {@inheritDoc}
      *
-     * <p>The window is applied to {@code query.date} as a half-open interval with the bound — not the
-     * column — cast, keeping the predicate sargable against {@code query_date_idx}.
+     * <p>The window is applied to {@code query.date} as a half-open interval of UTC instants, with the
+     * bound — not the column — converted, keeping the predicate sargable against {@code query_date_idx}.
      */
     @Override
     @Transactional(readOnly = true)
@@ -78,9 +77,11 @@ public class JdbcThreadsAwaitingAnalysisRepository implements ThreadsAwaitingAna
                 to,
                 promptId);
 
+        // Bind explicit UTC instants: the rest of the summary flow (controller clock, UI formatting) is
+        // UTC, so the window must not shift with the JVM/session time zone.
         Condition window = QUERY.DATE
-                .ge(cast(val(from), QUERY.DATE.getDataType()))
-                .and(QUERY.DATE.lt(cast(val(to.plusDays(1)), QUERY.DATE.getDataType())));
+                .ge(from.atStartOfDay().toInstant(ZoneOffset.UTC))
+                .and(QUERY.DATE.lt(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)));
 
         return find(window, promptId, channelIds);
     }
