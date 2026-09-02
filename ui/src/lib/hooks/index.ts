@@ -3,7 +3,6 @@
  * All hooks use React Query and call the Next.js API routes.
  */
 import type {
-  AnalysisData,
   ElevateIntegrityIssue,
   ElevateIntegrityIssueType,
   ElevateJourney,
@@ -13,7 +12,6 @@ import type {
   ElevateStatus,
   ElevateUser,
   EscalationTeam,
-  KnowledgeGapsStatus,
   PaginatedEscalations,
   PaginatedTickets,
   SupportMember,
@@ -490,27 +488,6 @@ export function useResolutionTimeByTag(enabled = true, startDate?: string, endDa
   });
 }
 
-// ===== Knowledge Gaps Hooks =====
-
-export function useKnowledgeGapsEnabled() {
-  return useQuery<boolean>({
-    queryKey: ["knowledge-gaps", "enabled"],
-    queryFn: async () => {
-      const response = await apiGet<KnowledgeGapsStatus>("/knowledge-gaps/enabled");
-      return response.enabled;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
-export function useAnalysis() {
-  return useQuery<AnalysisData>({
-    queryKey: ["analysis"],
-    queryFn: () => apiGet("/summary-data/results"),
-    staleTime: 2 * 60 * 1000,
-  });
-}
-
 export function useElevateEnabled() {
   return useQuery<boolean>({
     queryKey: ["elevate", "enabled"],
@@ -580,7 +557,7 @@ export function useSummaryPrompt(enabled: boolean) {
 
 // ===== Support Summary Hooks =====
 
-/** Cadence shared with the knowledge-gaps page's analysis polling. */
+/** Polling cadence while the summary backfill runs. */
 const SUMMARY_POLL_MS = 3000;
 
 export function useSummaryEnabled() {

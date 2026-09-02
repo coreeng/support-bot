@@ -123,28 +123,6 @@ export interface AssignmentStatus {
   enabled: boolean;
 }
 
-export interface KnowledgeGapsStatus {
-  enabled: boolean;
-}
-
-export interface QuerySummary {
-  text: string;
-  timestamp: string;
-  ticketId: string;
-}
-
-export interface DimensionSummary {
-  name: string;
-  coveragePercentage: number;
-  queryCount: number;
-  queries: QuerySummary[];
-}
-
-export interface AnalysisData {
-  knowledgeGaps: DimensionSummary[];
-  supportAreas: DimensionSummary[];
-}
-
 export interface BulkReassignRequest {
   ticketIds: string[]; // Array of ticket IDs
   assignedTo: string; // Slack user ID

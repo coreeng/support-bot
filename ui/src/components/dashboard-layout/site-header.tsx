@@ -20,7 +20,6 @@ import { UserDropdown } from "./user-dropdown";
 
 const SEGMENT_LABELS: Record<string, string> = {
   escalations: "Escalations",
-  "knowledge-gaps": "Support Area Summary",
   summary: "Support Summary",
   health: "Analytics & Operations",
   sla: "SLA",
