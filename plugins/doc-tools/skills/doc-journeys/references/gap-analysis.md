@@ -5,7 +5,7 @@ description: How the skill computes coverage gaps — per-journey verdicts (cove
 
 # Gap analysis
 
-This file specifies how the skill computes documentation coverage gaps. It runs after audience tagging (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/audience-tagging.md`) and before the placement map is built.
+This file specifies how the skill computes documentation coverage gaps. It runs after audience tagging (`${CLAUDE_SKILL_DIR}/references/audience-tagging.md`) and before the placement map is built.
 
 The output is a coverage analysis written into REPORT.md. Gap analysis is per-journey and per-product; it does **not** modify per-page frontmatter or any other per-page output.
 
@@ -67,7 +67,7 @@ The agent answers:
 
 #### Step 4 — Determine verdict (counts-driven, no re-judgement)
 
-**The verdict is determined SOLELY by the counts collected in Step 1.** This step counts; it does NOT re-evaluate whether a tagged match "really counts" or is "too tangential". The journey-matching procedure in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/journey-matching.md` is the only place where the line between strong, weak, and not-a-match is drawn; that decision is final.
+**The verdict is determined SOLELY by the counts collected in Step 1.** This step counts; it does NOT re-evaluate whether a tagged match "really counts" or is "too tangential". The journey-matching procedure in `${CLAUDE_SKILL_DIR}/references/journey-matching.md` is the only place where the line between strong, weak, and not-a-match is drawn; that decision is final.
 
 If you find yourself reasoning "these matches are tangential, so I'll exclude them" or "the weak matches don't really cover the journey" — **STOP**. The page is in `weak_spine` because the journey-matching step decided it was a partial-coverage match; that is exactly what `weak` means. Re-judging here breaks consistency with the per-page tags emitted in REPORT.md Sections 8 and 9 (and would, for the same journey, produce a Section 3 row that contradicts the per-page tags shown elsewhere in the same report).
 
@@ -215,7 +215,7 @@ brief:
 
 > `no product brief — product page is navigation-only, and the term set for every journey under this product is degraded`
 
-Both halves matter. The first is what a reader sees; the second is why the rest of the product's output is thinner than it looks, and omitting it invites the wrong conclusion — that the product is poorly documented, when in fact the skill was poorly equipped to look. See `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md`.
+Both halves matter. The first is what a reader sees; the second is why the rest of the product's output is thinner than it looks, and omitting it invites the wrong conclusion — that the product is poorly documented, when in fact the skill was poorly equipped to look. See `${CLAUDE_SKILL_DIR}/references/product-definition.md`.
 
 A brief that is present but `stale: true` is reported as a finding rather than a gap. An old product description is still a product description.
 
@@ -223,7 +223,7 @@ A brief that is present but `stale: true` is reported as a finding rather than a
 
 Always runs for journeys under `products/`. Never runs for cross-product journeys — they are already declared as spanning products, so there is nothing to suspect.
 
-A journey is declared under one product by a human. Discovery, meanwhile, searches every repository regardless of that declaration (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md`), so a run produces direct evidence about where a journey's documentation actually lives. Where the two disagree consistently, that is worth surfacing.
+A journey is declared under one product by a human. Discovery, meanwhile, searches every repository regardless of that declaration (`${CLAUDE_SKILL_DIR}/references/source-discovery.md`), so a run produces direct evidence about where a journey's documentation actually lives. Where the two disagree consistently, that is worth surfacing.
 
 #### Step 1 — Compute the spread
 
@@ -248,7 +248,7 @@ State it as an observation with its numbers:
 
 > `Onboard to Foglight` — declared under `foglight`, which contributed 34% of evidence weight. Larger contributors: `foglight-config` (28%), `foglight-agent` (22%).
 
-**Report by repo.** Where products declare `repos` (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md`), you may additionally group the repos under their owning products, since that grouping is then a declared fact rather than a guess. Report the repo-level numbers either way — they are what a human checks the grouping against, and a repo claimed by two products or by none is visible in the repo breakdown and invisible in the product one.
+**Report by repo.** Where products declare `repos` (`${CLAUDE_SKILL_DIR}/references/product-definition.md`), you may additionally group the repos under their owning products, since that grouping is then a declared fact rather than a guess. Report the repo-level numbers either way — they are what a human checks the grouping against, and a repo claimed by two products or by none is visible in the repo breakdown and invisible in the product one.
 
 Do not guess which product owns a repo from its name. An undeclared repo stays undeclared in this report exactly as it stays unattributed in the attribution pass.
 
@@ -256,7 +256,7 @@ Do not guess which product owns a repo from its name. An undeclared repo stays u
 
 Runs **only** for cross-product journeys, and always for them — whether their `products` list was declared or derived. Never runs for journeys under `products/`; those have an owning product by declaration and Part D is their equivalent.
 
-Part E reports the output of the product attribution pass in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md`. It computes nothing new. Its job is to make a derived product list inspectable, because a list the skill worked out is only trustworthy if a reader can see what it was worked out from.
+Part E reports the output of the product attribution pass in `${CLAUDE_SKILL_DIR}/references/source-discovery.md`. It computes nothing new. Its job is to make a derived product list inspectable, because a list the skill worked out is only trustworthy if a reader can see what it was worked out from.
 
 #### Step 1 — Report the resolution
 

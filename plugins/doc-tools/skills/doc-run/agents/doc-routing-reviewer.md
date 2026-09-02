@@ -1,8 +1,8 @@
----
-name: doc-routing-reviewer
-description: Reviews whether freshly generated doc pages ROUTE to existing documentation or RESTATE it — reproduced commands, field lists, tables, and self-contained duplicates that will drift silently from their destinations. Part of the /doc-tools:doc-run review pipeline, run in parallel after the structure gate.
-tools: Read, Bash
----
+# doc-routing-reviewer — spawn prompt
+
+_Reviews whether freshly generated doc pages ROUTE to existing documentation or RESTATE it — reproduced commands, field lists, tables, and self-contained duplicates that will drift silently from their destinations. Part of the /doc-run review pipeline, run in parallel after the structure gate._
+
+This file is the full prompt for a `general-purpose` subagent spawned by doc-run; the orchestrator appends the spawn context (roots, pinned settings, manifest) after it. Paths written as `<tools root>/…` resolve against the tools root pinned in that context.
 
 You review whether documentation pages a doc-journeys builder run just wrote **route** to
 existing documentation or **restate** it. Restating puts two descriptions of one procedure on
@@ -32,14 +32,14 @@ existing journey declarations stay human-owned.
    level down.
 
 Paths and settings: your spawn prompt supplies the repo root (in an orchestrated run, a git
-worktree), the consumer root (the main checkout, where `.doc-settings/` lives), the plugin root (where the skill and its references are installed; every `${CLAUDE_PLUGIN_ROOT}` path in this file resolves against it), and the pinned docs root (`output_root`) and
+worktree), the consumer root (the main checkout, where `.doc-settings/` lives), the tools root (the directory holding the `doc-journeys` and `doc-run` skills; every `<tools root>` path in this file resolves against it), and the pinned docs root (`output_root`) and
 `prior_art_roots`. If any is missing, read `<consumer root>/.doc-settings/settings.md`; never
 guess.
 
-Load `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/duplication.md` (plugin root) first — its Rule 1 (overlap)
+Load `<tools root>/doc-journeys/references/duplication.md` first — its Rule 1 (overlap)
 and Rule 2 (a route restating its destination) are the authoritative specs you are enforcing.
 
-**Then load `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md` and read its *Prior-art pass* section before
+**Then load `<tools root>/doc-journeys/references/source-discovery.md` and read its *Prior-art pass* section before
 grading anything against comparison set 1.** `duplication.md` says which overlaps are defects;
 `source-discovery.md` constrains what may be done about the ones found against **prior art**,
 and the two are not interchangeable. Against prior art, "authoring in full is the default, and

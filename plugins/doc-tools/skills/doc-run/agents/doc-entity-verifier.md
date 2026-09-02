@@ -1,8 +1,8 @@
----
-name: doc-entity-verifier
-description: Verifies entities on freshly generated doc pages that live outside the source repositories — Slack channels, group handles, DLs, named people, URLs, request forms — by corroboration counting, since citation cannot establish their existence. Part of the /doc-tools:doc-run review pipeline, run in parallel after the structure gate.
-tools: Read, Bash
----
+# doc-entity-verifier — spawn prompt
+
+_Verifies entities on freshly generated doc pages that live outside the source repositories — Slack channels, group handles, DLs, named people, URLs, request forms — by corroboration counting, since citation cannot establish their existence. Part of the /doc-run review pipeline, run in parallel after the structure gate._
+
+This file is the full prompt for a `general-purpose` subagent spawned by doc-run; the orchestrator appends the spawn context (roots, pinned settings, manifest) after it. Paths written as `<tools root>/…` resolve against the tools root pinned in that context.
 
 You verify entities on freshly authored documentation pages that live OUTSIDE the source
 repositories, where citing a source cannot establish existence. The recorded failure this role
@@ -32,7 +32,7 @@ existing journey declarations stay human-owned.
 - team names presented as contact points
 
 Paths and settings: your spawn prompt supplies the repo root (in an orchestrated run, a git
-worktree), the consumer root (the main checkout, where `.doc-settings/` lives), the plugin root (where the skill and its references are installed; every `${CLAUDE_PLUGIN_ROOT}` path in this file resolves against it), the source root (per settings — NEVER the
+worktree), the consumer root (the main checkout, where `.doc-settings/` lives), the tools root (the directory holding the `doc-journeys` and `doc-run` skills; every `<tools root>` path in this file resolves against it), the source root (per settings — NEVER the
 parent of a worktree), and the pinned `contact_corroborators`. If any is missing, read
 `<consumer root>/.doc-settings/settings.md`; never guess. Every direct-child git repository of
 the source root is a source repo. Corroboration follows `authoring.md`'s tiers: schema-validated
@@ -44,7 +44,7 @@ it does not count — its prose is exactly the stale-mention risk this check exi
 corroborating hit in any source repo outside the consumer repo means the entity does not belong
 on a page.
 
-Load the contact-point rules in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md` (plugin root) first
+Load the contact-point rules in `<tools root>/doc-journeys/references/authoring.md` first
 — they are the authority on what may appear on a page, and your job is to check they were
 applied. Then load the consumer's **estate adapter** (the `source_discovery` file in settings)
 for its *Known contact-point traps* — former names, prefix collisions, permalink form.

@@ -5,7 +5,7 @@ description: How the skill identifies candidate duplicate clusters — groups of
 
 # Duplication detection
 
-This file specifies how the skill identifies candidate duplicate clusters. It runs after gap analysis (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/gap-analysis.md`) and before the placement map.
+This file specifies how the skill identifies candidate duplicate clusters. It runs after gap analysis (`${CLAUDE_SKILL_DIR}/references/gap-analysis.md`) and before the placement map.
 
 This step is **intentionally minimal**. It uses one structural rule, no LLM judgement, no semantic similarity. Read the "What this does NOT catch" section carefully before interpreting the output — the simplicity comes at a cost, and the cost is explicit by design.
 
@@ -37,7 +37,7 @@ A small number of false positives at this stage is cheaper than the alternative 
 
 ### Step 1 — Filter scope
 
-Consider only pages that have at least one journey match with `confidence: strong` (from `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/journey-matching.md`). Pages with only weak journey matches are excluded — weak matches are partial coverage by definition, and including them would generate false positives.
+Consider only pages that have at least one journey match with `confidence: strong` (from `${CLAUDE_SKILL_DIR}/references/journey-matching.md`). Pages with only weak journey matches are excluded — weak matches are partial coverage by definition, and including them would generate false positives.
 
 Pages with no journey match are **not analysed** for duplication in this version. See "What this does NOT catch" below.
 
@@ -84,7 +84,7 @@ From the cross-product page and from each target, extract:
   * the contents of every fenced code block
   * inline-code spans matching a command, file path, config key, resource name, or flag
 
-These are the things `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md` requires be copied character-for-character, which is what makes them comparable at all: a restated step reproduces them exactly, because paraphrasing them is already forbidden.
+These are the things `${CLAUDE_SKILL_DIR}/references/authoring.md` requires be copied character-for-character, which is what makes them comparable at all: a restated step reproduces them exactly, because paraphrasing them is already forbidden.
 
 ### Step 3 — Flag overlaps
 
@@ -103,7 +103,7 @@ Ignore literals shorter than 8 characters and any that appear on more than three
 
 ### What a flag means, and what it does not
 
-A restating flag is a **defect in a page this run authored**, not a reportable observation about legacy content. Rule 1 against prior art is tolerated because two teams writing the same thing years apart is a fact about the estate; Rule 2 firing means the skill wrote a route that duplicates its own destination in the same run, and `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md` is explicit that it must not.
+A restating flag is a **defect in a page this run authored**, not a reportable observation about legacy content. Rule 1 against prior art is tolerated because two teams writing the same thing years apart is a fact about the estate; Rule 2 firing means the skill wrote a route that duplicates its own destination in the same run, and `${CLAUDE_SKILL_DIR}/references/authoring.md` is explicit that it must not.
 
 The remedy is to cut the restated material from the route and leave the link, not to delete the page and not to edit the target. Apply it before writing, and report the flag either way so a reviewer can see the route was trimmed rather than assume it was always clean.
 

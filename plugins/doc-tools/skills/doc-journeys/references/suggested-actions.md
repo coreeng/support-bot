@@ -7,13 +7,13 @@ description: How the skill synthesises per-step outputs into a single prioritise
 
 This file specifies how the skill turns the outputs of steps 1–6 into a single prioritised list of next actions. It is a **synthesis step**: it does not analyse, judge, or read pages. It maps existing signals to a fixed enum of action types using deterministic rules.
 
-The step runs after quality flags (`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/quality-flags.md`) and before the placement map is built.
+The step runs after quality flags (`${CLAUDE_SKILL_DIR}/references/quality-flags.md`) and before the placement map is built.
 
 ## Action vocabulary
 
 Twelve action types, fixed enum. The skill MUST NOT emit actions outside this list.
 
-Seven of the twelve derive from journey verdicts, duplication clusters or classification verdicts, so **none of them can fire on a product-only run** (`journeys = []`), where `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/audience-tagging.md` also leaves the audience-mismatch subtable empty. The remaining five — `expand-stub`, `clean-stale-markers`, and the three product-scoped types added below — are the only ones a product-only run can emit. Before this was true the section was reliably empty on such runs, and runs responded by writing free-prose lists into it against this file's own rule, which left the section meaning two different things across reports.
+Seven of the twelve derive from journey verdicts, duplication clusters or classification verdicts, so **none of them can fire on a product-only run** (`journeys = []`), where `${CLAUDE_SKILL_DIR}/references/audience-tagging.md` also leaves the audience-mismatch subtable empty. The remaining five — `expand-stub`, `clean-stale-markers`, and the three product-scoped types added below — are the only ones a product-only run can emit. Before this was true the section was reliably empty on such runs, and runs responded by writing free-prose lists into it against this file's own rule, which left the section meaning two different things across reports.
 
 | Action type | Severity | Triggered by |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ Seven of the twelve derive from journey verdicts, duplication clusters or classi
 | `complete-how-to` | medium | A journey whose gap-analysis verdict is `partial` AND the reason list contains `missing variations` or `not end-to-end`. |
 | `strengthen-how-to` | medium | A journey whose gap-analysis verdict is `partial` AND the reason list contains `weak how-to matches only`. |
 | `realign-audience` | medium | Any row in section 3's "Audience mismatches" subtable. |
-| `consolidate-cluster` | medium | Any duplication cluster from `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/duplication.md`. |
+| `consolidate-cluster` | medium | Any duplication cluster from `${CLAUDE_SKILL_DIR}/references/duplication.md`. |
 | `expand-stub` | low | A page carrying the `hollow` quality flag. |
 | `clean-stale-markers` | low | A page carrying the `stale-marker` quality flag. |
 | `review-rewrite` | low | Every page with a REWRITE-* verdict from classification. |
@@ -117,7 +117,7 @@ Fires once per run, on the product page, when BOTH hold after the entity sweep:
 - Description: `The product page gives a reader no corroborated route to a human; nearest candidate is '<entity>' (<n> corroborating sources), which needs an owner's confirmation before publication.`
 - Source reference: the product page path, plus the path and line of the strongest candidate, or `none found` where the sweep produced no candidate at all.
 
-Name the strongest **candidate** and its corroboration count; never the entity the brief asserted, unless corroboration independently reached it. A candidate attributed to the owning *team* rather than to this product is still a candidate — say so in the description, because generalising a team's channel into the product's channel is the error `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md` forbids, and the action exists precisely so a human closes that hop rather than the skill guessing it.
+Name the strongest **candidate** and its corroboration count; never the entity the brief asserted, unless corroboration independently reached it. A candidate attributed to the owning *team* rather than to this product is still a candidate — say so in the description, because generalising a team's channel into the product's channel is the error `${CLAUDE_SKILL_DIR}/references/authoring.md` forbids, and the action exists precisely so a human closes that hop rather than the skill guessing it.
 
 The one-hop test is what keeps this from firing on every page that correctly routes elsewhere: a product page that links to a wiki page naming a channel has given the reader a route, and no action is due.
 

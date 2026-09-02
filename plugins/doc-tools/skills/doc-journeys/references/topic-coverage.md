@@ -58,7 +58,7 @@ If a journey has zero matched pages, every topic is `missing` with empty evidenc
 
 ### Part A4 — Topic coverage per journey *(always when `journeys` is non-empty)*
 
-Position in the Part A sequence: **A1 → A2 → A3 → A4 → A5**. A4 precedes A5 (per-journey page index, specified in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/journey-matching.md`).
+Position in the Part A sequence: **A1 → A2 → A3 → A4 → A5**. A4 precedes A5 (per-journey page index, specified in `${CLAUDE_SKILL_DIR}/references/journey-matching.md`).
 
 Columns: `Journey | Topic | Status | Evidence`.
 
@@ -76,7 +76,7 @@ Part A4 is intentionally orthogonal to Parts A2/A3 and to the coverage verdicts 
 
 - A journey marked `covered` in Section 3 may still have `missing` topics in Part A4. Coverage is page-count-based; topic coverage is content-based.
 - A journey with a `present` topic count below `Min topics` from `weightings.md` is **not** flagged. The Min/Max columns are about page counts, not topic counts; the two metrics are distinct.
-- A `missing` topic does NOT trigger any suggested action in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/suggested-actions.md`. The action enum is fixed; this step is descriptive only.
+- A `missing` topic does NOT trigger any suggested action in `${CLAUDE_SKILL_DIR}/references/suggested-actions.md`. The action enum is fixed; this step is descriptive only.
 
 ## What this does NOT do
 

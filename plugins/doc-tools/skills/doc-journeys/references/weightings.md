@@ -11,7 +11,7 @@ The step is purely descriptive: no suggested actions are emitted from weighting 
 
 ## Input — `product-definition/weightings.md`
 
-Located alongside `product.md` and `journeys/` in the product definition — see `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md` for where that folder lives per mode (the consumer repository's `product-definition/` in `author` and `plan` modes; the scanned repo root in legacy `audit` mode). In a multi-product batch each product carries its own optional `weightings.md`. The skill is read-only with respect to this file.
+Located alongside `product.md` and `journeys/` in the product definition — see `${CLAUDE_SKILL_DIR}/references/product-definition.md` for where that folder lives per mode (the consumer repository's `product-definition/` in `author` and `plan` modes; the scanned repo root in legacy `audit` mode). In a multi-product batch each product carries its own optional `weightings.md`. The skill is read-only with respect to this file.
 
 ### Schema
 
@@ -78,7 +78,7 @@ Journeys present in `journeys/` but absent from the weightings table are **exclu
 
 ## Output — REPORT.md
 
-This file contributes Parts **A2** and **A3** under the "Journey relevance summary" Part A heading. Part A1 (existing), Part A4 (topic coverage, specified in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/topic-coverage.md`), and Part A5 (per-journey page index, specified in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/journey-matching.md`) are out of scope for this file but MUST appear in the report alongside A2/A3 when their own emit conditions are met. The full Part A sequence is **A1 → A2 → A3 → A4 → A5**. Part B ("Pages with no journey match") is unchanged.
+This file contributes Parts **A2** and **A3** under the "Journey relevance summary" Part A heading. Part A1 (existing), Part A4 (topic coverage, specified in `${CLAUDE_SKILL_DIR}/references/topic-coverage.md`), and Part A5 (per-journey page index, specified in `${CLAUDE_SKILL_DIR}/references/journey-matching.md`) are out of scope for this file but MUST appear in the report alongside A2/A3 when their own emit conditions are met. The full Part A sequence is **A1 → A2 → A3 → A4 → A5**. Part B ("Pages with no journey match") is unchanged.
 
 ### Part A1 — Per-journey page counts *(unchanged)*
 
@@ -104,7 +104,7 @@ When the weightings file is absent or unparseable, A2 and A3 are not emitted; Pa
 - **Does not enforce min/max topics.** Those columns are displayed for the reader's reference; no warning, action, or verdict is derived from them.
 - **Does not normalise sums.** Out-of-tolerance ideal sums are reported and used as-is.
 - **Does not handle SPLIT outputs as separate units.** Word count is measured at the source page; per-output-file word counts are not computed.
-- **Does not consider audience tier.** A page matched to journey J counts toward J regardless of whether its audience is `end-user` or `builder/maintainer`. Audience mismatches are reported separately per `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/audience-tagging.md`.
+- **Does not consider audience tier.** A page matched to journey J counts toward J regardless of whether its audience is `end-user` or `builder/maintainer`. Audience mismatches are reported separately per `${CLAUDE_SKILL_DIR}/references/audience-tagging.md`.
 
 ## Cross-section consistency
 

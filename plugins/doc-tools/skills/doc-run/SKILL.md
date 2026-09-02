@@ -1,6 +1,7 @@
 ---
 name: doc-run
-description: Orchestrate an unattended doc-journeys run in its own worktree and branch - plan, auto-confirmed build, structural gate, parallel deep review, adversarial verification of findings, an automatic fix loop, and a close-out that hands the user a branch to review and merge. Use when the user asks to generate or refresh product/journey documentation with review, or invokes /doc-tools:doc-run <documentation request>.
+description: Orchestrate an unattended doc-journeys run in its own worktree and branch - plan, auto-confirmed build, structural gate, parallel deep review, adversarial verification of findings, an automatic fix loop, and a close-out that hands the user a branch to review and merge. Use when the user asks to generate or refresh product/journey documentation with review, or invokes /doc-run <documentation request>.
+license: Apache-2.0
 ---
 
 # doc-run
@@ -15,17 +16,18 @@ across the whole run via `SendMessage`; the reviewers are always fresh spawns, n
 builder — the builder's context contains its own rationalisations, and independent eyes are
 the point of the pipeline.
 
-The agents, installed alongside this skill: `doc-tools:doc-builder`, `doc-tools:doc-structure-reviewer`,
-`doc-tools:doc-gap-auditor`, `doc-tools:doc-entity-verifier`, `doc-tools:doc-routing-reviewer`, `doc-tools:doc-finding-verifier`.
-
-They are plugin agents, so they are addressed by their namespaced name — pass `doc-tools:<agent>`
-as the Agent tool's `subagent_type`. If the tool's agent listing shows them under a different
-form, use the listed form and record that in the close-out.
+The six agents are **prompt files** under `${CLAUDE_SKILL_DIR}/agents/`: `doc-builder.md`,
+`doc-structure-reviewer.md`, `doc-gap-auditor.md`, `doc-entity-verifier.md`,
+`doc-routing-reviewer.md`, `doc-finding-verifier.md`. **To spawn one:** Agent tool,
+`subagent_type: "general-purpose"`, prompt = the file's full text verbatim, followed by a spawn
+context block — the four roots, the pinned settings, and whatever the step hands over (request,
+manifest, baseline, findings). "Spawn `doc-builder`" below always means exactly that. Reviewer
+prompts declare themselves read-only; the prompt is the contract, so never trim it.
 
 The pipeline is **consumer-agnostic**: everything about the repository being documented — its
 output root, its write locations, its base branch, how its site builds, what an unattended run is
 authorised to do — comes from that repository's `.doc-settings/` (doc-journeys'
-`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/settings.md`). You read it once, at step 0, and **pin every value you use into every
+`${CLAUDE_SKILL_DIR}/../doc-journeys/references/settings.md`). You read it once, at step 0, and **pin every value you use into every
 spawn prompt**, so no agent ever has to rediscover or guess one.
 
 ## Step 0 — settings, worktree and branch
@@ -45,12 +47,18 @@ missing, stop and name it.
 Every run gets its own worktree and branch so several runs can proceed in parallel from one
 workstation and each lands as a mergeable unit. Four roots, carried in **every** spawn prompt:
 
-- **Plugin root** — `${CLAUDE_PLUGIN_ROOT}`, the doc-tools plugin's installation directory,
-  substituted into this file when the skill loads. It holds `skills/` (doc-journeys, doc-run)
-  and `agents/`. Pin the substituted absolute path in every spawn prompt as "plugin root":
-  agent definitions are not guaranteed the substitution, so every plugin-root path
-  an agent reads resolves against the value you pinned. Agents load skills and references from
-  here, so a run always uses the pipeline as currently installed, not as of the branch point.
+- **Tools root** — the directory holding the `doc-run` and `doc-journeys` skill directories:
+  `${CLAUDE_SKILL_DIR}/..` (substituted into this file when the skill loads; the plugin's
+  `skills/`, or `.claude/skills/` in a vendored install). Resolve it once and pin the absolute
+  path in every spawn prompt as "tools root" — prompt files get no substitution, so every
+  `<tools root>` path an agent reads resolves against the value you pinned. Agents load
+  doc-journeys and its references from here, so a run always uses the pipeline as currently
+  installed, not as of the branch point.
+
+  ```bash
+  TOOLS_ROOT=$(cd "${CLAUDE_SKILL_DIR}/.." && pwd)
+  test -f "$TOOLS_ROOT/doc-journeys/SKILL.md" || stop   # doc-journeys must be installed beside doc-run
+  ```
 - **Consumer root** — the main checkout, resolved above. Holds `.doc-settings/` and anything
   gitignored that a worktree therefore lacks (`node_modules`, most importantly).
 - **Repo root** — the run's worktree (created below). Every read and write of
@@ -153,7 +161,7 @@ kind of thing the cross-check exists to catch. In a freshly created worktree the
 empty by construction; a non-empty one means the worktree was reused or pre-dirtied — stop and
 create a clean one rather than carrying a polluted baseline.
 
-Then spawn `doc-tools:doc-builder` (Agent tool, `subagent_type: "doc-tools:doc-builder"`) with the request, the
+Then spawn `doc-builder` (general-purpose, prompt file first — see the top of this file) with the request, the
 four roots, and the pinned settings values (the *Rules* list what every spawn prompt carries). It runs doc-journeys through the
 confirm-before-writing gate (Process step 6) and returns the resolved inputs, the full plan,
 and any open questions. It writes nothing.
@@ -205,7 +213,7 @@ the run.
 **Rule overrides come only from the user's original request.** An unattended run has no one to
 grant an override mid-flight. Where the request itself overrides a rule — "publish those
 channels anyway" — name the exact rule in the confirmation (*Corroborate before emitting* in
-`${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`, and nothing else) and say plainly that no other rule is overridden;
+`${CLAUDE_SKILL_DIR}/../doc-journeys/references/authoring.md`, and nothing else) and say plainly that no other rule is overridden;
 otherwise the builder generalises it to a neighbouring rule that governs the same fact, which is
 how one run published two rival Slack channels side by side. Carry the same framing into the
 step 8 findings package. Where no override is in the request, none exists — you never grant one
@@ -213,7 +221,7 @@ yourself, whatever the builder proposes.
 
 **The declaration gate.** Where the plan proposes a declaration under `product-definition/`
 (step 1), it is confirmed by you with the rest of the plan — but not waved through. Check it
-against the schema in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md`, check each frontmatter value is marked
+against the schema in `${CLAUDE_SKILL_DIR}/../doc-journeys/references/product-definition.md`, check each frontmatter value is marked
 *found* (with citation) or *proposed* (with justification), and check the catalogue line is a
 single appended entry. A declaration that fails those checks goes back to the builder as a
 defect. Confirm it explicitly in the `CONFIRMED` message, and reproduce its **full frontmatter
@@ -268,14 +276,14 @@ reviewer AND verifier spawn prompt.
 that round changed. Merge it into the run manifest — union of entries, latest disposition wins
 — and use the merged manifest everywhere downstream (steps 6, 7 and 9).
 
-If the builder dies or its context is lost after the build, spawn a fresh `doc-tools:doc-builder` whose
+If the builder dies or its context is lost after the build, spawn a fresh `doc-builder` whose
 first message starts with the line `FINDINGS` and says it is a recovery builder with no prior
 context, carrying the merged manifest, the findings, and the report paths — its definition's
-Phase 3 covers exactly this entry and makes it load `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/refresh.md` first.
+Phase 3 covers exactly this entry and makes it load `${CLAUDE_SKILL_DIR}/../doc-journeys/references/refresh.md` first.
 
 **Loss before or at the plan gate has its own recipe.** When the planner is lost after its
 plan was delivered (the compaction case above — you hold the plan, it does not): stand the
-old builder down explicitly, spawn a fresh `doc-tools:doc-builder` whose spawn prompt says it is a
+old builder down explicitly, spawn a fresh `doc-builder` whose spawn prompt says it is a
 pre-build recovery builder and carries the four roots, the pinned settings and the request, then — as a
 **separate** `SendMessage`, never inside the spawn prompt — send the confirmation: first line
 exactly `CONFIRMED`, followed by the full confirmed plan and any declaration **verbatim**
@@ -290,13 +298,13 @@ at step 2 with the accumulated refinements.
 
 ## Step 5 — structural gate
 
-Spawn `doc-tools:doc-structure-reviewer` with the manifest and the baseline. Add `scope: full-tree` when
+Spawn `doc-structure-reviewer` with the manifest and the baseline. Add `scope: full-tree` when
 the user asks for a retroactive audit, or on the first pipeline run over pages that predate it
 — old pages can carry collisions the rules postdate, and no manifest-scoped spawn will ever
 see them. It is mechanical and cheap, and it gates the expensive reviews: **if the site build
 fails or any `shipped`-severity structural finding against a PAGE comes back, do not proceed**
 — send those findings to the builder now (`SendMessage`, format under step 8), have it fix
-them, then re-run a fresh `doc-tools:doc-structure-reviewer` once — **with `scope: delta`**: pass the
+them, then re-run a fresh `doc-structure-reviewer` once — **with `scope: delta`**: pass the
 previous pass's findings and the fix round's changed-file list from its manifest, so the
 re-run builds the site once, re-checks the fixed defects by their reproduce commands, and
 runs full checks only over changed files. A full pass costs ~30 minutes and one recorded run
@@ -343,16 +351,16 @@ and a finding that the frame is wrong is a real finding for group 2.
 Spawn all three in a single message so they run concurrently, each with the manifest and a
 one-line note of the structure reviewer's outcome:
 
-- `doc-tools:doc-gap-auditor` — audits every absence claim adversarially
-- `doc-tools:doc-entity-verifier` — corroborates every external entity
-- `doc-tools:doc-routing-reviewer` — checks routing vs restatement
+- `doc-gap-auditor` — audits every absence claim adversarially
+- `doc-entity-verifier` — corroborates every external entity
+- `doc-routing-reviewer` — checks routing vs restatement
 
 They are read-only and independent; none of them needs another's output.
 
 ## Step 7 — verify, then triage (automatic)
 
 Collect all findings. Those flagged `needs_verification: true` (refuted gaps, entity removals,
-content deletions) go to `doc-tools:doc-finding-verifier` — every spawn prompt carries the findings AND
+content deletions) go to `doc-finding-verifier` — every spawn prompt carries the findings AND
 the merged manifest; batch into one spawn, or two parallel spawns if there are more than ~8.
 Findings the verifier OVERTURNS are dropped from the actionable list (but kept for the
 close-out under a separate heading — the user should see what was raised and rejected, and
@@ -404,7 +412,7 @@ produced false mismatches that cost a round to un-raise.
 
 ## Step 9 — re-verify
 
-Spawn a fresh `doc-tools:doc-structure-reviewer` **with `scope: delta`** — the step 8 round's findings
+Spawn a fresh `doc-structure-reviewer` **with `scope: delta`** — the step 8 round's findings
 plus its changed-file list — never a full pass here (fixes can introduce new collisions, but
 only in files they touched; precedent: the duplicate-title fix itself needed verifying
 against rendered HTML, and equally, full final passes have cost 27+ minutes re-verifying
@@ -461,9 +469,9 @@ not as open questions back to the user. Then:
   and recorded in the close-out. The only questions that reach the user are before the run
   starts (no request given) and after it ends. Hard stops — a failed structural re-run, an
   unauthorised `product-definition/` write — end the run with a close-out, not a question.
-- Every spawn prompt carries the four roots — plugin root (the substituted `${CLAUDE_PLUGIN_ROOT}`),
-  consumer root (the main checkout),
-  repo root (the worktree), source root. Agents read pipeline rules from the plugin root and
+- Every spawn prompt opens with the agent's prompt file verbatim and carries the four roots —
+  tools root (the resolved `${CLAUDE_SKILL_DIR}/..`), consumer root (the main checkout),
+  repo root (the worktree), source root. Agents read pipeline rules from the tools root and
   content from the repo root; nothing in a run reads or writes the main checkout's content tree.
 - Every spawn prompt also pins the settings values every agent otherwise rediscovers or gets
   wrong: `output_root`, `reports_dir`, `proposals_root`, `plan_file`, `write_locations`,

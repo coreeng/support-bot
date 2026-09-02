@@ -6,7 +6,7 @@ directory is missing or a required key is empty, so nothing here is optional unl
 `references/settings.md` says so.
 
 ```bash
-cp -r "$PLUGIN_ROOT/templates/doc-settings" <consumer root>/.doc-settings
+cp -r <tools root>/doc-journeys/assets/doc-settings <consumer root>/.doc-settings
 ```
 
 | File | Role | What to change |
@@ -33,5 +33,5 @@ document Foglight.
 Then run the skill in plan mode before anything writes:
 
 ```
-/doc-tools:doc-journeys plan mode for <a product you have declared>
+/doc-journeys plan mode for <a product you have declared>
 ```

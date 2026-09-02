@@ -11,7 +11,7 @@ It is a **reorganiser, not an author**. Given a product definition — products,
 ## Quick start
 
 The skill ships in the `doc-tools` Claude Code plugin (see *Installing* in the plugin README), so the
-slash form is `/doc-tools:doc-journeys <request>`. In prose:
+slash form is `/doc-journeys <request>` (`/doc-tools:doc-journeys` when installed as the plugin). In prose:
 
 ```
 Use doc-journeys in plan mode for Foglight.
@@ -35,7 +35,7 @@ Other modes: `refresh` updates pages a previous run wrote, touching only what it
 
 The repository being documented — the **consumer** — owns two directories at its root:
 
-  * **`.doc-settings/`** — everything repo-, site- and estate-specific. `settings.md` carries every scalar the skill pins (output root, reports and proposals directories, write locations, base branch, source root rule, build command, marker syntax, …) and names three adapter files: an **estate adapter** (source-root derivation, repo scope, prior art, known contact-point traps), a **site adapter** (section furniture, frontmatter conventions, template tags, Weight table, build notes) and an **authorisations** file (what an unattended run may do, granted by whom, when). The required keys are listed in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/settings.md`.
+  * **`.doc-settings/`** — everything repo-, site- and estate-specific. `settings.md` carries every scalar the skill pins (output root, reports and proposals directories, write locations, base branch, source root rule, build command, marker syntax, …) and names three adapter files: an **estate adapter** (source-root derivation, repo scope, prior art, known contact-point traps), a **site adapter** (section furniture, frontmatter conventions, template tags, Weight table, build notes) and an **authorisations** file (what an unattended run may do, granted by whom, when). The required keys are listed in `${CLAUDE_SKILL_DIR}/references/settings.md`.
   * **`product-definition/`** — the products and journeys to document, below.
 
 Prerequisites the skill checks or assumes: the site's dependency directory (`node_modules` or equivalent) is present at the consumer root; the `worktree_dir` is gitignored; `base_branch` exists.
@@ -63,7 +63,7 @@ product-definition/
 
 `journeys/<slug>.md` frontmatter — `name` (required); `description`, `users`, `feature`, `spine`, `variations` (optional). The `spine` is the Diátaxis type of the journey's end-to-end page: `how-to` (the default), `tutorial`, or `explanation`.
 
-Full schemas are in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/product-definition.md`.
+Full schemas are in `${CLAUDE_SKILL_DIR}/references/product-definition.md`.
 
 ### The brief is the highest-value input
 
@@ -100,13 +100,13 @@ Evidence splits into two roles:
 
 When prose and code disagree, the skill writes neither and reports the conflict. Material that exists only in code is reported as **undocumented surface area** — a concrete list of what a human needs to go and write.
 
-Details in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md` and `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/authoring.md`.
+Details in `${CLAUDE_SKILL_DIR}/references/source-discovery.md` and `${CLAUDE_SKILL_DIR}/references/authoring.md`.
 
 ---
 
 ## Confidence scoring
 
-Every authored page carries a confidence score. It is **computed from the evidence set, not judged** — number and relevance of evidence files, whether any claim was corroborated by deployed config or a schema, whether sources agreed, and whether every claim traces to a source. The rubric is in `${CLAUDE_PLUGIN_ROOT}/skills/doc-journeys/references/source-discovery.md`.
+Every authored page carries a confidence score. It is **computed from the evidence set, not judged** — number and relevance of evidence files, whether any claim was corroborated by deployed config or a schema, whether sources agreed, and whether every claim traces to a source. The rubric is in `${CLAUDE_SKILL_DIR}/references/source-discovery.md`.
 
   * **high** — well-evidenced, multiple relevant sources, at least one machine-corroborated claim
   * **medium** — grounded but thin
