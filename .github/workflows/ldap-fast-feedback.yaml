@@ -35,6 +35,14 @@ jobs:
 
   fastfeedback:
     needs: [version]
+    # Shares the group of support-bot-fast-feedback.yaml: both workflows helm
+    # upgrade support-bot-ldap in the shared support-bot-integration namespace
+    # (root Makefile ldap-deploy-integration vs. ldap/Makefile p2p-integration),
+    # and the namespace is fixed per stage, not per branch or PR. Queue, never
+    # cancel, so no in-flight helm operation is killed mid-install.
+    concurrency:
+      group: p2p-fast-feedback-support-bot
+      cancel-in-progress: false
     uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
     secrets:
       slack_webhook_url: ${{ secrets.P2P_SLACK_WEBHOOK_URL }}

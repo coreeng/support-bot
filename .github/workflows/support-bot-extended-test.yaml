@@ -21,6 +21,12 @@ jobs:
 
   extendedtests:
     needs: [get-latest-version]
+    # support-bot-extended is a single shared namespace (P2P_NAMESPACE_EXTENDED
+    # in .p2p.mk); a manual dispatch overlapping the nightly schedule must queue
+    # rather than race or cancel a run mid-deploy.
+    concurrency:
+      group: p2p-extended-test-support-bot
+      cancel-in-progress: false
     uses: coreeng/p2p/.github/workflows/p2p-workflow-extended-test.yaml@v1
     secrets:
       slack_webhook_url: ${{ secrets.P2P_SLACK_WEBHOOK_URL }}

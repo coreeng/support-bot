@@ -38,6 +38,16 @@ jobs:
 
   fastfeedback:
     needs: [version]
+    # The p2p namespaces are fixed per stage (support-bot-functional, -nft,
+    # -integration: see P2P_NAMESPACE in .p2p.mk), not per branch or PR, so every
+    # run of this workflow deploys into the same namespaces. Serialise the
+    # deploying job with a fixed group; never cancel a running deploy (that is
+    # what leaves helm releases stuck in pending-*), queue behind it instead.
+    # The group is shared with ldap-fast-feedback.yaml, which upgrades the same
+    # support-bot-ldap release in support-bot-integration.
+    concurrency:
+      group: p2p-fast-feedback-support-bot
+      cancel-in-progress: false
     uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
     secrets:
       slack_webhook_url: ${{ secrets.P2P_SLACK_WEBHOOK_URL }}
