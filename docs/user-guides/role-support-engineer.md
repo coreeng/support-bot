@@ -44,7 +44,7 @@ If an open ticket has had no activity for the configured period (default: 3 days
 
 ## Managing tickets
 
-Click any ticket row to open the edit modal. As a support engineer you can change:
+The tickets table is on the home page (`/tickets` still redirects there). Click any ticket row to open the edit modal. As a support engineer you can change:
 
 | Field | Options |
 |---|---|
@@ -66,25 +66,23 @@ You have access to all analytics pages:
 - **SLA** — SLA percentile and distribution views
 - **Health** — service health indicators
 
-These pages are also accessible to leadership, but only support engineers can feed new data into them via analysis (see below).
+These pages are also accessible to leadership.
 
-## Knowledge gaps and support area analysis
+## Support Summary
 
-The Knowledge Gaps page shows support areas and knowledge gaps identified from historical ticket data. As a support engineer you can refresh this data by running or managing analysis.
+The **Support Summary** page (`/summary`) replaced the Knowledge Gaps page — old `/knowledge-gaps` links redirect to it. It shows what tenants raised in a date window, and why. It appears in the sidebar only when the feature is enabled on your deployment, and only for support engineers and leadership.
 
-### When automated analysis is enabled
+Pick a window with the dropdown at the top right: **Last Week**, **Last 2 Weeks** (the default), **Last Month**, or **Custom** with a from/to date. Windows are whole days; the presets end yesterday, and a custom range may span up to 366 days (the end date must not be before the start). The page then shows:
 
-Click **Run Analysis**, select a query window (last week, month, or quarter), and click **Run Analysis** again. The page shows live progress while the job runs. Once complete, the support area summary updates automatically.
+- A strip with the window and the number of **tickets raised** in it.
+- **At a glance** — the LLM-written narrative for the window, followed by chips for the total raised, the top driver (with its share), top subject, top feature and top tenant team, and an **Awaiting classification** count if any tickets are not yet classified.
+- Breakdown cards: **Top Support Areas** (by driver, with a stacked share bar), **Top categories**, **Top knowledge gaps** (categories of tickets whose driver is "Knowledge Gap"), **Top products** (only when product tags are configured), **Top Platform Features** and **Top Teams** (each team shows its top product). Every row has a count and share; click a row to expand its five most recent tickets, and click a ticket to open the usual edit modal.
 
-### When automated analysis is disabled (manual workflow)
+The narrative has three states: **ready** (the text, with the model and generation time underneath), **generating** (a progress bar while threads are analysed, then "Writing the summary..."), or **unavailable** (an error message; the breakdowns still show).
 
-The same button opens a panel with three options:
+There is no **Run Analysis** button any more. Opening the page classifies any closed-but-unclassified tickets in the window automatically, then writes the summary; the page keeps polling until it is ready. Results are cached per window and regenerated only when the window's tickets change. If a window's **Awaiting classification** count never clears, see the [Support Summary runbook](../runbooks/support-summary.md#re-running-classification-by-hand) — a support engineer can re-run the classification through the API.
 
-1. **Export** — downloads a ZIP of the raw thread texts from the selected time window. This is the input you feed to the analysis script.
-2. **Analysis Bundle** — downloads the analysis prompt and script. Run this locally or in CI against the exported data to produce a `.jsonl` results file.
-3. **Import** — uploads a `.jsonl` results file produced by the analysis bundle. This updates the support area summary visible to everyone.
-
-The typical manual cycle is: Export → run the bundle locally → Import.
+**View Prompts** (top right) opens a dialog with a dropdown showing the two prompts the page uses: **Ticket classification** (how each thread is sorted into driver, category and feature) and **Summary generation** (how the narrative is written). Both are read-only.
 
 ## Escalations
 
@@ -92,7 +90,7 @@ You can view the full escalations list and its filters. To escalate a ticket, us
 
 ## Tips for new support engineers
 
-- Tag tickets accurately — tags feed the escalation trend and knowledge gap analysis, so they're more useful than they appear.
+- Tag tickets accurately — tags feed the escalation trend charts and the products breakdown on the Support Summary, so they're more useful than they appear.
 - Set "Author's team" before closing a ticket. The bot suggests likely teams based on the thread, but verify it — this field drives the per-team metrics.
 - If a ticket has been sitting as "opened" for a while with no reply, mark it "stale" rather than leaving it open — it keeps the metrics honest.
 - Check the Stats page weekly to spot patterns (recurring tags, teams with high escalation rates) that might warrant proactive docs or a retro.

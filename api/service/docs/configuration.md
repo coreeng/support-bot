@@ -422,10 +422,11 @@ Leadership and support-engineer users can inspect the connection, last attempts,
 ## Analysis (knowledge-gap LLM)
 
 Support Bot can analyse closed support threads with an LLM to identify knowledge gaps
-(the **Run Analysis** flow in the UI). The feature is off by default; enable it with
+(the classification behind the Support Summary page below, also triggerable through
+`POST /analysis/run`). The feature is off by default; enable it with
 `ANALYSIS_PROMPT_ENABLED=true`. The analysis prompt itself is stored in the database
-(versioned, with one version marked in use) and managed from the UI — there is no prompt
-file or environment variable.
+(versioned, with one version per type marked in use) — there is no prompt file or environment
+variable, and the UI only displays it.
 
 When enabled, the service builds exactly one LLM client at startup. Each provider block
 has an `enabled` flag and exactly one of them must be true — enabling both or neither
@@ -510,6 +511,16 @@ prompt is stored in the database alongside the classification prompt (`analysis_
 Access: the page and `GET /summary` are open to the `LEADERSHIP` and `SUPPORT_ENGINEER` roles;
 `GET /summary/enabled` is open to any authenticated user so the sidebar can decide whether to
 show the entry.
+
+A refresh that fails (LLM error, prompt missing) is remembered **in process**: per window, at most
+64 entries, and only until `SUMMARY_FAILURE_RETRY_DELAY` passes or the window's data or prompt
+changes. A restart forgets these failures, and each replica would keep its own set — the same
+trade-off the in-memory `GET /analysis/status` already makes. That is acceptable with the chart's
+single-replica API deployment (`helm-chart/templates/deployment.yaml` pins `replicas: 1`); if the
+API is ever scaled out, the worst case is one extra retry per replica after a failure.
+
+Rolling back past migration `V38` and re-running the classification by hand are covered in the
+[Support Summary runbook](../../../docs/runbooks/support-summary.md).
 
 ### Environment variables
 
