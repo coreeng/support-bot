@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.coreeng.supportbot.analysis.AnalysisPromptLoadException;
+import com.coreeng.supportbot.config.UtilsConfig;
 import com.coreeng.supportbot.security.AllowListService;
 import com.coreeng.supportbot.security.AuthCodeStore;
 import com.coreeng.supportbot.security.JwtAuthenticationToken;
@@ -54,7 +55,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
             "security.jwt.secret=test-jwt-secret-for-unit-tests-minimum-256-bits",
             "security.test-bypass.enabled=false"
         })
-@Import({SecurityConfig.class, SummaryMapper.class, SummaryExceptionHandler.class})
+// UtilsConfig supplies the production ObjectMapper so the ProblemDetail assertions below see the
+// same JSON shape the deployed app emits, not the Jackson defaults of the MockMvc slice.
+@Import({SecurityConfig.class, SummaryMapper.class, SummaryExceptionHandler.class, UtilsConfig.class})
 class SummaryControllerTest {
 
     /** A Thursday, so "yesterday" is unambiguous in the assertions below. */
