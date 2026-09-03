@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 
 import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
 import com.coreeng.supportbot.analysis.AnalysisService;
+import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisService;
 import com.coreeng.supportbot.analysis.WindowAnalysisRunner;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
@@ -68,6 +69,7 @@ class SummaryWiringTest {
             return new SummaryRefreshService(
                     mock(AsyncJobRepository.class),
                     mock(AnalysisService.class),
+                    mock(ThreadsAwaitingAnalysisService.class),
                     mock(AnalysisPromptRepository.class),
                     summaryReadRepository,
                     mock(SummarySnapshotRepository.class),

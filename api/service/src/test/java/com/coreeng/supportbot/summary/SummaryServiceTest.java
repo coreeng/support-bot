@@ -32,7 +32,7 @@ class SummaryServiceTest {
     private static final String CHANNEL = "C123456";
     private static final String CLASSIFICATION_PROMPT = "classify this";
     private static final String SUMMARY_PROMPT = "summarise this";
-    private static final String FINGERPRINT = "2@2026-03-23T10:00";
+    private static final String FINGERPRINT = "3/2@2026-03-23T10:00";
 
     private static final String CLASSIFICATION_PROMPT_ID = AnalysisService.computePromptId(CLASSIFICATION_PROMPT);
     private static final String SUMMARY_PROMPT_ID = AnalysisService.computePromptId(SUMMARY_PROMPT);
@@ -75,7 +75,8 @@ class SummaryServiceTest {
                 .thenReturn(breakdowns());
         lenient()
                 .when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
-                .thenReturn(new SummaryFingerprint(2, LocalDate.of(2026, 3, 23).atTime(10, 0)));
+                .thenReturn(
+                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0)));
         lenient().when(summaryRefresher.status()).thenReturn(idle());
         lenient()
                 .when(analysisService.getStatus())
@@ -97,7 +98,7 @@ class SummaryServiceTest {
     @Test
     void regeneratesWhenTheFingerprintNoLongerMatches() {
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
-                .thenReturn(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, "1@older", "stale", "model-a", null));
+                .thenReturn(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, "3/1@older", "stale", "model-a", null));
         when(summaryRefresher.start(WINDOW)).thenReturn(true);
 
         assertThat(service.get(FROM, TO).summary())
@@ -109,7 +110,8 @@ class SummaryServiceTest {
         // The analysis rows are unchanged since the snapshot, but a ticket has since closed unclassified:
         // the gap is part of the fingerprint, so the cached prose describes an incomplete window.
         when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
-                .thenReturn(new SummaryFingerprint(2, LocalDate.of(2026, 3, 23).atTime(10, 0), 1, 74));
+                .thenReturn(
+                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), 1, 74));
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
                 .thenReturn(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "prose", "model-a", null));
         when(summaryRefresher.start(WINDOW)).thenReturn(true);
@@ -137,7 +139,7 @@ class SummaryServiceTest {
         // A ticket whose thread is gone can never be classified. The snapshot was generated after
         // attempting it, so its fingerprint already carries the gap — regenerating would loop forever.
         SummaryFingerprint withGap =
-                new SummaryFingerprint(2, LocalDate.of(2026, 3, 23).atTime(10, 0), 1, 74);
+                new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), 1, 74);
         when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(withGap);
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))

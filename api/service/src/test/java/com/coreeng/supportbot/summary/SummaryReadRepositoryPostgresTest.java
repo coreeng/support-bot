@@ -245,36 +245,70 @@ class SummaryReadRepositoryPostgresTest {
         classify(classified, "Knowledge Gap", "Build & CI", "ci", "Done.", LocalDateTime.parse("2026-03-11T12:00:00"));
         SummaryFingerprint complete = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
         assertThat(complete.gapCount()).isZero();
-        assertThat(complete.value()).isEqualTo("1@2026-03-11T12:00");
+        assertThat(complete.value()).isEqualTo("1/1@2026-03-11T12:00");
 
         // An open ticket is not a gap — it will be classified once it closes.
         SummaryTestFixtures.insertTicket(
                 jdbcTemplate, CHANNEL, "ts-open", LocalDateTime.parse("2026-03-11T10:00:00"), "opened", "team-a");
-        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL)).value())
-                .isEqualTo(complete.value());
+        SummaryFingerprint withOpen = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        assertThat(withOpen.gapCount()).isZero();
+        assertThat(withOpen.value()).isEqualTo("2/1@2026-03-11T12:00");
 
         // A closed, unclassified ticket is: the fingerprint moves even though no analysis row changed.
         long gap = ticket("2026-03-12T09:00:00", "ts-gap", "team-a");
         SummaryFingerprint withGap = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        assertThat(withGap.ticketCount()).isEqualTo(3);
         assertThat(withGap.analysisCount()).isEqualTo(1);
         assertThat(withGap.gapCount()).isEqualTo(1);
         assertThat(withGap.gapIdSum()).isEqualTo(gap);
-        assertThat(withGap.value()).isEqualTo("1@2026-03-11T12:00#1:" + gap);
+        assertThat(withGap.value()).isEqualTo("3/1@2026-03-11T12:00#1:" + gap);
 
         // Classifying it closes the gap and moves the analysis half instead.
         classify(gap, "Task Request", "Build & CI", "ci", "Later.", LocalDateTime.parse("2026-03-12T12:00:00"));
         SummaryFingerprint after = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
         assertThat(after.gapCount()).isZero();
-        assertThat(after.value()).isEqualTo("2@2026-03-12T12:00");
+        assertThat(after.value()).isEqualTo("3/2@2026-03-12T12:00");
+    }
+
+    @Test
+    void fingerprintChangesWhenAnOpenTicketIsRaisedInTheWindow() {
+        long classified = ticket("2026-03-11T09:00:00", "ts-done", "team-a");
+        classify(classified, "Knowledge Gap", "Build & CI", "ci", "Done.", LocalDateTime.parse("2026-03-11T12:00:00"));
+        SummaryFingerprint before = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        assertThat(before.ticketCount()).isEqualTo(1);
+
+        // A ticket raised after the snapshot but still open changes no analysis row and is not a gap,
+        // yet it is in the totals the prose quotes — so a cached summary must read as stale.
+        SummaryTestFixtures.insertTicket(
+                jdbcTemplate, CHANNEL, "ts-open", LocalDateTime.parse("2026-03-12T10:00:00"), "opened", "team-b");
+        SummaryFingerprint after = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        assertThat(after.ticketCount()).isEqualTo(2);
+        assertThat(after.analysisCount()).isEqualTo(before.analysisCount());
+        assertThat(after.gapCount()).isZero();
+        assertThat(after.value()).isNotEqualTo(before.value());
+
+        // One raised outside the window, or in another channel, does not.
+        SummaryTestFixtures.insertTicket(
+                jdbcTemplate, CHANNEL, "ts-after", LocalDateTime.parse("2026-03-13T00:00:00"), "opened", "team-b");
+        SummaryTestFixtures.insertTicket(
+                jdbcTemplate,
+                OTHER_CHANNEL,
+                "ts-other",
+                LocalDateTime.parse("2026-03-12T11:00:00"),
+                "opened",
+                "team-b");
+        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL)).value())
+                .isEqualTo(after.value());
     }
 
     @Test
     void fingerprintOfAnEmptyWindowIsStable() {
         SummaryFingerprint fingerprint = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
 
+        assertThat(fingerprint.ticketCount()).isZero();
         assertThat(fingerprint.analysisCount()).isZero();
         assertThat(fingerprint.maxUpdatedAt()).isNull();
-        assertThat(fingerprint.value()).isEqualTo("0@-");
+        assertThat(fingerprint.value()).isEqualTo("0/0@-");
     }
 
     @Test

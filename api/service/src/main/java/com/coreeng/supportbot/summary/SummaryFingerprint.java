@@ -7,8 +7,12 @@ import org.jspecify.annotations.Nullable;
  * Cheap digest of the data a window's summary was generated from.
  *
  * <p>Cache validity is decided by comparing this against the stored snapshot's value — there is no
- * timer. Two things are digested:
+ * timer. Three things are digested:
  * <ul>
+ *   <li>The window's ticket count: every ticket raised in the window in a monitored channel, open or
+ *       closed. The prose quotes the window total and the "still open or not yet classified" figure,
+ *       so a ticket raised after the snapshot (a viewer whose window ends today) makes it stale even
+ *       though it is not yet a classification gap.
  *   <li>The window's {@code analysis} rows under the current prompt. Rows are only ever inserted or
  *       updated (never deleted), so a change to either the row count or the latest
  *       {@code updated_at} means the classifications moved and the prose is stale. This also catches
@@ -24,6 +28,7 @@ import org.jspecify.annotations.Nullable;
  *       data changes — typically a manual {@code /analysis/run} filling it.
  * </ul>
  *
+ * @param ticketCount tickets raised in the window, whatever their status
  * @param analysisCount number of analysis rows for the window under the current prompt
  * @param maxUpdatedAt the latest {@code analysis.updated_at} among them, null when there are none
  * @param gapCount closed tickets in the window still awaiting classification
@@ -31,19 +36,20 @@ import org.jspecify.annotations.Nullable;
  *     reads as a change
  */
 public record SummaryFingerprint(
-        long analysisCount, @Nullable LocalDateTime maxUpdatedAt, long gapCount, long gapIdSum) {
+        long ticketCount, long analysisCount, @Nullable LocalDateTime maxUpdatedAt, long gapCount, long gapIdSum) {
 
     /** A fingerprint for a window with no classification gaps. */
-    public SummaryFingerprint(long analysisCount, @Nullable LocalDateTime maxUpdatedAt) {
-        this(analysisCount, maxUpdatedAt, 0L, 0L);
+    public SummaryFingerprint(long ticketCount, long analysisCount, @Nullable LocalDateTime maxUpdatedAt) {
+        this(ticketCount, analysisCount, maxUpdatedAt, 0L, 0L);
     }
 
     /**
-     * Stable string form, stored in {@code summary_snapshot.fingerprint}. The gap suffix is only
-     * present when there are gaps, so a fully classified window reads as {@code count@updatedAt}.
+     * Stable string form, stored in {@code summary_snapshot.fingerprint}: {@code
+     * tickets/analysed@updatedAt}, with a gap suffix only when there are gaps, so a fully classified
+     * window reads as {@code tickets/analysed@updatedAt}.
      */
     public String value() {
-        String base = analysisCount + "@" + (maxUpdatedAt == null ? "-" : maxUpdatedAt.toString());
+        String base = ticketCount + "/" + analysisCount + "@" + (maxUpdatedAt == null ? "-" : maxUpdatedAt.toString());
         return gapCount == 0 ? base : base + "#" + gapCount + ":" + gapIdSum;
     }
 }

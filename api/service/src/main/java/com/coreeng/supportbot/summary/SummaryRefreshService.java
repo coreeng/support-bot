@@ -6,16 +6,21 @@ import com.coreeng.supportbot.analysis.AnalysisPromptLoadException;
 import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
 import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.analysis.AnalysisService;
+import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
+import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisService;
 import com.coreeng.supportbot.analysis.WindowAnalysisRunner;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SummaryProps;
+import com.coreeng.supportbot.slack.SlackException;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +54,7 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
 
     private final AsyncJobRepository asyncJobRepository;
     private final AnalysisService analysisService;
+    private final ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService;
     private final AnalysisPromptRepository analysisPromptRepository;
     private final SummaryReadRepository summaryReadRepository;
     private final SummarySnapshotRepository summarySnapshotRepository;
@@ -123,8 +129,7 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
         SummaryWindow window = new SummaryWindow(from, to);
         try {
             status.set(new SummaryRefreshStatus(window, SummaryState.Phase.CLASSIFYING, true));
-            analysisService.backfillWindow(from, to);
-            if (Thread.currentThread().isInterrupted()) {
+            if (!backfill(window)) {
                 // The backfill stops early on interrupt (shutdown) and returns normally. Summarising now
                 // would store a snapshot whose fingerprint marks the unclassified tickets as gaps, and
                 // that snapshot would be served as ready after restart without ever retrying them.
@@ -171,6 +176,51 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
     }
 
     /**
+     * Classifies the window's gaps, in at most two passes.
+     *
+     * <p>A pass classifies serially with a per-thread delay, so a wide window can take a long time,
+     * and a ticket closed meanwhile is not in the list the pass computed up front. Left alone it
+     * would be baked into the snapshot's fingerprint as a gap and served as "ready" without ever
+     * being classified — until the window's data happened to change again. So the gaps are read once
+     * more afterwards, and if any ticket is awaiting classification that the first pass could not
+     * have known about, one more pass runs. Only one: a gap the first pass already attempted is a
+     * ticket the backfill gave up on, not a new arrival, and anything closed during the second pass
+     * is left for the next refresh rather than chasing a moving target.
+     *
+     * @return false when a pass was interrupted (shutdown); the interrupt flag is left set
+     */
+    private boolean backfill(SummaryWindow window) {
+        String classificationPromptId = AnalysisService.computePromptId(analysisService.loadPrompt());
+        ImmutableSet<Long> firstPassTargets = awaitingClassification(window, classificationPromptId);
+
+        analysisService.backfillWindow(window.from(), window.to());
+        if (Thread.currentThread().isInterrupted()) {
+            return false;
+        }
+
+        ImmutableSet<Long> stillAwaiting = awaitingClassification(window, classificationPromptId);
+        if (firstPassTargets.containsAll(stillAwaiting)) {
+            return true;
+        }
+        log.info(
+                "{} ticket(s) closed in window {}..{} during the backfill; classifying them in a second pass",
+                stillAwaiting.stream()
+                        .filter(id -> !firstPassTargets.contains(id))
+                        .count(),
+                window.from(),
+                window.to());
+        analysisService.backfillWindow(window.from(), window.to());
+        return !Thread.currentThread().isInterrupted();
+    }
+
+    /** The same lookup the backfill itself starts from: closed tickets in the window with no analysis for the prompt. */
+    private ImmutableSet<Long> awaitingClassification(SummaryWindow window, String classificationPromptId) {
+        return threadsAwaitingAnalysisService.find(window.from(), window.to(), classificationPromptId).stream()
+                .map(ThreadToAnalyze::ticketId)
+                .collect(ImmutableSet.toImmutableSet());
+    }
+
+    /**
      * Reads the window afresh — after the backfill, so the counts, the reasons and the fingerprint
      * stored with the summary all describe the same post-backfill state.
      */
@@ -199,7 +249,7 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
 
         String content = llmSummaryService.generate(summaryPrompt.content(), breakdowns, reasons);
         if (content.isBlank()) {
-            throw new IllegalStateException("The model returned an empty summary");
+            throw new EmptySummaryException();
         }
 
         summarySnapshotRepository.upsert(new SummarySnapshot(
@@ -247,8 +297,44 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
         }
     }
 
-    private static String describe(Exception cause) {
-        String message = cause.getMessage();
-        return message == null || message.isBlank() ? cause.getClass().getSimpleName() : message;
+    /**
+     * The message the page shows for a failed refresh. Deliberately not the exception's own: that
+     * reaches every viewer of the page, and a jOOQ failure carries the full SQL while a model-client
+     * failure can carry endpoint and project identifiers. The raw cause is in the server log, keyed by
+     * window, so a fixed phrase per known failure is all the page needs. The cause chain is walked
+     * because the interesting exception is often wrapped.
+     */
+    static String describe(Exception cause) {
+        for (Throwable t = cause; t != null; t = t.getCause()) {
+            switch (t) {
+                case SlackException _ -> {
+                    return ERROR_SLACK;
+                }
+                case AnalysisPromptLoadException _ -> {
+                    return ERROR_PROMPT;
+                }
+                case EmptySummaryException _ -> {
+                    return ERROR_EMPTY_SUMMARY;
+                }
+                case InterruptedException _, RejectedExecutionException _ -> {
+                    return ERROR_INTERRUPTED;
+                }
+                default -> {}
+            }
+        }
+        return ERROR_GENERIC;
+    }
+
+    static final String ERROR_SLACK = "Slack could not be reached while classifying tickets";
+    static final String ERROR_PROMPT = "A prompt the summary needs could not be loaded";
+    static final String ERROR_EMPTY_SUMMARY = "The model returned an empty summary";
+    static final String ERROR_INTERRUPTED = "Summary generation was interrupted; it will be retried";
+    static final String ERROR_GENERIC = "Summary generation failed";
+
+    /** The model answered with nothing usable; caching a blank summary would serve an empty card as ready. */
+    private static final class EmptySummaryException extends RuntimeException {
+        EmptySummaryException() {
+            super("The model returned an empty summary");
+        }
     }
 }

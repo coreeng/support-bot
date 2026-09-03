@@ -39,6 +39,7 @@ import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record2;
+import org.jooq.Record3;
 import org.jooq.Record4;
 import org.jooq.SelectOnConditionStep;
 import org.jooq.Table;
@@ -141,7 +142,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
     @Override
     public SummaryFingerprint fingerprint(SummaryWindow window, String promptId, Collection<String> channelIds) {
         if (channelIds.isEmpty()) {
-            return new SummaryFingerprint(0L, null);
+            return new SummaryFingerprint(0L, 0L, null);
         }
 
         Record2<Integer, LocalDateTime> row = dsl.select(count(), max(ANALYSIS.UPDATED_AT))
@@ -153,23 +154,28 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .where(inWindow(window, channelIds))
                 .fetchSingle();
 
-        // Closed tickets with no analysis for this prompt: what the backfill would try to classify.
-        Record2<Integer, BigDecimal> gaps = dsl.select(count(), coalesce(sum(TICKET.ID), BigDecimal.ZERO))
+        // One pass over the window's tickets: how many were raised at all (open ones included — they
+        // are in the totals the prose quotes), and among them the closed ones with no analysis for
+        // this prompt, which is what the backfill would try to classify.
+        Condition isGap = TICKET.STATUS
+                .eq(TicketStatus.closed)
+                .and(notExists(selectOne().from(ANALYSIS).where(analysisJoin(promptId))));
+        Record3<Integer, Integer, BigDecimal> tickets = dsl.select(
+                        count(),
+                        count().filterWhere(isGap),
+                        coalesce(sum(TICKET.ID).filterWhere(isGap), BigDecimal.ZERO))
                 .from(QUERY)
                 .join(TICKET)
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
                 .where(inWindow(window, channelIds))
-                .and(TICKET.STATUS.eq(TicketStatus.closed))
-                .and(notExists(selectOne().from(ANALYSIS).where(analysisJoin(promptId))))
                 .fetchSingle();
 
-        Integer rowCount = row.value1();
-        Integer gapCount = gaps.value1();
-        BigDecimal gapIdSum = gaps.value2();
+        BigDecimal gapIdSum = tickets.value3();
         return new SummaryFingerprint(
-                rowCount == null ? 0L : rowCount.longValue(),
+                orZero(tickets.value1()),
+                orZero(row.value1()),
                 row.value2(),
-                gapCount == null ? 0L : gapCount.longValue(),
+                orZero(tickets.value2()),
                 gapIdSum == null ? 0L : gapIdSum.longValue());
     }
 
