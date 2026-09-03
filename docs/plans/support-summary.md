@@ -1,7 +1,9 @@
 # Support Summary page (EL-264)
 
-Status: exploratory — high-level requirements only. No committed design yet; we
-iterate together and update this doc as decisions land.
+Status: shipped in [PR #327](https://github.com/coreeng/support-bot/pull/327).
+Started as an exploratory requirements doc; the "Decisions" sections below are
+the record of what was agreed and what the PR ships. The "How the existing page
+works" section describes the page this one replaced and is kept as history.
 
 ## Context
 
@@ -9,10 +11,11 @@ iterate together and update this doc as decisions land.
   (child stories EL-265, EL-266 — both Draft, treat as input material, not spec).
 - Naming: the page is called **"Support Summary"** (per epic comment — not
   "Support Insights" as the prototype showed).
-- There is an existing page, **Support Area Summary** at `/knowledge-gaps`.
-  The new page follows a similar pattern. How it actually works (verified):
+- There was an existing page, **Support Area Summary** at `/knowledge-gaps`.
+  The new page follows a similar pattern and replaces it (retired in PR #327 —
+  see "Decisions from the PR #327 review"). How it worked (verified):
 
-### How the existing page works (verified in code)
+### How the existing page worked (verified in code, before PR #327)
 
 - Page: `ui/src/app/(dashboard)/knowledge-gaps/page.tsx` →
   `ui/src/components/knowledgegaps/knowledge-gaps.tsx` (~950 lines, everything
@@ -59,9 +62,9 @@ iterate together and update this doc as decisions land.
 
 ## High-level requirements
 
-1. **New page at `/summary`** ("Support Summary"), alongside the existing
-   Support Area Summary — same overall pattern (on-demand analysis + saved
-   snapshot + render).
+1. **New page at `/summary`** ("Support Summary"), replacing the existing
+   Support Area Summary (`/knowledge-gaps`, now a redirect — see decisions) —
+   same overall pattern (on-demand analysis + saved snapshot + render).
 2. **Time/period picker**, defaulting to the last 2 weeks. The existing page is
    window-less/fixed; this is the main structural difference.
 3. **More data and widgets** than the existing page. From the epic, the page
@@ -125,19 +128,69 @@ iterate together and update this doc as decisions land.
     permanent one, so a ticket skipped on a bad call is baked into the
     fingerprint as a gap and the snapshot is served, unchanged, until the
     window's data changes (a new closure, a reclassification, or the gap
-    being filled). Manual recovery is a SUPPORT_ENGINEER running
-    `POST /analysis/run?days=N` from the analysis page: that fills the gap,
-    which changes the fingerprint, and the next visit regenerates.
-  - Follow-up: distinguish "call failed" from "unparseable output" in the
-    backfill and exclude the former from the fingerprint (or age gaps so
-    they are retried after a while), so transient failures self-heal on
-    the next visit instead of waiting for a manual run.
+    being filled). Manual recovery is API-only: an authenticated
+    SUPPORT_ENGINEER calls `POST /analysis/run?days=N` directly (no UI
+    trigger remains — see below). That fills the gap, which changes the
+    fingerprint, and the next visit regenerates.
+  - Follow-up (still open for the *classification* backfill): distinguish
+    "call failed" from "unparseable output" and exclude the former from the
+    fingerprint (or age gaps so they are retried after a while), so transient
+    failures self-heal on the next visit instead of waiting for a manual run.
+    The equivalent problem on the *summary generation* side is addressed by
+    the expiring failure memo below.
+
+### Decisions from the PR #327 review
+
+- **`/knowledge-gaps` and `/tickets` are retired, with redirects.** Support
+  Summary replaces Support Area Summary rather than coexisting with it:
+  `/knowledge-gaps` redirects to `/summary`, and `/tickets` redirects to `/`
+  preserving the query string (the home page reads the same URL filter keys).
+  The tickets table now lives on the home page. The sidebar entry and the
+  `knowledge-gaps` components/feature flag are gone; the page is gated by the
+  `summary` feature flag.
+- **View Prompts dialog moved to `/summary`.** It shows both the
+  classification prompt (`GET /analysis/prompt`) and the summary prompt
+  (`GET /summary/prompt`), both readable by LEADERSHIP or SUPPORT_ENGINEER.
+- **No UI trigger for `POST /analysis/run` remains.** The UI proxy route for
+  it was deleted along with the old page (only the `/analysis/prompt` proxy
+  is left). The backend endpoint stays, SUPPORT_ENGINEER-only, as the API-only
+  recovery path: an authenticated SUPPORT_ENGINEER calls
+  `POST /analysis/run?days=N` directly. Everything the page needs is triggered
+  server-side while serving `GET /summary`.
+- **Window days are UTC calendar days, ending yesterday UTC.** `from`/`to`
+  are inclusive `LocalDate`s; the default is the last 14 days ending yesterday
+  (UTC), and a window may span at most 366 days (`SummaryController`;
+  `to < from` or a wider window is rejected as `SUMMARY_WINDOW_INVALID`). The
+  server clock is `Clock.systemUTC()` (`ElevateConfig`), the read and
+  awaiting-analysis queries bind the window as half-open UTC instants
+  (`JdbcSummaryReadRepository.inWindow`,
+  `JdbcThreadsAwaitingAnalysisRepository`), and the UI computes its default
+  window in UTC too (`ui/src/lib/utils/summary-window.ts`), so the default
+  window is the same in every browser zone and never shifts across a local
+  DST change.
+- **Stub LLM provider ships, local development only.** Enabling it requires
+  both `analysis.llm.stub.enabled=true` and
+  `analysis.llm.stub.acknowledge-synthetic-data=true`; startup fails
+  otherwise. It writes synthetic rows into `analysis` and `summary_snapshot`
+  like a real provider would, so it must never be pointed at a shared
+  database. Snapshots it produces are stamped with model `stub`. Details in
+  the "`stub` LLM provider mode" section below.
+- **Summary refresh failures are remembered per window, and expire.**
+  Failures are kept in a small bounded in-memory map keyed on (window,
+  classification fingerprint, summary prompt) and expire after a configurable
+  retry delay, so a transient LLM error no longer pins a historical window as
+  `unavailable` until restart — it is retried on the next visit after the
+  delay. Trade-off: the memo is in-process (lost on restart, per-pod under
+  multiple replicas), matching the existing in-memory `AnalysisService`
+  status; revisit if the service ever runs more than one replica.
 
 ## Backend decisions (agreed 2026-08-26)
 
 1. **Window semantics**: ticket **created** time defines the window (matches
    the epic's "tickets raised in the last 14 days"). The gap/backfill query
-   gets the same semantics.
+   gets the same semantics. Window bounds are **UTC calendar days**, both
+   ends inclusive, applied as half-open UTC instants (see "Decisions from the
+   PR #327 review").
 2. **Gap-filling for arbitrary windows**: extend the existing
    awaiting-analysis query with `from`/`to` bounds (don't fork it).
 3. **Open tickets**: keep classifying closed tickets only; expose an explicit
@@ -165,11 +218,11 @@ iterate together and update this doc as decisions land.
 
 ## Open questions
 
-- Relationship to the existing `/knowledge-gaps` page long-term (coexist?
-  eventually merge?).
 - Summary prompt content (seeded v1) — draft, then iterate against real data.
+- (Resolved in PR #327: `/knowledge-gaps` does not coexist with `/summary`;
+  it is retired and redirects there.)
 
-### `stub` LLM provider mode — ships or gets reverted?
+## `stub` LLM provider mode (decided: ships, local development only)
 
 **What it is.** A third provider mode alongside `vertex` and `proxy`, in
 `AnalysisProps.Llm` / `LlmConfig`. `StubChatModel` implements LangChain4j's
@@ -202,11 +255,11 @@ the fingerprint cache and the progress states — on a laptop or in a demo.
 ```yaml
 analysis:
   llm:
-    model-name: ${ANALYSIS_MODEL_NAME:stub-local}
     vertex:
       enabled: ${VERTEX_ENABLED:false}   # must be off: vertex defaults to true
     stub:
-      enabled: ${STUB_LLM_ENABLED:false}
+      enabled: true
+      acknowledge-synthetic-data: true   # both flags are required — see below
   prompt:
     enabled: ${ANALYSIS_PROMPT_ENABLED:true}
 ```
@@ -214,17 +267,22 @@ analysis:
 Exactly one of `vertex.enabled` / `proxy.enabled` / `stub.enabled` must be true,
 validated fail-fast at startup (only when `analysis.prompt.enabled`). Because
 `vertex.enabled` defaults to `true`, selecting this mode means turning vertex
-off explicitly — the same step proxy mode has always needed. Set `model-name`
-to something obviously fake: it is recorded verbatim in
-`summary_snapshot.model`, so leaving it as `gemini-2.5-flash` would label
-stubbed prose as if a real model had written it.
+off explicitly — the same step proxy mode has always needed.
 
-**Decision pending.** The risk is not the code — it reaches no network and holds
-no credentials — but the data: stubbed classifications and summaries are written
-to `analysis` and `summary_snapshot` exactly like real ones, and nothing in the
-schema marks them as synthetic. Point a stub-enabled instance at a shared
-database and the fake rows are indistinguishable from real ones. Either it ships
-with that caveat understood (local-only, never against shared data), or it is
-dropped before merge. It is deliberately confined to a **single commit**
-(`feat(api): add stub LLM provider mode for local dev`), so reverting is
-dropping that one commit — no untangling.
+**Decision (PR #327 review): it ships, as a local-development-only mode.** The
+risk is not the code — it reaches no network and holds no credentials — but
+the data: stubbed classifications and summaries are written to `analysis` and
+`summary_snapshot` exactly like real ones, and nothing in the schema marks the
+`analysis` rows as synthetic. Point a stub-enabled instance at a shared database
+and the fake rows are indistinguishable from real ones. The guard rails agreed
+in review:
+
+- Enabling it requires **both** `analysis.llm.stub.enabled=true` and
+  `analysis.llm.stub.acknowledge-synthetic-data=true`; startup fails if only
+  the first is set. The second flag exists purely so nobody turns the stub on
+  without reading what it does to the database.
+- It must **never be pointed at a shared database** — local or throwaway
+  databases only.
+- Snapshots it produces are stamped with model `stub` in
+  `summary_snapshot.model`, whatever `analysis.llm.model-name` says, so stubbed
+  prose can never be labelled as if a real model had written it.
