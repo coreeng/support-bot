@@ -47,7 +47,8 @@ describe("BreakdownCard", () => {
       expect(within(card).getByRole("heading", { level: 2, name: "Top Support Areas" })).toBeInTheDocument();
 
       const rows = within(card).getAllByRole("button", { expanded: false });
-      expect(rows.map((row) => within(row).getByRole("heading", { level: 3 }).textContent)).toEqual([
+      // The label is plain text, not a heading: a heading may not sit inside the row's button.
+      expect(rows.map((row) => row.querySelector(".text-sm.font-medium")?.textContent)).toEqual([
         "Knowledge Gap",
         "Product Temporary Issue",
         "Task Request",

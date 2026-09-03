@@ -27,6 +27,7 @@ import type {
 import type { SummaryData, SummaryStatus } from "@/lib/types/summary";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getCsrfToken, signOut } from "next-auth/react";
+import { useState } from "react";
 
 // ===== Shared API Helper =====
 
@@ -560,6 +561,9 @@ export function useSummaryPrompt(enabled: boolean) {
 /** Polling cadence while the summary backfill runs. */
 const SUMMARY_POLL_MS = 3000;
 
+/** Polling stops after this many failed polls in a row; a reload starts it again. */
+export const MAX_SUMMARY_POLL_FAILURES = 5;
+
 export function useSummaryEnabled() {
   return useQuery<boolean>({
     queryKey: ["summary", "enabled"],
@@ -571,21 +575,50 @@ export function useSummaryEnabled() {
   });
 }
 
+/** The last successful summary reply for a window, as seen by the query's cumulative counters. */
+interface LastSummarySuccess {
+  window: string;
+  dataUpdatedAt: number;
+  errorUpdateCount: number;
+}
+
+/**
+ * Failed polls in a row since the last successful reply for this window. React Query resets its
+ * own failure count on every fetch, so this is derived from the cumulative error counter instead.
+ */
+function pollFailuresSince(
+  lastSuccess: LastSummarySuccess,
+  window: string,
+  counters: { dataUpdatedAt: number; errorUpdateCount: number }
+): number {
+  if (lastSuccess.window !== window || lastSuccess.dataUpdatedAt !== counters.dataUpdatedAt) return 0;
+  return counters.errorUpdateCount - lastSuccess.errorUpdateCount;
+}
+
 /**
  * Loads the Support Summary for a window. The request itself triggers the server-side
  * backfill and prose generation, so while the summary section reports `generating` we
  * keep polling until it settles on `ready` or `unavailable`.
+ *
+ * A failed poll keeps the last reply on screen, so `pollFailures` tells the page how many polls
+ * in a row have failed; after `MAX_SUMMARY_POLL_FAILURES` polling stops rather than spinning
+ * through an outage.
  */
-export function useSummary(from?: string, to?: string) {
+export function useSummary(from?: string, to?: string, enabled = true) {
   const params = new URLSearchParams();
   if (from) params.append("from", from);
   if (to) params.append("to", to);
   const query = params.toString();
+  const [lastSuccess, setLastSuccess] = useState<LastSummarySuccess>({ window: query, dataUpdatedAt: 0, errorUpdateCount: 0 });
 
-  return useQuery<SummaryData>({
+  const result = useQuery<SummaryData>({
     queryKey: ["summary", from ?? null, to ?? null],
     queryFn: () => apiGet(`/summary${query ? `?${query}` : ""}`),
-    refetchInterval: (query) => (query.state.data?.summary.state === "generating" ? SUMMARY_POLL_MS : false),
+    enabled,
+    refetchInterval: ({ state }) => {
+      if (state.data?.summary.state !== "generating") return false;
+      return pollFailuresSince(lastSuccess, query, state) < MAX_SUMMARY_POLL_FAILURES ? SUMMARY_POLL_MS : false;
+    },
     // The window's figures move as the backfill runs; a stale cache would show the wrong ones.
     staleTime: 0,
     placeholderData: keepPreviousData,
@@ -593,6 +626,14 @@ export function useSummary(from?: string, to?: string) {
     // retrying with backoff while the previous window's figures linger on screen.
     retry: shouldRetryTransientFailure,
   });
+
+  const pollFailures = pollFailuresSince(lastSuccess, query, result);
+  // A new window or a fresh reply starts the count again from that reply.
+  if (lastSuccess.window !== query || lastSuccess.dataUpdatedAt !== result.dataUpdatedAt) {
+    setLastSuccess({ window: query, dataUpdatedAt: result.dataUpdatedAt, errorUpdateCount: result.errorUpdateCount });
+  }
+
+  return { ...result, pollFailures };
 }
 
 export function useTenantInsightsEnabled() {

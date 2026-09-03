@@ -1,6 +1,7 @@
 "use client";
 
 import type { SummaryCount, SummaryTicket } from "@/lib/types/summary";
+import { formatUtcDateTime } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
@@ -114,7 +115,7 @@ export default function BreakdownCard({
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-3">
-                        <h3 className="text-foreground truncate text-sm font-medium">{count.label}</h3>
+                        <span className="text-foreground truncate text-sm font-medium">{count.label}</span>
                         <CountWithShare count={count.count} share={sharePercent(count.count, total)} />
                       </div>
                       {secondary && <p className="text-muted-foreground mt-0.5 truncate text-xs">{secondary}</p>}
@@ -228,21 +229,7 @@ function RecentTicketRow({ ticket, onOpen }: { ticket: SummaryTicket; onOpen: (t
       className="bg-muted/40 hover:bg-muted flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors"
     >
       <p className="text-foreground min-w-0 flex-1 text-sm">{ticket.text || `Ticket ${ticket.ticketId}`}</p>
-      <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">{formatTicketTimestamp(ticket.timestamp)}</span>
+      <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">{formatUtcDateTime(ticket.timestamp)}</span>
     </button>
   );
-}
-
-function formatTicketTimestamp(timestamp: string): string {
-  const parsed = new Date(timestamp);
-  if (isNaN(parsed.getTime())) return timestamp;
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  }).format(parsed);
 }

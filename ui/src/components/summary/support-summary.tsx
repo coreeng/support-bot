@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PRESET_DAYS } from "@/lib/dateRange";
-import { isApiError, useRegistry, useSummary } from "@/lib/hooks";
+import { isApiError, MAX_SUMMARY_POLL_FAILURES, useRegistry, useSummary, useSummaryEnabled } from "@/lib/hooks";
 import { enumValidator, isoDateValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
 import type { SummaryCount, SummaryData, SummarySection } from "@/lib/types/summary";
+import { cn, formatUtcDateTime } from "@/lib/utils";
 import { MAX_SUMMARY_WINDOW_DAYS, summaryWindowProblem, windowEndingYesterday } from "@/lib/utils/summary-window";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Eye } from "lucide-react";
@@ -28,20 +29,6 @@ const PRESET_LABELS: Record<SummaryPreset, string> = {
   lastMonth: "Last month",
   custom: "Custom range",
 };
-
-function formatGeneratedAt(timestamp: string): string {
-  const parsed = new Date(timestamp);
-  if (isNaN(parsed.getTime())) return timestamp;
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  }).format(parsed);
-}
 
 /**
  * Formats an inclusive date window compactly, sharing whatever the two ends have in common:
@@ -66,18 +53,37 @@ function Metric({ children }: { children: ReactNode }) {
   return <span className="font-mono tabular-nums">{children}</span>;
 }
 
-/** The strip above the cards: which window is shown, and how many tickets it holds. */
-function WindowStrip({ preset, from, to, totalTickets }: { preset: SummaryPreset; from: string; to: string; totalTickets: number }) {
+/**
+ * The preset whose window (ending yesterday, UTC) is exactly this one, or `custom` when none is.
+ * Deriving the label from the window on screen keeps it honest while a newly chosen preset is
+ * still loading and the previous window's figures are shown in its place.
+ */
+function presetForWindow(from: string, to: string): SummaryPreset {
+  for (const preset of SUMMARY_PRESETS) {
+    if (preset === "custom") continue;
+    const window = windowEndingYesterday(PRESET_DAYS[preset]);
+    if (window.from === from && window.to === to) return preset;
+  }
+  return "custom";
+}
+
+/** The line above the cards: which window is shown, how many tickets it holds, and a cue while another loads. */
+function WindowStrip({ from, to, totalTickets, refreshing }: { from: string; to: string; totalTickets: number; refreshing: boolean }) {
   return (
-    <div
-      className="bg-card inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-2 text-sm"
-      data-testid="summary-window"
-    >
-      <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{PRESET_LABELS[preset]}</span>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="summary-window">
+      <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+        {PRESET_LABELS[presetForWindow(from, to)]}
+      </span>
       <span className="text-foreground font-semibold">{formatWindow(from, to)}</span>
       <span className="text-muted-foreground">
         · <span className="text-foreground font-mono font-semibold tabular-nums">{totalTickets.toLocaleString()}</span> tickets raised
       </span>
+      {refreshing && (
+        <span className="text-muted-foreground flex items-center gap-2" role="status">
+          <span className="border-primary inline-block h-3.5 w-3.5 animate-spin rounded-full border-b-2" />
+          Loading the selected window...
+        </span>
+      )}
     </div>
   );
 }
@@ -95,8 +101,15 @@ function GlanceChip({ label, children, muted = false }: { label: string; childre
   );
 }
 
+/** What the page shows while a poll fails but the last reply is still on screen. */
+interface RefreshProblem {
+  title: string;
+  /** False once polling has given up; the page needs a reload to resume. */
+  retrying: boolean;
+}
+
 /** Headline numbers for the window: total raised plus the top item of each breakdown. */
-function AtAGlanceCard({ data }: { data: SummaryData }) {
+function AtAGlanceCard({ data, refreshProblem }: { data: SummaryData; refreshProblem: RefreshProblem | null }) {
   const top = (counts: SummaryCount[]): SummaryCount | undefined => counts[0];
   const topDriver = top(data.drivers);
   const topCategory = top(data.categories);
@@ -106,53 +119,53 @@ function AtAGlanceCard({ data }: { data: SummaryData }) {
   const lastUpdated = data.summary.generatedAt;
 
   return (
-    <div className="bg-card rounded-xl border" data-testid="summary-at-a-glance">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
+    <div className="bg-card rounded-xl border p-6" data-testid="summary-at-a-glance">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-foreground text-base font-semibold">At a glance</h2>
         {lastUpdated && (
           <p className="text-muted-foreground text-sm">
-            Last updated <span className="text-foreground font-semibold">{formatGeneratedAt(lastUpdated)}</span>
+            Last updated <span className="text-foreground font-semibold">{formatUtcDateTime(lastUpdated)}</span>
           </p>
         )}
       </div>
-      <div className="border-b px-6 py-4">
-        <SummarySectionBody section={data.summary} />
-      </div>
-      <div className="flex flex-wrap gap-2 px-6 py-4">
-        <GlanceChip label="Raised">
-          <Metric>{data.totalTickets.toLocaleString()}</Metric> tickets
-        </GlanceChip>
-        {topDriver && (
-          <GlanceChip label="Top driver">
-            {topDriver.label} · <Metric>{topDriver.count.toLocaleString()}</Metric>
-            {driverShare !== null && (
-              <>
-                {" "}
-                (<Metric>{driverShare}%</Metric>)
-              </>
-            )}
+      <div className="space-y-6">
+        <SummarySectionBody section={data.summary} refreshProblem={refreshProblem} />
+        <div className="flex flex-wrap gap-2">
+          <GlanceChip label="Raised">
+            <Metric>{data.totalTickets.toLocaleString()}</Metric> tickets
           </GlanceChip>
-        )}
-        {topCategory && (
-          <GlanceChip label="Top subject">
-            {topCategory.label} · <Metric>{topCategory.count.toLocaleString()}</Metric>
-          </GlanceChip>
-        )}
-        {topFeature && (
-          <GlanceChip label="Top feature">
-            {topFeature.label} · <Metric>{topFeature.count.toLocaleString()}</Metric>
-          </GlanceChip>
-        )}
-        {topTeam && (
-          <GlanceChip label="Top tenant">
-            {topTeam.label} · <Metric>{topTeam.count.toLocaleString()}</Metric>
-          </GlanceChip>
-        )}
-        {data.unclassifiedTickets > 0 && (
-          <GlanceChip label="Awaiting classification" muted>
-            <Metric>{data.unclassifiedTickets.toLocaleString()}</Metric>
-          </GlanceChip>
-        )}
+          {topDriver && (
+            <GlanceChip label="Top driver">
+              {topDriver.label} · <Metric>{topDriver.count.toLocaleString()}</Metric>
+              {driverShare !== null && (
+                <>
+                  {" "}
+                  (<Metric>{driverShare}%</Metric>)
+                </>
+              )}
+            </GlanceChip>
+          )}
+          {topCategory && (
+            <GlanceChip label="Top subject">
+              {topCategory.label} · <Metric>{topCategory.count.toLocaleString()}</Metric>
+            </GlanceChip>
+          )}
+          {topFeature && (
+            <GlanceChip label="Top feature">
+              {topFeature.label} · <Metric>{topFeature.count.toLocaleString()}</Metric>
+            </GlanceChip>
+          )}
+          {topTeam && (
+            <GlanceChip label="Top tenant">
+              {topTeam.label} · <Metric>{topTeam.count.toLocaleString()}</Metric>
+            </GlanceChip>
+          )}
+          {data.unclassifiedTickets > 0 && (
+            <GlanceChip label="Awaiting classification" muted>
+              <Metric>{data.unclassifiedTickets.toLocaleString()}</Metric>
+            </GlanceChip>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -162,7 +175,7 @@ function AtAGlanceCard({ data }: { data: SummaryData }) {
  * The prose section, rendered inside the "At a glance" card. It carries its own state, so a
  * failure here degrades to an inline message and never hides the headline chips or breakdowns.
  */
-function SummarySectionBody({ section }: { section: SummarySection }) {
+function SummarySectionBody({ section, refreshProblem }: { section: SummarySection; refreshProblem: RefreshProblem | null }) {
   if (section.state === "generating") {
     const analysed = section.progress?.analysedThreads ?? null;
     const total = section.progress?.totalThreads ?? null;
@@ -192,6 +205,16 @@ function SummarySectionBody({ section }: { section: SummarySection }) {
             <div className="bg-secondary h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${percent}%` }} />
           </div>
         )}
+        {refreshProblem && (
+          <p className="text-warning mt-3 flex items-center gap-2 text-sm" role="status" data-testid="summary-refresh-failing">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>
+              {refreshProblem.retrying
+                ? `Refresh failing – retrying. ${refreshProblem.title}.`
+                : `Refresh failing – stopped after ${MAX_SUMMARY_POLL_FAILURES} attempts. ${refreshProblem.title}. Reload the page to try again.`}
+            </span>
+          </p>
+        )}
       </div>
     );
   }
@@ -215,12 +238,18 @@ function SummarySectionBody({ section }: { section: SummarySection }) {
         <p className="text-muted-foreground mt-4 text-xs">
           {section.model && <>Generated by {section.model}</>}
           {section.model && section.generatedAt && " · "}
-          {section.generatedAt && formatGeneratedAt(section.generatedAt)}
+          {section.generatedAt && formatUtcDateTime(section.generatedAt)}
         </p>
       )}
     </div>
   );
 }
+
+/** Shown both when the feature flag reports the page off and when the backend answers 404. */
+export const SUMMARY_NOT_ENABLED = {
+  title: "Support Summary is not enabled",
+  detail: "Enable the summary feature on the server to use this page.",
+} as const;
 
 /**
  * Explains a failed summary request. The backend's ProblemDetail `code` is forwarded by the API
@@ -231,7 +260,7 @@ export function summaryErrorMessage(error: unknown): { title: string; detail: st
     return { title: "You do not have permission to view the Support Summary", detail: "Ask an administrator for access." };
   }
   if (isApiError(error, 404)) {
-    return { title: "Support Summary is not enabled", detail: "Enable the summary feature on the server to use this page." };
+    return SUMMARY_NOT_ENABLED;
   }
   if (isApiError(error) && error.reason === "SUMMARY_WINDOW_INVALID") {
     return {
@@ -279,7 +308,20 @@ export default function SupportSummaryPage() {
     return windowEndingYesterday(PRESET_DAYS[preset]);
   }, [dateFilter, params.dateFrom, params.dateTo]);
 
-  const { data, isLoading, error } = useSummary(summaryWindow.from, summaryWindow.to);
+  // The sidebar hides the entry while the feature is off, but a direct visit must not fall through
+  // to a request the backend will refuse.
+  const { data: summaryEnabled, isLoading: isCheckingEnabled, isError: enabledCheckFailed } = useSummaryEnabled();
+  // When the flag check itself fails, the summary request is still made so its own error explains why.
+  const { data, isLoading, error, isFetching, isPlaceholderData, pollFailures } = useSummary(
+    summaryWindow.from,
+    summaryWindow.to,
+    summaryEnabled === true || enabledCheckFailed
+  );
+  // Another window was chosen and the previous one's figures stand in until it loads.
+  const refreshing = isFetching && isPlaceholderData;
+  // A poll failed after a reply was already on screen: the reply stays, with a hint in the generating block.
+  const refreshProblem: RefreshProblem | null =
+    error && data ? { title: summaryErrorMessage(error).title, retrying: pollFailures < MAX_SUMMARY_POLL_FAILURES } : null;
   // Same rule as the Products View tab: only shown once the registry confirms product tags exist,
   // so it never flashes in and out while the registry loads.
   const { data: registryData } = useRegistry();
@@ -311,58 +353,69 @@ export default function SupportSummaryPage() {
           <h1 className="text-foreground text-2xl font-bold">Support Summary</h1>
           <p className="text-muted-foreground text-sm">What tenants raised in the selected period, and why</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="default" onClick={() => setIsPromptDialogOpen(true)}>
-            <Eye className="h-4 w-4" />
-            View Prompts
-          </Button>
-          <Select
-            value={dateFilter}
-            onValueChange={(value) =>
-              setParams(value !== "custom" ? { dateFilter: value, dateFrom: "", dateTo: "" } : { dateFilter: value })
-            }
-          >
-            <SelectTrigger className="w-[160px]" data-testid="summary-date-filter">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="lastWeek">Last Week</SelectItem>
-              <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
-              <SelectItem value="lastMonth">Last Month</SelectItem>
-              <SelectItem value="custom">Custom</SelectItem>
-            </SelectContent>
-          </Select>
-          {dateFilter === "custom" && (
-            <>
-              <Input
-                type="date"
-                aria-label="From date"
-                value={params.dateFrom}
-                onChange={(event) => setParams({ dateFrom: event.target.value })}
-                className="w-[150px]"
-              />
-              <Input
-                type="date"
-                aria-label="To date"
-                value={params.dateTo}
-                onChange={(event) => setParams({ dateTo: event.target.value })}
-                className="w-[150px]"
-              />
-            </>
-          )}
-          {dateFilter === "custom" && rangeProblem !== null && (
-            <span className="text-destructive text-xs font-medium" role="alert">
-              {RANGE_PROBLEM_LABELS[rangeProblem]}
-            </span>
-          )}
-        </div>
+        {summaryEnabled !== false && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="default" onClick={() => setIsPromptDialogOpen(true)}>
+              <Eye className="h-4 w-4" />
+              View Prompts
+            </Button>
+            <Select
+              value={dateFilter}
+              onValueChange={(value) =>
+                setParams(value !== "custom" ? { dateFilter: value, dateFrom: "", dateTo: "" } : { dateFilter: value })
+              }
+            >
+              <SelectTrigger className="w-[160px]" data-testid="summary-date-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lastWeek">Last Week</SelectItem>
+                <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
+                <SelectItem value="lastMonth">Last Month</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+            {dateFilter === "custom" && (
+              <>
+                <Input
+                  type="date"
+                  aria-label="From date"
+                  value={params.dateFrom}
+                  onChange={(event) => setParams({ dateFrom: event.target.value })}
+                  className="w-[150px]"
+                />
+                <Input
+                  type="date"
+                  aria-label="To date"
+                  value={params.dateTo}
+                  onChange={(event) => setParams({ dateTo: event.target.value })}
+                  className="w-[150px]"
+                />
+              </>
+            )}
+            {dateFilter === "custom" && rangeProblem !== null && (
+              <span className="text-destructive text-xs font-medium" role="alert">
+                {RANGE_PROBLEM_LABELS[rangeProblem]}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      {isLoading && !data && (
+      {(isCheckingEnabled || (isLoading && !data)) && (
         <div className="flex h-full items-center justify-center">
           <div className="text-center">
             <div className="border-primary mb-4 inline-block h-12 w-12 animate-spin rounded-full border-b-2"></div>
             <p className="text-muted-foreground">Loading support summary...</p>
+          </div>
+        </div>
+      )}
+
+      {summaryEnabled === false && (
+        <div className="flex h-full items-center justify-center" data-testid="summary-not-enabled">
+          <div className="text-center">
+            <p className="text-foreground">{SUMMARY_NOT_ENABLED.title}</p>
+            <p className="text-muted-foreground mt-2 text-sm">{SUMMARY_NOT_ENABLED.detail}</p>
           </div>
         </div>
       )}
@@ -377,10 +430,14 @@ export default function SupportSummaryPage() {
       )}
 
       {data && (
-        <>
-          <WindowStrip preset={dateFilter} from={data.from} to={data.to} totalTickets={data.totalTickets} />
+        <div
+          className={cn("space-y-6 transition-opacity duration-[400ms]", refreshing && "opacity-60")}
+          aria-busy={refreshing}
+          data-testid="summary-body"
+        >
+          <WindowStrip from={data.from} to={data.to} totalTickets={data.totalTickets} refreshing={refreshing} />
 
-          <AtAGlanceCard data={data} />
+          <AtAGlanceCard data={data} refreshProblem={refreshProblem} />
 
           <BreakdownCard
             title="Top Support Areas"
@@ -411,7 +468,7 @@ export default function SupportSummaryPage() {
               onOpenTicket={openTicket}
             />
           </div>
-        </>
+        </div>
       )}
 
       <PromptDialog open={isPromptDialogOpen} onOpenChange={setIsPromptDialogOpen} />

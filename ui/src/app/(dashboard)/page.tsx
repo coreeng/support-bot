@@ -13,7 +13,7 @@ export default function Home() {
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <StatsPage />
       <TicketsPage embedded />
     </div>

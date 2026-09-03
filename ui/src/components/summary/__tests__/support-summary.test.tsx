@@ -12,10 +12,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PRESET_DAYS } from "../../../lib/dateRange";
-import { ApiError } from "../../../lib/hooks";
+import { ApiError, MAX_SUMMARY_POLL_FAILURES } from "../../../lib/hooks";
 import type { SummaryData, SummarySection, SummaryTicket } from "../../../lib/types/summary";
 import { MAX_SUMMARY_WINDOW_DAYS, windowEndingYesterday } from "../../../lib/utils/summary-window";
-import SupportSummaryPage, { summaryErrorMessage } from "../support-summary";
+import SupportSummaryPage, { SUMMARY_NOT_ENABLED, summaryErrorMessage } from "../support-summary";
 
 // A useState-backed useUrlParams so preset and date changes re-render, and so tests can seed
 // deep-link params (`?dateFilter=custom&dateFrom=..`) via setMockUrlParamsInitial.
@@ -109,12 +109,18 @@ type RouteHandler = (url: string) => MockReply;
 
 const originalFetch = global.fetch;
 
+const enabled =
+  (body: { enabled: boolean }): RouteHandler =>
+  () => ({ status: 200, body });
+const pending: RouteHandler = () => new Promise<never>(() => {});
+
 /** Routes every `/api/*` call the page makes; unrouted paths fail loudly. */
-function mockApi(summaryReply: RouteHandler, registry: unknown = emptyRegistry) {
+function mockApi(summaryReply: RouteHandler, registry: unknown = emptyRegistry, enabledReply: RouteHandler = enabled({ enabled: true })) {
   global.fetch = jest.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     let reply: MockReply;
     if (url === "/api/registry") reply = { status: 200, body: registry };
+    else if (url === "/api/summary/enabled") reply = enabledReply(url);
     else if (url.startsWith("/api/summary")) reply = summaryReply(url);
     else throw new Error(`Unexpected fetch: ${url}`);
     const { status, body } = await reply;
@@ -122,20 +128,38 @@ function mockApi(summaryReply: RouteHandler, registry: unknown = emptyRegistry) 
   }) as jest.MockedFunction<typeof fetch>;
 }
 
+/** A successful summary reply; like the backend, it echoes the requested window. */
 const ok =
-  (body: unknown): RouteHandler =>
-  () => ({ status: 200, body });
+  (body: SummaryData): RouteHandler =>
+  (url) => {
+    const requested = new URLSearchParams(url.split("?")[1] ?? "");
+    const from = requested.get("from");
+    const to = requested.get("to");
+    return { status: 200, body: from && to ? { ...body, from, to } : body };
+  };
 
-/** Answers each summary request with the next reply; the last one repeats. */
-function sequence(...bodies: SummaryData[]): RouteHandler {
+const failing =
+  (status: number): RouteHandler =>
+  () => ({ status, body: { error: `Backend error: ${status}` } });
+
+/** Answers each summary request with the next handler; the last one repeats. */
+function sequence(...replies: (SummaryData | RouteHandler)[]): RouteHandler {
   let index = 0;
-  return () => ({ status: 200, body: bodies[Math.min(index++, bodies.length - 1)] });
+  return (url) => {
+    const reply = replies[Math.min(index++, replies.length - 1)];
+    return typeof reply === "function" ? reply(url) : ok(reply)(url);
+  };
 }
 
 const summaryRequests = () =>
   (global.fetch as jest.MockedFunction<typeof fetch>).mock.calls
     .map(([input]) => String(input))
-    .filter((url) => url.startsWith("/api/summary"));
+    .filter((url) => url === "/api/summary" || url.startsWith("/api/summary?"));
+
+const enabledRequests = () =>
+  (global.fetch as jest.MockedFunction<typeof fetch>).mock.calls
+    .map(([input]) => String(input))
+    .filter((url) => url === "/api/summary/enabled");
 
 const summaryUrl = (from: string, to: string) => `/api/summary?from=${from}&to=${to}`;
 const defaultWindow = () => windowEndingYesterday(PRESET_DAYS.last2Weeks);
@@ -208,7 +232,7 @@ describe("SupportSummaryPage", () => {
 
   describe("Loading and error states", () => {
     it("shows the loading state while the first summary request is in flight", () => {
-      mockApi(() => new Promise<never>(() => {}));
+      mockApi(pending);
 
       renderPage();
 
@@ -251,6 +275,58 @@ describe("SupportSummaryPage", () => {
       renderPage();
 
       expect(await screen.findByText("Support Summary is not enabled")).toBeInTheDocument();
+    });
+  });
+
+  describe("Feature flag", () => {
+    it("shows the loading state and holds the summary request while the flag is checked", async () => {
+      mockApi(ok(readySummary), emptyRegistry, pending);
+
+      renderPage();
+
+      expect(screen.getByText("Loading support summary...")).toBeInTheDocument();
+      await waitFor(() => expect(enabledRequests()).toHaveLength(1));
+      expect(summaryRequests()).toHaveLength(0);
+      expect(screen.queryByTestId("summary-not-enabled")).not.toBeInTheDocument();
+    });
+
+    it("renders the not-enabled state and never requests the summary when the flag is off", async () => {
+      mockApi(ok(readySummary), emptyRegistry, enabled({ enabled: false }));
+
+      renderPage();
+
+      const block = await screen.findByTestId("summary-not-enabled");
+      // The same copy as the 404 mapping, so a direct visit and a refused request read alike.
+      expect(within(block).getByText(SUMMARY_NOT_ENABLED.title)).toBeInTheDocument();
+      expect(within(block).getByText(SUMMARY_NOT_ENABLED.detail)).toBeInTheDocument();
+      expect(summaryErrorMessage(new ApiError(404))).toEqual(SUMMARY_NOT_ENABLED);
+      expect(screen.getByRole("heading", { level: 1, name: "Support Summary" })).toBeInTheDocument();
+      expect(screen.queryByText("Loading support summary...")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("summary-error")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("summary-at-a-glance")).not.toBeInTheDocument();
+      // The page-level controls would only lead to more refused requests.
+      expect(screen.queryByRole("button", { name: /View Prompts/ })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("summary-date-filter")).not.toBeInTheDocument();
+      expect(summaryRequests()).toHaveLength(0);
+    });
+
+    it("loads the summary once the flag reports the feature on", async () => {
+      renderPage();
+
+      await findAtAGlance();
+      expect(enabledRequests()).toHaveLength(1);
+      expect(summaryRequests()).toHaveLength(1);
+      expect(screen.queryByTestId("summary-not-enabled")).not.toBeInTheDocument();
+    });
+
+    it("still requests the summary when the flag check itself fails, so its own error explains why", async () => {
+      mockApi(failing(404), emptyRegistry, failing(500));
+
+      renderPage();
+
+      const errorBlock = await screen.findByTestId("summary-error");
+      expect(within(errorBlock).getByText(SUMMARY_NOT_ENABLED.title)).toBeInTheDocument();
+      expect(summaryRequests()).toHaveLength(1);
     });
   });
 
@@ -351,6 +427,72 @@ describe("SupportSummaryPage", () => {
       });
       expect(summaryRequests()).toHaveLength(2);
     });
+
+    it("keeps the generating view with a retrying hint when a poll fails, and clears it on the next success", async () => {
+      jest.useFakeTimers();
+      const generating = withSummary({ state: "generating", progress: { phase: "classifying", analysedThreads: 30, totalThreads: 120 } });
+      // A 422 is not retried, so each poll is exactly one request.
+      mockApi(sequence(generating, failing(422), generating, readySummary));
+
+      renderPage();
+      const card = await findAtAGlance();
+      expect(within(card).queryByTestId("summary-refresh-failing")).not.toBeInTheDocument();
+
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+      });
+      const hint = await within(card).findByTestId("summary-refresh-failing");
+      expect(hint).toHaveTextContent("Refresh failing – retrying. Error loading support summary.");
+      // The last reply stays on screen; the page-level error block is for a page with nothing to show.
+      expect(within(card).getByText(/Analysing threads/)).toBeInTheDocument();
+      expect(screen.queryByTestId("summary-error")).not.toBeInTheDocument();
+      expect(screen.getByText("Top Support Areas")).toBeInTheDocument();
+
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+      });
+      await waitFor(() => expect(within(card).queryByTestId("summary-refresh-failing")).not.toBeInTheDocument());
+      expect(summaryRequests()).toHaveLength(3);
+
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+      });
+      expect(await screen.findByText(readySection.content as string)).toBeInTheDocument();
+    });
+
+    it("stops polling after the maximum number of failed polls in a row and says so", async () => {
+      jest.useFakeTimers();
+      const generating = withSummary({ state: "generating", progress: { phase: "classifying", analysedThreads: 30, totalThreads: 120 } });
+      mockApi(sequence(generating, failing(422)));
+
+      renderPage();
+      const card = await findAtAGlance();
+
+      for (let failed = 1; failed < MAX_SUMMARY_POLL_FAILURES; failed++) {
+        await act(async () => {
+          jest.advanceTimersByTime(3000);
+        });
+        expect(await within(card).findByTestId("summary-refresh-failing")).toHaveTextContent("Refresh failing – retrying.");
+        expect(summaryRequests()).toHaveLength(1 + failed);
+      }
+
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+      });
+      await waitFor(() =>
+        expect(within(card).getByTestId("summary-refresh-failing")).toHaveTextContent(
+          `Refresh failing – stopped after ${MAX_SUMMARY_POLL_FAILURES} attempts. Error loading support summary. Reload the page to try again.`
+        )
+      );
+      expect(summaryRequests()).toHaveLength(1 + MAX_SUMMARY_POLL_FAILURES);
+
+      // No further polls, however long the page stays open.
+      await act(async () => {
+        jest.advanceTimersByTime(60000);
+      });
+      expect(summaryRequests()).toHaveLength(1 + MAX_SUMMARY_POLL_FAILURES);
+      expect(within(card).getByText(/Analysing threads/)).toBeInTheDocument();
+    });
   });
 
   describe("Unavailable state", () => {
@@ -419,9 +561,32 @@ describe("SupportSummaryPage", () => {
 
       const strip = await screen.findByTestId("summary-window");
       expect(within(strip).getByText("Last 2 weeks")).toBeInTheDocument();
-      expect(within(strip).getByText("19 – 31 Aug 2026")).toBeInTheDocument();
       expect(within(strip).getByText("42")).toHaveClass("font-mono", "tabular-nums");
       expect(strip).toHaveTextContent("42 tickets raised");
+      // A plain line above the cards, not a bordered chip.
+      expect(strip).not.toHaveClass("border", "rounded-xl", "bg-card");
+      expect(within(strip).queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    it("formats a custom window compactly and labels it from the window shown", async () => {
+      setMockUrlParamsInitial({ dateFilter: "custom", dateFrom: "2026-08-19", dateTo: "2026-08-31" });
+
+      renderPage();
+
+      const strip = await screen.findByTestId("summary-window");
+      expect(within(strip).getByText("Custom range")).toBeInTheDocument();
+      expect(within(strip).getByText("19 – 31 Aug 2026")).toBeInTheDocument();
+    });
+
+    it("lays the At-a-glance card out as a standard card", async () => {
+      renderPage();
+
+      const card = await findAtAGlance();
+      expect(card).toHaveClass("bg-card", "rounded-xl", "border", "p-6");
+      const heading = within(card).getByRole("heading", { level: 2, name: "At a glance" });
+      expect(heading).toHaveClass("text-base", "font-semibold", "text-foreground");
+      expect(heading.parentElement).toHaveClass("mb-4");
+      expect(card.querySelector(".border-b")).toBeNull();
     });
 
     it("renders every breakdown card, with products only when the registry has product tags", async () => {
@@ -514,6 +679,46 @@ describe("SupportSummaryPage", () => {
 
       await waitFor(() => expect(summaryRequests()).toContain(summaryUrl("2026-07-01", "2026-07-31")));
       expect(summaryRequests().filter((url) => url === summaryUrl(fallback.from, fallback.to)).length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("dims the previous window and labels it honestly while a newly chosen preset loads", async () => {
+      const user = userEvent.setup();
+      let releaseMonth: (() => void) | undefined;
+      const month = windowEndingYesterday(PRESET_DAYS.lastMonth);
+      mockApi((url) => {
+        if (url === summaryUrl(month.from, month.to)) {
+          return new Promise((resolve) => {
+            releaseMonth = () => resolve(ok(readySummary)(url));
+          }) as unknown as MockReply;
+        }
+        return ok(readySummary)(url);
+      });
+
+      renderPage();
+      await findAtAGlance();
+      const body = screen.getByTestId("summary-body");
+      expect(body).not.toHaveClass("opacity-60");
+      expect(body).toHaveAttribute("aria-busy", "false");
+
+      await user.click(screen.getByTestId("summary-date-filter"));
+      await user.click(await screen.findByRole("option", { name: "Last Month" }));
+
+      await waitFor(() => expect(summaryRequests()).toContain(summaryUrl(month.from, month.to)));
+      // The previous window's figures stand in, dimmed, and the strip still names that window.
+      await waitFor(() => expect(screen.getByTestId("summary-body")).toHaveAttribute("aria-busy", "true"));
+      expect(screen.getByTestId("summary-body")).toHaveClass("opacity-60");
+      const strip = screen.getByTestId("summary-window");
+      expect(within(strip).getByText("Last 2 weeks")).toBeInTheDocument();
+      expect(within(strip).getByRole("status")).toHaveTextContent("Loading the selected window...");
+
+      await act(async () => {
+        releaseMonth?.();
+      });
+
+      await waitFor(() => expect(within(screen.getByTestId("summary-window")).getByText("Last month")).toBeInTheDocument());
+      expect(screen.getByTestId("summary-body")).toHaveAttribute("aria-busy", "false");
+      expect(screen.getByTestId("summary-body")).not.toHaveClass("opacity-60");
+      expect(within(screen.getByTestId("summary-window")).queryByRole("status")).not.toBeInTheDocument();
     });
 
     it("clears the custom dates when a preset is chosen again", async () => {

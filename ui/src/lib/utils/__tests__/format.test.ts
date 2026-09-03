@@ -1,6 +1,6 @@
 // src/lib/utils/__tests__/format.test.ts
 import { formatHoursToDHMS } from "../chart";
-import { calculatePercentageChange, formatDate, formatInterval } from "../format";
+import { calculatePercentageChange, formatDate, formatInterval, formatUtcDateTime } from "../format";
 
 describe("formatInterval", () => {
   it("should format simple time intervals", () => {
@@ -96,5 +96,20 @@ describe("formatDate", () => {
   it("should handle full ISO timestamps", () => {
     const formatted = formatDate("2025-11-05T14:20:00Z");
     expect(formatted).toMatch(/Nov 5, 2025/);
+  });
+});
+
+describe("formatUtcDateTime", () => {
+  it("formats an instant as a UTC date and 24-hour time", () => {
+    expect(formatUtcDateTime("2026-08-31T09:15:00Z")).toBe("31 Aug 2026, 09:15");
+  });
+
+  it("renders in UTC regardless of the offset in the input", () => {
+    expect(formatUtcDateTime("2026-08-31T23:30:00+02:00")).toBe("31 Aug 2026, 21:30");
+    expect(formatUtcDateTime("2026-12-31T23:59:00-02:00")).toBe("1 Jan 2027, 01:59");
+  });
+
+  it("returns the input unchanged when it is not a parseable instant", () => {
+    expect(formatUtcDateTime("not-a-date")).toBe("not-a-date");
   });
 });

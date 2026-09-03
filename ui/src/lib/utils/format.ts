@@ -91,3 +91,22 @@ export function calculatePercentageChange(current: number, previous: number): st
   const sign = percentChange > 0 ? "+" : "";
   return `${sign}${percentChange}%`;
 }
+
+/**
+ * Formats an instant as a UTC date and time, e.g. "31 Aug 2026, 09:15"
+ * @param timestamp - ISO instant string
+ * @returns The formatted instant; the input unchanged when it does not parse
+ */
+export function formatUtcDateTime(timestamp: string): string {
+  const parsed = new Date(timestamp);
+  if (isNaN(parsed.getTime())) return timestamp;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  }).format(parsed);
+}
