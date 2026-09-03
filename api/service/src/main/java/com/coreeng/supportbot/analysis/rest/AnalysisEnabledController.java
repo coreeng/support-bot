@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.analysis.rest;
 
 import com.coreeng.supportbot.config.AnalysisProps;
-import com.coreeng.supportbot.knowledgegaps.rest.KnowledgeGapsStatusUI;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,8 +21,9 @@ public class AnalysisEnabledController {
     private final AnalysisProps analysisProps;
 
     @GetMapping("/enabled")
-    public ResponseEntity<KnowledgeGapsStatusUI> getAnalysisEnabled() {
-        return ResponseEntity.ok(
-                new KnowledgeGapsStatusUI(analysisProps.prompt().enabled()));
+    public ResponseEntity<FeatureStatus> getAnalysisEnabled() {
+        return ResponseEntity.ok(new FeatureStatus(analysisProps.prompt().enabled()));
     }
+
+    public record FeatureStatus(boolean enabled) {}
 }

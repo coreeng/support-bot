@@ -3,7 +3,6 @@ package com.coreeng.supportbot.analysis.rest;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.config.AnalysisProps;
-import com.coreeng.supportbot.knowledgegaps.rest.KnowledgeGapsStatusUI;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -15,7 +14,7 @@ class AnalysisEnabledControllerTest {
     void returnsEnabled_whenAnalysisPromptEnabled() {
         AnalysisEnabledController controller = controllerWithEnabled(true);
 
-        ResponseEntity<KnowledgeGapsStatusUI> response = controller.getAnalysisEnabled();
+        ResponseEntity<AnalysisEnabledController.FeatureStatus> response = controller.getAnalysisEnabled();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -26,7 +25,7 @@ class AnalysisEnabledControllerTest {
     void returnsDisabled_whenAnalysisPromptDisabled() {
         AnalysisEnabledController controller = controllerWithEnabled(false);
 
-        ResponseEntity<KnowledgeGapsStatusUI> response = controller.getAnalysisEnabled();
+        ResponseEntity<AnalysisEnabledController.FeatureStatus> response = controller.getAnalysisEnabled();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
