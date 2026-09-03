@@ -490,9 +490,18 @@ Set these on the **API**:
 The **Support Summary** page (`/summary`) shows, for a chosen date window, how many tickets
 were raised and how they break down by driver, category, platform feature and team, plus a
 short LLM-written narrative. It reuses the analysis feature above: visiting the page classifies
-any closed-but-unclassified tickets in the window (the same job the **Run Analysis** button
-triggers), then asks the model for the narrative. Results are cached per window and prompt
-version, and recomputed only when the window's classifications change.
+any closed-but-unclassified tickets in the window (the same job `POST /analysis/run` triggers;
+there is no longer a button for it in the UI), then asks the model for the narrative. Results
+are cached per window and prompt version, and recomputed only when the window's
+classifications change.
+
+Windows are whole UTC calendar days, both ends inclusive. The default window is the last
+14 days ending yesterday (UTC), and a window may span at most 366 days; `GET /summary` rejects
+an inverted or longer window with `SUMMARY_WINDOW_INVALID`.
+
+The page replaced the earlier Support Area Summary page: `/knowledge-gaps` now redirects to
+`/summary`, and the tickets table that lived at `/tickets` moved to the home page (`/tickets`
+redirects there, keeping its query string).
 
 The feature is off by default. Enabling it requires the analysis feature to be enabled as well
 — `SUMMARY_ENABLED=true` with `ANALYSIS_PROMPT_ENABLED=false` fails startup. The summary
