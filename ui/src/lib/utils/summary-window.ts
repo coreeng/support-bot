@@ -17,3 +17,22 @@ export function windowEndingYesterday(days: number, now: Date = new Date()): { f
   start.setUTCDate(end.getUTCDate() - (days - 1));
   return { from: toUtcDateString(start), to: toUtcDateString(end) };
 }
+
+/** The longest window the backend accepts, both ends included (`SummaryController.MAX_WINDOW_DAYS`). */
+export const MAX_SUMMARY_WINDOW_DAYS = 366;
+
+export type SummaryWindowProblem = "inverted" | "tooLong";
+
+/** Number of inclusive calendar days from `from` to `to` (both `YYYY-MM-DD`), e.g. one day when equal. */
+const inclusiveDays = (from: string, to: string): number =>
+  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+
+/**
+ * Why the backend would reject a `from`..`to` window with `SUMMARY_WINDOW_INVALID`, or `null`
+ * when it would accept it. Mirrors the server rules so the page can refuse the range up front.
+ */
+export function summaryWindowProblem(from: string, to: string): SummaryWindowProblem | null {
+  if (to < from) return "inverted";
+  if (inclusiveDays(from, to) > MAX_SUMMARY_WINDOW_DAYS) return "tooLong";
+  return null;
+}

@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PRESET_DAYS } from "@/lib/dateRange";
-import { useRegistry, useSummary } from "@/lib/hooks";
+import { isApiError, useRegistry, useSummary } from "@/lib/hooks";
 import { enumValidator, isoDateValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
 import type { SummaryCount, SummaryData, SummarySection } from "@/lib/types/summary";
-import { windowEndingYesterday } from "@/lib/utils/summary-window";
+import { MAX_SUMMARY_WINDOW_DAYS, summaryWindowProblem, windowEndingYesterday } from "@/lib/utils/summary-window";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Eye } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
@@ -61,6 +61,11 @@ function formatWindow(from: string, to: string): string {
   return `${part(start, { day: "numeric" })} – ${part(end, full)}`;
 }
 
+/** A count or percentage inline in prose; every metric is set in a monospaced, tabular face. */
+function Metric({ children }: { children: ReactNode }) {
+  return <span className="font-mono tabular-nums">{children}</span>;
+}
+
 /** The strip above the cards: which window is shown, and how many tickets it holds. */
 function WindowStrip({ preset, from, to, totalTickets }: { preset: SummaryPreset; from: string; to: string; totalTickets: number }) {
   return (
@@ -71,7 +76,7 @@ function WindowStrip({ preset, from, to, totalTickets }: { preset: SummaryPreset
       <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{PRESET_LABELS[preset]}</span>
       <span className="text-foreground font-semibold">{formatWindow(from, to)}</span>
       <span className="text-muted-foreground">
-        · <span className="text-foreground font-semibold tabular-nums">{totalTickets.toLocaleString()}</span> tickets raised
+        · <span className="text-foreground font-mono font-semibold tabular-nums">{totalTickets.toLocaleString()}</span> tickets raised
       </span>
     </div>
   );
@@ -114,31 +119,38 @@ function AtAGlanceCard({ data }: { data: SummaryData }) {
         <SummarySectionBody section={data.summary} />
       </div>
       <div className="flex flex-wrap gap-2 px-6 py-4">
-        <GlanceChip label="Raised">{data.totalTickets.toLocaleString()} tickets</GlanceChip>
+        <GlanceChip label="Raised">
+          <Metric>{data.totalTickets.toLocaleString()}</Metric> tickets
+        </GlanceChip>
         {topDriver && (
           <GlanceChip label="Top driver">
-            {topDriver.label} · {topDriver.count.toLocaleString()}
-            {driverShare !== null && ` (${driverShare}%)`}
+            {topDriver.label} · <Metric>{topDriver.count.toLocaleString()}</Metric>
+            {driverShare !== null && (
+              <>
+                {" "}
+                (<Metric>{driverShare}%</Metric>)
+              </>
+            )}
           </GlanceChip>
         )}
         {topCategory && (
           <GlanceChip label="Top subject">
-            {topCategory.label} · {topCategory.count.toLocaleString()}
+            {topCategory.label} · <Metric>{topCategory.count.toLocaleString()}</Metric>
           </GlanceChip>
         )}
         {topFeature && (
           <GlanceChip label="Top feature">
-            {topFeature.label} · {topFeature.count.toLocaleString()}
+            {topFeature.label} · <Metric>{topFeature.count.toLocaleString()}</Metric>
           </GlanceChip>
         )}
         {topTeam && (
           <GlanceChip label="Top tenant">
-            {topTeam.label} · {topTeam.count.toLocaleString()}
+            {topTeam.label} · <Metric>{topTeam.count.toLocaleString()}</Metric>
           </GlanceChip>
         )}
         {data.unclassifiedTickets > 0 && (
           <GlanceChip label="Awaiting classification" muted>
-            {data.unclassifiedTickets.toLocaleString()}
+            <Metric>{data.unclassifiedTickets.toLocaleString()}</Metric>
           </GlanceChip>
         )}
       </div>
@@ -155,12 +167,16 @@ function SummarySectionBody({ section }: { section: SummarySection }) {
     const analysed = section.progress?.analysedThreads ?? null;
     const total = section.progress?.totalThreads ?? null;
     const percent = total && total > 0 && analysed !== null ? Math.round((analysed / total) * 100) : null;
-    const message =
-      section.progress?.phase === "summarising"
-        ? "Writing the summary..."
-        : analysed !== null && total !== null && total > 0
-          ? `Analysing threads... ${analysed} of ${total} complete`
-          : "Checking for threads to analyse...";
+    const message: ReactNode =
+      section.progress?.phase === "summarising" ? (
+        "Writing the summary..."
+      ) : analysed !== null && total !== null && total > 0 ? (
+        <>
+          Analysing threads... <Metric>{analysed.toLocaleString()}</Metric> of <Metric>{total.toLocaleString()}</Metric> complete
+        </>
+      ) : (
+        "Checking for threads to analyse..."
+      );
 
     return (
       <div>
@@ -206,6 +222,38 @@ function SummarySectionBody({ section }: { section: SummarySection }) {
   );
 }
 
+/**
+ * Explains a failed summary request. The backend's ProblemDetail `code` is forwarded by the API
+ * route, so the page can tell a bad window or a missing prompt apart from an outage.
+ */
+export function summaryErrorMessage(error: unknown): { title: string; detail: string } {
+  if (isApiError(error, 403)) {
+    return { title: "You do not have permission to view the Support Summary", detail: "Ask an administrator for access." };
+  }
+  if (isApiError(error, 404)) {
+    return { title: "Support Summary is not enabled", detail: "Enable the summary feature on the server to use this page." };
+  }
+  if (isApiError(error) && error.reason === "SUMMARY_WINDOW_INVALID") {
+    return {
+      title: "The selected range is invalid",
+      detail: `The window must not exceed ${MAX_SUMMARY_WINDOW_DAYS} days, and the end date must not be before the start date.`,
+    };
+  }
+  if (isApiError(error) && error.reason === "ANALYSIS_PROMPT_LOAD_FAILED") {
+    return {
+      title: "The classification prompt could not be loaded",
+      detail: "The summary cannot be computed until the analysis prompt configuration on the server is fixed.",
+    };
+  }
+  return { title: "Error loading support summary", detail: "Please try again later" };
+}
+
+/** Inline guidance next to the custom range inputs; nothing while the range is valid or incomplete. */
+const RANGE_PROBLEM_LABELS = {
+  inverted: "Invalid range: end date is before start date",
+  tooLong: `Invalid range: ${MAX_SUMMARY_WINDOW_DAYS} days at most`,
+} as const;
+
 export default function SupportSummaryPage() {
   const [params, setParams] = useUrlParams(
     // Widened to string so `setParams` accepts any preset, not just the default's literal type.
@@ -218,12 +266,13 @@ export default function SupportSummaryPage() {
   );
   // Safe to cast: the validator guarantees a valid preset.
   const dateFilter = params.dateFilter as SummaryPreset;
-  const isDateRangeValid = !params.dateFrom || !params.dateTo || params.dateFrom <= params.dateTo;
+  // Mirrors the backend's window rules, so a range it would reject with 400 is never requested.
+  const rangeProblem = params.dateFrom && params.dateTo ? summaryWindowProblem(params.dateFrom, params.dateTo) : null;
 
-  // Falls back to the default preset while a custom range is incomplete or inverted, so the
+  // Falls back to the default preset while a custom range is incomplete or invalid, so the
   // page always has a window to load rather than sitting empty.
   const summaryWindow = useMemo(() => {
-    if (dateFilter === "custom" && params.dateFrom && params.dateTo && params.dateFrom <= params.dateTo) {
+    if (dateFilter === "custom" && params.dateFrom && params.dateTo && summaryWindowProblem(params.dateFrom, params.dateTo) === null) {
       return { from: params.dateFrom, to: params.dateTo };
     }
     const preset = dateFilter === "custom" ? DEFAULT_PRESET : dateFilter;
@@ -301,7 +350,11 @@ export default function SupportSummaryPage() {
               />
             </>
           )}
-          {dateFilter === "custom" && !isDateRangeValid && <span className="text-destructive text-xs font-medium">Invalid range</span>}
+          {dateFilter === "custom" && rangeProblem !== null && (
+            <span className="text-destructive text-xs font-medium" role="alert">
+              {RANGE_PROBLEM_LABELS[rangeProblem]}
+            </span>
+          )}
         </div>
       </div>
 
@@ -315,10 +368,10 @@ export default function SupportSummaryPage() {
       )}
 
       {error && !data && (
-        <div className="flex h-full items-center justify-center">
+        <div className="flex h-full items-center justify-center" data-testid="summary-error">
           <div className="text-center">
-            <p className="text-destructive">Error loading support summary</p>
-            <p className="text-muted-foreground mt-2 text-sm">Please try again later</p>
+            <p className="text-destructive">{summaryErrorMessage(error).title}</p>
+            <p className="text-muted-foreground mt-2 text-sm">{summaryErrorMessage(error).detail}</p>
           </div>
         </div>
       )}

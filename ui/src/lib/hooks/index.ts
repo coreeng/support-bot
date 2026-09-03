@@ -589,6 +589,9 @@ export function useSummary(from?: string, to?: string) {
     // The window's figures move as the backfill runs; a stale cache would show the wrong ones.
     staleTime: 0,
     placeholderData: keepPreviousData,
+    // A 4xx (bad window, feature off, forbidden) will not fix itself: surface it at once instead of
+    // retrying with backoff while the previous window's figures linger on screen.
+    retry: shouldRetryTransientFailure,
   });
 }
 
@@ -669,11 +672,17 @@ function elevateQueryOptions<T>(queryKey: readonly unknown[], path: string, enab
   };
 }
 
-export function shouldRetryElevateQuery(failureCount: number, error: Error) {
+/**
+ * Retries network failures, 429s and 5xx answers at most twice; any other 4xx is final and is
+ * surfaced immediately.
+ */
+export function shouldRetryTransientFailure(failureCount: number, error: Error) {
   if (failureCount >= 2) return false;
   if (!isApiError(error)) return true;
   return error.status === 429 || error.status >= 500;
 }
+
+export const shouldRetryElevateQuery = shouldRetryTransientFailure;
 
 export function useElevateProducts(request: ElevatePageRequest, enabled = true) {
   const params = elevatePageParams(request);

@@ -24,15 +24,21 @@ export const BREAKDOWN_ACCENTS = {
 
 export type BreakdownAccent = keyof typeof BREAKDOWN_ACCENTS;
 
-/** Distinct row colours for a breakdown whose rows should be told apart, e.g. under a stacked bar. */
+/**
+ * Distinct row colours for a breakdown whose rows should be told apart, e.g. under a stacked bar.
+ *
+ * Chart tokens only, so they follow the theme. Ordered so neighbouring ranks differ in hue and the
+ * top ranks — the segments wide enough to carry a label — take the tokens with the strongest
+ * contrast against `text-primary-foreground`, which stays light in both themes.
+ */
 export const DISTINCT_ROW_COLORS = [
-  "bg-emerald-700",
-  "bg-amber-600",
-  "bg-teal-600",
-  "bg-red-700",
-  "bg-violet-500",
-  "bg-sky-600",
-  "bg-pink-600",
+  "bg-chart-1",
+  "bg-chart-7",
+  "bg-chart-9",
+  "bg-chart-2",
+  "bg-chart-10",
+  "bg-chart-6",
+  "bg-chart-5",
 ] as const;
 
 export const sumCounts = (counts: SummaryCount[]): number => counts.reduce((sum, count) => sum + count.count, 0);
@@ -153,7 +159,7 @@ function StackedShareBar({
         return (
           <div
             key={count.label}
-            className={`flex items-center justify-center ${colorFor(index)} font-mono text-xs font-semibold text-white tabular-nums transition-all duration-500 ease-out`}
+            className={`flex items-center justify-center ${colorFor(index)} text-primary-foreground font-mono text-xs font-semibold tabular-nums transition-all duration-500 ease-out`}
             style={{ width: `${total > 0 ? (count.count / total) * 100 : 0}%` }}
             title={`${count.label}: ${count.count.toLocaleString()} (${share}%)`}
           >
