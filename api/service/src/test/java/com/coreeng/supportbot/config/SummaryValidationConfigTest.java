@@ -16,25 +16,29 @@ class SummaryValidationConfigTest {
 
     @Test
     void refusesToStartWithTheSummaryPageOnAndAnalysisOff() {
-        assertThatThrownBy(() -> new SummaryValidationConfig(new SummaryProps(true, 400), analysisProps(false)))
+        assertThatThrownBy(() -> new SummaryValidationConfig(
+                        new SummaryProps(true, 400, Duration.ofMinutes(15)), analysisProps(false)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("summary.enabled=true requires analysis.prompt.enabled=true");
     }
 
     @Test
     void allowsTheSupportedCombinations() {
-        assertThatCode(() -> new SummaryValidationConfig(new SummaryProps(true, 400), analysisProps(true)))
+        assertThatCode(() -> new SummaryValidationConfig(
+                        new SummaryProps(true, 400, Duration.ofMinutes(15)), analysisProps(true)))
                 .doesNotThrowAnyException();
-        assertThatCode(() -> new SummaryValidationConfig(new SummaryProps(false, 400), analysisProps(false)))
+        assertThatCode(() -> new SummaryValidationConfig(
+                        new SummaryProps(false, 400, Duration.ofMinutes(15)), analysisProps(false)))
                 .doesNotThrowAnyException();
         // Analysis without the summary page is the pre-existing deployment shape and must stay valid.
-        assertThatCode(() -> new SummaryValidationConfig(new SummaryProps(false, 400), analysisProps(true)))
+        assertThatCode(() -> new SummaryValidationConfig(
+                        new SummaryProps(false, 400, Duration.ofMinutes(15)), analysisProps(true)))
                 .doesNotThrowAnyException();
     }
 
     @Test
     void rejectsANonsensicalReasonLimitWhenEnabled() {
-        assertThatThrownBy(() -> new SummaryProps(true, 0))
+        assertThatThrownBy(() -> new SummaryProps(true, 0, Duration.ofMinutes(15)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("summary.max-reasons");
     }

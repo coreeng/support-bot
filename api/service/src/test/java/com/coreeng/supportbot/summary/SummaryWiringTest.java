@@ -10,6 +10,8 @@ import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryProps;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.Executor;
 import org.junit.jupiter.api.Test;
@@ -71,8 +73,9 @@ class SummaryWiringTest {
                     mock(SummarySnapshotRepository.class),
                     mock(LlmSummaryService.class),
                     channelRegistry(),
-                    new SummaryProps(true, 400),
-                    applicationContext);
+                    new SummaryProps(true, 400, Duration.ofMinutes(15)),
+                    applicationContext,
+                    Clock.systemUTC());
         }
 
         @Bean

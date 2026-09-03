@@ -25,8 +25,9 @@ public interface SummaryRefresher {
     SummaryRefreshStatus status();
 
     /**
-     * @return the recorded error for this window and data fingerprint, or null when the last attempt
-     *     did not fail or the data has moved on since it did
+     * @return the recorded error for this window, summary prompt version and data fingerprint, or
+     *     null when the last attempt did not fail, its input has moved on since, or the retry delay
+     *     has passed
      */
-    @Nullable String failureFor(SummaryWindow window, String fingerprint);
+    @Nullable String failureFor(SummaryWindow window, String summaryPromptId, String fingerprint);
 }

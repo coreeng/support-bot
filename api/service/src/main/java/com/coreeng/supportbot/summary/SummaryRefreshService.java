@@ -11,7 +11,11 @@ import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SummaryProps;
 import com.google.common.collect.ImmutableList;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +44,9 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
 
     private static final String ASYNC_ID = "analysis";
 
+    /** Upper bound on remembered failures; past it the oldest is dropped and simply retried. */
+    static final int MAX_REMEMBERED_FAILURES = 64;
+
     private final AsyncJobRepository asyncJobRepository;
     private final AnalysisService analysisService;
     private final AnalysisPromptRepository analysisPromptRepository;
@@ -49,16 +56,39 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
     private final SlackChannelRegistry channelRegistry;
     private final SummaryProps summaryProps;
     private final ApplicationContext applicationContext;
+    private final Clock clock;
 
     private final AtomicReference<SummaryRefreshStatus> status = new AtomicReference<>(SummaryRefreshStatus.IDLE);
-    private final AtomicReference<@Nullable Failure> lastFailure = new AtomicReference<>();
 
     /**
-     * A failed attempt, remembered so the page reports the error instead of retrying on every poll.
-     * It is keyed on the fingerprint as well as the window: once the window's data changes the
-     * failure is no longer about the same input and is worth retrying.
+     * Failed attempts by window, remembered so the page reports the error instead of retrying on
+     * every 3s poll. Insertion-ordered and capped: a service that has failed for more windows than
+     * fit here has bigger problems than a retry. Guarded by its own monitor — touched from the async
+     * refresh thread and from every request thread that polls.
      */
-    private record Failure(SummaryWindow window, String fingerprint, String error) {}
+    private final Map<SummaryWindow, Failure> failures = new LinkedHashMap<>() {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<SummaryWindow, Failure> eldest) {
+            return size() > MAX_REMEMBERED_FAILURES;
+        }
+    };
+
+    /**
+     * A failed attempt. It only applies while the input it failed on is unchanged — the window's
+     * data fingerprint and the summary prompt version — and only for {@link
+     * SummaryProps#failureRetryDelay()}: a window whose data never changes again (last month's)
+     * would otherwise stay pinned to a transient error until a restart.
+     */
+    private record Failure(String summaryPromptId, String fingerprint, String error, Instant recordedAt) {
+
+        boolean matches(String summaryPromptId, String fingerprint) {
+            return this.summaryPromptId.equals(summaryPromptId) && this.fingerprint.equals(fingerprint);
+        }
+
+        boolean expiredAt(Instant now, SummaryProps props) {
+            return !now.isBefore(recordedAt.plus(props.failureRetryDelay()));
+        }
+    }
 
     @Override
     public boolean start(SummaryWindow window) {
@@ -124,14 +154,20 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
     }
 
     @Override
-    public @Nullable String failureFor(SummaryWindow window, String fingerprint) {
-        Failure failure = lastFailure.get();
-        if (failure == null
-                || !failure.window().equals(window)
-                || !failure.fingerprint().equals(fingerprint)) {
-            return null;
+    public @Nullable String failureFor(SummaryWindow window, String summaryPromptId, String fingerprint) {
+        synchronized (failures) {
+            Failure failure = failures.get(window);
+            if (failure == null) {
+                return null;
+            }
+            if (!failure.matches(summaryPromptId, fingerprint) || failure.expiredAt(clock.instant(), summaryProps)) {
+                // Either the input moved on or the retry delay has passed: the next visit retries, and
+                // whatever comes of that replaces this entry.
+                failures.remove(window);
+                return null;
+            }
+            return failure.error();
         }
-        return failure.error();
     }
 
     /**
@@ -171,8 +207,16 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
     }
 
     private void recordFailure(SummaryWindow window, Exception cause) {
+        String summaryPromptId;
         String fingerprint;
         try {
+            AnalysisPrompt summaryPrompt = analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY);
+            if (summaryPrompt == null) {
+                // The page reports the missing prompt itself without starting a refresh, so there is
+                // nothing to pin.
+                return;
+            }
+            summaryPromptId = AnalysisService.computePromptId(summaryPrompt.content());
             fingerprint = summaryReadRepository
                     .fingerprint(
                             window,
@@ -180,16 +224,27 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
                             channelRegistry.monitoredChannelIds())
                     .value();
         } catch (Exception e) {
-            // Without a fingerprint the failure cannot be tied to a data state, so let the next visit
-            // retry rather than pinning an error we can no longer invalidate.
-            log.warn("Could not fingerprint window {}..{} after a failed refresh", window.from(), window.to(), e);
+            // Without the input's identity the failure cannot be tied to what it failed on, so let the
+            // next visit retry rather than pinning an error we can no longer invalidate.
+            log.warn(
+                    "Could not identify the input of window {}..{} after a failed refresh",
+                    window.from(),
+                    window.to(),
+                    e);
             return;
         }
-        lastFailure.set(new Failure(window, fingerprint, describe(cause)));
+        Failure failure = new Failure(summaryPromptId, fingerprint, describe(cause), clock.instant());
+        synchronized (failures) {
+            // Remove first so a repeat failure moves to the newest end instead of keeping its old slot.
+            failures.remove(window);
+            failures.put(window, failure);
+        }
     }
 
     private void clearFailure(SummaryWindow window) {
-        lastFailure.updateAndGet(failure -> failure != null && failure.window().equals(window) ? null : failure);
+        synchronized (failures) {
+            failures.remove(window);
+        }
     }
 
     private static String describe(Exception cause) {

@@ -286,6 +286,7 @@ analysis:
 summary:
   enabled: ${SUMMARY_ENABLED:false}
   max-reasons: ${SUMMARY_MAX_REASONS:400} # Newest per-ticket reasons fed to the summary model
+  failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried
 ```
 
 For deployment versatility across different secret delivery mechanisms, you can base64-encode the PEM file into a single line before storing it:
@@ -489,6 +490,7 @@ Set these on the **API**:
 |----------|-------------|
 | `SUMMARY_ENABLED` | Master switch for the Support Summary page. Requires `ANALYSIS_PROMPT_ENABLED=true`. |
 | `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons (newest first) included in the report sent to the model, so a very wide window cannot overflow its context. Default `400`. |
+| `SUMMARY_FAILURE_RETRY_DELAY` | How long a failed summary refresh is reported as an error before the next visit retries it. A change to the window's data or to the in-use summary prompt retries sooner. Default `15m`. |
 
 ## Single Sign-On (SSO)
 

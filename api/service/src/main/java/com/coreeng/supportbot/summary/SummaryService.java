@@ -84,10 +84,11 @@ public class SummaryService {
                 .fingerprint(window, classificationPromptId, channelIds)
                 .value();
 
-        String failure = summaryRefresher.failureFor(window, fingerprint);
+        String failure = summaryRefresher.failureFor(window, summaryPromptId, fingerprint);
         if (failure != null) {
             // Retrying on every poll would hammer the LLM with the same failing input; the failure is
-            // released as soon as the window's data changes.
+            // released as soon as the window's data or the summary prompt changes, or the retry delay
+            // passes.
             return new SummaryState.Unavailable(failure);
         }
 

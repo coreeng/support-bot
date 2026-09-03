@@ -3,6 +3,7 @@ package com.coreeng.supportbot.summary.rest;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.config.SummaryProps;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,6 @@ class SummaryEnabledControllerTest {
     }
 
     private static SummaryEnabledController controllerWithEnabled(boolean enabled) {
-        return new SummaryEnabledController(new SummaryProps(enabled, 400));
+        return new SummaryEnabledController(new SummaryProps(enabled, 400, Duration.ofMinutes(15)));
     }
 }

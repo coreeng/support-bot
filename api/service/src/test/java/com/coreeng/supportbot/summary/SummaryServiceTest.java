@@ -164,7 +164,8 @@ class SummaryServiceTest {
 
     @Test
     void reportsAFailedAttemptInsteadOfRetryingItEveryPoll() {
-        when(summaryRefresher.failureFor(WINDOW, FINGERPRINT)).thenReturn("the model timed out");
+        when(summaryRefresher.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT))
+                .thenReturn("the model timed out");
 
         assertThat(service.get(FROM, TO).summary()).isEqualTo(new SummaryState.Unavailable("the model timed out"));
         verify(summaryRefresher, never()).start(any());

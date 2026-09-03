@@ -2,6 +2,7 @@ package com.coreeng.supportbot.summary;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -20,7 +21,12 @@ import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryProps;
 import com.google.common.collect.ImmutableList;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +47,9 @@ class SummaryRefreshServiceTest {
     private static final String SUMMARY_PROMPT = "summarise this";
     private static final String CLASSIFICATION_PROMPT_ID = AnalysisService.computePromptId(CLASSIFICATION_PROMPT);
     private static final String SUMMARY_PROMPT_ID = AnalysisService.computePromptId(SUMMARY_PROMPT);
+    private static final String FINGERPRINT = "2@2026-03-23T10:00";
+    private static final Duration RETRY_DELAY = Duration.ofMinutes(15);
+    private static final Instant NOW = Instant.parse("2026-03-23T12:00:00Z");
 
     @Mock
     private AsyncJobRepository asyncJobRepository;
@@ -63,6 +72,7 @@ class SummaryRefreshServiceTest {
     @Mock
     private ApplicationContext applicationContext;
 
+    private final SteppingClock clock = new SteppingClock(NOW);
     private SummaryRefreshService service;
 
     @BeforeEach
@@ -77,8 +87,9 @@ class SummaryRefreshServiceTest {
                 summarySnapshotRepository,
                 llmSummaryService,
                 channelRegistry,
-                new SummaryProps(true, 400),
-                applicationContext);
+                new SummaryProps(true, 400, RETRY_DELAY),
+                applicationContext,
+                clock);
 
         lenient().when(analysisService.loadPrompt()).thenReturn(CLASSIFICATION_PROMPT);
         lenient()
@@ -130,7 +141,7 @@ class SummaryRefreshServiceTest {
                         WINDOW, SUMMARY_PROMPT_ID, "2@2026-03-23T10:00", "the prose", "model-a", null));
         assertThat(service.status().running()).isFalse();
         verify(asyncJobRepository).deleteJob("analysis");
-        assertThat(service.failureFor(WINDOW, "2@2026-03-23T10:00")).isNull();
+        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
     }
 
     @Test
@@ -143,7 +154,7 @@ class SummaryRefreshServiceTest {
         verify(asyncJobRepository).deleteJob("analysis");
         verify(summarySnapshotRepository, never()).upsert(any());
         assertThat(service.status().running()).isFalse();
-        assertThat(service.failureFor(WINDOW, "2@2026-03-23T10:00")).isEqualTo("model exploded");
+        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isEqualTo("model exploded");
     }
 
     @Test
@@ -154,9 +165,88 @@ class SummaryRefreshServiceTest {
 
         // A different fingerprint means the window's data moved on: the failure is stale, so a retry
         // is warranted rather than a sticky error.
-        assertThat(service.failureFor(WINDOW, "9@2026-04-01T10:00")).isNull();
-        assertThat(service.failureFor(new SummaryWindow(FROM, TO.plusDays(1)), "2@2026-03-23T10:00"))
+        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, "9@2026-04-01T10:00"))
                 .isNull();
+        assertThat(service.failureFor(new SummaryWindow(FROM, TO.plusDays(1)), SUMMARY_PROMPT_ID, FINGERPRINT))
+                .isNull();
+    }
+
+    @Test
+    void aRecordedFailureIsRetriedOnceTheDelayHasPassedEvenIfTheDataIsUnchanged() {
+        when(llmSummaryService.generate(any(), any(), any())).thenThrow(new IllegalStateException("model exploded"));
+
+        service.runWindowRefresh(FROM, TO);
+
+        // Polls inside the delay keep reporting the error rather than hammering the model.
+        clock.advance(RETRY_DELAY.minusSeconds(1));
+        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isEqualTo("model exploded");
+        // A window whose data never changes again (last month's) must not stay pinned to a transient
+        // error until a restart: once the delay has passed the next visit gets to retry.
+        clock.advance(Duration.ofSeconds(1));
+        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
+        // And the expiry is not a one-off: the entry is gone, not merely hidden.
+        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
+    }
+
+    @Test
+    void aNewSummaryPromptVersionReleasesARecordedFailure() {
+        when(llmSummaryService.generate(any(), any(), any())).thenThrow(new IllegalStateException("model exploded"));
+
+        service.runWindowRefresh(FROM, TO);
+
+        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isEqualTo("model exploded");
+        // The failure was about a particular prompt; a newly published version is a different input
+        // and deserves a fresh attempt even though the window's data is identical.
+        String newPromptId = AnalysisService.computePromptId("summarise this, but better");
+        assertThat(service.failureFor(WINDOW, newPromptId, FINGERPRINT)).isNull();
+    }
+
+    @Test
+    void failuresForDifferentWindowsAreRememberedIndependently() {
+        SummaryWindow otherWindow = new SummaryWindow(FROM.minusMonths(1), TO.minusMonths(1));
+        String otherFingerprint = "7@2026-02-20T09:00";
+        when(summaryReadRepository.fingerprint(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(new SummaryFingerprint(7, LocalDate.of(2026, 2, 20).atTime(9, 0)));
+        when(summaryReadRepository.breakdowns(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(breakdowns());
+        when(summaryReadRepository.reasons(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
+                .thenReturn(ImmutableList.of("Because."));
+        when(llmSummaryService.generate(any(), any(), any()))
+                .thenThrow(new IllegalStateException("first exploded"))
+                .thenThrow(new IllegalStateException("second exploded"));
+
+        service.runWindowRefresh(FROM, TO);
+        service.runWindowRefresh(otherWindow.from(), otherWindow.to());
+
+        // The second window's failure must not evict the first's, or the first would be retried on
+        // the very next poll of a tab that is still looking at it.
+        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isEqualTo("first exploded");
+        assertThat(service.failureFor(otherWindow, SUMMARY_PROMPT_ID, otherFingerprint))
+                .isEqualTo("second exploded");
+    }
+
+    @Test
+    void theFailureMemoIsBoundedAndDropsTheOldestWindowFirst() {
+        when(llmSummaryService.generate(any(), any(), any())).thenThrow(new IllegalStateException("model exploded"));
+        when(summaryReadRepository.fingerprint(any(), any(), any()))
+                .thenReturn(new SummaryFingerprint(2, LocalDate.of(2026, 3, 23).atTime(10, 0)));
+        when(summaryReadRepository.breakdowns(any(), any(), any())).thenReturn(breakdowns());
+        when(summaryReadRepository.reasons(any(), any(), any(), anyInt())).thenReturn(ImmutableList.of("Because."));
+
+        service.runWindowRefresh(FROM, TO);
+        for (int i = 1; i <= SummaryRefreshService.MAX_REMEMBERED_FAILURES; i++) {
+            service.runWindowRefresh(FROM.plusDays(i), TO.plusDays(i));
+        }
+
+        // The first window was pushed out; the most recent ones are still remembered.
+        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
+        assertThat(service.failureFor(
+                        new SummaryWindow(FROM.plusDays(1), TO.plusDays(1)), SUMMARY_PROMPT_ID, FINGERPRINT))
+                .isEqualTo("model exploded");
+        SummaryWindow newest = new SummaryWindow(
+                FROM.plusDays(SummaryRefreshService.MAX_REMEMBERED_FAILURES),
+                TO.plusDays(SummaryRefreshService.MAX_REMEMBERED_FAILURES));
+        assertThat(service.failureFor(newest, SUMMARY_PROMPT_ID, FINGERPRINT)).isEqualTo("model exploded");
     }
 
     @Test
@@ -169,7 +259,7 @@ class SummaryRefreshServiceTest {
 
         verifyNoInteractions(llmSummaryService);
         verify(asyncJobRepository).deleteJob("analysis");
-        assertThat(service.failureFor(WINDOW, "2@2026-03-23T10:00")).isEqualTo("slack is down");
+        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isEqualTo("slack is down");
     }
 
     @Test
@@ -190,7 +280,8 @@ class SummaryRefreshServiceTest {
             verify(asyncJobRepository).deleteJob("analysis");
             assertThat(service.status().running()).isFalse();
             // Nothing is pinned, so the next visit starts a fresh refresh.
-            assertThat(service.failureFor(WINDOW, "2@2026-03-23T10:00")).isNull();
+            assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT))
+                    .isNull();
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
         } finally {
             Thread.interrupted();
@@ -204,7 +295,35 @@ class SummaryRefreshServiceTest {
         service.runWindowRefresh(FROM, TO);
 
         verify(summarySnapshotRepository, never()).upsert(any());
-        assertThat(service.failureFor(WINDOW, "2@2026-03-23T10:00")).isNotNull();
+        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isNotNull();
+    }
+
+    /** A clock the test moves by hand; the service only ever asks it for the instant. */
+    private static final class SteppingClock extends Clock {
+        private Instant now;
+
+        SteppingClock(Instant start) {
+            this.now = start;
+        }
+
+        void advance(Duration by) {
+            now = now.plus(by);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
     }
 
     private static SummaryBreakdowns breakdowns() {
