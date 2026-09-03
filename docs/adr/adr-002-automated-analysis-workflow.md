@@ -2,7 +2,7 @@
 
 **Date:** 2026-02-23
 **Status:** Proposed
-**Amended:** 2026-09 — [PR #327](https://github.com/coreeng/support-bot/pull/327) retired the UI that triggered this pipeline (`/knowledge-gaps`, now redirecting to `/summary`); the backfill is triggered server-side while serving `GET /summary`, and `POST /analysis/run` remains as an API-only path. See [docs/plans/support-summary.md](../plans/support-summary.md).
+**Amended:** 2026-09 — [PR #327](https://github.com/coreeng/support-bot/pull/327) retired the UI that triggered this pipeline (`/knowledge-gaps`, now redirecting to `/summary`); the backfill is triggered server-side while serving `GET /summary`, and `POST /analysis/run` remains as an API-only path. The Support Summary settings are documented in `api/service/docs/configuration.md`.
 
 ---
 

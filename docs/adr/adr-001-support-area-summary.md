@@ -1,6 +1,6 @@
 # ADR: Summary Data Export/Import for Knowledge Gap Analysis
 
-**Amended:** 2026-09 — [PR #327](https://github.com/coreeng/support-bot/pull/327) removed the UI export/import/results surface (the Support Area Summary page at `/knowledge-gaps`, which now redirects to `/summary`). The `/summary-data/*` endpoints (export, import, results) remain and are API-only (see `api/service/README.md`); aggregated insights are now shown on the Support Summary page (`/summary`) — see [docs/plans/support-summary.md](../plans/support-summary.md). Items 4–5 and the "UI Integration" consequence below describe the original UI and are kept as history.
+**Amended:** 2026-09 — [PR #327](https://github.com/coreeng/support-bot/pull/327) removed the UI export/import/results surface (the Support Area Summary page at `/knowledge-gaps`, which now redirects to `/summary`). The `/summary-data/*` endpoints (export, import, results) remain and are API-only (see `api/service/README.md`); aggregated insights are now shown on the Support Summary page (`/summary`) (settings in `api/service/docs/configuration.md`). Items 4–5 and the "UI Integration" consequence below describe the original UI and are kept as history.
 
 ---
 
