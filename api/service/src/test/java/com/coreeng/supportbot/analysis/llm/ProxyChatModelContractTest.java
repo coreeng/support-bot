@@ -90,7 +90,7 @@ class ProxyChatModelContractTest {
                 Duration.ofMillis(1),
                 new AnalysisProps.Vertex(false, "", ""),
                 new AnalysisProps.Proxy(true, BASE_URL, new AnalysisProps.Proxy.Auth(BASE64_TOKEN), timeout),
-                new AnalysisProps.Stub(false));
+                new AnalysisProps.Stub(false, false));
         AnalysisProps analysisProps = new AnalysisProps(
                 llm,
                 new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip"),

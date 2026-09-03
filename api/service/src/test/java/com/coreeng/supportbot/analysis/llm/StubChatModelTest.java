@@ -13,6 +13,8 @@ import com.coreeng.supportbot.summary.SummaryCount;
 import com.coreeng.supportbot.summary.SummaryWindow;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.google.common.collect.ImmutableList;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -89,6 +91,23 @@ class StubChatModelTest {
     }
 
     @Test
+    void reportsItselfAsTheStubModelOnEveryResponse() {
+        // Whatever analysis.llm.model-name says, rows written from stub output must not carry a
+        // real model id — the response metadata is what LlmSummaryService.modelName() consults.
+        ChatResponse response = stub.chat(UserMessage.from("anything at all"));
+
+        assertThat(response.modelName()).isEqualTo(StubChatModel.MODEL_NAME).isEqualTo("stub");
+        assertThat(stub.defaultRequestParameters().modelName()).isEqualTo("stub");
+    }
+
+    @Test
+    void summaryIsStampedWithTheStubModelNameNotTheConfiguredOne() {
+        LlmSummaryService summaryService = new LlmSummaryService(stub, analysisProps());
+
+        assertThat(summaryService.modelName()).isEqualTo("stub").isNotEqualTo("stub-local");
+    }
+
+    @Test
     void makesNoNetworkCallAndNeedsNoCredentials() {
         // Nothing to assert about sockets directly; the meaningful guarantee is that the model is
         // constructible with no configuration at all and still answers.
@@ -110,7 +129,7 @@ class StubChatModelTest {
                 Duration.ofMillis(1),
                 new AnalysisProps.Vertex(false, "", ""),
                 new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)),
-                new AnalysisProps.Stub(true));
+                new AnalysisProps.Stub(true, true));
         return new AnalysisProps(
                 llm,
                 new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip"),

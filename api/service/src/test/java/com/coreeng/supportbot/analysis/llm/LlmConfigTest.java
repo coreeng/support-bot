@@ -118,6 +118,26 @@ class LlmConfigTest {
     }
 
     @Test
+    void failsStartupWhenStubEnabledWithoutSyntheticDataAcknowledgement() {
+        // The provider flag on its own must not start: a config copied from a laptop into a shared
+        // environment would otherwise write synthetic rows there.
+        contextRunner
+                .withPropertyValues(
+                        "analysis.prompt.enabled=true",
+                        "analysis.llm.vertex.enabled=false",
+                        "analysis.llm.stub.enabled=true",
+                        "analysis.llm.model-name=stub-local")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .rootCause()
+                            .hasMessageContaining("analysis.llm.stub.acknowledge-synthetic-data=true")
+                            .hasMessageContaining("synthetic rows into analysis and summary_snapshot")
+                            .hasMessageContaining("never be enabled against a shared database");
+                });
+    }
+
+    @Test
     void failsStartupWhenStubAndProxyBothEnabled() {
         contextRunner
                 .withPropertyValues(stubProperties())
@@ -144,7 +164,10 @@ class LlmConfigTest {
 
     private static String[] stubProperties() {
         return new String[] {
-            "analysis.llm.vertex.enabled=false", "analysis.llm.stub.enabled=true", "analysis.llm.model-name=stub-local"
+            "analysis.llm.vertex.enabled=false",
+            "analysis.llm.stub.enabled=true",
+            "analysis.llm.stub.acknowledge-synthetic-data=true",
+            "analysis.llm.model-name=stub-local"
         };
     }
 

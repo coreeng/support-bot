@@ -49,7 +49,7 @@ class SummaryValidationConfigTest {
                 Duration.ofMillis(100),
                 new Vertex(true, "test-project", "europe-west2"),
                 new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)),
-                new Stub(false));
+                new Stub(false, false));
         return new AnalysisProps(
                 llm, new Bundle("classpath:placeholder-analysis-bundle.zip"), new Prompt(promptEnabled));
     }

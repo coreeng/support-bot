@@ -68,7 +68,7 @@ class AnalysisServiceTest {
                 Duration.ofMillis(100),
                 new Vertex(true, "test-project", "europe-west2"),
                 new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)),
-                new Stub(false));
+                new Stub(false, false));
         Bundle bundle = new Bundle("classpath:placeholder-analysis-bundle.zip");
         Prompt prompt = new Prompt(true);
         analysisProps = new AnalysisProps(llm, bundle, prompt);

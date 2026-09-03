@@ -43,12 +43,16 @@ public class LlmConfig {
      * credentials, no spend. See {@link StubChatModel} for what it returns and how it tells the two
      * callers apart.
      *
-     * <p>May be dropped before merge — see {@code docs/plans/support-summary.md}.
+     * <p>Local-only: its output lands in {@code analysis} and {@code summary_snapshot} like real
+     * model output. {@link AnalysisProps.Stub#validate()} refuses to start unless
+     * {@code analysis.llm.stub.acknowledge-synthetic-data=true} is also set, so this bean only exists
+     * once an operator has opted in twice.
      */
     @Bean
     @ConditionalOnProperty(prefix = "analysis.llm.stub", name = "enabled", havingValue = "true")
     public ChatModel stubChatModel() {
-        log.warn("Using the STUB LLM provider: responses are canned and describe no real data");
+        log.warn("Using the STUB LLM provider: responses are canned and describe no real data;"
+                + " classifications and summaries written from here are synthetic");
         return new StubChatModel();
     }
 

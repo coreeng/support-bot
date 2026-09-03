@@ -5,6 +5,7 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import java.util.List;
 
@@ -16,7 +17,11 @@ import java.util.List;
  * the request, so a re-run produces identical classifications — which also keeps the summary's
  * data fingerprint stable instead of invalidating the cache on every visit.
  *
- * <p>May be dropped before merge — see {@code docs/plans/support-summary.md}.
+ * <p>Local development and demo only. Its classifications and summaries are stored exactly like
+ * real ones, so it must never run against a shared database; {@code AnalysisProps.Stub} enforces
+ * the explicit opt-in. Every response — and {@link #defaultRequestParameters()} — reports
+ * {@value #MODEL_NAME} as the model name so stored rows carry the stub's name rather than whichever
+ * real model id happens to be configured.
  *
  * <h2>Telling the two callers apart</h2>
  *
@@ -31,6 +36,9 @@ import java.util.List;
  * change to either delimiter fails there instead of quietly degrading.
  */
 public class StubChatModel implements ChatModel {
+
+    /** The model name the stub reports on every response, and the one stored against its output. */
+    public static final String MODEL_NAME = "stub";
 
     /** Set by {@code LlmSummaryService} around the aggregated window report. */
     private static final String SUMMARY_MARKER = "--- BEGIN WINDOW REPORT ---";
@@ -79,8 +87,14 @@ public class StubChatModel implements ChatModel {
         String answer = prompt.contains(SUMMARY_MARKER) ? CANNED_SUMMARY : classification(prompt);
         return ChatResponse.builder()
                 .aiMessage(AiMessage.from(answer))
-                .modelName("stub")
+                .modelName(MODEL_NAME)
                 .build();
+    }
+
+    /** Self-describes as {@value #MODEL_NAME}, so callers that record a model name never label stub output as a real model. */
+    @Override
+    public ChatRequestParameters defaultRequestParameters() {
+        return ChatRequestParameters.builder().modelName(MODEL_NAME).build();
     }
 
     /**

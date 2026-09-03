@@ -52,8 +52,9 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
                 vertex.validate();
             } else if (proxy.enabled()) {
                 proxy.validate();
+            } else {
+                stub.validate();
             }
-            // The stub has nothing to validate: it takes no credentials and reaches no network.
         }
     }
 
@@ -162,9 +163,27 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
      * all. Takes no credentials, which is the point — neither GCP IAM nor the internal proxy's token
      * is needed to exercise the analysis and Support Summary features end to end.
      *
-     * <p>May be dropped before merge — see {@code docs/plans/support-summary.md}.
+     * <p>Local-only. Its output is stored exactly like real model output, so enabling it is a
+     * two-step opt-in: {@code enabled} selects the provider and {@code acknowledgeSyntheticData}
+     * confirms the operator knows the database will receive synthetic rows. Startup fails with the
+     * first flag alone, so a copied-over {@code enabled=true} cannot quietly reach a shared
+     * environment.
      */
-    public record Stub(@DefaultValue("false") boolean enabled) {}
+    public record Stub(
+            @DefaultValue("false") boolean enabled,
+            @DefaultValue("false") boolean acknowledgeSyntheticData) {
+
+        static final String SYNTHETIC_DATA_GUARD =
+                "analysis.llm.stub.enabled=true also requires analysis.llm.stub.acknowledge-synthetic-data=true:"
+                        + " the stub LLM provider writes synthetic rows into analysis and summary_snapshot,"
+                        + " is for local development only and must never be enabled against a shared database";
+
+        void validate() {
+            if (!acknowledgeSyntheticData) {
+                throw new IllegalArgumentException(SYNTHETIC_DATA_GUARD);
+            }
+        }
+    }
 
     public record Bundle(String path) {}
 

@@ -266,7 +266,7 @@ analysis:
   llm:
     model-name: ${ANALYSIS_MODEL_NAME:gemini-2.5-flash} # Model id, used by both providers
     request-delay: ${ANALYSIS_REQUEST_DELAY:500ms} # Pause between per-thread LLM calls (rate-limit mitigation)
-    vertex: # Hosted Vertex AI via ADC. Exactly one of vertex/proxy may be enabled.
+    vertex: # Hosted Vertex AI via ADC. Exactly one of vertex/proxy/stub may be enabled.
       enabled: ${VERTEX_ENABLED:true}
       project-id: ${VERTEX_PROJECT_ID:} # Required when enabled
       location: ${VERTEX_LOCATION:europe-west2} # Required when enabled
@@ -276,6 +276,9 @@ analysis:
       auth:
         basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:} # Base64 user:password — deliver via a Secret
       timeout: ${AI_PROXY_TIMEOUT:20s} # Connect + read timeout per proxy call
+    stub: # LOCAL DEVELOPMENT ONLY: canned responses that write synthetic data. Not in application.yaml on purpose.
+      enabled: false # Set in a local override only; never against a shared database
+      acknowledge-synthetic-data: false # Must also be true or startup fails
   bundle:
     path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip served by the summary-data download endpoint
   prompt:
@@ -435,6 +438,21 @@ fails startup:
   through an internal LLM proxy and authenticates with a static
   `Authorization: Basic <token>` header instead of cloud credentials. No GCP credential
   discovery happens in this mode, and there is no silent fallback between providers.
+- **`analysis.llm.stub.enabled`** (default `false`) — **local development only.** Returns
+  canned, deterministic text with no network call, no credentials and no spend, so the
+  analysis run and the Support Summary page can be exercised on a laptop. Its output is
+  **synthetic data**: classifications land in `analysis` and summaries in `summary_snapshot`
+  exactly like real ones, and nothing in the schema marks them as fake (only
+  `summary_snapshot.model`, which records `stub` in this mode). **Never point a stub-enabled
+  instance at a shared database.** Because vertex defaults to on, selecting the stub also
+  means `analysis.llm.vertex.enabled=false`.
+
+The stub is a two-flag opt-in. `analysis.llm.stub.enabled=true` on its own fails startup;
+`analysis.llm.stub.acknowledge-synthetic-data=true` (default `false`) must be set as well, and
+the failure message spells out why. Both flags are deliberately absent from `application.yaml`
+and from the Helm chart: set them in a local override (or through Spring's relaxed binding
+as `ANALYSIS_LLM_STUB_ENABLED` / `ANALYSIS_LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA`) on a
+throwaway database only. The service logs a startup `WARN` whenever the stub is active.
 
 While the feature is enabled, configuration is validated at startup: only the enabled
 provider's settings are required, and the service fails fast naming the offending property
@@ -449,8 +467,10 @@ Set these on the **API**:
 |----------|-------------|
 | `ANALYSIS_PROMPT_ENABLED` | Master switch for the analysis feature. No LLM client is created when off. |
 | `VERTEX_ENABLED` | Enables the hosted Vertex AI provider. |
-| `AI_PROXY_ENABLED` | Enables the LLM proxy provider. Exactly one of `VERTEX_ENABLED` and `AI_PROXY_ENABLED` must be true. |
-| `ANALYSIS_MODEL_NAME` | Model id used by **both** providers. |
+| `AI_PROXY_ENABLED` | Enables the LLM proxy provider. Exactly one of `VERTEX_ENABLED`, `AI_PROXY_ENABLED` and the stub must be true. |
+| `ANALYSIS_LLM_STUB_ENABLED` | **Local development only.** Enables the stub provider, which writes synthetic classifications and summaries. Never use against a shared database. Fails startup unless the acknowledgement below is also set. Not wired in `application.yaml` or the Helm chart; this is the relaxed-binding form of `analysis.llm.stub.enabled`. |
+| `ANALYSIS_LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA` | Required alongside the stub flag: confirms the operator accepts synthetic rows in `analysis` and `summary_snapshot`. Relaxed-binding form of `analysis.llm.stub.acknowledge-synthetic-data`. |
+| `ANALYSIS_MODEL_NAME` | Model id used by the Vertex and proxy providers. The stub ignores it and stamps summaries as `stub`. |
 | `ANALYSIS_REQUEST_DELAY` | Pause between per-thread LLM calls to stay under rate limits. |
 | `VERTEX_PROJECT_ID` | GCP project hosting Vertex AI. Required when the vertex provider is enabled. |
 | `VERTEX_LOCATION` | Vertex AI region, e.g. `europe-west2`. Required when the vertex provider is enabled. |

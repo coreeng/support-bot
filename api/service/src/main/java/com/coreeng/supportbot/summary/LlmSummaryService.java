@@ -24,8 +24,19 @@ public class LlmSummaryService {
     private final ChatModel chatModel;
     private final AnalysisProps analysisProps;
 
-    /** The model name recorded alongside a generated summary, for traceability. */
+    /**
+     * The model name recorded alongside a generated summary, for traceability.
+     *
+     * <p>Prefers the name the {@link ChatModel} reports about itself over the configured
+     * {@code analysis.llm.model-name}, so a provider that is not the configured model — the stub in
+     * particular — is stamped as what it is rather than as e.g. {@code gemini-2.5-flash}. Falls back
+     * to the configured name for providers that do not self-describe.
+     */
     public String modelName() {
+        String reported = chatModel.defaultRequestParameters().modelName();
+        if (reported != null && !reported.isBlank()) {
+            return reported;
+        }
         return analysisProps.llm().modelName();
     }
 
