@@ -1,0 +1,13 @@
+{
+  "name": "doc-tools",
+  "version": "0.1.0",
+  "description": "Consumer-agnostic documentation pipeline: doc-journeys consolidates documentation scattered across many repositories into Diátaxis-typed site pages, and doc-run wraps it in an unattended, reviewed run with general-purpose review agents. Everything repository-specific comes from the consumer's .doc-settings/. Also installable as plain skills via gh skill install.",
+  "author": {
+    "name": "coreeng",
+    "url": "https://github.com/coreeng"
+  },
+  "homepage": "https://github.com/coreeng/support-bot/tree/main/plugins/doc-tools",
+  "repository": "https://github.com/coreeng/support-bot",
+  "license": "Apache-2.0",
+  "keywords": ["documentation", "diataxis", "docs-as-code", "skills", "agents"]
+}
