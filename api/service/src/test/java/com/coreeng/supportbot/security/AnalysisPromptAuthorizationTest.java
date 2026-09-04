@@ -96,6 +96,16 @@ class AnalysisPromptAuthorizationTest {
     }
 
     @Test
+    void promptEndpoint_returnsPromptForLeadership() throws Exception {
+        // The summary page's View Prompt dialog defaults to this prompt, and leadership can open it.
+        when(analysisService.loadPrompt()).thenReturn("prompt text");
+
+        mockMvc.perform(get("/analysis/prompt").with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"prompt\":\"prompt text\"}"));
+    }
+
+    @Test
     void promptEndpoint_returns500ProblemWhenPromptCannotBeLoaded() throws Exception {
         when(analysisService.loadPrompt())
                 .thenThrow(new AnalysisPromptLoadException("No analysis prompt version is marked as in use"));
@@ -108,7 +118,7 @@ class AnalysisPromptAuthorizationTest {
     }
 
     @Test
-    void promptEndpoint_forbidsAuthenticatedUsersWithoutSupportEngineerRole() throws Exception {
+    void promptEndpoint_forbidsAuthenticatedUsersWithoutViewerRoles() throws Exception {
         mockMvc.perform(get("/analysis/prompt").with(authentication(authTokenWithRoles(Role.USER))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().json("{\"error\":\"Forbidden\"}"));

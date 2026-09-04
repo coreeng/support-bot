@@ -1,17 +1,22 @@
 package com.coreeng.supportbot.slack.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
 import com.slack.api.methods.MethodsClient;
+import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
 import com.slack.api.methods.request.conversations.ConversationsInfoRequest;
 import com.slack.api.methods.request.usergroups.UsergroupsListRequest;
+import com.slack.api.methods.response.conversations.ConversationsHistoryResponse;
 import com.slack.api.methods.response.conversations.ConversationsInfoResponse;
 import com.slack.api.methods.response.usergroups.UsergroupsListResponse;
 import com.slack.api.model.Usergroup;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;
@@ -37,6 +42,21 @@ class SlackClientImplTest {
         meterRegistry = new SimpleMeterRegistry();
         slackClient =
                 new SlackClientImpl(methodsClient, permalinkCache, userCache, groupCache, channelCache, meterRegistry);
+    }
+
+    @Test
+    public void shouldThrowSlackExceptionWhenMessageByTsIsMissing() throws Exception {
+        ConversationsHistoryResponse response = new ConversationsHistoryResponse();
+        response.setOk(true);
+        response.setMessages(List.of());
+        when(methodsClient.conversationsHistory(any(ConversationsHistoryRequest.class)))
+                .thenReturn(response);
+
+        assertThatThrownBy(() -> slackClient.getMessageByTs(
+                        new SlackGetMessageByTsRequest("C123", MessageTs.of("1700000000.000100"))))
+                .isInstanceOf(SlackException.class)
+                .hasMessageContaining("C123")
+                .hasMessageContaining("1700000000.000100");
     }
 
     @Test

@@ -3,7 +3,6 @@ package com.coreeng.supportbot.analysis.rest;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.config.AnalysisProps;
-import com.coreeng.supportbot.knowledgegaps.rest.KnowledgeGapsStatusUI;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -15,7 +14,7 @@ class AnalysisEnabledControllerTest {
     void returnsEnabled_whenAnalysisPromptEnabled() {
         AnalysisEnabledController controller = controllerWithEnabled(true);
 
-        ResponseEntity<KnowledgeGapsStatusUI> response = controller.getAnalysisEnabled();
+        ResponseEntity<AnalysisEnabledController.FeatureStatus> response = controller.getAnalysisEnabled();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -26,7 +25,7 @@ class AnalysisEnabledControllerTest {
     void returnsDisabled_whenAnalysisPromptDisabled() {
         AnalysisEnabledController controller = controllerWithEnabled(false);
 
-        ResponseEntity<KnowledgeGapsStatusUI> response = controller.getAnalysisEnabled();
+        ResponseEntity<AnalysisEnabledController.FeatureStatus> response = controller.getAnalysisEnabled();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -38,7 +37,8 @@ class AnalysisEnabledControllerTest {
                 "gemini-2.5-flash",
                 Duration.ofMillis(100),
                 new AnalysisProps.Vertex(true, "test-project", "europe-west2"),
-                new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)));
+                new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)),
+                new AnalysisProps.Stub(false, false));
         AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
         AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(enabled);
         AnalysisProps analysisProps = new AnalysisProps(llm, bundle, prompt);

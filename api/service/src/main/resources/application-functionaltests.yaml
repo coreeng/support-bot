@@ -248,3 +248,9 @@ analysis:
         basic-auth-token: ZnVuY3Rpb25hbDpwcm94eQ== # functional:proxy
   prompt:
     enabled: true
+
+# The Support Summary page. Its prose is generated through the same proxy ChatModel as the
+# classifier, so the permanent generateContent stub above serves it too; SummaryValidationConfig
+# requires analysis.prompt.enabled, which is on.
+summary:
+  enabled: true

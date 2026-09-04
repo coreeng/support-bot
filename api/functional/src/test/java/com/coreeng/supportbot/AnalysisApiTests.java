@@ -129,7 +129,7 @@ public class AnalysisApiTests {
     @Order(6)
     void analysisPrompt_returns403_forNonSupportEngineer() {
         // Not "leadership": TestAuthBypassFilter grants it SUPPORT_ENGINEER too.
-        // 403, not 401 like the export endpoints: /analysis/prompt has a scoped AccessDeniedHandler.
+        // /analysis/prompt has a scoped AccessDeniedHandler that writes a JSON body with the 403.
         assertThat(supportBotClient.getStatusCodeAsRole("/analysis/prompt", "escalation"))
                 .isEqualTo(403);
     }

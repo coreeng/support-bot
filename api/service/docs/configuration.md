@@ -266,7 +266,7 @@ analysis:
   llm:
     model-name: ${ANALYSIS_MODEL_NAME:gemini-2.5-flash} # Model id, used by both providers
     request-delay: ${ANALYSIS_REQUEST_DELAY:500ms} # Pause between per-thread LLM calls (rate-limit mitigation)
-    vertex: # Hosted Vertex AI via ADC. Exactly one of vertex/proxy may be enabled.
+    vertex: # Hosted Vertex AI via ADC. Exactly one of vertex/proxy/stub may be enabled.
       enabled: ${VERTEX_ENABLED:true}
       project-id: ${VERTEX_PROJECT_ID:} # Required when enabled
       location: ${VERTEX_LOCATION:europe-west2} # Required when enabled
@@ -276,10 +276,20 @@ analysis:
       auth:
         basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:} # Base64 user:password — deliver via a Secret
       timeout: ${AI_PROXY_TIMEOUT:20s} # Connect + read timeout per proxy call
+    stub: # LOCAL DEVELOPMENT ONLY: canned responses that write synthetic data. Not in application.yaml on purpose.
+      enabled: false # Set in a local override only; never against a shared database
+      acknowledge-synthetic-data: false # Must also be true or startup fails
   bundle:
     path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip served by the summary-data download endpoint
   prompt:
     enabled: ${ANALYSIS_PROMPT_ENABLED:false} # Master switch for the analysis feature
+
+# Support Summary page (/summary). Requires analysis.prompt.enabled.
+# Full operator reference is in the "Support Summary" section under Integrations below.
+summary:
+  enabled: ${SUMMARY_ENABLED:false}
+  max-reasons: ${SUMMARY_MAX_REASONS:400} # Newest per-ticket reasons fed to the summary model
+  failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried
 ```
 
 For deployment versatility across different secret delivery mechanisms, you can base64-encode the PEM file into a single line before storing it:
@@ -412,10 +422,11 @@ Leadership and support-engineer users can inspect the connection, last attempts,
 ## Analysis (knowledge-gap LLM)
 
 Support Bot can analyse closed support threads with an LLM to identify knowledge gaps
-(the **Run Analysis** flow in the UI). The feature is off by default; enable it with
+(the classification behind the Support Summary page below, also triggerable through
+`POST /analysis/run`). The feature is off by default; enable it with
 `ANALYSIS_PROMPT_ENABLED=true`. The analysis prompt itself is stored in the database
-(versioned, with one version marked in use) and managed from the UI — there is no prompt
-file or environment variable.
+(versioned, with one version per type marked in use) — there is no prompt file or environment
+variable, and the UI only displays it.
 
 When enabled, the service builds exactly one LLM client at startup. Each provider block
 has an `enabled` flag and exactly one of them must be true — enabling both or neither
@@ -428,6 +439,21 @@ fails startup:
   through an internal LLM proxy and authenticates with a static
   `Authorization: Basic <token>` header instead of cloud credentials. No GCP credential
   discovery happens in this mode, and there is no silent fallback between providers.
+- **`analysis.llm.stub.enabled`** (default `false`) — **local development only.** Returns
+  canned, deterministic text with no network call, no credentials and no spend, so the
+  analysis run and the Support Summary page can be exercised on a laptop. Its output is
+  **synthetic data**: classifications land in `analysis` and summaries in `summary_snapshot`
+  exactly like real ones, and nothing in the schema marks them as fake (only
+  `summary_snapshot.model`, which records `stub` in this mode). **Never point a stub-enabled
+  instance at a shared database.** Because vertex defaults to on, selecting the stub also
+  means `analysis.llm.vertex.enabled=false`.
+
+The stub is a two-flag opt-in. `analysis.llm.stub.enabled=true` on its own fails startup;
+`analysis.llm.stub.acknowledge-synthetic-data=true` (default `false`) must be set as well, and
+the failure message spells out why. Both flags are deliberately absent from `application.yaml`
+and from the Helm chart: set them in a local override (or through Spring's relaxed binding
+as `ANALYSIS_LLM_STUB_ENABLED` / `ANALYSIS_LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA`) on a
+throwaway database only. The service logs a startup `WARN` whenever the stub is active.
 
 While the feature is enabled, configuration is validated at startup: only the enabled
 provider's settings are required, and the service fails fast naming the offending property
@@ -442,8 +468,10 @@ Set these on the **API**:
 |----------|-------------|
 | `ANALYSIS_PROMPT_ENABLED` | Master switch for the analysis feature. No LLM client is created when off. |
 | `VERTEX_ENABLED` | Enables the hosted Vertex AI provider. |
-| `AI_PROXY_ENABLED` | Enables the LLM proxy provider. Exactly one of `VERTEX_ENABLED` and `AI_PROXY_ENABLED` must be true. |
-| `ANALYSIS_MODEL_NAME` | Model id used by **both** providers. |
+| `AI_PROXY_ENABLED` | Enables the LLM proxy provider. Exactly one of `VERTEX_ENABLED`, `AI_PROXY_ENABLED` and the stub must be true. |
+| `ANALYSIS_LLM_STUB_ENABLED` | **Local development only.** Enables the stub provider, which writes synthetic classifications and summaries. Never use against a shared database. Fails startup unless the acknowledgement below is also set. Not wired in `application.yaml` or the Helm chart; this is the relaxed-binding form of `analysis.llm.stub.enabled`. |
+| `ANALYSIS_LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA` | Required alongside the stub flag: confirms the operator accepts synthetic rows in `analysis` and `summary_snapshot`. Relaxed-binding form of `analysis.llm.stub.acknowledge-synthetic-data`. |
+| `ANALYSIS_MODEL_NAME` | Model id used by the Vertex and proxy providers. The stub ignores it and stamps summaries as `stub`. |
 | `ANALYSIS_REQUEST_DELAY` | Pause between per-thread LLM calls to stay under rate limits. |
 | `VERTEX_PROJECT_ID` | GCP project hosting Vertex AI. Required when the vertex provider is enabled. |
 | `VERTEX_LOCATION` | Vertex AI region, e.g. `europe-west2`. Required when the vertex provider is enabled. |
@@ -457,6 +485,52 @@ Set these on the **API**:
 > (they now apply to both providers, not just Vertex). The old names are silently ignored, so a
 > deployment that sets them keeps running on the defaults — move any explicit values to the new
 > names when upgrading.
+
+## Support Summary
+
+The **Support Summary** page (`/summary`) shows, for a chosen date window, how many tickets
+were raised and how they break down by driver, category, platform feature and team, plus a
+short LLM-written narrative. It reuses the analysis feature above: visiting the page classifies
+any closed-but-unclassified tickets in the window (the same job `POST /analysis/run` triggers;
+there is no longer a button for it in the UI), then asks the model for the narrative. Results
+are cached per window and prompt version, and recomputed only when the window's
+classifications change.
+
+Windows are whole UTC calendar days, both ends inclusive. The default window is the last
+14 days ending yesterday (UTC), and a window may span at most 366 days; `GET /summary` rejects
+an inverted or longer window with `SUMMARY_WINDOW_INVALID`.
+
+The page replaced the earlier Support Area Summary page: `/knowledge-gaps` now redirects to
+`/summary`, and the tickets table that lived at `/tickets` moved to the home page (`/tickets`
+redirects there, keeping its query string).
+
+The feature is off by default. Enabling it requires the analysis feature to be enabled as well
+— `SUMMARY_ENABLED=true` with `ANALYSIS_PROMPT_ENABLED=false` fails startup. The summary
+prompt is stored in the database alongside the classification prompt (`analysis_prompt.type`).
+
+Access: the page and `GET /summary` are open to the `LEADERSHIP` and `SUPPORT_ENGINEER` roles;
+`GET /summary/enabled` is open to any authenticated user so the sidebar can decide whether to
+show the entry.
+
+A refresh that fails (LLM error, prompt missing) is remembered **in process**: per window, at most
+64 entries, and only until `SUMMARY_FAILURE_RETRY_DELAY` passes or the window's data or prompt
+changes. A restart forgets these failures, and each replica would keep its own set — the same
+trade-off the in-memory `GET /analysis/status` already makes. That is acceptable with the chart's
+single-replica API deployment (`helm-chart/templates/deployment.yaml` pins `replicas: 1`); if the
+API is ever scaled out, the worst case is one extra retry per replica after a failure.
+
+Rolling back past migration `V38` and re-running the classification by hand are covered in the
+[Support Summary runbook](../../../docs/runbooks/support-summary.md).
+
+### Environment variables
+
+Set these on the **API**:
+
+| Variable | Description |
+|----------|-------------|
+| `SUMMARY_ENABLED` | Master switch for the Support Summary page. Requires `ANALYSIS_PROMPT_ENABLED=true`. |
+| `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons (newest first) included in the report sent to the model, so a very wide window cannot overflow its context. Default `400`. |
+| `SUMMARY_FAILURE_RETRY_DELAY` | How long a failed summary refresh is reported as an error before the next visit retries it. A change to the window's data or to the in-use summary prompt retries sooner. Default `15m`. |
 
 ## Single Sign-On (SSO)
 

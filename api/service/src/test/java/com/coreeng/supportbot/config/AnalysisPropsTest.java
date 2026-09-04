@@ -8,12 +8,20 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
 class AnalysisPropsTest {
 
     private static final String BASE64_TOKEN = "dXNlcjpwYXNz";
+    private static final String EXACTLY_ONE_PROVIDER = "exactly one of analysis.llm.vertex.enabled,"
+            + " analysis.llm.proxy.enabled and analysis.llm.stub.enabled must be true";
+    private static final String STUB_GUARD =
+            "analysis.llm.stub.enabled=true also requires analysis.llm.stub.acknowledge-synthetic-data=true:"
+                    + " the stub LLM provider writes synthetic rows into analysis and summary_snapshot,"
+                    + " is for local development only and must never be enabled against a shared database";
 
     @Test
     void defaultsToVertexWithoutRequiringProxySettings() {
@@ -30,14 +38,46 @@ class AnalysisPropsTest {
         assertThat(llm.proxy().timeout()).isEqualTo(Duration.ofSeconds(20));
     }
 
+    /** Every combination of the three provider flags; exactly one enabled is the only legal shape. */
+    @ParameterizedTest(name = "vertex={0}, proxy={1}, stub={2} -> valid={3}")
+    @CsvSource({
+        "true,  false, false, true",
+        "false, true,  false, true",
+        "false, false, true,  true",
+        "false, false, false, false",
+        "true,  true,  false, false",
+        "true,  false, true,  false",
+        "false, true,  true,  false",
+        "true,  true,  true,  false",
+    })
+    void acceptsExactlyOneEnabledProvider(boolean vertex, boolean proxy, boolean stub, boolean valid) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("analysis.prompt.enabled", "true");
+        values.put("analysis.llm.model-name", "gemini-2.5-flash");
+        // Each provider's own settings are supplied throughout, so the only thing under test is the
+        // mutual-exclusion rule rather than an incidental missing-field failure.
+        values.put("analysis.llm.vertex.enabled", Boolean.toString(vertex));
+        values.put("analysis.llm.vertex.project-id", "test-project");
+        values.put("analysis.llm.vertex.location", "europe-west2");
+        values.put("analysis.llm.proxy.enabled", Boolean.toString(proxy));
+        values.put("analysis.llm.proxy.base-url", "https://llm-proxy.example.test/proxy/v1beta");
+        values.put("analysis.llm.proxy.auth.basic-auth-token", BASE64_TOKEN);
+        values.put("analysis.llm.stub.enabled", Boolean.toString(stub));
+        values.put("analysis.llm.stub.acknowledge-synthetic-data", "true");
+
+        if (valid) {
+            assertThat(bind(values)).isNotNull();
+        } else {
+            assertThatThrownBy(() -> bind(values)).hasRootCauseMessage(EXACTLY_ONE_PROVIDER);
+        }
+    }
+
     @Test
     void rejectsBothProvidersEnabled() {
         Map<String, Object> values = vertexValues();
         values.put("analysis.llm.proxy.enabled", "true");
 
-        assertThatThrownBy(() -> bind(values))
-                .hasRootCauseMessage(
-                        "exactly one of analysis.llm.vertex.enabled and analysis.llm.proxy.enabled must be true");
+        assertThatThrownBy(() -> bind(values)).hasRootCauseMessage(EXACTLY_ONE_PROVIDER);
     }
 
     @Test
@@ -45,9 +85,72 @@ class AnalysisPropsTest {
         Map<String, Object> values = vertexValues();
         values.put("analysis.llm.vertex.enabled", "false");
 
-        assertThatThrownBy(() -> bind(values))
-                .hasRootCauseMessage(
-                        "exactly one of analysis.llm.vertex.enabled and analysis.llm.proxy.enabled must be true");
+        assertThatThrownBy(() -> bind(values)).hasRootCauseMessage(EXACTLY_ONE_PROVIDER);
+    }
+
+    @Test
+    void stubModeNeedsNoCredentialsAtAll() {
+        // The point of the mode: no project, no base URL, no token — just the two flags.
+        Llm llm = bind(stubValues());
+
+        assertThat(llm.stub().enabled()).isTrue();
+        assertThat(llm.stub().acknowledgeSyntheticData()).isTrue();
+        assertThat(llm.vertex().enabled()).isFalse();
+        assertThat(llm.proxy().enabled()).isFalse();
+        assertThat(llm.vertex().projectId()).isEmpty();
+        assertThat(llm.proxy().baseUrl()).isEmpty();
+    }
+
+    @Test
+    void stubModeRequiresSyntheticDataAcknowledgement() {
+        // The hard guard: the provider flag alone must not start the app, or a copied-over local
+        // config could write synthetic rows into a shared database.
+        Map<String, Object> values = stubValues();
+        values.remove("analysis.llm.stub.acknowledge-synthetic-data");
+
+        assertThatThrownBy(() -> bind(values)).hasRootCauseMessage(STUB_GUARD);
+    }
+
+    @Test
+    void stubModeRejectsExplicitlyUnacknowledgedSyntheticData() {
+        Map<String, Object> values = stubValues();
+        values.put("analysis.llm.stub.acknowledge-synthetic-data", "false");
+
+        assertThatThrownBy(() -> bind(values)).hasRootCauseMessage(STUB_GUARD);
+    }
+
+    @Test
+    void stubFlagsDefaultToOff() {
+        Llm llm = bind(vertexValues());
+
+        assertThat(llm.stub().enabled()).isFalse();
+        assertThat(llm.stub().acknowledgeSyntheticData()).isFalse();
+    }
+
+    @Test
+    void acknowledgementAloneDoesNotSelectTheStub() {
+        // The acknowledgement is a consent flag, not a provider switch: with vertex still enabled
+        // the real provider is used and nothing about the stub is validated.
+        Map<String, Object> values = vertexValues();
+        values.put("analysis.llm.stub.acknowledge-synthetic-data", "true");
+
+        Llm llm = bind(values);
+
+        assertThat(llm.vertex().enabled()).isTrue();
+        assertThat(llm.stub().enabled()).isFalse();
+    }
+
+    @Test
+    void stubGuardIsSkippedWhenPromptDisabled() {
+        // Same rule as every other LLM setting: with the feature off, nothing here can block startup.
+        Map<String, Object> values = stubValues();
+        values.put("analysis.prompt.enabled", "false");
+        values.remove("analysis.llm.stub.acknowledge-synthetic-data");
+
+        Llm llm = bind(values);
+
+        assertThat(llm.stub().enabled()).isTrue();
+        assertThat(llm.stub().acknowledgeSyntheticData()).isFalse();
     }
 
     @Test
@@ -228,6 +331,7 @@ class AnalysisPropsTest {
 
         assertThat(llm.vertex().enabled()).isFalse();
         assertThat(llm.proxy().enabled()).isFalse();
+        assertThat(llm.stub().enabled()).isFalse();
         assertThat(llm.modelName()).isEmpty();
     }
 
@@ -246,6 +350,16 @@ class AnalysisPropsTest {
         values.put("analysis.llm.model-name", "gemini-2.5-flash");
         values.put("analysis.llm.vertex.project-id", "test-project");
         values.put("analysis.llm.vertex.location", "europe-west2");
+        return values;
+    }
+
+    private static Map<String, Object> stubValues() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("analysis.prompt.enabled", "true");
+        values.put("analysis.llm.model-name", "stub-local");
+        values.put("analysis.llm.vertex.enabled", "false");
+        values.put("analysis.llm.stub.enabled", "true");
+        values.put("analysis.llm.stub.acknowledge-synthetic-data", "true");
         return values;
     }
 

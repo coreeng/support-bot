@@ -6,6 +6,13 @@ metadata:
     {{- include "support-bot.labels" . | nindent 4 }}
 spec:
   replicas: 1
+  {{- /* Recreate, not RollingUpdate: the API runs its Flyway migrations on startup and runs as a
+         single replica, so an old pod must be gone before the new one migrates the schema. A
+         rolling update would keep the old pod serving against data it cannot read (e.g. V38
+         marks a second analysis_prompt row in use) until the new pod became ready. Costs a few
+         seconds of downtime per deploy. */}}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "support-bot.selectorLabels" . | nindent 6 }}

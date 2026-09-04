@@ -2,6 +2,7 @@ package com.coreeng.supportbot.security;
 
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.TeamService;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.LinkedHashMap;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,12 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Unhandled exceptions are re-dispatched by the container to Spring Boot's
+                        // /error handler. JwtAuthenticationFilter is a OncePerRequestFilter, which skips
+                        // ERROR dispatches, so without this rule every 5xx would be reported to the
+                        // caller as a 401 — and the UI signs the user out on 401.
+                        .dispatcherTypeMatchers(DispatcherType.ERROR)
+                        .permitAll()
                         // Public endpoints
                         .requestMatchers("/oauth2/**", "/login/**")
                         .permitAll()
@@ -59,16 +66,30 @@ public class SecurityConfig {
                         // Feature-enabled checks are open to any authenticated user (not just leadership/
                         // support engineers) so the UI sidebar can safely query them for everyone to decide
                         // whether to show the nav item, without a 403 for users lacking that role.
-                        .requestMatchers("/elevate/enabled")
+                        // Listed ahead of the role-gated rules below so the check keeps working if
+                        // one of those is ever widened to a wildcard.
+                        .requestMatchers("/elevate/enabled", "/summary/enabled")
                         .authenticated()
                         // Dashboard restricted to leadership or support engineers
                         .requestMatchers("/dashboard/**", "/summary-data/results", "/elevate/**")
+                        .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
+                        // Support Summary page. Deliberately NOT support-engineer-only: serving it
+                        // triggers the backfill server-side, so leadership viewers must be able to
+                        // reach it without being granted the /analysis/run permission. Not scoped to
+                        // GET: Spring MVC serves HEAD through @GetMapping handlers, so a method-scoped
+                        // rule would let any authenticated user start the backfill with a HEAD.
+                        .requestMatchers("/summary")
+                        .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
+                        // Prompt texts are read-only and shown by the summary page's View Prompt
+                        // dialog, which leadership can open — so both prompts follow the page's
+                        // roles rather than the support-engineer-only analysis actions.
+                        .requestMatchers("/summary/prompt", "/analysis/prompt")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Summary data export/import is restricted to support engineers
                         .requestMatchers("/summary-data/**")
                         .hasAnyRole("SUPPORT_ENGINEER")
                         // Analysis endpoints restricted to support engineers
-                        .requestMatchers("/analysis/status", "/analysis/run", "/analysis/prompt")
+                        .requestMatchers("/analysis/status", "/analysis/run")
                         .hasAnyRole("SUPPORT_ENGINEER")
                         // All other endpoints require authentication
                         .anyRequest()
@@ -94,13 +115,13 @@ public class SecurityConfig {
 
     private AccessDeniedHandler accessDeniedHandler() {
         var handlers = new LinkedHashMap<RequestMatcher, AccessDeniedHandler>();
-        handlers.put(
-                PathPatternRequestMatcher.withDefaults().matcher("/analysis/prompt"),
-                (request, response, accessDeniedException) -> {
-                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.setContentType("application/json");
-                    response.getWriter().write("{\"error\":\"Forbidden\"}");
-                });
+        AccessDeniedHandler jsonForbidden = (request, response, accessDeniedException) -> {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Forbidden\"}");
+        };
+        handlers.put(PathPatternRequestMatcher.withDefaults().matcher("/analysis/prompt"), jsonForbidden);
+        handlers.put(PathPatternRequestMatcher.withDefaults().matcher("/summary/prompt"), jsonForbidden);
         return new RequestMatcherDelegatingAccessDeniedHandler(handlers, new AccessDeniedHandlerImpl());
     }
 

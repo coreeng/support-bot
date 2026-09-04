@@ -392,9 +392,6 @@ metrics:
   enabled: false
   refresh-interval: 60s
 
-knowledge-gaps:
-  enabled: true
-
 # Analysis configuration
 analysis:
   llm:
@@ -414,3 +411,10 @@ analysis:
     path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip}
   prompt:
     enabled: ${ANALYSIS_PROMPT_ENABLED:false}
+
+# Support Summary page (/summary): windowed breakdowns plus an LLM-written summary.
+# Requires analysis.prompt.enabled. Off by default.
+summary:
+  enabled: ${SUMMARY_ENABLED:false}
+  max-reasons: ${SUMMARY_MAX_REASONS:400} # Newest per-ticket reasons fed to the summary model
+  failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried

@@ -169,9 +169,9 @@ When("user {string} logs in", async function (this: CustomWorld, email: string) 
   await this.page.goto(BASE_URL);
   await this.page.waitForTimeout(1500); // Wait for session and context to fully load
 
-  // Sidebar hydration sentinel: the Tickets nav link is always rendered.
+  // Sidebar hydration sentinel: the Escalations nav link is always rendered.
   await this.page
-    .getByRole("link", { name: /^Tickets$/i })
+    .getByRole("link", { name: /^Escalations$/i })
     .first()
     .waitFor({ state: "visible", timeout: 5000 });
 });

@@ -11,7 +11,6 @@ Feature: Authorization Flow
     And the backend returns L2 support teams
     When user "leader@example.com" logs in
     Then user should see "Home" navigation button
-    And user should see "Tickets" navigation button
     And user should see "Escalations" navigation button
     And user should see "Analytics & Operations" navigation button
     And user should see "SLA Dashboard" navigation button
@@ -21,7 +20,6 @@ Feature: Authorization Flow
     And the backend returns L2 support teams
     When user "engineer@example.com" logs in
     Then user should see "Home" navigation button
-    And user should see "Tickets" navigation button
     And user should see "Escalations" navigation button
     And user should see "Analytics & Operations" navigation button
     And user should see "SLA Dashboard" navigation button
@@ -31,7 +29,6 @@ Feature: Authorization Flow
     And the backend returns L2 support teams
     When user "tenant@example.com" logs in
     Then user should see "Home" navigation button
-    And user should see "Tickets" navigation button
     And user should see "Escalations" navigation button
     But user should NOT see "Analytics & Operations" navigation button
     And user should NOT see "SLA Dashboard" navigation button
@@ -74,7 +71,6 @@ Feature: Authorization Flow
     Given the backend authorization endpoints return 500 error
     When user "user@example.com" logs in
     Then user should see "Home" navigation button
-    And user should see "Tickets" navigation button
     And user should see "Escalations" navigation button
     But user should NOT see "Analytics & Operations" navigation button
     And user should NOT see "SLA Dashboard" navigation button

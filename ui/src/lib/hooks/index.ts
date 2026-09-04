@@ -3,7 +3,6 @@
  * All hooks use React Query and call the Next.js API routes.
  */
 import type {
-  AnalysisData,
   ElevateIntegrityIssue,
   ElevateIntegrityIssueType,
   ElevateJourney,
@@ -13,7 +12,6 @@ import type {
   ElevateStatus,
   ElevateUser,
   EscalationTeam,
-  KnowledgeGapsStatus,
   PaginatedEscalations,
   PaginatedTickets,
   SupportMember,
@@ -26,8 +24,10 @@ import type {
   RepoInsights,
   RequestBreakdown,
 } from "@/lib/types/dashboard";
+import type { SummaryData, SummaryStatus } from "@/lib/types/summary";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getCsrfToken, signOut } from "next-auth/react";
+import { useState } from "react";
 
 // ===== Shared API Helper =====
 
@@ -72,8 +72,15 @@ export function isApiError(error: unknown, status?: number): error is ApiError {
   return error instanceof ApiError && (status === undefined || error.status === status);
 }
 
-async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`/api${path}`, { signal });
+interface ApiGetOptions {
+  signal?: AbortSignal;
+  /** Send the CSRF token: for GETs that have side effects on the backend (see {@link apiFetch}). */
+  csrf?: boolean;
+}
+
+async function apiGet<T>(path: string, { signal, csrf = false }: ApiGetOptions = {}): Promise<T> {
+  const headers = csrf ? { "X-CSRF-Token": (await getCsrfToken()) || "" } : undefined;
+  const res = await fetch(`/api${path}`, { signal, headers });
   if (!res.ok) {
     if (res.status === 401) {
       return handle401();
@@ -489,27 +496,6 @@ export function useResolutionTimeByTag(enabled = true, startDate?: string, endDa
   });
 }
 
-// ===== Knowledge Gaps Hooks =====
-
-export function useKnowledgeGapsEnabled() {
-  return useQuery<boolean>({
-    queryKey: ["knowledge-gaps", "enabled"],
-    queryFn: async () => {
-      const response = await apiGet<KnowledgeGapsStatus>("/knowledge-gaps/enabled");
-      return response.enabled;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
-export function useAnalysis() {
-  return useQuery<AnalysisData>({
-    queryKey: ["analysis"],
-    queryFn: () => apiGet("/summary-data/results"),
-    staleTime: 2 * 60 * 1000,
-  });
-}
-
 export function useElevateEnabled() {
   return useQuery<boolean>({
     queryKey: ["elevate", "enabled"],
@@ -546,6 +532,116 @@ export function useAnalysisPrompt(enabled: boolean) {
     staleTime: 0,
     gcTime: 0,
   });
+}
+
+/**
+ * The in-use prompt the summary prose is generated with, for the summary page's prompt dialog.
+ * Mirrors {@link useAnalysisPrompt}, including its no-cache behaviour.
+ */
+export function useSummaryPrompt(enabled: boolean) {
+  return useQuery<{ prompt: string }>({
+    queryKey: ["summary", "prompt"],
+    queryFn: async () => {
+      const response = await apiFetch("/api/summary/prompt");
+      if (!response.ok) {
+        let reason: string | undefined;
+        try {
+          const body = (await response.json()) as { code?: string; reason?: string };
+          reason = body.code ?? body.reason;
+        } catch {
+          // The status code remains sufficient when a proxy returns no JSON body.
+        }
+        throw new ApiError(response.status, reason);
+      }
+      return (await response.json()) as { prompt: string };
+    },
+    enabled,
+    retry: false,
+    // The in-use prompt version can change without a reload; always show the current one.
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+// ===== Support Summary Hooks =====
+
+/** Polling cadence while the summary backfill runs. */
+const SUMMARY_POLL_MS = 3000;
+
+/** Polling stops after this many failed polls in a row; a reload starts it again. */
+export const MAX_SUMMARY_POLL_FAILURES = 5;
+
+export function useSummaryEnabled() {
+  return useQuery<boolean>({
+    queryKey: ["summary", "enabled"],
+    queryFn: async () => {
+      const response = await apiGet<SummaryStatus>("/summary/enabled");
+      return response.enabled;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** The last successful summary reply for a window, as seen by the query's cumulative counters. */
+interface LastSummarySuccess {
+  window: string;
+  dataUpdatedAt: number;
+  errorUpdateCount: number;
+}
+
+/**
+ * Failed polls in a row since the last successful reply for this window. React Query resets its
+ * own failure count on every fetch, so this is derived from the cumulative error counter instead.
+ */
+function pollFailuresSince(
+  lastSuccess: LastSummarySuccess,
+  window: string,
+  counters: { dataUpdatedAt: number; errorUpdateCount: number }
+): number {
+  if (lastSuccess.window !== window || lastSuccess.dataUpdatedAt !== counters.dataUpdatedAt) return 0;
+  return counters.errorUpdateCount - lastSuccess.errorUpdateCount;
+}
+
+/**
+ * Loads the Support Summary for a window. The request itself triggers the server-side
+ * backfill and prose generation, so while the summary section reports `generating` we
+ * keep polling until it settles on `ready` or `unavailable`.
+ *
+ * A failed poll keeps the last reply on screen, so `pollFailures` tells the page how many polls
+ * in a row have failed; after `MAX_SUMMARY_POLL_FAILURES` polling stops rather than spinning
+ * through an outage.
+ */
+export function useSummary(from?: string, to?: string, enabled = true) {
+  const params = new URLSearchParams();
+  if (from) params.append("from", from);
+  if (to) params.append("to", to);
+  const query = params.toString();
+  const [lastSuccess, setLastSuccess] = useState<LastSummarySuccess>({ window: query, dataUpdatedAt: 0, errorUpdateCount: 0 });
+
+  const result = useQuery<SummaryData>({
+    queryKey: ["summary", from ?? null, to ?? null],
+    // The request triggers backfill and prose generation on the backend, so it carries the CSRF token.
+    queryFn: () => apiGet(`/summary${query ? `?${query}` : ""}`, { csrf: true }),
+    enabled,
+    refetchInterval: ({ state }) => {
+      if (state.data?.summary.state !== "generating") return false;
+      return pollFailuresSince(lastSuccess, query, state) < MAX_SUMMARY_POLL_FAILURES ? SUMMARY_POLL_MS : false;
+    },
+    // The window's figures move as the backfill runs; a stale cache would show the wrong ones.
+    staleTime: 0,
+    placeholderData: keepPreviousData,
+    // A 4xx (bad window, feature off, forbidden) will not fix itself: surface it at once instead of
+    // retrying with backoff while the previous window's figures linger on screen.
+    retry: shouldRetryTransientFailure,
+  });
+
+  const pollFailures = pollFailuresSince(lastSuccess, query, result);
+  // A new window or a fresh reply starts the count again from that reply.
+  if (lastSuccess.window !== query || lastSuccess.dataUpdatedAt !== result.dataUpdatedAt) {
+    setLastSuccess({ window: query, dataUpdatedAt: result.dataUpdatedAt, errorUpdateCount: result.errorUpdateCount });
+  }
+
+  return { ...result, pollFailures };
 }
 
 export function useTenantInsightsEnabled() {
@@ -593,7 +689,7 @@ export function useInFlightPrs(team?: string) {
 export function useElevateStatus() {
   return useQuery<ElevateStatus>({
     queryKey: ["elevate", "status"],
-    queryFn: ({ signal }) => apiGet("/elevate/status", signal),
+    queryFn: ({ signal }) => apiGet("/elevate/status", { signal }),
     staleTime: 30 * 1000,
   });
 }
@@ -617,7 +713,7 @@ function elevatePageParams(request: ElevatePageRequest) {
 function elevateQueryOptions<T>(queryKey: readonly unknown[], path: string, enabled: boolean, retainPreviousData = false) {
   return {
     queryKey,
-    queryFn: ({ signal }: { signal: AbortSignal }) => apiGet<T>(path, signal),
+    queryFn: ({ signal }: { signal: AbortSignal }) => apiGet<T>(path, { signal }),
     enabled,
     placeholderData: retainPreviousData ? keepPreviousData : undefined,
     staleTime: 30 * 1000,
@@ -625,11 +721,17 @@ function elevateQueryOptions<T>(queryKey: readonly unknown[], path: string, enab
   };
 }
 
-export function shouldRetryElevateQuery(failureCount: number, error: Error) {
+/**
+ * Retries network failures, 429s and 5xx answers at most twice; any other 4xx is final and is
+ * surfaced immediately.
+ */
+export function shouldRetryTransientFailure(failureCount: number, error: Error) {
   if (failureCount >= 2) return false;
   if (!isApiError(error)) return true;
   return error.status === 429 || error.status >= 500;
 }
+
+export const shouldRetryElevateQuery = shouldRetryTransientFailure;
 
 export function useElevateProducts(request: ElevatePageRequest, enabled = true) {
   const params = elevatePageParams(request);

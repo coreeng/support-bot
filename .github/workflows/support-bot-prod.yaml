@@ -22,6 +22,12 @@ jobs:
 
   prod:
     needs: [get-latest-version]
+    # Prod publishes images and the chart for one shared support-bot-prod
+    # target; two dispatches must run one after the other, never cancelled
+    # half-way through a publish.
+    concurrency:
+      group: p2p-prod-support-bot
+      cancel-in-progress: false
     uses: coreeng/p2p/.github/workflows/p2p-workflow-prod.yaml@v1
     secrets:
       slack_webhook_url: ${{ secrets.P2P_SLACK_WEBHOOK_URL }}

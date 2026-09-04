@@ -15,16 +15,19 @@ import com.coreeng.supportbot.config.AnalysisProps.Bundle;
 import com.coreeng.supportbot.config.AnalysisProps.Llm;
 import com.coreeng.supportbot.config.AnalysisProps.Prompt;
 import com.coreeng.supportbot.config.AnalysisProps.Proxy;
+import com.coreeng.supportbot.config.AnalysisProps.Stub;
 import com.coreeng.supportbot.config.AnalysisProps.Vertex;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -50,6 +53,9 @@ class AnalysisServiceTest {
     @Mock
     private ApplicationContext applicationContext;
 
+    @Mock
+    private ObjectProvider<WindowAnalysisRunner> windowAnalysisRunner;
+
     private static final String PROMPT_TEXT = "Test prompt content";
 
     private AnalysisProps analysisProps;
@@ -61,7 +67,8 @@ class AnalysisServiceTest {
                 "gemini-2.5-flash",
                 Duration.ofMillis(100),
                 new Vertex(true, "test-project", "europe-west2"),
-                new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)));
+                new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)),
+                new Stub(false, false));
         Bundle bundle = new Bundle("classpath:placeholder-analysis-bundle.zip");
         Prompt prompt = new Prompt(true);
         analysisProps = new AnalysisProps(llm, bundle, prompt);
@@ -73,11 +80,13 @@ class AnalysisServiceTest {
                 analysisRepository,
                 analysisPromptRepository,
                 analysisProps,
-                applicationContext);
+                applicationContext,
+                windowAnalysisRunner);
     }
 
     private void givenPromptInUse() {
-        when(analysisPromptRepository.findInUse()).thenReturn(new AnalysisPrompt(1, PROMPT_TEXT));
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenReturn(new AnalysisPrompt(1, PROMPT_TEXT));
     }
 
     @Test
@@ -137,6 +146,34 @@ class AnalysisServiceTest {
         // then
         verify(asyncJobRepository).findJob("analysis");
         verifyNoInteractions(applicationContext);
+    }
+
+    @Test
+    void resumeAnalysisOnStartup_shouldHandOffAWindowJobToItsRunner() {
+        // A window job belongs to the Support Summary feature; the analysis service only holds the
+        // shared lock row and must not try to resume it as a days-based run.
+        AsyncJob windowJob = new AsyncJob("analysis", "window:2026-03-10:2026-03-23", Instant.now());
+        when(asyncJobRepository.findJob("analysis")).thenReturn(windowJob);
+        WindowAnalysisRunner runner = mock(WindowAnalysisRunner.class);
+        when(windowAnalysisRunner.getIfAvailable()).thenReturn(runner);
+
+        service.resumeAnalysisOnStartup();
+
+        verify(runner).runWindowRefresh(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23));
+        verify(asyncJobRepository, never()).deleteJob("analysis");
+        verifyNoInteractions(applicationContext);
+    }
+
+    @Test
+    void resumeAnalysisOnStartup_shouldDeleteAWindowJobWhenTheSummaryFeatureIsOff() {
+        // Nothing can run it, and leaving the row behind would hold the shared lock forever.
+        AsyncJob windowJob = new AsyncJob("analysis", "window:2026-03-10:2026-03-23", Instant.now());
+        when(asyncJobRepository.findJob("analysis")).thenReturn(windowJob);
+        when(windowAnalysisRunner.getIfAvailable()).thenReturn(null);
+
+        service.resumeAnalysisOnStartup();
+
+        verify(asyncJobRepository).deleteJob("analysis");
     }
 
     @Test
@@ -402,7 +439,8 @@ class AnalysisServiceTest {
     @Test
     void runAsyncAnalysis_setsErrorOnPromptLoadFailure() {
         // given — no prompt version is marked as in use
-        when(analysisPromptRepository.findInUse()).thenReturn(null);
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenReturn(null);
 
         // when
         service.runAsyncAnalysis(7);
@@ -424,7 +462,8 @@ class AnalysisServiceTest {
 
     @Test
     void loadPrompt_throwsWhenNoVersionIsInUse() {
-        when(analysisPromptRepository.findInUse()).thenReturn(null);
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenReturn(null);
 
         assertThatThrownBy(service::loadPrompt)
                 .isInstanceOf(AnalysisPromptLoadException.class)
@@ -434,7 +473,8 @@ class AnalysisServiceTest {
     @Test
     void loadPrompt_wrapsDatabaseFailure() {
         // Keeps the ANALYSIS_PROMPT_LOAD_FAILED contract the UI relies on when the DB is unreachable.
-        when(analysisPromptRepository.findInUse()).thenThrow(new DataAccessResourceFailureException("db down"));
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
 
         assertThatThrownBy(service::loadPrompt)
                 .isInstanceOf(AnalysisPromptLoadException.class)
