@@ -245,14 +245,14 @@ class SummaryReadRepositoryPostgresTest {
         classify(classified, "Knowledge Gap", "Build & CI", "ci", "Done.", LocalDateTime.parse("2026-03-11T12:00:00"));
         SummaryFingerprint complete = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
         assertThat(complete.gapCount()).isZero();
-        assertThat(complete.value()).isEqualTo("1/1@2026-03-11T12:00");
+        assertThat(complete.value()).isEqualTo("1/1@2026-03-11T12:00~" + complete.attribution());
 
         // An open ticket is not a gap — it will be classified once it closes.
         SummaryTestFixtures.insertTicket(
                 jdbcTemplate, CHANNEL, "ts-open", LocalDateTime.parse("2026-03-11T10:00:00"), "opened", "team-a");
         SummaryFingerprint withOpen = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
         assertThat(withOpen.gapCount()).isZero();
-        assertThat(withOpen.value()).isEqualTo("2/1@2026-03-11T12:00");
+        assertThat(withOpen.value()).isEqualTo("2/1@2026-03-11T12:00~" + withOpen.attribution());
 
         // A closed, unclassified ticket is: the fingerprint moves even though no analysis row changed.
         long gap = ticket("2026-03-12T09:00:00", "ts-gap", "team-a");
@@ -260,14 +260,65 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(withGap.ticketCount()).isEqualTo(3);
         assertThat(withGap.analysisCount()).isEqualTo(1);
         assertThat(withGap.gapCount()).isEqualTo(1);
+        assertThat(withGap.gapIds()).containsExactly(gap);
         assertThat(withGap.gapIdSum()).isEqualTo(gap);
-        assertThat(withGap.value()).isEqualTo("3/1@2026-03-11T12:00#1:" + gap);
+        assertThat(withGap.value()).isEqualTo("3/1@2026-03-11T12:00~" + withGap.attribution() + "#1:" + gap);
 
         // Classifying it closes the gap and moves the analysis half instead.
         classify(gap, "Task Request", "Build & CI", "ci", "Later.", LocalDateTime.parse("2026-03-12T12:00:00"));
         SummaryFingerprint after = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
         assertThat(after.gapCount()).isZero();
-        assertThat(after.value()).isEqualTo("3/2@2026-03-12T12:00");
+        assertThat(after.value()).isEqualTo("3/2@2026-03-12T12:00~" + after.attribution());
+    }
+
+    @Test
+    void fingerprintChangesWhenATicketsAttributionChanges() {
+        long ticket = ticket("2026-03-11T09:00:00", "ts-1", "team-a");
+        classify(ticket, "Knowledge Gap", "Build & CI", "ci", "One.", LocalDateTime.parse("2026-03-11T12:00:00"));
+        long other = ticket("2026-03-12T09:00:00", "ts-2", "team-b");
+        classify(other, "Task Request", "Build & CI", "ci", "Two.", LocalDateTime.parse("2026-03-12T12:00:00"));
+        SummaryFingerprint initial = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        assertThat(initial.attribution()).isNotNull().hasSize(32);
+
+        // Re-saving a ticket with nothing changed must not invalidate the cached prose.
+        jdbcTemplate.update("UPDATE ticket SET team = team, status = status WHERE id = ?", ticket);
+        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(initial);
+
+        // Correcting the team changes the teams breakdown the prose quotes, with no analysis row touched.
+        jdbcTemplate.update("UPDATE ticket SET team = ? WHERE id = ?", "team-c", ticket);
+        SummaryFingerprint reteamed = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        assertThat(reteamed.ticketCount()).isEqualTo(initial.ticketCount());
+        assertThat(reteamed.analysisCount()).isEqualTo(initial.analysisCount());
+        assertThat(reteamed.maxUpdatedAt()).isEqualTo(initial.maxUpdatedAt());
+        assertThat(reteamed.attribution()).isNotEqualTo(initial.attribution());
+        assertThat(reteamed.value()).isNotEqualTo(initial.value());
+
+        // So does tagging it with a product.
+        SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "alpha", "Product - Alpha");
+        SummaryFingerprint tagged = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        assertThat(tagged.attribution()).isNotEqualTo(reteamed.attribution());
+        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(tagged);
+
+        // The digest is order-independent of how the tags were attached: the same set reads the same.
+        jdbcTemplate.update("DELETE FROM ticket_to_tag WHERE ticket_id = ?", ticket);
+        SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "beta", "Product - Beta");
+        SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "alpha", "Product - Alpha");
+        SummaryFingerprint twoTags = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        jdbcTemplate.update("DELETE FROM ticket_to_tag WHERE ticket_id = ?", ticket);
+        SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "alpha", "Product - Alpha");
+        SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "beta", "Product - Beta");
+        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(twoTags);
+
+        // A ticket outside the window or channel is not part of the digest.
+        long outside = SummaryTestFixtures.insertTicket(
+                jdbcTemplate,
+                OTHER_CHANNEL,
+                "ts-other",
+                LocalDateTime.parse("2026-03-11T09:00:00"),
+                "closed",
+                "team-a");
+        jdbcTemplate.update("UPDATE ticket SET team = ? WHERE id = ?", "team-z", outside);
+        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(twoTags);
     }
 
     @Test
@@ -308,7 +359,9 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(fingerprint.ticketCount()).isZero();
         assertThat(fingerprint.analysisCount()).isZero();
         assertThat(fingerprint.maxUpdatedAt()).isNull();
-        assertThat(fingerprint.value()).isEqualTo("0/0@-");
+        assertThat(fingerprint.attribution()).isNull();
+        assertThat(fingerprint.gapIds()).isEmpty();
+        assertThat(fingerprint.value()).isEqualTo("0/0@-~-");
     }
 
     @Test

@@ -129,7 +129,8 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
         SummaryWindow window = new SummaryWindow(from, to);
         try {
             status.set(new SummaryRefreshStatus(window, SummaryState.Phase.CLASSIFYING, true));
-            if (!backfill(window)) {
+            ImmutableSet<Long> attempted = backfill(window);
+            if (attempted == null) {
                 // The backfill stops early on interrupt (shutdown) and returns normally. Summarising now
                 // would store a snapshot whose fingerprint marks the unclassified tickets as gaps, and
                 // that snapshot would be served as ready after restart without ever retrying them.
@@ -140,7 +141,7 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
             }
 
             status.set(new SummaryRefreshStatus(window, SummaryState.Phase.SUMMARISING, true));
-            generate(window);
+            generate(window, attempted);
 
             clearFailure(window);
             log.info("Summary refresh for window {}..{} completed", from, to);
@@ -185,22 +186,25 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
      * more afterwards, and if any ticket is awaiting classification that the first pass could not
      * have known about, one more pass runs. Only one: a gap the first pass already attempted is a
      * ticket the backfill gave up on, not a new arrival, and anything closed during the second pass
-     * is left for the next refresh rather than chasing a moving target.
+     * is left for the next refresh rather than chasing a moving target — which works because the
+     * snapshot is stored under a fingerprint that only counts the gaps returned here (see {@link
+     * #generate}), so such a ticket makes the next visit's fingerprint differ.
      *
-     * @return false when a pass was interrupted (shutdown); the interrupt flag is left set
+     * @return the ids of the tickets the passes set out to classify (whether or not they succeeded),
+     *     or null when a pass was interrupted (shutdown); the interrupt flag is then left set
      */
-    private boolean backfill(SummaryWindow window) {
+    private @Nullable ImmutableSet<Long> backfill(SummaryWindow window) {
         String classificationPromptId = AnalysisService.computePromptId(analysisService.loadPrompt());
         ImmutableSet<Long> firstPassTargets = awaitingClassification(window, classificationPromptId);
 
         analysisService.backfillWindow(window.from(), window.to());
         if (Thread.currentThread().isInterrupted()) {
-            return false;
+            return null;
         }
 
         ImmutableSet<Long> stillAwaiting = awaitingClassification(window, classificationPromptId);
         if (firstPassTargets.containsAll(stillAwaiting)) {
-            return true;
+            return firstPassTargets;
         }
         log.info(
                 "{} ticket(s) closed in window {}..{} during the backfill; classifying them in a second pass",
@@ -210,7 +214,13 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
                 window.from(),
                 window.to());
         analysisService.backfillWindow(window.from(), window.to());
-        return !Thread.currentThread().isInterrupted();
+        if (Thread.currentThread().isInterrupted()) {
+            return null;
+        }
+        return ImmutableSet.<Long>builder()
+                .addAll(firstPassTargets)
+                .addAll(stillAwaiting)
+                .build();
     }
 
     /** The same lookup the backfill itself starts from: closed tickets in the window with no analysis for the prompt. */
@@ -223,8 +233,16 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
     /**
      * Reads the window afresh — after the backfill, so the counts, the reasons and the fingerprint
      * stored with the summary all describe the same post-backfill state.
+     *
+     * <p>The stored fingerprint's gap component is narrowed to the gaps the backfill attempted. A gap
+     * it attempted and could not fill is pinned into the fingerprint, so the page serves the snapshot
+     * instead of retrying it on every poll. A gap it never attempted — a ticket closed during the
+     * second pass — is left out, so the next visit computes a different fingerprint and starts the
+     * refresh that will attempt it.
+     *
+     * @param attempted the ids of the tickets the backfill set out to classify
      */
-    private void generate(SummaryWindow window) {
+    private void generate(SummaryWindow window, ImmutableSet<Long> attempted) {
         AnalysisPrompt summaryPrompt = analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY);
         if (summaryPrompt == null) {
             throw new AnalysisPromptLoadException("No summary prompt version is marked as in use");
@@ -234,13 +252,22 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
         ImmutableList<String> channelIds = channelRegistry.monitoredChannelIds();
 
         SummaryBreakdowns breakdowns = summaryReadRepository.breakdowns(window, classificationPromptId, channelIds);
-        SummaryFingerprint fingerprint = summaryReadRepository.fingerprint(window, classificationPromptId, channelIds);
+        SummaryFingerprint current = summaryReadRepository.fingerprint(window, classificationPromptId, channelIds);
+        SummaryFingerprint fingerprint = current.withGapsAmong(attempted);
         if (fingerprint.gapCount() > 0) {
             // Not an error: the summary is generated from what could be classified, and stored under a
             // fingerprint that includes these gaps so the page does not retry them on every poll.
             log.warn(
                     "{} closed ticket(s) in window {}..{} could not be classified; summarising without them",
                     fingerprint.gapCount(),
+                    window.from(),
+                    window.to());
+        }
+        if (current.gapCount() > fingerprint.gapCount()) {
+            log.info(
+                    "{} ticket(s) closed in window {}..{} after the backfill computed its targets; left out of the"
+                            + " snapshot's fingerprint so the next visit refreshes",
+                    current.gapCount() - fingerprint.gapCount(),
                     window.from(),
                     window.to());
         }

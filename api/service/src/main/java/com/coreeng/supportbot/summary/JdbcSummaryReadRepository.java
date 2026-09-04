@@ -5,12 +5,16 @@ import static com.coreeng.supportbot.dbschema.Tables.QUERY;
 import static com.coreeng.supportbot.dbschema.Tables.TAG;
 import static com.coreeng.supportbot.dbschema.Tables.TICKET;
 import static com.coreeng.supportbot.dbschema.Tables.TICKET_TO_TAG;
+import static org.jooq.impl.DSL.arrayAgg;
 import static org.jooq.impl.DSL.coalesce;
+import static org.jooq.impl.DSL.concat;
 import static org.jooq.impl.DSL.count;
 import static org.jooq.impl.DSL.countDistinct;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.inline;
+import static org.jooq.impl.DSL.listAgg;
 import static org.jooq.impl.DSL.max;
+import static org.jooq.impl.DSL.md5;
 import static org.jooq.impl.DSL.name;
 import static org.jooq.impl.DSL.noCondition;
 import static org.jooq.impl.DSL.notExists;
@@ -19,13 +23,12 @@ import static org.jooq.impl.DSL.partitionBy;
 import static org.jooq.impl.DSL.regexpReplaceFirst;
 import static org.jooq.impl.DSL.rowNumber;
 import static org.jooq.impl.DSL.selectOne;
-import static org.jooq.impl.DSL.sum;
 import static org.jooq.impl.DSL.trim;
 
 import com.coreeng.supportbot.dbschema.enums.TicketStatus;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import java.math.BigDecimal;
+import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -142,7 +145,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
     @Override
     public SummaryFingerprint fingerprint(SummaryWindow window, String promptId, Collection<String> channelIds) {
         if (channelIds.isEmpty()) {
-            return new SummaryFingerprint(0L, 0L, null);
+            return new SummaryFingerprint(0L, 0L, null, null);
         }
 
         Record2<Integer, LocalDateTime> row = dsl.select(count(), max(ANALYSIS.UPDATED_AT))
@@ -155,28 +158,51 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .fetchSingle();
 
         // One pass over the window's tickets: how many were raised at all (open ones included — they
-        // are in the totals the prose quotes), and among them the closed ones with no analysis for
-        // this prompt, which is what the backfill would try to classify.
+        // are in the totals the prose quotes); among them the closed ones with no analysis for this
+        // prompt, which is what the backfill would try to classify; and a digest of the attribution
+        // the report reads off the ticket itself rather than off its analysis.
         Condition isGap = TICKET.STATUS
                 .eq(TicketStatus.closed)
                 .and(notExists(selectOne().from(ANALYSIS).where(analysisJoin(promptId))));
-        Record3<Integer, Integer, BigDecimal> tickets = dsl.select(
-                        count(),
-                        count().filterWhere(isGap),
-                        coalesce(sum(TICKET.ID).filterWhere(isGap), BigDecimal.ZERO))
+        Record3<Integer, Long[], String> tickets = dsl.select(
+                        count(), arrayAgg(TICKET.ID).filterWhere(isGap), attributionDigest())
                 .from(QUERY)
                 .join(TICKET)
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
                 .where(inWindow(window, channelIds))
                 .fetchSingle();
 
-        BigDecimal gapIdSum = tickets.value3();
+        Long[] gapIds = tickets.value2();
         return new SummaryFingerprint(
                 orZero(tickets.value1()),
                 orZero(row.value1()),
                 row.value2(),
-                orZero(tickets.value2()),
-                gapIdSum == null ? 0L : gapIdSum.longValue());
+                tickets.value3(),
+                gapIds == null ? ImmutableSet.of() : ImmutableSet.copyOf(gapIds));
+    }
+
+    /**
+     * MD5 over the window's tickets, in id order, of everything the report attributes by ticket
+     * rather than by analysis: {@code id:team:status:tag+tag}. The {@code ticket} table has no
+     * {@code updated_at}, so this is how an edit to a ticket's team or product tags reaches the
+     * fingerprint. Null over an empty window ({@code string_agg} of no rows).
+     */
+    private Field<String> attributionDigest() {
+        Field<String> tags = coalesce(
+                dsl.select(listAgg(TICKET_TO_TAG.TAG_CODE, "+").withinGroupOrderBy(TICKET_TO_TAG.TAG_CODE))
+                        .from(TICKET_TO_TAG)
+                        .where(TICKET_TO_TAG.TICKET_ID.eq(TICKET.ID))
+                        .<String>asField(),
+                inline(""));
+        Field<String> ticket = concat(
+                TICKET.ID.cast(String.class),
+                inline(":"),
+                coalesce(TICKET.TEAM, inline("")),
+                inline(":"),
+                TICKET.STATUS.cast(String.class),
+                inline(":"),
+                tags);
+        return md5(listAgg(ticket, ",").withinGroupOrderBy(TICKET.ID));
     }
 
     @Override

@@ -26,6 +26,7 @@ import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryProps;
 import com.coreeng.supportbot.slack.SlackException;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -55,7 +56,8 @@ class SummaryRefreshServiceTest {
     private static final String SUMMARY_PROMPT = "summarise this";
     private static final String CLASSIFICATION_PROMPT_ID = AnalysisService.computePromptId(CLASSIFICATION_PROMPT);
     private static final String SUMMARY_PROMPT_ID = AnalysisService.computePromptId(SUMMARY_PROMPT);
-    private static final String FINGERPRINT = "3/2@2026-03-23T10:00";
+    private static final String ATTRIBUTION = "a1b2c3";
+    private static final String FINGERPRINT = "3/2@2026-03-23T10:00~" + ATTRIBUTION;
     private static final Duration RETRY_DELAY = Duration.ofMinutes(15);
     private static final Instant NOW = Instant.parse("2026-03-23T12:00:00Z");
 
@@ -116,7 +118,7 @@ class SummaryRefreshServiceTest {
         lenient()
                 .when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(
-                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0)));
+                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), ATTRIBUTION));
         lenient()
                 .when(summaryReadRepository.reasons(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
                 .thenReturn(ImmutableList.of("Because."));
@@ -153,8 +155,7 @@ class SummaryRefreshServiceTest {
         ArgumentCaptor<SummarySnapshot> stored = ArgumentCaptor.forClass(SummarySnapshot.class);
         verify(summarySnapshotRepository).upsert(stored.capture());
         assertThat(stored.getValue())
-                .isEqualTo(new SummarySnapshot(
-                        WINDOW, SUMMARY_PROMPT_ID, "3/2@2026-03-23T10:00", "the prose", "model-a", null));
+                .isEqualTo(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "the prose", "model-a", null));
         assertThat(service.status().running()).isFalse();
         verify(asyncJobRepository).deleteJob("analysis");
         assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
@@ -223,10 +224,10 @@ class SummaryRefreshServiceTest {
     @Test
     void failuresForDifferentWindowsAreRememberedIndependently() {
         SummaryWindow otherWindow = new SummaryWindow(FROM.minusMonths(1), TO.minusMonths(1));
-        String otherFingerprint = "9/7@2026-02-20T09:00";
+        String otherFingerprint = "9/7@2026-02-20T09:00~" + ATTRIBUTION;
         when(summaryReadRepository.fingerprint(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(
-                        new SummaryFingerprint(9, 7, LocalDate.of(2026, 2, 20).atTime(9, 0)));
+                        new SummaryFingerprint(9, 7, LocalDate.of(2026, 2, 20).atTime(9, 0), ATTRIBUTION));
         when(summaryReadRepository.breakdowns(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(breakdowns());
         when(summaryReadRepository.reasons(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
@@ -254,7 +255,7 @@ class SummaryRefreshServiceTest {
         when(llmSummaryService.generate(any(), any(), any())).thenThrow(new IllegalStateException("model exploded"));
         when(summaryReadRepository.fingerprint(any(), any(), any()))
                 .thenReturn(
-                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0)));
+                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), ATTRIBUTION));
         when(summaryReadRepository.breakdowns(any(), any(), any())).thenReturn(breakdowns());
         when(summaryReadRepository.reasons(any(), any(), any(), anyInt())).thenReturn(ImmutableList.of("Because."));
         when(threadsAwaitingAnalysisService.find(any(), any(), any())).thenReturn(ImmutableList.of());
@@ -432,6 +433,53 @@ class SummaryRefreshServiceTest {
         } finally {
             Thread.interrupted();
         }
+    }
+
+    @Test
+    void aGapTheBackfillNeverAttemptedIsLeftOutOfTheStoredFingerprint() {
+        // Ticket 99 closes during the first pass and is picked up by the second; ticket 100 closes
+        // during the second pass, too late for either. By the time the summary is generated both are
+        // gaps in the database.
+        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
+                .thenReturn(ImmutableList.of())
+                .thenReturn(ImmutableList.of(new ThreadToAnalyze(99L, "ts-99", CHANNEL)));
+        SummaryFingerprint current = new SummaryFingerprint(
+                3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), ATTRIBUTION, ImmutableSet.of(99L, 100L));
+        when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(current);
+        when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");
+
+        service.runWindowRefresh(FROM, TO);
+
+        ArgumentCaptor<SummarySnapshot> stored = ArgumentCaptor.forClass(SummarySnapshot.class);
+        verify(summarySnapshotRepository).upsert(stored.capture());
+        // Only the attempted gap (99) is pinned. The next GET computes the fingerprint from the
+        // database — both gaps — so it does not match the snapshot and SummaryService starts a refresh
+        // that will attempt ticket 100, instead of serving the snapshot until unrelated data changes.
+        assertThat(stored.getValue().fingerprint())
+                .isEqualTo(FINGERPRINT + "#1:99")
+                .isNotEqualTo(current.value());
+        verify(analysisService, times(2)).backfillWindow(FROM, TO);
+    }
+
+    @Test
+    void aGapTheBackfillAttemptedAndCouldNotFillStaysInTheStoredFingerprint() {
+        // Ticket 42's thread is gone: it awaits classification before the pass and still after it.
+        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
+                .thenReturn(ImmutableList.of(new ThreadToAnalyze(42L, "ts-42", CHANNEL)));
+        SummaryFingerprint current = new SummaryFingerprint(
+                3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), ATTRIBUTION, ImmutableSet.of(42L));
+        when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(current);
+        when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");
+
+        service.runWindowRefresh(FROM, TO);
+
+        ArgumentCaptor<SummarySnapshot> stored = ArgumentCaptor.forClass(SummarySnapshot.class);
+        verify(summarySnapshotRepository).upsert(stored.capture());
+        // The gap was attempted, so it is baked in: the next GET's fingerprint matches and the snapshot
+        // is served rather than the same failing classification being retried on every poll.
+        assertThat(stored.getValue().fingerprint()).isEqualTo(current.value()).isEqualTo(FINGERPRINT + "#1:42");
     }
 
     @Test
