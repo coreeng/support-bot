@@ -2,6 +2,15 @@ suite: api deployment
 templates:
   - templates/deployment.yaml
 tests:
+  - it: recreates the pod instead of rolling so startup migrations never overlap an old reader
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - equal:
+          path: spec.replicas
+          value: 1
+
   - it: reports the chart app version when the image tag is empty
     asserts:
       - contains:

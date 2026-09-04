@@ -6,6 +6,19 @@ window. Two operations need a human: rolling back past the `V38` migration, and 
 classification when a window will not clear on its own. Settings are in
 [`api/service/docs/configuration.md`](../../api/service/docs/configuration.md#support-summary).
 
+## Forward deployment
+
+`V38` runs with the new pod's Flyway migrations at startup and marks the summary prompt as in use.
+From that moment a pre-V38 pod cannot read the prompt table at all (see the rollback section for
+why), so the old pod must be gone before the migration runs. The chart therefore sets
+`strategy: Recreate` on the API Deployment (`helm-chart/templates/deployment.yaml`): Kubernetes
+stops the old pod, then starts the new one. Expect a few seconds of downtime per deploy; there is
+no overlap in which the old pod serves against migrated data.
+
+If the new pod fails **after** migrating, the old one is not brought back automatically. Either
+roll forward (fix the new version and deploy it again — the migration is already applied and is
+idempotent), or, if you must go back to a pre-V38 release, run the rollback SQL below first.
+
 ## Rolling back to a release before V38
 
 `V38__summary_snapshot_and_prompt_type.sql` adds `analysis_prompt.type` and seeds a second
@@ -83,11 +96,14 @@ curl -s "$API_URL/analysis/status" -H "Authorization: Bearer $TOKEN"
 ```
 
 `running` flips to `false` when the job ends; `error` is present only if it failed. The run
-persists each classification as it goes. An open summary page shows `generating` while the run
-holds the lock and polls until it ends; the changed fingerprint then triggers its own refresh, so
-the new classifications and a regenerated summary appear without a reload. Threads that fail
-again are still skipped — check the API logs for `Failed to analyze thread for ticket` if the
-count does not move.
+persists each classification as it goes. It does **not** update the summary page on its own: a
+page already showing a `ready` summary keeps it and does not poll, and the manual run does not
+mark the summary as refreshing. Once `running` is `false`, **reload or revisit** the page: the
+next `GET /summary` sees the changed data, regenerates the summary and shows `generating` until
+it is done. Only a page that was already showing `generating` (because it hit the lock, see
+below) polls and picks the new classifications up by itself. Threads that fail again are still
+skipped — check the API logs for `Failed to analyze thread for ticket` if the count does not
+move.
 
 ### Single-flight: the `analysis` lock
 
@@ -96,8 +112,9 @@ The manual run and the page's own refresh share one lock, the `async_job` row wi
 
 - `POST /analysis/run` returns **409 Conflict** while a summary refresh (or another manual run)
   holds the lock. Wait for `GET /analysis/status` to report `running: false` and retry.
-- While a manual run holds the lock, the summary page shows `generating` for every window and
-  starts its own refresh once the lock is free.
+- While a manual run holds the lock, a summary page whose window needs a refresh shows
+  `generating` and polls; once the lock is free its next poll starts that window's refresh. A
+  window whose cached summary is still current is served as `ready` and is not polled.
 
 A job that was interrupted by a restart is resumed at startup from the same row.
 
