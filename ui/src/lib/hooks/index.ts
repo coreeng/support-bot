@@ -72,8 +72,15 @@ export function isApiError(error: unknown, status?: number): error is ApiError {
   return error instanceof ApiError && (status === undefined || error.status === status);
 }
 
-async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`/api${path}`, { signal });
+interface ApiGetOptions {
+  signal?: AbortSignal;
+  /** Send the CSRF token: for GETs that have side effects on the backend (see {@link apiFetch}). */
+  csrf?: boolean;
+}
+
+async function apiGet<T>(path: string, { signal, csrf = false }: ApiGetOptions = {}): Promise<T> {
+  const headers = csrf ? { "X-CSRF-Token": (await getCsrfToken()) || "" } : undefined;
+  const res = await fetch(`/api${path}`, { signal, headers });
   if (!res.ok) {
     if (res.status === 401) {
       return handle401();
@@ -613,7 +620,8 @@ export function useSummary(from?: string, to?: string, enabled = true) {
 
   const result = useQuery<SummaryData>({
     queryKey: ["summary", from ?? null, to ?? null],
-    queryFn: () => apiGet(`/summary${query ? `?${query}` : ""}`),
+    // The request triggers backfill and prose generation on the backend, so it carries the CSRF token.
+    queryFn: () => apiGet(`/summary${query ? `?${query}` : ""}`, { csrf: true }),
     enabled,
     refetchInterval: ({ state }) => {
       if (state.data?.summary.state !== "generating") return false;
@@ -681,7 +689,7 @@ export function useInFlightPrs(team?: string) {
 export function useElevateStatus() {
   return useQuery<ElevateStatus>({
     queryKey: ["elevate", "status"],
-    queryFn: ({ signal }) => apiGet("/elevate/status", signal),
+    queryFn: ({ signal }) => apiGet("/elevate/status", { signal }),
     staleTime: 30 * 1000,
   });
 }
@@ -705,7 +713,7 @@ function elevatePageParams(request: ElevatePageRequest) {
 function elevateQueryOptions<T>(queryKey: readonly unknown[], path: string, enabled: boolean, retainPreviousData = false) {
   return {
     queryKey,
-    queryFn: ({ signal }: { signal: AbortSignal }) => apiGet<T>(path, signal),
+    queryFn: ({ signal }: { signal: AbortSignal }) => apiGet<T>(path, { signal }),
     enabled,
     placeholderData: retainPreviousData ? keepPreviousData : undefined,
     staleTime: 30 * 1000,
