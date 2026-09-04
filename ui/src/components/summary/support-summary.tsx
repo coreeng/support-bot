@@ -101,15 +101,32 @@ function GlanceChip({ label, children, muted = false }: { label: string; childre
   );
 }
 
-/** What the page shows while a poll fails but the last reply is still on screen. */
+/** What the page shows while a refresh fails but the last reply is still on screen. */
 interface RefreshProblem {
   title: string;
   /** False once polling has given up; the page needs a reload to resume. */
   retrying: boolean;
 }
 
+/**
+ * The refresh-failing hint, shown above the cards whatever state the summary is in: a poll while
+ * generating, a refetch after a ticket save, or a focus refetch can all fail with figures on screen.
+ */
+function RefreshFailingHint({ problem }: { problem: RefreshProblem }) {
+  return (
+    <p className="text-warning flex items-center gap-2 text-sm" role="status" data-testid="summary-refresh-failing">
+      <AlertCircle className="h-4 w-4 shrink-0" />
+      <span>
+        {problem.retrying
+          ? `Refresh failing – retrying. ${problem.title}.`
+          : `Refresh failing – stopped after ${MAX_SUMMARY_POLL_FAILURES} attempts. ${problem.title}. Reload the page to try again.`}
+      </span>
+    </p>
+  );
+}
+
 /** Headline numbers for the window: total raised plus the top item of each breakdown. */
-function AtAGlanceCard({ data, refreshProblem }: { data: SummaryData; refreshProblem: RefreshProblem | null }) {
+function AtAGlanceCard({ data }: { data: SummaryData }) {
   const top = (counts: SummaryCount[]): SummaryCount | undefined => counts[0];
   const topDriver = top(data.drivers);
   const topCategory = top(data.categories);
@@ -129,7 +146,7 @@ function AtAGlanceCard({ data, refreshProblem }: { data: SummaryData; refreshPro
         )}
       </div>
       <div className="space-y-6">
-        <SummarySectionBody section={data.summary} refreshProblem={refreshProblem} />
+        <SummarySectionBody section={data.summary} />
         <div className="flex flex-wrap gap-2">
           <GlanceChip label="Raised">
             <Metric>{data.totalTickets.toLocaleString()}</Metric> tickets
@@ -175,7 +192,7 @@ function AtAGlanceCard({ data, refreshProblem }: { data: SummaryData; refreshPro
  * The prose section, rendered inside the "At a glance" card. It carries its own state, so a
  * failure here degrades to an inline message and never hides the headline chips or breakdowns.
  */
-function SummarySectionBody({ section, refreshProblem }: { section: SummarySection; refreshProblem: RefreshProblem | null }) {
+function SummarySectionBody({ section }: { section: SummarySection }) {
   if (section.state === "generating") {
     const analysed = section.progress?.analysedThreads ?? null;
     const total = section.progress?.totalThreads ?? null;
@@ -204,16 +221,6 @@ function SummarySectionBody({ section, refreshProblem }: { section: SummarySecti
           <div className="bg-muted mt-3 h-2.5 overflow-hidden rounded-full">
             <div className="bg-secondary h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${percent}%` }} />
           </div>
-        )}
-        {refreshProblem && (
-          <p className="text-warning mt-3 flex items-center gap-2 text-sm" role="status" data-testid="summary-refresh-failing">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>
-              {refreshProblem.retrying
-                ? `Refresh failing – retrying. ${refreshProblem.title}.`
-                : `Refresh failing – stopped after ${MAX_SUMMARY_POLL_FAILURES} attempts. ${refreshProblem.title}. Reload the page to try again.`}
-            </span>
-          </p>
         )}
       </div>
     );
@@ -319,7 +326,8 @@ export default function SupportSummaryPage() {
   );
   // Another window was chosen and the previous one's figures stand in until it loads.
   const refreshing = isFetching && isPlaceholderData;
-  // A poll failed after a reply was already on screen: the reply stays, with a hint in the generating block.
+  // A refresh (poll, ticket-save invalidation, focus) failed after a reply was already on screen:
+  // the reply stays, with a hint above the cards.
   const refreshProblem: RefreshProblem | null =
     error && data ? { title: summaryErrorMessage(error).title, retrying: pollFailures < MAX_SUMMARY_POLL_FAILURES } : null;
   // Same rule as the Products View tab: only shown once the registry confirms product tags exist,
@@ -435,9 +443,12 @@ export default function SupportSummaryPage() {
           aria-busy={refreshing}
           data-testid="summary-body"
         >
-          <WindowStrip from={data.from} to={data.to} totalTickets={data.totalTickets} refreshing={refreshing} />
+          <div className="space-y-2">
+            <WindowStrip from={data.from} to={data.to} totalTickets={data.totalTickets} refreshing={refreshing} />
+            {refreshProblem && <RefreshFailingHint problem={refreshProblem} />}
+          </div>
 
-          <AtAGlanceCard data={data} refreshProblem={refreshProblem} />
+          <AtAGlanceCard data={data} />
 
           <BreakdownCard
             title="Top Support Areas"

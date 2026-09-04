@@ -241,6 +241,37 @@ describe("StatsPage (Home Dashboard)", () => {
       expect(screen.getByText(/Error loading dashboard/i)).toBeInTheDocument();
     });
 
+    it("keeps the header and date filter controls mounted when tickets fail to load", () => {
+      // On the Home page the embedded ticket list hides its own period controls in favour of
+      // these, so a stats failure must not take away the only way to change the period.
+      mockUseAllTickets.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: new Error("Failed to load"),
+      } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+      render(<StatsPage />, { wrapper: Wrapper });
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Error loading dashboard");
+      expect(screen.getByRole("heading", { level: 1, name: "Support Dashboard" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox")).toHaveTextContent("Last Week");
+      expect(screen.queryByTestId("time-series-chart")).not.toBeInTheDocument();
+    });
+
+    it("keeps the header and date filter controls mounted while tickets are loading", () => {
+      mockUseAllTickets.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+      render(<StatsPage />, { wrapper: Wrapper });
+
+      expect(document.querySelector(".animate-pulse")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Support Dashboard" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox")).toHaveTextContent("Last Week");
+    });
+
     it("shows an explicit chart error when incoming/resolved data fails to load", () => {
       mockUseIncomingVsResolvedRate.mockReturnValue({
         data: undefined,

@@ -17,6 +17,12 @@ import type { SummaryData, SummarySection, SummaryTicket } from "../../../lib/ty
 import { MAX_SUMMARY_WINDOW_DAYS, windowEndingYesterday } from "../../../lib/utils/summary-window";
 import SupportSummaryPage, { SUMMARY_NOT_ENABLED, summaryErrorMessage } from "../support-summary";
 
+// useSummary sends the CSRF token with the summary request; the global next-auth mock has no getCsrfToken.
+jest.mock("next-auth/react", () => ({
+  getCsrfToken: jest.fn(() => Promise.resolve("mock-csrf-token")),
+  signOut: jest.fn(() => Promise.resolve()),
+}));
+
 // A useState-backed useUrlParams so preset and date changes re-render, and so tests can seed
 // deep-link params (`?dateFilter=custom&dateFrom=..`) via setMockUrlParamsInitial.
 jest.mock("../../../lib/hooks/useUrlParams", () => ({
@@ -436,12 +442,12 @@ describe("SupportSummaryPage", () => {
 
       renderPage();
       const card = await findAtAGlance();
-      expect(within(card).queryByTestId("summary-refresh-failing")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("summary-refresh-failing")).not.toBeInTheDocument();
 
       await act(async () => {
         jest.advanceTimersByTime(3000);
       });
-      const hint = await within(card).findByTestId("summary-refresh-failing");
+      const hint = await screen.findByTestId("summary-refresh-failing");
       expect(hint).toHaveTextContent("Refresh failing – retrying. Error loading support summary.");
       // The last reply stays on screen; the page-level error block is for a page with nothing to show.
       expect(within(card).getByText(/Analysing threads/)).toBeInTheDocument();
@@ -451,7 +457,7 @@ describe("SupportSummaryPage", () => {
       await act(async () => {
         jest.advanceTimersByTime(3000);
       });
-      await waitFor(() => expect(within(card).queryByTestId("summary-refresh-failing")).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByTestId("summary-refresh-failing")).not.toBeInTheDocument());
       expect(summaryRequests()).toHaveLength(3);
 
       await act(async () => {
@@ -472,7 +478,7 @@ describe("SupportSummaryPage", () => {
         await act(async () => {
           jest.advanceTimersByTime(3000);
         });
-        expect(await within(card).findByTestId("summary-refresh-failing")).toHaveTextContent("Refresh failing – retrying.");
+        expect(await screen.findByTestId("summary-refresh-failing")).toHaveTextContent("Refresh failing – retrying.");
         expect(summaryRequests()).toHaveLength(1 + failed);
       }
 
@@ -480,7 +486,7 @@ describe("SupportSummaryPage", () => {
         jest.advanceTimersByTime(3000);
       });
       await waitFor(() =>
-        expect(within(card).getByTestId("summary-refresh-failing")).toHaveTextContent(
+        expect(screen.getByTestId("summary-refresh-failing")).toHaveTextContent(
           `Refresh failing – stopped after ${MAX_SUMMARY_POLL_FAILURES} attempts. Error loading support summary. Reload the page to try again.`
         )
       );
@@ -607,6 +613,32 @@ describe("SupportSummaryPage", () => {
 
       expect(await screen.findByRole("heading", { level: 2, name: "Top products" })).toBeInTheDocument();
       expect(screen.getByText("Checkout")).toBeInTheDocument();
+    });
+
+    it("keeps the figures on screen with a refresh-failing hint when a refetch fails", async () => {
+      // A 422 is not retried, so the refetch is exactly one request.
+      mockApi(sequence(readySummary, failing(422)));
+
+      renderPage();
+      const drivers = await screen.findByTestId("summary-drivers");
+      expect(screen.queryByTestId("summary-refresh-failing")).not.toBeInTheDocument();
+
+      // Saving a ticket invalidates the summary, which refetches it for the current window.
+      fireEvent.click(within(drivers).getByRole("button", { name: /Knowledge Gap/ }));
+      fireEvent.click(within(drivers).getByRole("button", { name: "View ticket 101" }));
+      fireEvent.click(screen.getByRole("button", { name: "Trigger modal success" }));
+
+      const hint = await screen.findByTestId("summary-refresh-failing");
+      expect(hint).toHaveTextContent("Refresh failing – retrying. Error loading support summary.");
+      expect(summaryRequests()).toHaveLength(2);
+      // The stale figures stay rendered, with the hint above the cards rather than inside the prose block.
+      const card = screen.getByTestId("summary-at-a-glance");
+      expect(within(card).queryByTestId("summary-refresh-failing")).not.toBeInTheDocument();
+      expect(within(card).getByText(readySection.content as string)).toBeInTheDocument();
+      expect(chip("Raised")).toHaveTextContent("42 tickets");
+      expect(screen.getByTestId("summary-window")).toHaveTextContent("42 tickets raised");
+      expect(screen.getByText("Top Support Areas")).toBeInTheDocument();
+      expect(screen.queryByTestId("summary-error")).not.toBeInTheDocument();
     });
 
     it("opens the prompt dialog from the View Prompts button", async () => {

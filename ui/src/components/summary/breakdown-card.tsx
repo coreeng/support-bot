@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import type { SummaryCount, SummaryTicket } from "@/lib/types/summary";
 import { formatUtcDateTime } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
@@ -97,12 +98,14 @@ export default function BreakdownCard({
               const secondary = subtitle?.(count);
               return (
                 <div key={count.label}>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="default"
                     onClick={() => toggle(count.label)}
                     aria-expanded={expanded}
                     aria-controls={contentId}
-                    className="hover:bg-muted/40 -mx-2 flex w-[calc(100%+1rem)] cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-left transition-colors"
+                    className="-mx-2 flex h-auto w-[calc(100%+1rem)] cursor-pointer justify-start gap-3 px-2 py-2 text-left font-normal whitespace-normal has-[>svg]:px-2"
                   >
                     {palette ? (
                       <span className={`h-3 w-3 shrink-0 rounded-sm ${barColor(index)}`} />
@@ -129,7 +132,7 @@ export default function BreakdownCard({
                     <ChevronDown
                       className={`text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-[400ms] ${expanded ? "" : "-rotate-90"}`}
                     />
-                  </button>
+                  </Button>
                   {expanded && <RecentTicketsPanel id={contentId} tickets={count.recent} onOpenTicket={onOpenTicket} />}
                 </div>
               );
@@ -222,14 +225,16 @@ function RecentTicketsPanel({
 
 function RecentTicketRow({ ticket, onOpen }: { ticket: SummaryTicket; onOpen: (ticketId: string) => void }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="default"
       aria-label={`View ticket ${ticket.ticketId}`}
       onClick={() => onOpen(ticket.ticketId)}
-      className="bg-muted/40 hover:bg-muted flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors"
+      className="bg-muted/40 flex h-auto w-full cursor-pointer justify-between gap-3 border px-3 py-2 text-left font-normal whitespace-normal"
     >
-      <p className="text-foreground min-w-0 flex-1 text-sm">{ticket.text || `Ticket ${ticket.ticketId}`}</p>
+      <span className="text-foreground min-w-0 flex-1 text-sm">{ticket.text || `Ticket ${ticket.ticketId}`}</span>
       <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">{formatUtcDateTime(ticket.timestamp)}</span>
-    </button>
+    </Button>
   );
 }
