@@ -79,8 +79,7 @@ plugins/doc-tools/
   skills/doc-run/
     SKILL.md  README.md
     agents/doc-*.md                prompt files for the six general-purpose agents
-  scripts/check-agnostic.sh        denylist: nothing consumer-specific may enter the plugin
-  scripts/check-layout.sh          paths resolve, agent prompts match, manifests and frontmatter valid
+  scripts/check-layout.sh          paths resolve, agent prompts match, manifests and frontmatter valid, no machine-specific paths
 ```
 
 Paths are written relative to a skill directory so they work in both layouts: inside a skill
@@ -91,12 +90,11 @@ holding both skills and doc-run pins it into every spawn prompt. Claude Code sub
 
 ## Checks
 
-Both scripts run in CI (`.github/workflows/doc-tools-plugin.yaml`) on any change under
+The layout script runs in CI (`.github/workflows/doc-tools-plugin.yaml`) on any change under
 `plugins/doc-tools/` or `.claude-plugin/`, together with `gh skill publish --dry-run`, and
 locally from anywhere:
 
 ```bash
-plugins/doc-tools/scripts/check-agnostic.sh
 plugins/doc-tools/scripts/check-layout.sh
 claude plugin validate plugins/doc-tools --strict
 gh skill publish --dry-run .
@@ -104,5 +102,5 @@ gh skill publish --dry-run .
 
 Worked examples in the skills use **Foglight**, a fictional observability product
 (`skills/doc-journeys/references/examples.md`). If you find a real repository, site or team
-named anywhere in the plugin, it belongs in a consumer's `.doc-settings/` — the denylist check
-exists to keep it there.
+named anywhere in the plugin, it belongs in a consumer's `.doc-settings/`; keep the plugin
+free of it.

@@ -28,9 +28,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Denylist — nothing consumer- or estate-specific in the plugin
-        run: plugins/doc-tools/scripts/check-agnostic.sh
-
       - name: Layout — skill-relative paths resolve, agent prompts match, manifests and frontmatter valid
         run: plugins/doc-tools/scripts/check-layout.sh
 

@@ -16,6 +16,8 @@
 #      no plugin-style agent names (doc-tools:doc-*) remain
 #   3. plugin.json and the root marketplace.json parse as JSON and carry the required fields;
 #      both skills carry name (matching the directory), description (<= 1024 chars) and license
+#   4. nothing machine-specific: no absolute home paths or ~/ paths in the skill tree (the
+#      consumer's .doc-settings/ owns every real path)
 #
 # Uses grep, find and python3 only (no rg). Exits 1 on any failure.
 set -euo pipefail
@@ -145,6 +147,15 @@ if ok:
     print(f"   plugin.json ({name} {plugin.get('version')}), marketplace.json ({mname}) and skill frontmatter look valid")
 sys.exit(0 if ok else 1)
 PY
+
+echo "== 4. no machine-specific paths"
+if hits=$(grep -rnIE '(/Users/[A-Za-z]|/home/[a-z]|(^|[ `"(])~/[A-Za-z.])' "$skills_root" "$plugin_root/README.md"); then
+  echo "FAIL: absolute or home-relative paths in the skill tree:"
+  echo "$hits" | sed "s#^$plugin_root/#  #"
+  status=1
+else
+  echo "   none found"
+fi
 
 if [[ $status -eq 0 ]]; then echo "all layout checks passed"; fi
 exit $status
