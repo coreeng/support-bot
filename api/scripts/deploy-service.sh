@@ -42,66 +42,26 @@ reset_db_schema() {
   log_success "Database schema reset complete"
 }
 
-# A pending-* release younger than this many seconds is treated as a live helm
-# operation (possibly from another CI run against the same namespace) rather
-# than a wreck. It must exceed the longest helm --timeout any caller uses on
-# these releases: 3m (deploy_db), 5m (deploy_service) and 10m (the root
-# Makefile's deploy-ui-% upgrade of the service release), so 10m + 1m grace.
-STUCK_RELEASE_MIN_AGE="${STUCK_RELEASE_MIN_AGE:-660}" # seconds
-STUCK_RELEASE_POLL_INTERVAL="${STUCK_RELEASE_POLL_INTERVAL:-10}" # seconds
-
-# Print "<status> <age-seconds>" for a release from `helm list -o json`; age is
-# empty when the timestamp cannot be parsed. Uses sed + GNU/BSD date only, as
-# the rest of this script does (no jq: the integration-tests image is a bare
-# ubi9 runtime, and the script also runs from there).
-release_status_and_age() {
-  local ns="$1" release="$2" json status updated epoch
-  json=$(helm list -n "$ns" -a -f "^${release}\$" -o json 2>/dev/null || true)
-  status=$(printf '%s' "$json" | sed -n 's/.*"status":"\([^"]*\)".*/\1/p')
-  # helm prints Go's time.String() form ("2024-05-01 12:34:56.123456789 +0000
-  # UTC"); drop the fractional seconds and zone name so date can parse it.
-  updated=$(printf '%s' "$json" | sed -n 's/.*"updated":"\([^"]*\)".*/\1/p' \
-    | sed -E 's/\.[0-9]+//; s/ [A-Za-z]+$//')
-  epoch=""
-  if [[ -n "$updated" ]]; then
-    epoch=$(date -u -d "$updated" +%s 2>/dev/null \
-      || date -u -j -f '%Y-%m-%d %H:%M:%S %z' "$updated" +%s 2>/dev/null \
-      || true)
-  fi
-  if [[ "$epoch" =~ ^[0-9]+$ ]]; then
-    echo "$status $(( $(date +%s) - epoch ))"
-  else
-    echo "$status"
-  fi
+# Print the status of a release from `helm list -o json`, empty when it does not
+# exist. Uses sed only, as the rest of this script does (no jq: the
+# integration-tests image is a bare ubi9 runtime, and the script also runs from
+# there).
+release_status() {
+  local ns="$1" release="$2"
+  helm list -n "$ns" -a -f "^${release}\$" -o json 2>/dev/null \
+    | sed -n 's/.*"status":"\([^"]*\)".*/\1/p'
 }
 
 # A cancelled CI run kills helm mid-install, leaving the release stuck in a
 # pending-* state that blocks every subsequent install with "another operation
-# (install/upgrade/rollback) is in progress". Clear such wrecks before deploying.
-#
-# A live helm install/upgrade from a concurrent run looks exactly the same, so
-# never uninstall on status alone: helm stamps the release's `updated` time when
-# the operation starts, so a pending-* release is only a wreck once it is older
-# than the longest helm --timeout that could still be running against it. Until
-# then wait for the operation to finish (the status leaves pending-*). If the
-# age cannot be determined, leave the release alone and let helm fail loudly
-# with "another operation in progress" rather than destroy a possibly live one.
+# (install/upgrade/rollback) is in progress". P2P serialises the runs that
+# deploy into a namespace, so a pending-* release found here cannot be a live
+# operation from another run: it is a wreck, uninstall it before deploying.
 clear_stuck_release() {
-  local ns="$1" release="$2" status age
-  while :; do
-    read -r status age <<<"$(release_status_and_age "$ns" "$release")"
-    [[ "$status" == pending-* ]] || return 0
-    if [[ -z "$age" ]]; then
-      log_warning "Release ${release} is ${status} but its last-updated time could not be read; leaving it alone"
-      return 0
-    fi
-    if (( age >= STUCK_RELEASE_MIN_AGE )); then
-      break
-    fi
-    log "Release ${release} is ${status}, updated ${age}s ago (< ${STUCK_RELEASE_MIN_AGE}s): may be a live helm operation from another run; waiting ${STUCK_RELEASE_POLL_INTERVAL}s..."
-    sleep "$STUCK_RELEASE_POLL_INTERVAL"
-  done
-  log "Release ${release} is stuck in ${status} (updated ${age}s ago); uninstalling it first..."
+  local ns="$1" release="$2" status
+  status=$(release_status "$ns" "$release")
+  [[ "$status" == pending-* ]] || return 0
+  log "Release ${release} is stuck in ${status}; uninstalling it first..."
   helm uninstall "$release" -n "$ns" --wait --timeout=2m || true
 }
 
