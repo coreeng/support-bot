@@ -122,6 +122,17 @@ deploy_service() {
   log_success "Service deployed"
 }
 
+# deploy_db drops and recreates the schema. If a service pod is already running (a rerun
+# of a failed workflow keeps the namespace), it keeps serving against the now-empty
+# schema, and helm only restarts it when the rendered spec changes -- which a rerun with
+# the same image tag does not. Roll the deployment so Flyway runs again.
+restart_service() {
+  local ns="$1" release="$2"
+  local deploy_name="${RELEASE_DEPLOYMENT_NAME:-$release}"
+  log "Deployment/${deploy_name} predates the schema reset; restarting it so migrations run again..."
+  kubectl rollout restart deployment/"$deploy_name" -n "$ns"
+}
+
 wait_for_service() {
   local ns="$1" release="$2" timeout_secs="${3:-180}"
   # Deployment name often equals release; allow override via RELEASE_DEPLOYMENT_NAME var
@@ -161,10 +172,18 @@ main() {
         fi
       fi
 
+      local service_existed=false
+      if [[ "$DEPLOY_DB" == "true" ]] \
+        && kubectl get deployment/"${RELEASE_DEPLOYMENT_NAME:-$SERVICE_RELEASE}" -n "$NAMESPACE" >/dev/null 2>&1; then
+        service_existed=true
+      fi
       if [[ "$DEPLOY_DB" == "true" ]]; then
         deploy_db "$NAMESPACE" "$DB_RELEASE"
       fi
       deploy_service "$NAMESPACE" "$SERVICE_RELEASE" "$SERVICE_CHART_PATH" "$IMAGE_REPOSITORY" "$IMAGE_TAG"
+      if [[ "$service_existed" == "true" ]]; then
+        restart_service "$NAMESPACE" "$SERVICE_RELEASE"
+      fi
       wait_for_service "$NAMESPACE" "$SERVICE_RELEASE" "$WAIT_TIMEOUT"
       ;;
     delete)
