@@ -1,5 +1,5 @@
 ---
-name: doc-tools plugin checks
+name: doc-tools skills checks
 
 on:
   workflow_dispatch:
@@ -7,16 +7,14 @@ on:
     branches:
       - main
     paths:
-      - 'plugins/doc-tools/**'
-      - '.claude-plugin/**'
-      - '.github/workflows/doc-tools-plugin.yaml'
+      - 'skills/**'
+      - '.github/workflows/doc-tools-skills.yaml'
   pull_request:
     branches:
       - main
     paths:
-      - 'plugins/doc-tools/**'
-      - '.claude-plugin/**'
-      - '.github/workflows/doc-tools-plugin.yaml'
+      - 'skills/**'
+      - '.github/workflows/doc-tools-skills.yaml'
 
 permissions:
   contents: read
@@ -28,8 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Layout — skill-relative paths resolve, agent prompts match, manifests and frontmatter valid
-        run: python3 plugins/doc-tools/scripts/check_layout.py
+      - name: Layout — skill-relative paths resolve, agent prompts match, frontmatter valid, no machine paths
+        run: python3 skills/check_layout.py
 
       - name: Agent Skills spec — gh skill publish dry run
         env:

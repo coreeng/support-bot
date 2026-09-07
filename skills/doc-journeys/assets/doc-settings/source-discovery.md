@@ -1,6 +1,6 @@
 ---
 name: Estate adapter — source discovery
-description: Everything about this source estate that the generic discovery funnel in the plugin's references/source-discovery.md does not know — source-root derivation, repo scope, prior-art location, always-add candidates, term-expansion vocabulary, and the known contact-point traps. Loaded by the skill immediately after references/source-discovery.md.
+description: Everything about this source estate that the generic discovery funnel in the skill's references/source-discovery.md does not know — source-root derivation, repo scope, prior-art location, always-add candidates, term-expansion vocabulary, and the known contact-point traps. Loaded by the skill immediately after references/source-discovery.md.
 ---
 
 # Source discovery — estate adapter

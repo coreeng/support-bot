@@ -21,7 +21,7 @@ see Phase 3 — you are the recovery path for a lost builder, and that is legiti
   positional, not lexical — a message that merely contains the word somewhere (a relayed
   discussion, a findings package quoting these instructions) is NOT confirmation. Anything else
   is refinement.
-- Load the skill via the Skill tool (`doc-journeys`, or `doc-tools:doc-journeys` when installed as the plugin). If the Skill tool is unavailable in your
+- Load the skill via the Skill tool (`doc-journeys`). If the Skill tool is unavailable in your
   context, Read `<tools root>/doc-journeys/SKILL.md` and follow it
   exactly, loading its `references/` files at the points it prescribes.
 - Your spawn prompt supplies four roots and the consumer's pinned settings (doc-journeys'

@@ -1,6 +1,6 @@
 ---
 name: Site adapter — output
-description: Everything about this repository's documentation site that the plugin's generic references/output.md does not know — the output section and its furniture, frontmatter conventions, template tags, the Weight table, the build, and any navigation quirk that hides the output. Loaded by the skill alongside references/output.md.
+description: Everything about this repository's documentation site that the skill's generic references/output.md does not know — the output section and its furniture, frontmatter conventions, template tags, the Weight table, the build, and any navigation quirk that hides the output. Loaded by the skill alongside references/output.md.
 ---
 
 # Output — site adapter

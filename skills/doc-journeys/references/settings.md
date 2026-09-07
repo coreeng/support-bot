@@ -20,7 +20,7 @@ Four roots, used consistently across every reference file and every agent defini
 
 | Role | Meaning | Used for |
 | --- | --- | --- |
-| **tools root** | the directory holding the `doc-journeys` and `doc-run` skill directories — `${CLAUDE_SKILL_DIR}/..` from either skill (the plugin's `skills/`, or `.claude/skills/` in a vendored install); in an orchestrated run, pinned verbatim in every spawn prompt | `SKILL.md`, `references/`, the agent prompt files under `doc-run/agents/` |
+| **tools root** | the directory holding the `doc-journeys` and `doc-run` skill directories — `${CLAUDE_SKILL_DIR}/..` from either skill (`.claude/skills/` in a consumer); in an orchestrated run, pinned verbatim in every spawn prompt | `SKILL.md`, `references/`, the agent prompt files under `doc-run/agents/` |
 | **consumer root** | the **main** checkout of the repository being documented | `.doc-settings/`, `node_modules` and anything else that is gitignored and therefore absent from a worktree |
 | **repo root** | the checkout content is read from and written to — in an orchestrated run, a worktree under the consumer's `worktree_dir` | `product-definition/`, every path in `settings.md` |
 | **source root** | per `source_root` in `settings.md` | discovery |
@@ -45,7 +45,7 @@ worktree was created from. When a spawn prompt supplies any of these paths, use 
 not guess an output root from the repository's layout, and do not proceed with defaults. The
 same posture applies as to a missing source root: a run that cannot find its settings would
 write somewhere nobody intended. Tell the user what the file is for and point them at the
-`${CLAUDE_SKILL_DIR}/assets/doc-settings/` starter that ships with the plugin (or at another consumer's
+`${CLAUDE_SKILL_DIR}/assets/doc-settings/` starter that ships with the skill (or at another consumer's
 `.doc-settings/` as a worked example).
 
 Legacy `audit` mode is the one exception — it classifies markdown in a single repository and

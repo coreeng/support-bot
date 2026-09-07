@@ -56,7 +56,7 @@ Reference files under `${CLAUDE_SKILL_DIR}/references/` hold the load-bearing lo
 
 **Load order for `author` mode:**
 
-- `${CLAUDE_SKILL_DIR}/references/settings.md` — load **first, before anything else**. Locates the consumer's `.doc-settings/settings.md`, defines the four path roles (plugin root, consumer root, repo root, source root), lists the required keys, and **stops the run if settings are absent**. Every path this skill reads or writes comes from here. Read the `authorisations` file it names at the same time: it decides what the Guardrails' bounded `product-definition/` writes are permitted to do in this consumer, and the run report cites it wherever a declaration is created or a `product.md` amended.
+- `${CLAUDE_SKILL_DIR}/references/settings.md` — load **first, before anything else**. Locates the consumer's `.doc-settings/settings.md`, defines the four path roles (tools root, consumer root, repo root, source root), lists the required keys, and **stops the run if settings are absent**. Every path this skill reads or writes comes from here. Read the `authorisations` file it names at the same time: it decides what the Guardrails' bounded `product-definition/` writes are permitted to do in this consumer, and the run report cites it wherever a declaration is created or a `product.md` amended.
 - `${CLAUDE_SKILL_DIR}/references/product-definition.md` — load **next**. Product and journey ingestion, the multi-product catalogue schema, cross-product journeys, and the paste fallback. Resolves the blocking input step.
 - `${CLAUDE_SKILL_DIR}/references/source-discovery.md` — load **immediately after the product definition resolves**, followed by the consumer's **estate adapter** (the `source_discovery` file in settings). Multi-repo scope, the five-pass discovery funnel, relevance scoring, the confidence rubric, the prior-art pass over `prior_art_roots`, and the **product attribution pass** that derives or corroborates a cross-product journey's product list.
 - `${CLAUDE_SKILL_DIR}/references/authoring.md` — load **after discovery completes, before writing any page**. The page set per product, per journey and per cross-product journey, how to choose a spine, the grounding and citation contract, unverified-claim markers, and voice.
@@ -308,8 +308,7 @@ The report is not written in `plan` mode; the step 6 plan is printed to chat ins
 
 ## Invocation examples
 
-Slash form: `/doc-journeys <request>` — `/doc-tools:doc-journeys` when installed as the plugin;
-the natural-language forms below resolve to the same thing.
+Slash form: `/doc-journeys <request>`; the natural-language forms below resolve to the same thing.
 
 ```
 Use doc-journeys to generate documentation for Foglight.

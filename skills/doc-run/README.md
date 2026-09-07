@@ -9,7 +9,7 @@ The defining property is that the run never stops to ask a question. Every decis
 ## Invocation
 
 ```
-/doc-run <documentation request>          # /doc-tools:doc-run when installed as the plugin
+/doc-run <documentation request>
 ```
 
 The argument is a plain-language documentation request, passed to `doc-journeys` verbatim. It names one of:
@@ -88,7 +88,7 @@ The orchestrator authors nothing itself. It spawns one **builder** agent that ke
 
 The agents the pipeline spawns are prompt files under `agents/` in this skill, run as `general-purpose` subagents: `doc-builder`, `doc-structure-reviewer`, `doc-gap-auditor`, `doc-entity-verifier`, `doc-routing-reviewer`, `doc-finding-verifier`. Nothing has to be installed beyond the two skills.
 
-Install either as the `doc-tools` Claude Code plugin (skills then appear as `/doc-tools:doc-run` and `/doc-tools:doc-journeys`) or as plain skills with `gh skill install coreeng/support-bot doc-run --agent claude-code` plus the same for `doc-journeys`; see the plugin README. doc-run requires `doc-journeys` installed beside it.
+Install with `gh skill install coreeng/support-bot doc-run --agent claude-code` plus the same for `doc-journeys` (see the [skills README](../README.md)); doc-run requires `doc-journeys` installed beside it.
 
 ---
 

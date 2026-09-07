@@ -10,8 +10,7 @@ It is a **reorganiser, not an author**. Given a product definition — products,
 
 ## Quick start
 
-The skill ships in the `doc-tools` Claude Code plugin (see *Installing* in the plugin README), so the
-slash form is `/doc-journeys <request>` (`/doc-tools:doc-journeys` when installed as the plugin). In prose:
+Installed per the [skills README](../README.md), the slash form is `/doc-journeys <request>`. In prose:
 
 ```
 Use doc-journeys in plan mode for Foglight.
