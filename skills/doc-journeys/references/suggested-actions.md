@@ -207,7 +207,7 @@ When two or more **low-severity** actions in the full action table share the sam
 
 Examples:
 
-- 8 `expand-stub` rows → 1 row: `"Expand or remove the 8 hollow stubs: p2p/extended-test/p2p-extended-test, p2p/fast-feedback/p2p-functional, …"`
+- 8 `expand-stub` rows → 1 row: `"Expand or remove the 8 hollow stubs: foglight-agent/how-to/install-on-linux, foglight-agent/reference/config-keys, …"`
 - 5 `clean-stale-markers` rows → 1 row: `"Review stale markers in 5 pages: changelogs/foglight, changelogs/foglight-cli, …"`
 
 The Source column for a grouped row reads `(N rows in §<section number>)` so readers can locate the underlying detail (e.g. `(8 rows in §6)` for `expand-stub` referencing Quality flags).

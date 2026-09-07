@@ -262,7 +262,7 @@ The skill still reports the evidence for a *scope* change — see *suspected mis
 
 A cross-product journey exists because a reader has a goal and does not know which products serve it. Its page answers "what do you need, in what order, and where is each part documented" — and then links. It does not re-document the steps that the product journeys already cover.
 
-This matters because the two journey lists overlap by design. "Expose a service to users" and "Expose an application to consumers outside the Kubernetes cluster" are the same ground at two levels of abstraction: one is wayfinding, one is the procedure. Written as two end-to-end procedures they compete, drift, and neither ends up authoritative. Written as a route plus a procedure they compose.
+This matters because the two journey lists overlap by design. "Observe a service end to end" and "Ship telemetry from an application" are the same ground at two levels of abstraction: one is wayfinding, one is the procedure. Written as two end-to-end procedures they compete, drift, and neither ends up authoritative. Written as a route plus a procedure they compose.
 
 The page contract is in `${CLAUDE_SKILL_DIR}/references/authoring.md`; `${CLAUDE_SKILL_DIR}/references/duplication.md` checks that the restating failure mode did not happen.
 
@@ -274,27 +274,26 @@ Example:
 
 ```yaml
 ---
-name: Expose a service to users
-description: Get an application running inside the cluster reachable by consumers outside it, with a name they can resolve and a certificate they trust.
-users: [end-user, application-developer]
+name: Observe a service end to end
+description: Get an application's logs, metrics and traces flowing into Foglight, alert on them, and see them on a dashboard the team owns.
+users: [application-developer, on-call-engineer]
 # products omitted — discovery derives it and reports the inclusion confidence
 # for each product it considered. Declare it to override the derivation.
 routes_to:
-  - Expose an application to consumers outside Kubernetes Cluster
-  - Create or use a custom DNS name
+  - Ship telemetry from an application
+  - Create an alert rule
 spine: explanation
 ---
 
-# Expose a service to users
+# Observe a service end to end
 
-A reader arriving here knows they have a service and needs it reachable. They do
-not yet know whether they need ingress, DNS, a certificate, an egress rule, or
-all four...
+A reader arriving here knows they have a service and needs to see what it is doing. They
+do not yet know whether they need the agent, an alert rule, a dashboard, or all three...
 ```
 
 ## Declaring from a run
 
-A request may name a journey no file declares, a journey that belongs to no one product, or a product with no directory at all. **This is not a defect in the request.** Journeys are frequently discovered by documenting them: the run is how anyone finds out that the GCP path is undocumented or that the requester's side is a separate journey. Refusing until a human hand-writes the declaration first asks them to answer, cold, the questions the run exists to answer.
+A request may name a journey no file declares, a journey that belongs to no one product, or a product with no directory at all. **This is not a defect in the request.** Journeys are frequently discovered by documenting them: the run is how anyone finds out that a whole variation is undocumented or that the requester's side is a separate journey. Refusing until a human hand-writes the declaration first asks them to answer, cold, the questions the run exists to answer.
 
 So the skill may **create** the missing declaration — and only create. The rules:
 
@@ -372,7 +371,7 @@ Nothing else in `catalogue.md` is ever machine-edited: not `exclude`, not the or
 
    Uniqueness is global rather than per-product because the two output sections are read together. Two pages titled "Onboard to Foglight" in different sections is the worst available outcome — a reader cannot tell which is authoritative, and neither page can say.
 
-   **This check is necessary and nowhere near sufficient.** It compares names, so it catches only exact collisions. The overlaps that actually matter are semantic and pass it cleanly: "Archive telemetry" against "Forward logs to long-term storage", or "Make the service production-ready" against "Configure the application for production". Those are caught after authoring by `${CLAUDE_SKILL_DIR}/references/duplication.md`, not here. Do not read a clean uniqueness check as evidence that the journey set is non-overlapping.
+   **This check is necessary and nowhere near sufficient.** It compares names, so it catches only exact collisions. The overlaps that actually matter are semantic and pass it cleanly: "Archive telemetry" against "Forward logs to long-term storage", or "Create an alert rule" against "Get notified when a service degrades". Those are caught after authoring by `${CLAUDE_SKILL_DIR}/references/duplication.md`, not here. Do not read a clean uniqueness check as evidence that the journey set is non-overlapping.
 7. After parsing, print the resolved product (name, owners, features, **brief present or absent with its capture date**) and the journey list (names, counts, and any skipped files) back to the user. In a multi-product batch, print one block per product plus a batch header giving the product count, run order, and **how many products are unbriefed** — that count is the single most useful number in the confirmation, because it predicts where the output will be weakest before any work is done.
 
    Print each product's `repos` declaration too, or `repos: not declared`. It is the input that most directly determines whether product attribution will work, and the cheapest moment to notice it is missing is before discovery rather than after.

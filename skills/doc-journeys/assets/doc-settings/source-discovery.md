@@ -92,7 +92,7 @@ four:
     validated by the config pipeline against an allowed chat host — a malformed value fails the
     pipeline, so a well-formed one has been checked by something other than a human's memory.
     Declared as `contact_corroborators` in `settings.md`.
-  * **Former names in live use.** `#foglight-support` is channel ID `C0FOGLIGHT`; two source
+  * **Former names in live use.** `#foglight-support` is channel ID `C0FOGL1GHT`; two source
     repos still call it by its old name `#foglight-help`. A reader who greps concludes there are
     two channels.
   * **Prefix collisions.** `#foglight-alerts` matches inside `#foglight-alerts-staging`; anchor

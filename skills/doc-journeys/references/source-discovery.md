@@ -128,7 +128,7 @@ Two consequences worth expecting rather than discovering:
 
 **Ownership never narrows the scan.** A journey declared under one product is still searched for across every source repo, exactly as a cross-product journey is. What a product declaration changes is the vocabulary the search uses, not its reach — which is why a single-product journey can, and often does, find most of its evidence outside its own product's repositories. `${CLAUDE_SKILL_DIR}/references/gap-analysis.md` Part D reports when it does.
 
-**Expansion.** For each term set, add plausible synonyms, abbreviations, and the concrete technology names the journey implies. This is a judgement step and is expected to be non-deterministic. The shape of the reasoning: a journey mentioning "deploy a workload" expands to `helm`, `chart`, `deployment.yaml`, `argocd`, `kustomize`, `pipeline`; one mentioning "ingress" expands to the estate's ingress controller and proxy names as well as `gateway` and `route`. The estate adapter carries the estate-specific vocabulary — component names a term like "ingress" should expand to here — and is the place to record expansions that proved productive.
+**Expansion.** For each term set, add plausible synonyms, abbreviations, and the concrete technology names the journey implies. This is a judgement step and is expected to be non-deterministic. The shape of the reasoning: a journey mentioning "deploy a workload" expands to `helm`, `chart`, `deployment.yaml`, `kustomize`, `pipeline`; one mentioning "ingress" expands to the estate's ingress controller and proxy names as well as `gateway` and `route`. The estate adapter carries the estate-specific vocabulary — component names a term like "ingress" should expand to here — and is the place to record expansions that proved productive.
 
 Cap the expanded per-journey term set at 40 terms. Beyond that, precision collapses and every pass returns noise. If you have more than 40 candidate terms, keep the ones most specific to this journey and drop the generic ones (`config`, `service`, `platform`, `app` are almost always worth dropping).
 
@@ -181,7 +181,7 @@ Score each candidate:
 
 Before ranking, collapse **instance directories** — directories holding many near-identical files that are per-tenant, per-namespace, per-cluster, or per-environment instances of one schema. Configuration repositories are full of them, and they will swamp the shortlist with files that all say the same thing.
 
-The scale is real: measured on one estate, a single journey's path pass returned nearly nine thousand hits in one config repo, more than four fifths of them per-namespace quota manifests under one directory (the estate adapter records the figures). Shortlisting 40 of those teaches you nothing that the first one did not.
+The scale is real: a single journey's path pass can return thousands of hits in one configuration repository, the large majority of them near-identical per-namespace manifests under one directory (the estate adapter records the figures for its estate). Shortlisting 40 of those teaches you nothing that the first one did not.
 
 Detect an instance directory when a single directory subtree contributes **more than 20 candidates** whose filenames or immediate parent directories vary but whose structure does not. Then, instead of the individual files, add to the candidate set:
 
