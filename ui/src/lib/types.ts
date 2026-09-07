@@ -92,6 +92,8 @@ export type TicketTag = {
   code: string;
   label: string;
   active?: boolean;
+  /** Declared in `enums.tags[].product`; drives the Products View and the summary's product breakdown. */
+  product?: boolean;
 };
 
 export interface PaginatedTickets {

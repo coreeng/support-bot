@@ -43,15 +43,22 @@ class RegistryControllerTest {
 
     @Test
     void listTags_flagsRetiredAsInactive() {
-        when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of(new Tag("Active", "active")));
+        when(tagsRegistry.listAllTags())
+                .thenReturn(
+                        ImmutableList.of(new Tag("Active", "active"), new Tag("Checkout", "product-checkout", true)));
         when(tagsRegistry.listAllTagsIncludingRetired())
-                .thenReturn(ImmutableList.of(new Tag("Active", "active"), new Tag("Retired", "retired")));
+                .thenReturn(ImmutableList.of(
+                        new Tag("Active", "active"),
+                        new Tag("Checkout", "product-checkout", true),
+                        new Tag("Retired", "retired")));
 
         var body = controller.listTags().getBody();
 
+        // The product flag travels with the tag so the UI never has to infer it from the label.
         assertThat(body)
                 .containsExactly(
-                        new RegistryController.TagUI("Active", "active", true),
-                        new RegistryController.TagUI("Retired", "retired", false));
+                        new RegistryController.TagUI("Active", "active", true, false),
+                        new RegistryController.TagUI("Checkout", "product-checkout", true, true),
+                        new RegistryController.TagUI("Retired", "retired", false, false));
     }
 }

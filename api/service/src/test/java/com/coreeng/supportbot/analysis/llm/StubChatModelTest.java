@@ -10,6 +10,7 @@ import com.coreeng.supportbot.config.AnalysisProps;
 import com.coreeng.supportbot.summary.LlmSummaryService;
 import com.coreeng.supportbot.summary.SummaryBreakdowns;
 import com.coreeng.supportbot.summary.SummaryCount;
+import com.coreeng.supportbot.summary.SummaryReason;
 import com.coreeng.supportbot.summary.SummaryWindow;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.google.common.collect.ImmutableList;
@@ -81,7 +82,10 @@ class StubChatModelTest {
     void summaryCallGetsProseRatherThanAClassificationBlock() {
         LlmSummaryService summaryService = new LlmSummaryService(stub, analysisProps());
 
-        String summary = summaryService.generate("Summarise the window.", breakdowns(), ImmutableList.of("Because."));
+        String summary = summaryService.generate(
+                "Summarise the window.",
+                breakdowns(),
+                ImmutableList.of(new SummaryReason(LocalDate.of(2026, 3, 12), "Because.")));
 
         assertThat(summary).isNotBlank();
         // The two shapes are mutually exclusive: prose must not carry the strict classification lines,

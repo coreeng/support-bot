@@ -43,10 +43,10 @@ public class LlmSummaryService {
     /**
      * @param prompt the in-use summary prompt text
      * @param breakdowns the window's aggregated counts
-     * @param reasons per-ticket {@code Reason} lines for the window
+     * @param reasons per-ticket {@code Reason}s for the window, each dated
      * @return the generated prose
      */
-    public String generate(String prompt, SummaryBreakdowns breakdowns, ImmutableList<String> reasons) {
+    public String generate(String prompt, SummaryBreakdowns breakdowns, ImmutableList<SummaryReason> reasons) {
         String report = buildReport(breakdowns, reasons);
         log.info(
                 "Generating summary for window {}..{} ({} tickets, {} reasons)",
@@ -57,7 +57,7 @@ public class LlmSummaryService {
         return chatModel.chat(prompt + "\n\n--- BEGIN WINDOW REPORT ---\n" + report + "\n--- END WINDOW REPORT ---\n");
     }
 
-    private static String buildReport(SummaryBreakdowns breakdowns, ImmutableList<String> reasons) {
+    private static String buildReport(SummaryBreakdowns breakdowns, ImmutableList<SummaryReason> reasons) {
         StringBuilder report = new StringBuilder(1024);
         report.append("Window: ")
                 .append(breakdowns.window().from())
@@ -82,8 +82,8 @@ public class LlmSummaryService {
         appendCounts(report, "Products (from product tags)", breakdowns.products());
 
         report.append("\nPer-ticket reasons (").append(reasons.size()).append("):\n");
-        for (String reason : reasons) {
-            report.append("- ").append(reason).append('\n');
+        for (SummaryReason reason : reasons) {
+            report.append("- ").append(reason.line()).append('\n');
         }
         return report.toString();
     }

@@ -19,11 +19,13 @@ public interface SummaryReadRepository {
     SummaryFingerprint fingerprint(SummaryWindow window, String promptId, Collection<String> channelIds);
 
     /**
-     * The per-ticket {@code Reason} texts ({@code analysis.summary}) for the window — the raw
-     * material the LLM summarises alongside the aggregated counts.
+     * The per-ticket {@code Reason} texts ({@code analysis.summary}) for the window, each with the
+     * day its ticket was raised — the raw material the LLM summarises alongside the aggregated
+     * counts.
      *
      * @param limit maximum number of reasons to return, newest ticket first; keeps a very wide
      *     window from overflowing the model's context
      */
-    ImmutableList<String> reasons(SummaryWindow window, String promptId, Collection<String> channelIds, int limit);
+    ImmutableList<SummaryReason> reasons(
+            SummaryWindow window, String promptId, Collection<String> channelIds, int limit);
 }

@@ -607,7 +607,7 @@ describe("SupportSummaryPage", () => {
     });
 
     it("renders the products card when the registry has an active product tag", async () => {
-      mockApi(ok(readySummary), { impacts: [], tags: [{ code: "product-checkout", label: "Product - Checkout", active: true }] });
+      mockApi(ok(readySummary), { impacts: [], tags: [{ code: "product-checkout", label: "Checkout", active: true, product: true }] });
 
       renderPage();
 

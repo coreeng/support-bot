@@ -145,6 +145,16 @@ configMap:
     pr-review-tracking:
       tags: []
       impact: ""
+    # Ticket tags. A tag flagged `product: true` names a product: it feeds the Products View and the
+    # Support Summary's product breakdown under its label, exactly as configured (no "Product - "
+    # prefix is needed or stripped). Codes are immutable keys; labels may change.
+    # enums:
+    #   tags:
+    #     - label: Networking
+    #       code: networking
+    #     - label: Checkout
+    #       code: product-checkout
+    #       product: true
 
 # UI deployment (disabled by default for backward compatibility)
 ui:

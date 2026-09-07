@@ -3,16 +3,15 @@ package com.coreeng.supportbot.summary;
 import com.coreeng.supportbot.analysis.AnalysisJobData;
 import com.coreeng.supportbot.analysis.AnalysisPrompt;
 import com.coreeng.supportbot.analysis.AnalysisPromptLoadException;
-import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
 import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.analysis.AnalysisService;
-import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisService;
 import com.coreeng.supportbot.analysis.WindowAnalysisRunner;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SummaryProps;
 import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.time.Clock;
@@ -20,15 +19,13 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.ApplicationContext;
-import org.springframework.core.task.TaskRejectedException;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
@@ -40,14 +37,16 @@ import org.springframework.stereotype.Service;
  *
  * <p>The lock also means concurrent visitors never duplicate work: the first claim wins, everyone
  * else sees {@code generating} and re-polls.
+ *
+ * <p>The run itself is handed to the same single-threaded {@code analysisTaskExecutor} the
+ * days-based analysis uses, so the two kinds of run also never overlap on the LLM.
  */
 @Service
 @ConditionalOnProperty(name = "summary.enabled", havingValue = "true")
-@RequiredArgsConstructor
 @Slf4j
-public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRunner {
+public class SummaryRefreshService implements WindowAnalysisRunner {
 
-    private static final String ASYNC_ID = "analysis";
+    private static final String ASYNC_ID = AnalysisJobData.JOB_ID;
 
     /** Upper bound on remembered failures; past it the oldest is dropped and simply retried. */
     static final int MAX_REMEMBERED_FAILURES = 64;
@@ -55,14 +54,36 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
     private final AsyncJobRepository asyncJobRepository;
     private final AnalysisService analysisService;
     private final ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService;
-    private final AnalysisPromptRepository analysisPromptRepository;
     private final SummaryReadRepository summaryReadRepository;
     private final SummarySnapshotRepository summarySnapshotRepository;
     private final LlmSummaryService llmSummaryService;
     private final SlackChannelRegistry channelRegistry;
     private final SummaryProps summaryProps;
-    private final ApplicationContext applicationContext;
+    private final Executor analysisExecutor;
     private final Clock clock;
+
+    public SummaryRefreshService(
+            AsyncJobRepository asyncJobRepository,
+            AnalysisService analysisService,
+            ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService,
+            SummaryReadRepository summaryReadRepository,
+            SummarySnapshotRepository summarySnapshotRepository,
+            LlmSummaryService llmSummaryService,
+            SlackChannelRegistry channelRegistry,
+            SummaryProps summaryProps,
+            @Qualifier("analysisTaskExecutor") Executor analysisExecutor,
+            Clock clock) {
+        this.asyncJobRepository = asyncJobRepository;
+        this.analysisService = analysisService;
+        this.threadsAwaitingAnalysisService = threadsAwaitingAnalysisService;
+        this.summaryReadRepository = summaryReadRepository;
+        this.summarySnapshotRepository = summarySnapshotRepository;
+        this.llmSummaryService = llmSummaryService;
+        this.channelRegistry = channelRegistry;
+        this.summaryProps = summaryProps;
+        this.analysisExecutor = analysisExecutor;
+        this.clock = clock;
+    }
 
     private final AtomicReference<SummaryRefreshStatus> status = new AtomicReference<>(SummaryRefreshStatus.IDLE);
 
@@ -96,40 +117,45 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
         }
     }
 
-    @Override
+    /**
+     * Claims the shared {@code async_job} lock and kicks off a refresh for the window.
+     *
+     * @return false when another run already holds the lock, or the executor is saturated
+     */
     public boolean start(SummaryWindow window) {
         if (!asyncJobRepository.tryStartJob(ASYNC_ID, AnalysisJobData.window(window.from(), window.to()))) {
             log.debug(
                     "Summary refresh for {}..{} not started: a job already holds the lock", window.from(), window.to());
             return false;
         }
+        log.info("Started summary refresh for window {}..{}", window.from(), window.to());
+        return runWindowRefresh(window.from(), window.to());
+    }
+
+    @Override
+    public boolean runWindowRefresh(LocalDate from, LocalDate to) {
+        SummaryWindow window = new SummaryWindow(from, to);
         try {
-            log.info("Started summary refresh for window {}..{}", window.from(), window.to());
-            // Through the context so the @Async proxy applies — a direct call would run inline. Asked
-            // for by interface: the proxy is a JDK one (this class implements interfaces), so no bean
-            // of the concrete type exists to look up.
-            applicationContext.getBean(WindowAnalysisRunner.class).runWindowRefresh(window.from(), window.to());
+            analysisExecutor.execute(() -> refresh(window));
             return true;
-        } catch (TaskRejectedException e) {
-            log.error("Executor rejected summary refresh, cleaning up DB record", e);
+        } catch (RejectedExecutionException e) {
+            log.error("Executor rejected summary refresh for {}..{}, cleaning up DB record", from, to, e);
             asyncJobRepository.deleteJob(ASYNC_ID);
             return false;
         }
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * <p>Never throws: a failed refresh must leave the breakdowns renderable, so the error is
-     * recorded for the page to show and the lock is always released.
+     * The refresh itself, on the executor thread. Never throws: a failed refresh must leave the
+     * breakdowns renderable, so the error is recorded for the page to show and the lock is always
+     * released.
      */
-    @Override
-    @Async("analysisTaskExecutor")
-    public void runWindowRefresh(LocalDate from, LocalDate to) {
-        SummaryWindow window = new SummaryWindow(from, to);
+    private void refresh(SummaryWindow window) {
+        LocalDate from = window.from();
+        LocalDate to = window.to();
         try {
             status.set(new SummaryRefreshStatus(window, SummaryState.Phase.CLASSIFYING, true));
-            ImmutableSet<Long> attempted = backfill(window);
+            ImmutableSet<TicketId> attempted = backfill(window);
             if (attempted == null) {
                 // The backfill stops early on interrupt (shutdown) and returns normally. Summarising now
                 // would store a snapshot whose fingerprint marks the unclassified tickets as gaps, and
@@ -154,12 +180,16 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
         }
     }
 
-    @Override
+    /** The current refresh state; {@link SummaryRefreshStatus#running()} is false when idle. */
     public SummaryRefreshStatus status() {
         return status.get();
     }
 
-    @Override
+    /**
+     * @return the recorded error for this window, summary prompt version and data fingerprint, or
+     *     null when the last attempt did not fail, its input has moved on since, or the retry delay
+     *     has passed
+     */
     public @Nullable String failureFor(SummaryWindow window, String summaryPromptId, String fingerprint) {
         synchronized (failures) {
             Failure failure = failures.get(window);
@@ -193,16 +223,16 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
      * @return the ids of the tickets the passes set out to classify (whether or not they succeeded),
      *     or null when a pass was interrupted (shutdown); the interrupt flag is then left set
      */
-    private @Nullable ImmutableSet<Long> backfill(SummaryWindow window) {
-        String classificationPromptId = AnalysisService.computePromptId(analysisService.loadPrompt());
-        ImmutableSet<Long> firstPassTargets = awaitingClassification(window, classificationPromptId);
+    private @Nullable ImmutableSet<TicketId> backfill(SummaryWindow window) {
+        String classificationPromptId = analysisService.currentPromptId();
+        ImmutableSet<TicketId> firstPassTargets = awaitingClassification(window, classificationPromptId);
 
         analysisService.backfillWindow(window.from(), window.to());
         if (Thread.currentThread().isInterrupted()) {
             return null;
         }
 
-        ImmutableSet<Long> stillAwaiting = awaitingClassification(window, classificationPromptId);
+        ImmutableSet<TicketId> stillAwaiting = awaitingClassification(window, classificationPromptId);
         if (firstPassTargets.containsAll(stillAwaiting)) {
             return firstPassTargets;
         }
@@ -217,16 +247,16 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
         if (Thread.currentThread().isInterrupted()) {
             return null;
         }
-        return ImmutableSet.<Long>builder()
+        return ImmutableSet.<TicketId>builder()
                 .addAll(firstPassTargets)
                 .addAll(stillAwaiting)
                 .build();
     }
 
     /** The same lookup the backfill itself starts from: closed tickets in the window with no analysis for the prompt. */
-    private ImmutableSet<Long> awaitingClassification(SummaryWindow window, String classificationPromptId) {
+    private ImmutableSet<TicketId> awaitingClassification(SummaryWindow window, String classificationPromptId) {
         return threadsAwaitingAnalysisService.find(window.from(), window.to(), classificationPromptId).stream()
-                .map(ThreadToAnalyze::ticketId)
+                .map(thread -> new TicketId(thread.ticketId()))
                 .collect(ImmutableSet.toImmutableSet());
     }
 
@@ -242,13 +272,13 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
      *
      * @param attempted the ids of the tickets the backfill set out to classify
      */
-    private void generate(SummaryWindow window, ImmutableSet<Long> attempted) {
-        AnalysisPrompt summaryPrompt = analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY);
+    private void generate(SummaryWindow window, ImmutableSet<TicketId> attempted) {
+        AnalysisPrompt summaryPrompt = analysisService.inUsePrompt(AnalysisPromptType.SUMMARY);
         if (summaryPrompt == null) {
             throw new AnalysisPromptLoadException("No summary prompt version is marked as in use");
         }
         String summaryPromptId = AnalysisService.computePromptId(summaryPrompt.content());
-        String classificationPromptId = AnalysisService.computePromptId(analysisService.loadPrompt());
+        String classificationPromptId = analysisService.currentPromptId();
         ImmutableList<String> channelIds = channelRegistry.monitoredChannelIds();
 
         SummaryBreakdowns breakdowns = summaryReadRepository.breakdowns(window, classificationPromptId, channelIds);
@@ -271,7 +301,7 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
                     window.from(),
                     window.to());
         }
-        ImmutableList<String> reasons =
+        ImmutableList<SummaryReason> reasons =
                 summaryReadRepository.reasons(window, classificationPromptId, channelIds, summaryProps.maxReasons());
 
         String content = llmSummaryService.generate(summaryPrompt.content(), breakdowns, reasons);
@@ -287,7 +317,7 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
         String summaryPromptId;
         String fingerprint;
         try {
-            AnalysisPrompt summaryPrompt = analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY);
+            AnalysisPrompt summaryPrompt = analysisService.inUsePrompt(AnalysisPromptType.SUMMARY);
             if (summaryPrompt == null) {
                 // The page reports the missing prompt itself without starting a refresh, so there is
                 // nothing to pin.
@@ -295,10 +325,7 @@ public class SummaryRefreshService implements SummaryRefresher, WindowAnalysisRu
             }
             summaryPromptId = AnalysisService.computePromptId(summaryPrompt.content());
             fingerprint = summaryReadRepository
-                    .fingerprint(
-                            window,
-                            AnalysisService.computePromptId(analysisService.loadPrompt()),
-                            channelRegistry.monitoredChannelIds())
+                    .fingerprint(window, analysisService.currentPromptId(), channelRegistry.monitoredChannelIds())
                     .value();
         } catch (Exception e) {
             // Without the input's identity the failure cannot be tied to what it failed on, so let the

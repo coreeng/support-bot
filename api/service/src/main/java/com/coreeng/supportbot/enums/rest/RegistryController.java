@@ -39,12 +39,16 @@ public class RegistryController {
         ImmutableSet<String> activeCodes =
                 tagsRegistry.listAllTags().stream().map(Tag::code).collect(toImmutableSet());
         ImmutableList<TagUI> tags = tagsRegistry.listAllTagsIncludingRetired().stream()
-                .map(t -> new TagUI(t.label(), t.code(), activeCodes.contains(t.code())))
+                .map(t -> new TagUI(t.label(), t.code(), activeCodes.contains(t.code()), t.product()))
                 .collect(toImmutableList());
         return ResponseEntity.ok(tags);
     }
 
     public record ImpactUI(String label, String code, boolean active) {}
 
-    public record TagUI(String label, String code, boolean active) {}
+    /**
+     * @param product whether the tag is a product tag ({@code enums.tags[].product}); the Products
+     *     View filters on this rather than on the label
+     */
+    public record TagUI(String label, String code, boolean active, boolean product) {}
 }

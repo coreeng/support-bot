@@ -2,11 +2,13 @@ package com.coreeng.supportbot.summary;
 
 import com.coreeng.supportbot.analysis.AnalysisPrompt;
 import com.coreeng.supportbot.analysis.AnalysisPromptLoadException;
-import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
 import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
+import com.coreeng.supportbot.config.SummaryProps;
 import com.google.common.collect.ImmutableList;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,11 +33,12 @@ import org.springframework.stereotype.Service;
 public class SummaryService {
 
     private final AnalysisService analysisService;
-    private final AnalysisPromptRepository analysisPromptRepository;
     private final SummaryReadRepository summaryReadRepository;
     private final SummarySnapshotRepository summarySnapshotRepository;
-    private final SummaryRefresher summaryRefresher;
+    private final SummaryRefreshService summaryRefresher;
     private final SlackChannelRegistry channelRegistry;
+    private final SummaryProps summaryProps;
+    private final Clock clock;
 
     /** Breakdowns plus whatever can be said about the prose summary right now. */
     public record SummaryResult(SummaryBreakdowns breakdowns, SummaryState summary) {}
@@ -46,7 +49,7 @@ public class SummaryService {
      * @throws AnalysisPromptLoadException when no summary prompt version is marked as in use
      */
     public String promptContent() {
-        AnalysisPrompt prompt = analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY);
+        AnalysisPrompt prompt = analysisService.inUsePrompt(AnalysisPromptType.SUMMARY);
         if (prompt == null) {
             throw new AnalysisPromptLoadException("No summary prompt version is marked as in use");
         }
@@ -55,7 +58,7 @@ public class SummaryService {
 
     public SummaryResult get(LocalDate from, LocalDate to) {
         SummaryWindow window = new SummaryWindow(from, to);
-        String classificationPromptId = AnalysisService.computePromptId(analysisService.loadPrompt());
+        String classificationPromptId = analysisService.currentPromptId();
         ImmutableList<String> channelIds = channelRegistry.monitoredChannelIds();
 
         SummaryBreakdowns breakdowns = summaryReadRepository.breakdowns(window, classificationPromptId, channelIds);
@@ -74,17 +77,15 @@ public class SummaryService {
             return generating(refresh.phase());
         }
 
-        AnalysisPrompt summaryPrompt = analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY);
+        AnalysisPrompt summaryPrompt = analysisService.inUsePrompt(AnalysisPromptType.SUMMARY);
         if (summaryPrompt == null) {
             return new SummaryState.Unavailable("No summary prompt version is marked as in use");
         }
         String summaryPromptId = AnalysisService.computePromptId(summaryPrompt.content());
 
-        String fingerprint = summaryReadRepository
-                .fingerprint(window, classificationPromptId, channelIds)
-                .value();
+        SummaryFingerprint fingerprint = summaryReadRepository.fingerprint(window, classificationPromptId, channelIds);
 
-        String failure = summaryRefresher.failureFor(window, summaryPromptId, fingerprint);
+        String failure = summaryRefresher.failureFor(window, summaryPromptId, fingerprint.value());
         if (failure != null) {
             // Retrying on every poll would hammer the LLM with the same failing input; the failure is
             // released as soon as the window's data or the summary prompt changes, or the retry delay
@@ -93,10 +94,12 @@ public class SummaryService {
         }
 
         // The fingerprint covers the classification gaps too, so a snapshot generated after a backfill
-        // that could not classify everything is still served: regenerating would only re-run the same
-        // failing classifications and the same summary on every poll.
+        // that could not classify everything is still served: regenerating on every poll would only
+        // re-run the same failing classifications and the same summary.
         SummarySnapshot snapshot = summarySnapshotRepository.find(window, summaryPromptId);
-        if (snapshot != null && snapshot.fingerprint().equals(fingerprint)) {
+        if (snapshot != null
+                && snapshot.fingerprint().equals(fingerprint.value())
+                && !gapsDueForRetry(snapshot, fingerprint)) {
             return new SummaryState.Ready(snapshot.content(), snapshot.model(), snapshot.generatedAt());
         }
 
@@ -105,6 +108,35 @@ public class SummaryService {
         }
         // Someone claimed the lock between the check above and here; report their run.
         return generating(summaryRefresher.status().phase());
+    }
+
+    /**
+     * Whether a snapshot that matches the window's data should nevertheless be regenerated because
+     * the gaps baked into it are old enough to try again.
+     *
+     * <p>A gap is a closed ticket the backfill could not classify. Some never will be (the Slack
+     * thread is gone), but many are transient — a rate limit, a timeout — and pinning them into the
+     * fingerprint until the window's data happens to change would leave a finished window
+     * permanently short. So once the snapshot is older than {@link SummaryProps#failureRetryDelay()}
+     * its gaps are treated as stale and the next visit starts a refresh that attempts them again. The
+     * refresh stores a new snapshot either way, and its {@code generatedAt} restarts the clock, so a
+     * gap that still cannot be filled costs one retry per delay rather than one per poll.
+     */
+    private boolean gapsDueForRetry(SummarySnapshot snapshot, SummaryFingerprint fingerprint) {
+        Instant generatedAt = snapshot.generatedAt();
+        if (fingerprint.gapCount() == 0 || generatedAt == null) {
+            return false;
+        }
+        boolean due = !clock.instant().isBefore(generatedAt.plus(summaryProps.failureRetryDelay()));
+        if (due) {
+            log.info(
+                    "Snapshot for window {}..{} carries {} classification gap(s) and is older than {}; retrying them",
+                    snapshot.window().from(),
+                    snapshot.window().to(),
+                    fingerprint.gapCount(),
+                    summaryProps.failureRetryDelay());
+        }
+        return due;
     }
 
     private SummaryState.Generating generating(SummaryState.Phase phase) {

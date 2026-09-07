@@ -12,19 +12,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.coreeng.supportbot.analysis.AnalysisJobData;
 import com.coreeng.supportbot.analysis.AnalysisPrompt;
 import com.coreeng.supportbot.analysis.AnalysisPromptLoadException;
-import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
 import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisService;
-import com.coreeng.supportbot.analysis.WindowAnalysisRunner;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryProps;
 import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.time.Clock;
@@ -34,6 +34,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.Executor;
 import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +44,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationContext;
+import org.springframework.core.task.TaskRejectedException;
 
 @ExtendWith(MockitoExtension.class)
 class SummaryRefreshServiceTest {
@@ -56,8 +57,9 @@ class SummaryRefreshServiceTest {
     private static final String SUMMARY_PROMPT = "summarise this";
     private static final String CLASSIFICATION_PROMPT_ID = AnalysisService.computePromptId(CLASSIFICATION_PROMPT);
     private static final String SUMMARY_PROMPT_ID = AnalysisService.computePromptId(SUMMARY_PROMPT);
-    private static final String ATTRIBUTION = "a1b2c3";
-    private static final String FINGERPRINT = "3/2@2026-03-23T10:00~" + ATTRIBUTION;
+    private static final Instant TICKET_UPDATED_AT = Instant.parse("2026-03-23T09:30:00Z");
+    private static final String FINGERPRINT = "3/2@2026-03-23T10:00~" + TICKET_UPDATED_AT;
+    private static final SummaryReason REASON = new SummaryReason(LocalDate.of(2026, 3, 12), "Because.");
     private static final Duration RETRY_DELAY = Duration.ofMinutes(15);
     private static final Instant NOW = Instant.parse("2026-03-23T12:00:00Z");
 
@@ -71,9 +73,6 @@ class SummaryRefreshServiceTest {
     private ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService;
 
     @Mock
-    private AnalysisPromptRepository analysisPromptRepository;
-
-    @Mock
     private SummaryReadRepository summaryReadRepository;
 
     @Mock
@@ -82,35 +81,25 @@ class SummaryRefreshServiceTest {
     @Mock
     private LlmSummaryService llmSummaryService;
 
+    /** Stands in for the {@code analysisTaskExecutor} in the dispatch tests; nothing runs unless a test runs it. */
     @Mock
-    private ApplicationContext applicationContext;
+    private Executor analysisExecutor;
 
     private final SteppingClock clock = new SteppingClock(NOW);
+
+    /** Runs the refresh inline, so the tests of the refresh body read top to bottom. */
     private SummaryRefreshService service;
 
     @BeforeEach
     void setUp() {
-        SlackChannelRegistry channelRegistry = new SlackChannelRegistry(
-                new SlackTicketsProps(CHANNEL, List.of(), "eyes", "ticket", "white_check_mark", "rocket"));
-        service = new SummaryRefreshService(
-                asyncJobRepository,
-                analysisService,
-                threadsAwaitingAnalysisService,
-                analysisPromptRepository,
-                summaryReadRepository,
-                summarySnapshotRepository,
-                llmSummaryService,
-                channelRegistry,
-                new SummaryProps(true, 400, RETRY_DELAY),
-                applicationContext,
-                clock);
+        service = newService(Runnable::run);
 
-        lenient().when(analysisService.loadPrompt()).thenReturn(CLASSIFICATION_PROMPT);
+        lenient().when(analysisService.currentPromptId()).thenReturn(CLASSIFICATION_PROMPT_ID);
         lenient()
                 .when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of());
         lenient()
-                .when(analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY))
+                .when(analysisService.inUsePrompt(AnalysisPromptType.SUMMARY))
                 .thenReturn(new AnalysisPrompt(1, SUMMARY_PROMPT));
         lenient()
                 .when(summaryReadRepository.breakdowns(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
@@ -118,35 +107,91 @@ class SummaryRefreshServiceTest {
         lenient()
                 .when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(
-                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), ATTRIBUTION));
+                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT));
         lenient()
                 .when(summaryReadRepository.reasons(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
-                .thenReturn(ImmutableList.of("Because."));
+                .thenReturn(ImmutableList.of(REASON));
         lenient().when(llmSummaryService.modelName()).thenReturn("model-a");
     }
 
+    private SummaryRefreshService newService(Executor executor) {
+        SlackChannelRegistry channelRegistry = new SlackChannelRegistry(
+                new SlackTicketsProps(CHANNEL, List.of(), "eyes", "ticket", "white_check_mark", "rocket"));
+        return new SummaryRefreshService(
+                asyncJobRepository,
+                analysisService,
+                threadsAwaitingAnalysisService,
+                summaryReadRepository,
+                summarySnapshotRepository,
+                llmSummaryService,
+                channelRegistry,
+                new SummaryProps(true, 400, RETRY_DELAY),
+                executor,
+                clock);
+    }
+
     @Test
-    void start_claimsTheSharedLockWithAWindowPayload() {
-        when(asyncJobRepository.tryStartJob("analysis", "window:2026-03-10:2026-03-23"))
+    void start_claimsTheSharedLockWithAWindowPayloadAndRunsOnTheExecutor() {
+        SummaryRefreshService dispatching = newService(analysisExecutor);
+        when(asyncJobRepository.tryStartJob("analysis", AnalysisJobData.window(FROM, TO)))
                 .thenReturn(true);
-        when(applicationContext.getBean(WindowAnalysisRunner.class)).thenReturn(service);
         when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");
 
-        assertThat(service.start(WINDOW)).isTrue();
+        assertThat(dispatching.start(WINDOW)).isTrue();
+
+        // The request thread only hands the run over; nothing has been classified or summarised yet.
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(analysisExecutor).execute(task.capture());
+        verifyNoInteractions(analysisService, llmSummaryService, summarySnapshotRepository);
+        assertThat(dispatching.status().running()).isFalse();
+
+        task.getValue().run();
+
+        verify(analysisService).backfillWindow(FROM, TO);
+        verify(summarySnapshotRepository).upsert(any());
+        verify(asyncJobRepository).deleteJob("analysis");
     }
 
     @Test
     void start_doesNothingWhenAnotherJobHoldsTheLock() {
-        when(asyncJobRepository.tryStartJob("analysis", "window:2026-03-10:2026-03-23"))
+        SummaryRefreshService dispatching = newService(analysisExecutor);
+        when(asyncJobRepository.tryStartJob("analysis", AnalysisJobData.window(FROM, TO)))
                 .thenReturn(false);
 
-        assertThat(service.start(WINDOW)).isFalse();
-        verifyNoInteractions(applicationContext, analysisService);
+        assertThat(dispatching.start(WINDOW)).isFalse();
+        verifyNoInteractions(analysisExecutor, analysisService);
+    }
+
+    @Test
+    void start_releasesTheLockWhenTheExecutorRejectsTheRun() {
+        // The single-threaded executor has no queue: a rejection means the row just claimed would
+        // otherwise hold the shared lock with nothing running under it.
+        SummaryRefreshService dispatching = newService(analysisExecutor);
+        when(asyncJobRepository.tryStartJob("analysis", AnalysisJobData.window(FROM, TO)))
+                .thenReturn(true);
+        doThrow(new TaskRejectedException("saturated")).when(analysisExecutor).execute(any());
+
+        assertThat(dispatching.start(WINDOW)).isFalse();
+
+        verify(asyncJobRepository).deleteJob("analysis");
+        verifyNoInteractions(analysisService);
+    }
+
+    @Test
+    void runWindowRefresh_releasesTheLockWhenTheExecutorRejectsTheResumedRun() {
+        // The startup resume hands over a row it found rather than one it claimed; the cleanup is the
+        // same, or the row would block every later run.
+        SummaryRefreshService dispatching = newService(analysisExecutor);
+        doThrow(new TaskRejectedException("saturated")).when(analysisExecutor).execute(any());
+
+        assertThat(dispatching.runWindowRefresh(FROM, TO)).isFalse();
+
+        verify(asyncJobRepository).deleteJob("analysis");
     }
 
     @Test
     void backfillsBeforeGeneratingAndStoresTheResultingSnapshot() {
-        when(llmSummaryService.generate(SUMMARY_PROMPT, breakdowns(), ImmutableList.of("Because.")))
+        when(llmSummaryService.generate(SUMMARY_PROMPT, breakdowns(), ImmutableList.of(REASON)))
                 .thenReturn("  the prose  ");
 
         service.runWindowRefresh(FROM, TO);
@@ -224,14 +269,14 @@ class SummaryRefreshServiceTest {
     @Test
     void failuresForDifferentWindowsAreRememberedIndependently() {
         SummaryWindow otherWindow = new SummaryWindow(FROM.minusMonths(1), TO.minusMonths(1));
-        String otherFingerprint = "9/7@2026-02-20T09:00~" + ATTRIBUTION;
+        String otherFingerprint = "9/7@2026-02-20T09:00~" + TICKET_UPDATED_AT;
         when(summaryReadRepository.fingerprint(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(
-                        new SummaryFingerprint(9, 7, LocalDate.of(2026, 2, 20).atTime(9, 0), ATTRIBUTION));
+                        new SummaryFingerprint(9, 7, LocalDate.of(2026, 2, 20).atTime(9, 0), TICKET_UPDATED_AT));
         when(summaryReadRepository.breakdowns(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(breakdowns());
         when(summaryReadRepository.reasons(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
-                .thenReturn(ImmutableList.of("Because."));
+                .thenReturn(ImmutableList.of(REASON));
         when(threadsAwaitingAnalysisService.find(otherWindow.from(), otherWindow.to(), CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of());
         // Distinguishable failures, so the test can tell whose memo is whose.
@@ -255,9 +300,9 @@ class SummaryRefreshServiceTest {
         when(llmSummaryService.generate(any(), any(), any())).thenThrow(new IllegalStateException("model exploded"));
         when(summaryReadRepository.fingerprint(any(), any(), any()))
                 .thenReturn(
-                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), ATTRIBUTION));
+                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT));
         when(summaryReadRepository.breakdowns(any(), any(), any())).thenReturn(breakdowns());
-        when(summaryReadRepository.reasons(any(), any(), any(), anyInt())).thenReturn(ImmutableList.of("Because."));
+        when(summaryReadRepository.reasons(any(), any(), any(), anyInt())).thenReturn(ImmutableList.of(REASON));
         when(threadsAwaitingAnalysisService.find(any(), any(), any())).thenReturn(ImmutableList.of());
 
         service.runWindowRefresh(FROM, TO);
@@ -324,7 +369,7 @@ class SummaryRefreshServiceTest {
     void aMissingSummaryPromptIsReportedAsAPromptProblem() {
         // The summary prompt vanishes between the page's check and the refresh: the page shows the
         // prompt message, and nothing is pinned (there is no prompt id to pin it to).
-        when(analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY)).thenReturn(null);
+        when(analysisService.inUsePrompt(AnalysisPromptType.SUMMARY)).thenReturn(null);
 
         service.runWindowRefresh(FROM, TO);
 
@@ -444,7 +489,11 @@ class SummaryRefreshServiceTest {
                 .thenReturn(ImmutableList.of())
                 .thenReturn(ImmutableList.of(new ThreadToAnalyze(99L, "ts-99", CHANNEL)));
         SummaryFingerprint current = new SummaryFingerprint(
-                3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), ATTRIBUTION, ImmutableSet.of(99L, 100L));
+                3,
+                2,
+                LocalDate.of(2026, 3, 23).atTime(10, 0),
+                TICKET_UPDATED_AT,
+                ImmutableSet.of(new TicketId(99), new TicketId(100)));
         when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(current);
         when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");
@@ -468,7 +517,7 @@ class SummaryRefreshServiceTest {
         when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of(new ThreadToAnalyze(42L, "ts-42", CHANNEL)));
         SummaryFingerprint current = new SummaryFingerprint(
-                3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), ATTRIBUTION, ImmutableSet.of(42L));
+                3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT, ImmutableSet.of(new TicketId(42)));
         when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(current);
         when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");

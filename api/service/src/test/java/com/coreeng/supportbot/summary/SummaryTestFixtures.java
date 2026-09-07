@@ -82,12 +82,17 @@ public final class SummaryTestFixtures {
     /** Prefix of every tag code this fixture creates, so {@link #clear} can find them. */
     public static final String TAG_CODE_PREFIX = "summary-test-";
 
-    /** Tags a ticket, creating the tag (with the given label) if it does not exist yet. */
+    /** Tags a ticket with a plain (non-product) tag, creating the tag with the given label if needed. */
     public static void tagTicket(JdbcTemplate jdbcTemplate, long ticketId, String code, String label) {
-        jdbcTemplate.update(
-                "INSERT INTO tag (code, label) VALUES (?, ?) ON CONFLICT (code) DO UPDATE SET label = EXCLUDED.label",
-                TAG_CODE_PREFIX + code,
-                label);
+        tagTicket(jdbcTemplate, ticketId, code, label, false);
+    }
+
+    /** Tags a ticket, creating the tag (with the given label and product flag) if it does not exist yet. */
+    public static void tagTicket(JdbcTemplate jdbcTemplate, long ticketId, String code, String label, boolean product) {
+        jdbcTemplate.update("""
+                INSERT INTO tag (code, label, product) VALUES (?, ?, ?)
+                ON CONFLICT (code) DO UPDATE SET label = EXCLUDED.label, product = EXCLUDED.product
+                """, TAG_CODE_PREFIX + code, label, product);
         jdbcTemplate.update(
                 "INSERT INTO ticket_to_tag (ticket_id, tag_code) VALUES (?, ?)", ticketId, TAG_CODE_PREFIX + code);
     }

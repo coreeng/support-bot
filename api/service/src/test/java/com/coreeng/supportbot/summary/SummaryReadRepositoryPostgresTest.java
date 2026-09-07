@@ -3,7 +3,9 @@ package com.coreeng.supportbot.summary;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -196,20 +198,22 @@ class SummaryReadRepositoryPostgresTest {
         long both = ticket("2026-03-11T09:00:00", "ts-both", "team-a");
         long vaultOnly = ticket("2026-03-12T09:00:00", "ts-vault", "team-b");
         classify(alphaOnly, "Knowledge Gap", "Build & CI", "ci", "Alpha reason.");
-        SummaryTestFixtures.tagTicket(jdbcTemplate, alphaOnly, "alpha", "Product - Alpha");
-        // Prefix matching is case-insensitive and accepts an en dash; two tags naming Alpha count once.
-        SummaryTestFixtures.tagTicket(jdbcTemplate, both, "alpha", "Product - Alpha");
-        SummaryTestFixtures.tagTicket(jdbcTemplate, both, "alpha-legacy", "product \u2013 Alpha");
-        SummaryTestFixtures.tagTicket(jdbcTemplate, both, "beta", "PRODUCT - Beta");
-        // Not products: an ordinary tag, and a label that is only the prefix.
+        SummaryTestFixtures.tagTicket(jdbcTemplate, alphaOnly, "alpha", "Alpha", true);
+        // Two flagged tags with the same label name one product; the ticket counts once for it.
+        SummaryTestFixtures.tagTicket(jdbcTemplate, both, "alpha", "Alpha", true);
+        SummaryTestFixtures.tagTicket(jdbcTemplate, both, "alpha-legacy", " Alpha ", true);
+        // A flagged tag whose label still carries the old prefix is shown as configured, nothing stripped.
+        SummaryTestFixtures.tagTicket(jdbcTemplate, both, "beta", "Product - Beta", true);
+        // Not products: an ordinary tag, a product-looking label without the flag, and a flagged blank label.
         SummaryTestFixtures.tagTicket(jdbcTemplate, vaultOnly, "vault", "Vault");
-        SummaryTestFixtures.tagTicket(jdbcTemplate, vaultOnly, "empty", "Product - ");
+        SummaryTestFixtures.tagTicket(jdbcTemplate, vaultOnly, "unflagged", "Product - Vault");
+        SummaryTestFixtures.tagTicket(jdbcTemplate, vaultOnly, "empty", "  ", true);
 
         SummaryBreakdowns breakdowns = repository.breakdowns(WINDOW, PROMPT_ID, List.of(CHANNEL));
 
         assertThat(breakdowns.products())
                 .extracting(SummaryCount::label, SummaryCount::count)
-                .containsExactly(tuple("Alpha", 2L), tuple("Beta", 1L));
+                .containsExactly(tuple("Alpha", 2L), tuple("Product - Beta", 1L));
         // Newest first, unclassified tickets included with a blank reason, no duplicate for the double tag.
         assertThat(recentFor(breakdowns.products(), "Alpha"))
                 .extracting(SummaryTicketExample::ticketId, SummaryTicketExample::text)
@@ -245,14 +249,14 @@ class SummaryReadRepositoryPostgresTest {
         classify(classified, "Knowledge Gap", "Build & CI", "ci", "Done.", LocalDateTime.parse("2026-03-11T12:00:00"));
         SummaryFingerprint complete = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
         assertThat(complete.gapCount()).isZero();
-        assertThat(complete.value()).isEqualTo("1/1@2026-03-11T12:00~" + complete.attribution());
+        assertThat(complete.value()).isEqualTo("1/1@2026-03-11T12:00~" + complete.maxTicketUpdatedAt());
 
         // An open ticket is not a gap — it will be classified once it closes.
         SummaryTestFixtures.insertTicket(
                 jdbcTemplate, CHANNEL, "ts-open", LocalDateTime.parse("2026-03-11T10:00:00"), "opened", "team-a");
         SummaryFingerprint withOpen = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
         assertThat(withOpen.gapCount()).isZero();
-        assertThat(withOpen.value()).isEqualTo("2/1@2026-03-11T12:00~" + withOpen.attribution());
+        assertThat(withOpen.value()).isEqualTo("2/1@2026-03-11T12:00~" + withOpen.maxTicketUpdatedAt());
 
         // A closed, unclassified ticket is: the fingerprint moves even though no analysis row changed.
         long gap = ticket("2026-03-12T09:00:00", "ts-gap", "team-a");
@@ -260,15 +264,15 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(withGap.ticketCount()).isEqualTo(3);
         assertThat(withGap.analysisCount()).isEqualTo(1);
         assertThat(withGap.gapCount()).isEqualTo(1);
-        assertThat(withGap.gapIds()).containsExactly(gap);
+        assertThat(withGap.gapIds()).containsExactly(new TicketId(gap));
         assertThat(withGap.gapIdSum()).isEqualTo(gap);
-        assertThat(withGap.value()).isEqualTo("3/1@2026-03-11T12:00~" + withGap.attribution() + "#1:" + gap);
+        assertThat(withGap.value()).isEqualTo("3/1@2026-03-11T12:00~" + withGap.maxTicketUpdatedAt() + "#1:" + gap);
 
         // Classifying it closes the gap and moves the analysis half instead.
         classify(gap, "Task Request", "Build & CI", "ci", "Later.", LocalDateTime.parse("2026-03-12T12:00:00"));
         SummaryFingerprint after = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
         assertThat(after.gapCount()).isZero();
-        assertThat(after.value()).isEqualTo("3/2@2026-03-12T12:00~" + after.attribution());
+        assertThat(after.value()).isEqualTo("3/2@2026-03-12T12:00~" + after.maxTicketUpdatedAt());
     }
 
     @Test
@@ -278,10 +282,13 @@ class SummaryReadRepositoryPostgresTest {
         long other = ticket("2026-03-12T09:00:00", "ts-2", "team-b");
         classify(other, "Task Request", "Build & CI", "ci", "Two.", LocalDateTime.parse("2026-03-12T12:00:00"));
         SummaryFingerprint initial = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
-        assertThat(initial.attribution()).isNotNull().hasSize(32);
+        assertThat(initial.maxTicketUpdatedAt()).isNotNull().isEqualTo(updatedAt(other));
 
         // Re-saving a ticket with nothing changed must not invalidate the cached prose.
         jdbcTemplate.update("UPDATE ticket SET team = team, status = status WHERE id = ?", ticket);
+        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(initial);
+        // Nor must thread activity: last_interacted_at is not part of what the prose describes.
+        jdbcTemplate.update("UPDATE ticket SET last_interacted_at = now() WHERE id = ?", ticket);
         assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(initial);
 
         // Correcting the team changes the teams breakdown the prose quotes, with no analysis row touched.
@@ -290,26 +297,21 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(reteamed.ticketCount()).isEqualTo(initial.ticketCount());
         assertThat(reteamed.analysisCount()).isEqualTo(initial.analysisCount());
         assertThat(reteamed.maxUpdatedAt()).isEqualTo(initial.maxUpdatedAt());
-        assertThat(reteamed.attribution()).isNotEqualTo(initial.attribution());
+        assertThat(reteamed.maxTicketUpdatedAt()).isEqualTo(updatedAt(ticket)).isAfter(initial.maxTicketUpdatedAt());
         assertThat(reteamed.value()).isNotEqualTo(initial.value());
 
-        // So does tagging it with a product.
-        SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "alpha", "Product - Alpha");
+        // So does tagging it with a product: the tag row's trigger reaches the parent ticket.
+        SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "alpha", "Alpha", true);
         SummaryFingerprint tagged = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
-        assertThat(tagged.attribution()).isNotEqualTo(reteamed.attribution());
+        assertThat(tagged.maxTicketUpdatedAt()).isAfter(reteamed.maxTicketUpdatedAt());
         assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(tagged);
 
-        // The digest is order-independent of how the tags were attached: the same set reads the same.
+        // And removing a tag.
         jdbcTemplate.update("DELETE FROM ticket_to_tag WHERE ticket_id = ?", ticket);
-        SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "beta", "Product - Beta");
-        SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "alpha", "Product - Alpha");
-        SummaryFingerprint twoTags = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
-        jdbcTemplate.update("DELETE FROM ticket_to_tag WHERE ticket_id = ?", ticket);
-        SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "alpha", "Product - Alpha");
-        SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "beta", "Product - Beta");
-        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(twoTags);
+        SummaryFingerprint untagged = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        assertThat(untagged.maxTicketUpdatedAt()).isAfter(tagged.maxTicketUpdatedAt());
 
-        // A ticket outside the window or channel is not part of the digest.
+        // A ticket outside the window or channel is not part of the fingerprint, however it is edited.
         long outside = SummaryTestFixtures.insertTicket(
                 jdbcTemplate,
                 OTHER_CHANNEL,
@@ -318,7 +320,20 @@ class SummaryReadRepositoryPostgresTest {
                 "closed",
                 "team-a");
         jdbcTemplate.update("UPDATE ticket SET team = ? WHERE id = ?", "team-z", outside);
-        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(twoTags);
+        SummaryTestFixtures.tagTicket(jdbcTemplate, outside, "alpha", "Alpha", true);
+        long later = SummaryTestFixtures.insertTicket(
+                jdbcTemplate, CHANNEL, "ts-later", LocalDateTime.parse("2026-03-13T00:00:00"), "closed", "team-a");
+        jdbcTemplate.update("UPDATE ticket SET team = ? WHERE id = ?", "team-z", later);
+        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(untagged);
+    }
+
+    private Instant updatedAt(long ticketId) {
+        Instant updatedAt =
+                jdbcTemplate.queryForObject("SELECT updated_at FROM ticket WHERE id = ?", Instant.class, ticketId);
+        if (updatedAt == null) {
+            throw new IllegalStateException("ticket " + ticketId + " has no updated_at");
+        }
+        return updatedAt;
     }
 
     @Test
@@ -359,20 +374,24 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(fingerprint.ticketCount()).isZero();
         assertThat(fingerprint.analysisCount()).isZero();
         assertThat(fingerprint.maxUpdatedAt()).isNull();
-        assertThat(fingerprint.attribution()).isNull();
+        assertThat(fingerprint.maxTicketUpdatedAt()).isNull();
         assertThat(fingerprint.gapIds()).isEmpty();
         assertThat(fingerprint.value()).isEqualTo("0/0@-~-");
     }
 
     @Test
-    void reasonsComeBackNewestFirstAndSkipBlanks() {
+    void reasonsComeBackNewestFirstWithTheirRaisedDayAndSkipBlanks() {
         classify(ticket("2026-03-10T09:00:00", "ts-old", "team-a"), "Knowledge Gap", "Build & CI", "ci", "Oldest.");
-        classify(ticket("2026-03-12T09:00:00", "ts-new", "team-a"), "Knowledge Gap", "Build & CI", "ci", "Newest.");
+        // Late on the 12th in UTC: the day is the window's UTC day, not the session zone's.
+        classify(ticket("2026-03-12T23:30:00", "ts-new", "team-a"), "Knowledge Gap", "Build & CI", "ci", "Newest.");
         classify(ticket("2026-03-11T09:00:00", "ts-empty", "team-a"), "Knowledge Gap", "Build & CI", "ci", "   ");
 
-        assertThat(repository.reasons(WINDOW, PROMPT_ID, List.of(CHANNEL), 100)).containsExactly("Newest.", "Oldest.");
-        assertThat(repository.reasons(WINDOW, PROMPT_ID, List.of(CHANNEL), 1)).containsExactly("Newest.");
+        SummaryReason newest = new SummaryReason(LocalDate.of(2026, 3, 12), "Newest.");
+        SummaryReason oldest = new SummaryReason(LocalDate.of(2026, 3, 10), "Oldest.");
+        assertThat(repository.reasons(WINDOW, PROMPT_ID, List.of(CHANNEL), 100)).containsExactly(newest, oldest);
+        assertThat(repository.reasons(WINDOW, PROMPT_ID, List.of(CHANNEL), 1)).containsExactly(newest);
         assertThat(repository.reasons(WINDOW, PROMPT_ID, List.of(CHANNEL), 0)).isEmpty();
+        assertThat(newest.line()).isEqualTo("2026-03-12 — Newest.");
     }
 
     @Test

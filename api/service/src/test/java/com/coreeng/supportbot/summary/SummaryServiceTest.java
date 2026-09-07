@@ -8,13 +8,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.analysis.AnalysisPrompt;
-import com.coreeng.supportbot.analysis.AnalysisPromptRepository;
 import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SummaryProps;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -33,17 +36,16 @@ class SummaryServiceTest {
     private static final String CHANNEL = "C123456";
     private static final String CLASSIFICATION_PROMPT = "classify this";
     private static final String SUMMARY_PROMPT = "summarise this";
-    private static final String ATTRIBUTION = "a1b2c3";
-    private static final String FINGERPRINT = "3/2@2026-03-23T10:00~" + ATTRIBUTION;
+    private static final Instant TICKET_UPDATED_AT = Instant.parse("2026-03-23T09:30:00Z");
+    private static final String FINGERPRINT = "3/2@2026-03-23T10:00~" + TICKET_UPDATED_AT;
 
     private static final String CLASSIFICATION_PROMPT_ID = AnalysisService.computePromptId(CLASSIFICATION_PROMPT);
     private static final String SUMMARY_PROMPT_ID = AnalysisService.computePromptId(SUMMARY_PROMPT);
+    private static final Duration RETRY_DELAY = Duration.ofMinutes(15);
+    private static final Instant NOW = Instant.parse("2026-03-23T12:00:00Z");
 
     @Mock
     private AnalysisService analysisService;
-
-    @Mock
-    private AnalysisPromptRepository analysisPromptRepository;
 
     @Mock
     private SummaryReadRepository summaryReadRepository;
@@ -52,7 +54,10 @@ class SummaryServiceTest {
     private SummarySnapshotRepository summarySnapshotRepository;
 
     @Mock
-    private SummaryRefresher summaryRefresher;
+    private SummaryRefreshService summaryRefresher;
+
+    @Mock
+    private Clock clock;
 
     private SummaryService service;
 
@@ -62,15 +67,17 @@ class SummaryServiceTest {
                 new SlackTicketsProps(CHANNEL, List.of(), "eyes", "ticket", "white_check_mark", "rocket"));
         service = new SummaryService(
                 analysisService,
-                analysisPromptRepository,
                 summaryReadRepository,
                 summarySnapshotRepository,
                 summaryRefresher,
-                channelRegistry);
+                channelRegistry,
+                new SummaryProps(true, 400, RETRY_DELAY),
+                clock);
 
-        lenient().when(analysisService.loadPrompt()).thenReturn(CLASSIFICATION_PROMPT);
+        lenient().when(clock.instant()).thenReturn(NOW);
+        lenient().when(analysisService.currentPromptId()).thenReturn(CLASSIFICATION_PROMPT_ID);
         lenient()
-                .when(analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY))
+                .when(analysisService.inUsePrompt(AnalysisPromptType.SUMMARY))
                 .thenReturn(new AnalysisPrompt(1, SUMMARY_PROMPT));
         lenient()
                 .when(summaryReadRepository.breakdowns(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
@@ -78,7 +85,7 @@ class SummaryServiceTest {
         lenient()
                 .when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(
-                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), ATTRIBUTION));
+                        new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT));
         lenient().when(summaryRefresher.status()).thenReturn(idle());
         lenient()
                 .when(analysisService.getStatus())
@@ -87,6 +94,7 @@ class SummaryServiceTest {
 
     @Test
     void servesTheCachedSummaryWhenTheFingerprintMatches() {
+        // However old it is: a fully classified window has nothing to retry.
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
                 .thenReturn(new SummarySnapshot(
                         WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "the prose", "model-a", Instant.EPOCH));
@@ -113,7 +121,11 @@ class SummaryServiceTest {
         // the gap is part of the fingerprint, so the cached prose describes an incomplete window.
         when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(new SummaryFingerprint(
-                        3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), ATTRIBUTION, ImmutableSet.of(74L)));
+                        3,
+                        2,
+                        LocalDate.of(2026, 3, 23).atTime(10, 0),
+                        TICKET_UPDATED_AT,
+                        ImmutableSet.of(new TicketId(74))));
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
                 .thenReturn(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "prose", "model-a", null));
         when(summaryRefresher.start(WINDOW)).thenReturn(true);
@@ -137,20 +149,48 @@ class SummaryServiceTest {
     }
 
     @Test
-    void servesTheCachedSummaryWhenTheOnlyGapsAreOnesTheBackfillAlreadyGaveUpOn() {
-        // A ticket whose thread is gone can never be classified. The snapshot was generated after
-        // attempting it, so its fingerprint already carries the gap — regenerating would loop forever.
+    void servesTheCachedSummaryWhenTheOnlyGapsAreOnesTheBackfillJustGaveUpOn() {
+        // The snapshot was generated after attempting the gap, so its fingerprint already carries it:
+        // regenerating on every poll would re-run the same failing classification each time.
+        givenASnapshotWithAGapGeneratedAt(NOW.minus(RETRY_DELAY).plusSeconds(1));
+
+        assertThat(service.get(FROM, TO).summary())
+                .isEqualTo(new SummaryState.Ready(
+                        "the prose", "model-a", NOW.minus(RETRY_DELAY).plusSeconds(1)));
+        verify(summaryRefresher, never()).start(any());
+    }
+
+    @Test
+    void retriesTheGapsOnceTheSnapshotIsOlderThanTheRetryDelay() {
+        // A gap may be transient (rate limit, timeout). Left alone it would stay pinned until the
+        // window's data happened to change — never, for last month's window — so once the delay has
+        // passed the next visit starts a refresh that attempts it again.
+        givenASnapshotWithAGapGeneratedAt(NOW.minus(RETRY_DELAY));
+        when(summaryRefresher.start(WINDOW)).thenReturn(true);
+
+        assertThat(service.get(FROM, TO).summary())
+                .isEqualTo(new SummaryState.Generating(SummaryState.Phase.CLASSIFYING, null, null));
+    }
+
+    @Test
+    void aRetryThatStillCannotFillTheGapIsNotRepeatedUntilAnotherDelayHasPassed() {
+        // The retry stores a fresh snapshot under the same fingerprint; its generatedAt restarts the
+        // clock, so a gap that can never be filled costs one attempt per delay, not one per poll.
+        givenASnapshotWithAGapGeneratedAt(NOW);
+        when(clock.instant()).thenReturn(NOW.plus(RETRY_DELAY).minusSeconds(1));
+
+        assertThat(service.get(FROM, TO).summary()).isInstanceOf(SummaryState.Ready.class);
+        verify(summaryRefresher, never()).start(any());
+    }
+
+    private void givenASnapshotWithAGapGeneratedAt(Instant generatedAt) {
         SummaryFingerprint withGap = new SummaryFingerprint(
-                3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), ATTRIBUTION, ImmutableSet.of(74L));
+                3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT, ImmutableSet.of(new TicketId(74)));
         when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(withGap);
         when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
                 .thenReturn(new SummarySnapshot(
-                        WINDOW, SUMMARY_PROMPT_ID, withGap.value(), "the prose", "model-a", Instant.EPOCH));
-
-        assertThat(service.get(FROM, TO).summary())
-                .isEqualTo(new SummaryState.Ready("the prose", "model-a", Instant.EPOCH));
-        verify(summaryRefresher, never()).start(any());
+                        WINDOW, SUMMARY_PROMPT_ID, withGap.value(), "the prose", "model-a", generatedAt));
     }
 
     @Test
@@ -162,7 +202,7 @@ class SummaryServiceTest {
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.SUMMARISING, null, null));
         verify(summaryRefresher, never()).start(any());
         // A poll during a run is the hot path: it must not pay for the summary prompt or the fingerprint.
-        verify(analysisPromptRepository, never()).findInUse(any());
+        verify(analysisService, never()).inUsePrompt(any());
         verify(summaryReadRepository, never()).fingerprint(any(), any(), any());
     }
 
@@ -177,7 +217,7 @@ class SummaryServiceTest {
 
     @Test
     void reportsUnavailableWhenNoSummaryPromptIsInUse() {
-        when(analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY)).thenReturn(null);
+        when(analysisService.inUsePrompt(AnalysisPromptType.SUMMARY)).thenReturn(null);
 
         SummaryService.SummaryResult result = service.get(FROM, TO);
 

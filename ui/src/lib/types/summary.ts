@@ -50,7 +50,7 @@ export interface SummaryData {
   knowledgeGaps: SummaryCount[];
   features: SummaryCount[];
   teams: SummaryCount[];
-  /** Tickets per product tag ("Product - <name>"), once per ticket per product; untagged tickets have no row. */
+  /** Tickets per product tag (`enums.tags[].product: true`), once per ticket per product; untagged tickets have no row. */
   products: SummaryCount[];
   summary: SummarySection;
 }

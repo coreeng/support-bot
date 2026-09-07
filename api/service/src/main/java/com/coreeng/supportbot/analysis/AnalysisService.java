@@ -10,17 +10,13 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.util.HexFormat;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.event.EventListener;
-import org.springframework.core.task.TaskRejectedException;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
@@ -31,12 +27,12 @@ import org.springframework.stereotype.Service;
  *   <li>Starting new analysis jobs with database-level concurrency control via {@link AsyncJobRepository}</li>
  *   <li>Asynchronous processing of tickets using {@link LlmAnalysisService}</li>
  *   <li>Incremental persistence of analysis results to {@link AnalysisRepository}</li>
- *   <li>Automatic resume of interrupted jobs on application startup</li>
  *   <li>In-memory status tracking for progress monitoring via {@link AnalysisStatus}</li>
  * </ul>
  *
  * <p>Concurrency is controlled via a unique constraint on the {@code async_job} table,
- * ensuring only one analysis job can run at a time.
+ * ensuring only one analysis job can run at a time. A job interrupted by a restart is picked up
+ * again by {@link AnalysisJobResumer}.
  *
  * <p>The analysis process runs asynchronously on a dedicated single-threaded executor
  * ({@code analysisTaskExecutor}) to avoid LLM rate limits and prevent double processing.
@@ -47,11 +43,10 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
-@RequiredArgsConstructor
 @Slf4j
 public class AnalysisService {
 
-    private static final String ASYNC_ID = "analysis";
+    private static final String ASYNC_ID = AnalysisJobData.JOB_ID;
 
     /**
      * Repository for managing async job state in the database.
@@ -64,14 +59,26 @@ public class AnalysisService {
     private final AnalysisRepository analysisRepository;
     private final AnalysisPromptRepository analysisPromptRepository;
     private final AnalysisProps analysisProps;
-    private final ApplicationContext applicationContext;
 
-    /**
-     * Optional: only present when the Support Summary feature is enabled. Resolved lazily through a
-     * provider because the implementation lives downstream of this service and injecting it directly
-     * would be a construction cycle.
-     */
-    private final ObjectProvider<WindowAnalysisRunner> windowAnalysisRunner;
+    /** The single-threaded {@code analysisTaskExecutor}; every run, days-based or windowed, goes through it. */
+    private final Executor analysisExecutor;
+
+    public AnalysisService(
+            AsyncJobRepository asyncJobRepository,
+            ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService,
+            LlmAnalysisService llmAnalysisService,
+            AnalysisRepository analysisRepository,
+            AnalysisPromptRepository analysisPromptRepository,
+            AnalysisProps analysisProps,
+            @Qualifier("analysisTaskExecutor") Executor analysisExecutor) {
+        this.asyncJobRepository = asyncJobRepository;
+        this.threadsAwaitingAnalysisService = threadsAwaitingAnalysisService;
+        this.llmAnalysisService = llmAnalysisService;
+        this.analysisRepository = analysisRepository;
+        this.analysisPromptRepository = analysisPromptRepository;
+        this.analysisProps = analysisProps;
+        this.analysisExecutor = analysisExecutor;
+    }
 
     private static final AnalysisStatus IDLE_STATUS = new AnalysisStatus(null, null, null, false, null);
     private final AtomicReference<AnalysisStatus> currentStatus = new AtomicReference<>(IDLE_STATUS);
@@ -95,79 +102,48 @@ public class AnalysisService {
             @Nullable String error) {}
 
     /**
-     * Resumes any pending analysis job on application startup.
-     * This ensures that interrupted jobs (e.g., due to pod restart) are automatically resumed.
-     */
-    @EventListener(ApplicationReadyEvent.class)
-    public void resumeAnalysisOnStartup() {
-        try {
-            AsyncJobRepository.AsyncJob existingJob = asyncJobRepository.findJob(ASYNC_ID);
-            if (existingJob == null) return;
-
-            AnalysisJobData.Parsed job = AnalysisJobData.parse(existingJob.data());
-            if (job == null) {
-                log.error("Corrupt async job data '{}', deleting job", existingJob.data());
-                asyncJobRepository.deleteJob(ASYNC_ID);
-                return;
-            }
-
-            log.info("Found pending async job on startup: {}, resuming...", ASYNC_ID);
-            switch (job) {
-                case AnalysisJobData.DaysRun daysRun ->
-                    applicationContext.getBean(AnalysisService.class).runAsyncAnalysis(daysRun.days());
-                case AnalysisJobData.WindowRun windowRun -> resumeWindowRun(windowRun);
-            }
-        } catch (TaskRejectedException e) {
-            log.error("Executor rejected resume of analysis job, cleaning up DB record", e);
-            asyncJobRepository.deleteJob(ASYNC_ID);
-        } catch (Exception e) {
-            log.error("Failed to resume analysis job on startup", e);
-        }
-    }
-
-    /**
-     * Hands a windowed job back to whoever owns it (the Support Summary feature). With that feature
-     * off there is no owner, and the row has to go: it holds the shared lock, so leaving it would
-     * block every future analysis run.
-     */
-    private void resumeWindowRun(AnalysisJobData.WindowRun windowRun) {
-        WindowAnalysisRunner runner = windowAnalysisRunner.getIfAvailable();
-        if (runner == null) {
-            log.warn(
-                    "Pending windowed analysis job {}..{} has no runner (summary feature disabled), deleting job",
-                    windowRun.from(),
-                    windowRun.to());
-            asyncJobRepository.deleteJob(ASYNC_ID);
-            return;
-        }
-        runner.runWindowRefresh(windowRun.from(), windowRun.to());
-    }
-
-    /**
      * Attempts to start a new analysis job for the specified time range.
      *
      * @param days Number of days to look back for closed tickets to analyze
      * @return true if the job was started successfully, false if a job is already running
      */
     public boolean start(int days) {
-        if (asyncJobRepository.tryStartJob(ASYNC_ID, AnalysisJobData.days(days))) {
-            try {
-                log.info("Started new async job: id={}, days={}", ASYNC_ID, days);
-                applicationContext.getBean(AnalysisService.class).runAsyncAnalysis(days);
-                return true;
-            } catch (TaskRejectedException e) {
-                log.error("Executor rejected analysis job, cleaning up DB record", e);
-                asyncJobRepository.deleteJob(ASYNC_ID);
-                return false;
-            }
-        } else {
+        if (!asyncJobRepository.tryStartJob(ASYNC_ID, AnalysisJobData.days(days))) {
             log.warn("Cannot start async job {}: already running", ASYNC_ID);
+            return false;
+        }
+        log.info("Started new async job: id={}, days={}", ASYNC_ID, days);
+        return dispatch(days);
+    }
+
+    /**
+     * Resumes a days-based run whose {@code async_job} row already exists — a run a restart
+     * interrupted. Unlike {@link #start} it does not claim the lock, because the row is the lock.
+     *
+     * @return false if the executor rejected the run; the row has then been deleted
+     */
+    public boolean resume(int days) {
+        return dispatch(days);
+    }
+
+    /**
+     * Hands the run to the analysis executor. The caller holds the lock row; if the executor will
+     * not take the run, the row is released here so it does not block every later run.
+     */
+    private boolean dispatch(int days) {
+        try {
+            analysisExecutor.execute(() -> runAnalysis(days));
+            return true;
+        } catch (RejectedExecutionException e) {
+            log.error("Executor rejected analysis job, cleaning up DB record", e);
+            asyncJobRepository.deleteJob(ASYNC_ID);
             return false;
         }
     }
 
     /**
-     * Runs the analysis job asynchronously on the {@code analysisTaskExecutor}.
+     * Runs the analysis job on the calling thread — {@link #start} and {@link #resume} put it on the
+     * {@code analysisTaskExecutor} — and releases the {@code async_job} lock when done.
      *
      * <p>This method:
      * <ol>
@@ -183,8 +159,7 @@ public class AnalysisService {
      *
      * @param days Number of days to look back for closed tickets
      */
-    @Async("analysisTaskExecutor")
-    public void runAsyncAnalysis(int days) {
+    public void runAnalysis(int days) {
         try {
             String prompt = loadPrompt();
             String promptId = computePromptId(prompt);
@@ -283,22 +258,44 @@ public class AnalysisService {
     }
 
     /**
-     * Loads the text of the prompt version currently marked as in use.
+     * Loads the text of the classification prompt version currently marked as in use.
      *
      * @return The prompt text content
      * @throws AnalysisPromptLoadException if no prompt version is marked as in use
      */
     public String loadPrompt() {
-        AnalysisPrompt prompt;
-        try {
-            prompt = analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION);
-        } catch (RuntimeException e) {
-            throw new AnalysisPromptLoadException("Failed to read the analysis prompt", e);
-        }
+        AnalysisPrompt prompt = inUsePrompt(AnalysisPromptType.CLASSIFICATION);
         if (prompt == null) {
             throw new AnalysisPromptLoadException("No analysis prompt version is marked as in use");
         }
         return prompt.content();
+    }
+
+    /**
+     * The identity of the classification prompt currently in use: the {@link #computePromptId hash}
+     * of its text, which is what {@code analysis.prompt_id} holds and what every read of the analysis
+     * rows must be keyed on.
+     *
+     * @throws AnalysisPromptLoadException if no classification prompt version is marked as in use
+     */
+    public String currentPromptId() {
+        return computePromptId(loadPrompt());
+    }
+
+    /**
+     * The prompt version of the given type currently marked as in use. The one door to the prompt
+     * store for other features (the Support Summary reads its own prompt through here), so a change
+     * in how prompts are stored stays inside this package.
+     *
+     * @return the in-use prompt, or null if no version of that type is marked as in use
+     * @throws AnalysisPromptLoadException if the prompt store could not be read
+     */
+    public @Nullable AnalysisPrompt inUsePrompt(AnalysisPromptType type) {
+        try {
+            return analysisPromptRepository.findInUse(type);
+        } catch (RuntimeException e) {
+            throw new AnalysisPromptLoadException("Failed to read the " + type.dbValue() + " prompt", e);
+        }
     }
 
     /**

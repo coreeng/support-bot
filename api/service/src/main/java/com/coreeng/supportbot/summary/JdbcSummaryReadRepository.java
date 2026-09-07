@@ -7,31 +7,30 @@ import static com.coreeng.supportbot.dbschema.Tables.TICKET;
 import static com.coreeng.supportbot.dbschema.Tables.TICKET_TO_TAG;
 import static org.jooq.impl.DSL.arrayAgg;
 import static org.jooq.impl.DSL.coalesce;
-import static org.jooq.impl.DSL.concat;
 import static org.jooq.impl.DSL.count;
 import static org.jooq.impl.DSL.countDistinct;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.inline;
-import static org.jooq.impl.DSL.listAgg;
 import static org.jooq.impl.DSL.max;
-import static org.jooq.impl.DSL.md5;
 import static org.jooq.impl.DSL.name;
 import static org.jooq.impl.DSL.noCondition;
 import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.nullif;
 import static org.jooq.impl.DSL.partitionBy;
-import static org.jooq.impl.DSL.regexpReplaceFirst;
 import static org.jooq.impl.DSL.rowNumber;
 import static org.jooq.impl.DSL.selectOne;
 import static org.jooq.impl.DSL.trim;
 
 import com.coreeng.supportbot.dbschema.enums.TicketStatus;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -44,6 +43,7 @@ import org.jooq.Field;
 import org.jooq.Record2;
 import org.jooq.Record3;
 import org.jooq.Record4;
+import org.jooq.Result;
 import org.jooq.SelectOnConditionStep;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -84,14 +84,6 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
      * does this" tickets; the same literal the knowledge-gaps page filters on.
      */
     static final String KNOWLEDGE_GAP_DRIVER = "Knowledge Gap";
-
-    /**
-     * Product tags are recognised by their label prefix ("Product - &lt;name&gt;"), exactly as the
-     * Products View does in the UI: case-insensitive, any dash, and a label that is only the prefix
-     * is not a product. Postgres ARE syntax, with the case flag embedded so the same literal serves
-     * both the match and the strip.
-     */
-    static final String PRODUCT_TAG_PREFIX = "(?i)^\\s*product\\s*[-\u2013\u2014]\\s*";
 
     /** How many example tickets each breakdown row carries — the same cap the knowledge-gaps page uses. */
     static final int RECENT_PER_ROW = 5;
@@ -159,13 +151,15 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
 
         // One pass over the window's tickets: how many were raised at all (open ones included — they
         // are in the totals the prose quotes); among them the closed ones with no analysis for this
-        // prompt, which is what the backfill would try to classify; and a digest of the attribution
-        // the report reads off the ticket itself rather than off its analysis.
+        // prompt, which is what the backfill would try to classify; and the latest edit to any of
+        // them. `ticket.updated_at` is trigger-maintained (V39) and also moves when the ticket's tags
+        // change, so this is how a corrected team or product reaches the fingerprint without hashing
+        // every row.
         Condition isGap = TICKET.STATUS
                 .eq(TicketStatus.closed)
                 .and(notExists(selectOne().from(ANALYSIS).where(analysisJoin(promptId))));
-        Record3<Integer, Long[], String> tickets = dsl.select(
-                        count(), arrayAgg(TICKET.ID).filterWhere(isGap), attributionDigest())
+        Record3<Integer, Long[], Instant> tickets = dsl.select(
+                        count(), arrayAgg(TICKET.ID).filterWhere(isGap), max(TICKET.UPDATED_AT))
                 .from(QUERY)
                 .join(TICKET)
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
@@ -178,42 +172,19 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 orZero(row.value1()),
                 row.value2(),
                 tickets.value3(),
-                gapIds == null ? ImmutableSet.of() : ImmutableSet.copyOf(gapIds));
-    }
-
-    /**
-     * MD5 over the window's tickets, in id order, of everything the report attributes by ticket
-     * rather than by analysis: {@code id:team:status:tag+tag}. The {@code ticket} table has no
-     * {@code updated_at}, so this is how an edit to a ticket's team or product tags reaches the
-     * fingerprint. Null over an empty window ({@code string_agg} of no rows).
-     */
-    private Field<String> attributionDigest() {
-        Field<String> tags = coalesce(
-                dsl.select(listAgg(TICKET_TO_TAG.TAG_CODE, "+").withinGroupOrderBy(TICKET_TO_TAG.TAG_CODE))
-                        .from(TICKET_TO_TAG)
-                        .where(TICKET_TO_TAG.TICKET_ID.eq(TICKET.ID))
-                        .<String>asField(),
-                inline(""));
-        Field<String> ticket = concat(
-                TICKET.ID.cast(String.class),
-                inline(":"),
-                coalesce(TICKET.TEAM, inline("")),
-                inline(":"),
-                TICKET.STATUS.cast(String.class),
-                inline(":"),
-                tags);
-        return md5(listAgg(ticket, ",").withinGroupOrderBy(TICKET.ID));
+                gapIds == null
+                        ? ImmutableSet.of()
+                        : Arrays.stream(gapIds).map(TicketId::new).collect(ImmutableSet.toImmutableSet()));
     }
 
     @Override
-    public ImmutableList<String> reasons(
+    public ImmutableList<SummaryReason> reasons(
             SummaryWindow window, String promptId, Collection<String> channelIds, int limit) {
         if (channelIds.isEmpty() || limit <= 0) {
             return ImmutableList.of();
         }
 
-        return dsl
-                .select(ANALYSIS.SUMMARY)
+        Result<Record2<Instant, String>> rows = dsl.select(QUERY.DATE, ANALYSIS.SUMMARY)
                 .from(QUERY)
                 .join(TICKET)
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
@@ -223,9 +194,20 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .and(trim(ANALYSIS.SUMMARY).ne(""))
                 .orderBy(QUERY.DATE.desc(), TICKET.ID.desc())
                 .limit(limit)
-                .fetch(ANALYSIS.SUMMARY)
-                .stream()
-                .collect(ImmutableList.toImmutableList());
+                .fetch();
+
+        ImmutableList.Builder<SummaryReason> reasons = ImmutableList.builderWithExpectedSize(rows.size());
+        for (Record2<Instant, String> row : rows) {
+            Instant raisedAt = row.value1();
+            String text = row.value2();
+            if (raisedAt == null || text == null) {
+                continue;
+            }
+            // The same UTC day the window is expressed in, so a reason never lands outside its window.
+            LocalDate raisedOn = raisedAt.atOffset(ZoneOffset.UTC).toLocalDate();
+            reasons.add(new SummaryReason(raisedOn, text));
+        }
+        return reasons.build();
     }
 
     /**
@@ -263,7 +245,8 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
     /**
      * Tickets per product, read from the product tags on each ticket. A ticket counts once per distinct
      * product however many of its tags name it; a ticket with no product tag has no row, so this
-     * breakdown reconciles against neither total. Tags are matched whether or not they have since been
+     * breakdown reconciles against neither total. Product tags are the ones flagged {@code product} in
+     * configuration ({@code tag.product}, synced at startup), whether or not they have since been
      * retired, so history stays attributed — the same rules as the UI's Products View.
      */
     private ImmutableList<SummaryCount> countByProduct(
@@ -311,14 +294,17 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
         return ImmutableMap.copyOf(top);
     }
 
-    /** The product a tag names: its label with the "Product - " prefix removed. Inlined for GROUP BY, as in {@link #bucketed}. */
+    /**
+     * The product a tag names: its label as configured, nothing stripped. A label that still carries a
+     * legacy "Product - " prefix is shown that way until the configuration drops it.
+     */
     private static Field<String> productName() {
-        return trim(regexpReplaceFirst(TAG.LABEL, inline(PRODUCT_TAG_PREFIX), inline("")));
+        return trim(TAG.LABEL);
     }
 
-    /** Whether the joined tag is a product tag: prefixed label with a non-empty product name. */
+    /** Whether the joined tag is a product tag: flagged in configuration, with a non-blank label. */
     private static Condition isProductTag(Field<String> productName) {
-        return TAG.LABEL.likeRegex(inline(PRODUCT_TAG_PREFIX)).and(productName.ne(inline("")));
+        return TAG.PRODUCT.isTrue().and(productName.ne(inline("")));
     }
 
     /**
