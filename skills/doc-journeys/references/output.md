@@ -200,7 +200,7 @@ Directory and file names are slugged: lowercase, ASCII, dash-separated, punctuat
   * Product slug — from `product.md`'s `name`. `Foglight Agent` → `foglight-agent`.
   * Journey slug — from the journey's `name`, with leading verbs kept. `Deploy a workload` → `deploy-a-workload`.
   * Variation slug — from the variation string verbatim. `cron-job` → `cron-job.md`.
-  * Cross-product journey slug — the same rule as a journey slug. `Expose a service to users` → `expose-a-service-to-users`.
+  * Cross-product journey slug — the same rule as a journey slug. `Observe a service end to end` → `observe-a-service-end-to-end`.
 
 Collisions cannot occur, because `${CLAUDE_SKILL_DIR}/references/product-definition.md` rule 6 rejects duplicate journey names **across the whole definition** — every product's journeys and every cross-product journey share one namespace. If two journeys slug to the same value, that is an input defect: stop and report it rather than disambiguating silently.
 
@@ -327,7 +327,7 @@ Title the spine page for **what it is within the journey**, not for the journey:
 
 | Spine | Journey index title | Spine page title |
 | --- | --- | --- |
-| `explanation` (a route) | `Expose a service to users` | `The route` |
+| `explanation` (a route) | `Observe a service end to end` | `The route` |
 | `how-to` | `Roll back a release` | `The procedure`, or the concrete outcome — `Roll back to a previous version` |
 | `tutorial` | `Your first deployment` | `The walkthrough` |
 
