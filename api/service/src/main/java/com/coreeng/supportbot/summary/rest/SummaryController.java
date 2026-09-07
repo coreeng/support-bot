@@ -29,8 +29,12 @@ public class SummaryController {
     /** Default window length, in days, including both ends. */
     private static final int DEFAULT_WINDOW_DAYS = 14;
 
-    /** Widest window that may be requested, to bound the LLM input and the SQL scan. */
-    private static final long MAX_WINDOW_DAYS = 366;
+    /**
+     * Widest window that may be requested: one quarter. Every closed ticket in the window is fed to
+     * the summary model in a single call, and {@code summary.max-reasons} is sized to cover a
+     * quarter's worth; longer windows need chunked summarisation first.
+     */
+    private static final long MAX_WINDOW_DAYS = 92;
 
     private final SummaryService summaryService;
     private final SummaryMapper summaryMapper;
@@ -54,7 +58,8 @@ public class SummaryController {
         }
         // Both ends are included, so a window of from..to spans (to - from) + 1 days.
         if (ChronoUnit.DAYS.between(resolvedFrom, resolvedTo) + 1 > MAX_WINDOW_DAYS) {
-            throw new InvalidSummaryWindowException("The window must not exceed " + MAX_WINDOW_DAYS + " days");
+            throw new InvalidSummaryWindowException(
+                    "The window must not exceed " + MAX_WINDOW_DAYS + " days (about one quarter)");
         }
 
         return summaryMapper.mapToUI(summaryService.get(resolvedFrom, resolvedTo));

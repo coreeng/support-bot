@@ -780,27 +780,27 @@ describe("SupportSummaryPage", () => {
     });
 
     it("flags a custom range longer than the backend maximum and never requests it", async () => {
-      // 367 inclusive days, one over the limit.
-      setMockUrlParamsInitial({ dateFilter: "custom", dateFrom: "2025-01-01", dateTo: "2026-01-02" });
+      // 93 inclusive days, one over the one-quarter limit.
+      setMockUrlParamsInitial({ dateFilter: "custom", dateFrom: "2025-01-01", dateTo: "2025-04-03" });
 
       renderPage();
       await findAtAGlance();
 
       expect(screen.getByRole("alert")).toHaveTextContent(`Invalid range: ${MAX_SUMMARY_WINDOW_DAYS} days at most`);
-      expect(MAX_SUMMARY_WINDOW_DAYS).toBe(366);
+      expect(MAX_SUMMARY_WINDOW_DAYS).toBe(92);
       const { from, to } = defaultWindow();
       expect(summaryRequests()).toEqual([summaryUrl(from, to)]);
     });
 
     it("accepts a custom range of exactly the backend maximum", async () => {
-      // 366 inclusive days: 2025-01-01 through 2026-01-01.
-      setMockUrlParamsInitial({ dateFilter: "custom", dateFrom: "2025-01-01", dateTo: "2026-01-01" });
+      // 92 inclusive days: 2025-01-01 through 2025-04-02.
+      setMockUrlParamsInitial({ dateFilter: "custom", dateFrom: "2025-01-01", dateTo: "2025-04-02" });
 
       renderPage();
       await findAtAGlance();
 
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-      expect(summaryRequests()).toEqual([summaryUrl("2025-01-01", "2026-01-01")]);
+      expect(summaryRequests()).toEqual([summaryUrl("2025-01-01", "2025-04-02")]);
     });
 
     it("clears the inline problem once the range is corrected", async () => {

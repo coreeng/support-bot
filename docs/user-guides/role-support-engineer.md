@@ -72,7 +72,7 @@ These pages are also accessible to leadership.
 
 The **Support Summary** page (`/summary`) replaced the Knowledge Gaps page — old `/knowledge-gaps` links redirect to it. It shows what tenants raised in a date window, and why. It appears in the sidebar only when the feature is enabled on your deployment, and only for support engineers and leadership.
 
-Pick a window with the dropdown at the top right: **Last Week**, **Last 2 Weeks** (the default), **Last Month**, or **Custom** with a from/to date. Windows are whole days; the presets end yesterday, and a custom range may span up to 366 days (the end date must not be before the start). The page then shows:
+Pick a window with the dropdown at the top right: **Last Week**, **Last 2 Weeks** (the default), **Last Month**, or **Custom** with a from/to date. Windows are whole days; the presets end yesterday, and a custom range may span up to 92 days — about a quarter (the end date must not be before the start). The page then shows:
 
 - A strip with the window and the number of **tickets raised** in it.
 - **At a glance** — the LLM-written narrative for the window, followed by chips for the total raised, the top driver (with its share), top subject, top feature and top tenant team, and an **Awaiting classification** count if any tickets are not yet classified.

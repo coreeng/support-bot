@@ -86,12 +86,12 @@ public class SummaryApiTests {
     }
 
     @Test
-    void summary_returns400_whenWindowExceeds366Days() {
-        // 2023-01-01..2024-01-02 is 367 days with both ends included; 366 is the widest allowed.
-        var response = get(SUPPORT_ENGINEER_ROLE, "/summary?from=2023-01-01&to=2024-01-02");
+    void summary_returns400_whenWindowExceeds92Days() {
+        // 2023-01-01..2023-04-03 is 93 days with both ends included; 92 (one quarter) is the widest allowed.
+        var response = get(SUPPORT_ENGINEER_ROLE, "/summary?from=2023-01-01&to=2023-04-03");
 
         assertInvalidWindow(response);
-        assertThat(response.jsonPath().getString("detail")).contains("366");
+        assertThat(response.jsonPath().getString("detail")).contains("92");
     }
 
     @Test

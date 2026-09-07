@@ -168,8 +168,8 @@ class SummaryControllerTest {
     }
 
     @Test
-    void rejectsAWindowWiderThanAYear() throws Exception {
-        mockMvc.perform(get("/summary?from=2020-01-01&to=2026-01-01")
+    void rejectsAWindowWiderThanAQuarter() throws Exception {
+        mockMvc.perform(get("/summary?from=2025-01-01&to=2026-01-01")
                         .with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("SUMMARY_WINDOW_INVALID"));
@@ -177,23 +177,24 @@ class SummaryControllerTest {
 
     @Test
     void acceptsAWindowOfExactlyTheMaximumWidth() throws Exception {
-        // Both ends are included, so 2025-01-01..2026-01-01 is 366 days: the widest allowed window.
+        // Both ends are included, so 2025-01-01..2025-04-02 is 92 days: the widest allowed window.
         givenSummary();
 
-        mockMvc.perform(get("/summary?from=2025-01-01&to=2026-01-01")
+        mockMvc.perform(get("/summary?from=2025-01-01&to=2025-04-02")
                         .with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
                 .andExpect(status().isOk());
 
-        verify(summaryService).get(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 1, 1));
+        verify(summaryService).get(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 4, 2));
     }
 
     @Test
     void rejectsAWindowOneDayWiderThanTheMaximum() throws Exception {
-        // 2025-01-01..2026-01-02 is 367 days including both ends, one over the limit.
-        mockMvc.perform(get("/summary?from=2025-01-01&to=2026-01-02")
+        // 2025-01-01..2025-04-03 is 93 days including both ends, one over the limit.
+        mockMvc.perform(get("/summary?from=2025-01-01&to=2025-04-03")
                         .with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("SUMMARY_WINDOW_INVALID"));
+                .andExpect(jsonPath("$.code").value("SUMMARY_WINDOW_INVALID"))
+                .andExpect(jsonPath("$.detail").value("The window must not exceed 92 days (about one quarter)"));
 
         verify(summaryService, never()).get(any(), any());
     }

@@ -18,8 +18,11 @@ export function windowEndingYesterday(days: number, now: Date = new Date()): { f
   return { from: toUtcDateString(start), to: toUtcDateString(end) };
 }
 
-/** The longest window the backend accepts, both ends included (`SummaryController.MAX_WINDOW_DAYS`). */
-export const MAX_SUMMARY_WINDOW_DAYS = 366;
+/**
+ * The longest window the backend accepts, both ends included: one quarter
+ * (`SummaryController.MAX_WINDOW_DAYS`).
+ */
+export const MAX_SUMMARY_WINDOW_DAYS = 92;
 
 export type SummaryWindowProblem = "inverted" | "tooLong";
 

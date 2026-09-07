@@ -13,14 +13,15 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *
  * @param enabled whether the page and its endpoint exist at all; there is no degraded mode
  * @param maxReasons upper bound on the per-ticket reason lines handed to the LLM, so a very wide
- *     window cannot overflow the model's context
+ *     window cannot overflow the model's context; the default covers the widest allowed window (one
+ *     quarter, {@code SummaryController.MAX_WINDOW_DAYS}) at roughly 80 tickets a week
  * @param failureRetryDelay how long a failed refresh is reported as an error before the next visit
  *     retries it, when neither the window's data nor the summary prompt has changed in between
  */
 @ConfigurationProperties(prefix = "summary")
 public record SummaryProps(
         @DefaultValue("false") boolean enabled,
-        @DefaultValue("400") int maxReasons,
+        @DefaultValue("1000") int maxReasons,
         @DefaultValue("15m") Duration failureRetryDelay) {
 
     public SummaryProps {
