@@ -70,13 +70,19 @@ Cached summaries key on the prompt version, so re-enabling the same version serv
 
 The page classifies closed tickets in the window that have no analysis for the in-use
 classification prompt, then writes the summary. A thread whose LLM call fails is logged and
-**skipped**, not retried: the summary is generated from what could be classified and the cached
-snapshot is served as `ready` until the window's data changes (a ticket is raised or closes, is reclassified,
-or the prompt changes). A transient LLM outage can therefore leave a window with a stuck
-"Awaiting classification" count.
+**skipped** for that pass: the summary is generated from what could be classified and served as
+`ready`. The gap is not forgotten, though — a cached snapshot that still has unclassified closed
+tickets counts as stale once `SUMMARY_FAILURE_RETRY_DELAY` (default `15m`) has passed since it was
+written, so the next visit after that retries the skipped tickets and regenerates the summary. Gaps
+are retried at most once per retry delay, so a transient LLM outage clears itself on a later visit;
+only a ticket that keeps failing stays in the "Awaiting classification" count. (The snapshot is also
+regenerated sooner if the window's data changes — a ticket is raised or closes, is reclassified —
+or the prompt changes.)
 
 Note that the count also includes tickets that are still **open** — only closed tickets are ever
-classified — so first check that the tickets in question are actually closed.
+classified — so first check that the tickets in question are actually closed. Then check the API
+logs for `Failed to analyze thread for ticket`: a ticket that fails on every retry needs the manual
+run below, or a fix to whatever the log reports.
 
 There is no button for this in the UI. A `SUPPORT_ENGINEER` (leadership alone is not enough)
 can trigger the same job through the API:
@@ -101,9 +107,18 @@ page already showing a `ready` summary keeps it and does not poll, and the manua
 mark the summary as refreshing. Once `running` is `false`, **reload or revisit** the page: the
 next `GET /summary` sees the changed data, regenerates the summary and shows `generating` until
 it is done. Only a page that was already showing `generating` (because it hit the lock, see
-below) polls and picks the new classifications up by itself. Threads that fail again are still
-skipped — check the API logs for `Failed to analyze thread for ticket` if the count does not
-move.
+below) polls and picks the new classifications up by itself. Threads that fail again are skipped
+for that pass and retried after the next retry delay — check the API logs for
+`Failed to analyze thread for ticket` if the count does not move.
+
+## Failed refreshes
+
+A refresh that fails (LLM error, prompt missing) is remembered **in process**: per window, at most
+64 entries, and only until `SUMMARY_FAILURE_RETRY_DELAY` passes or the window's data or prompt
+changes. A restart forgets these failures, and each replica would keep its own set — the same
+trade-off the in-memory `GET /analysis/status` already makes. That is acceptable with the chart's
+single-replica API deployment (`helm-chart/templates/deployment.yaml` pins `replicas: 1`); if the
+API is ever scaled out, the worst case is one extra retry per replica after a failure.
 
 ### Single-flight: the `analysis` lock
 

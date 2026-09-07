@@ -288,7 +288,7 @@ analysis:
 # Full operator reference is in the "Support Summary" section under Integrations below.
 summary:
   enabled: ${SUMMARY_ENABLED:false}
-  max-reasons: ${SUMMARY_MAX_REASONS:400} # Newest per-ticket reasons fed to the summary model
+  max-reasons: ${SUMMARY_MAX_REASONS:1000} # Newest per-ticket reasons fed to the summary model; sized for the 92-day window cap
   failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried
 ```
 
@@ -439,21 +439,9 @@ fails startup:
   through an internal LLM proxy and authenticates with a static
   `Authorization: Basic <token>` header instead of cloud credentials. No GCP credential
   discovery happens in this mode, and there is no silent fallback between providers.
-- **`analysis.llm.stub.enabled`** (default `false`) — **local development only.** Returns
-  canned, deterministic text with no network call, no credentials and no spend, so the
-  analysis run and the Support Summary page can be exercised on a laptop. Its output is
-  **synthetic data**: classifications land in `analysis` and summaries in `summary_snapshot`
-  exactly like real ones, and nothing in the schema marks them as fake (only
-  `summary_snapshot.model`, which records `stub` in this mode). **Never point a stub-enabled
-  instance at a shared database.** Because vertex defaults to on, selecting the stub also
-  means `analysis.llm.vertex.enabled=false`.
-
-The stub is a two-flag opt-in. `analysis.llm.stub.enabled=true` on its own fails startup;
-`analysis.llm.stub.acknowledge-synthetic-data=true` (default `false`) must be set as well, and
-the failure message spells out why. Both flags are deliberately absent from `application.yaml`
-and from the Helm chart: set them in a local override (or through Spring's relaxed binding
-as `ANALYSIS_LLM_STUB_ENABLED` / `ANALYSIS_LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA`) on a
-throwaway database only. The service logs a startup `WARN` whenever the stub is active.
+- **`analysis.llm.stub.enabled`** (default `false`) — **local development only**: canned
+  responses that write synthetic data, never for a deployed instance. See
+  [Running bot locally → Stub LLM provider](../README.md#6-stub-llm-provider-optional).
 
 While the feature is enabled, configuration is validated at startup: only the enabled
 provider's settings are required, and the service fails fast naming the offending property
@@ -469,8 +457,8 @@ Set these on the **API**:
 | `ANALYSIS_PROMPT_ENABLED` | Master switch for the analysis feature. No LLM client is created when off. |
 | `VERTEX_ENABLED` | Enables the hosted Vertex AI provider. |
 | `AI_PROXY_ENABLED` | Enables the LLM proxy provider. Exactly one of `VERTEX_ENABLED`, `AI_PROXY_ENABLED` and the stub must be true. |
-| `ANALYSIS_LLM_STUB_ENABLED` | **Local development only.** Enables the stub provider, which writes synthetic classifications and summaries. Never use against a shared database. Fails startup unless the acknowledgement below is also set. Not wired in `application.yaml` or the Helm chart; this is the relaxed-binding form of `analysis.llm.stub.enabled`. |
-| `ANALYSIS_LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA` | Required alongside the stub flag: confirms the operator accepts synthetic rows in `analysis` and `summary_snapshot`. Relaxed-binding form of `analysis.llm.stub.acknowledge-synthetic-data`. |
+| `ANALYSIS_LLM_STUB_ENABLED` | **Local development only** (see [Stub LLM provider](../README.md#6-stub-llm-provider-optional)). Enables the stub provider, which writes synthetic classifications and summaries; fails startup unless the acknowledgement below is also set. Not wired in the Helm chart. |
+| `ANALYSIS_LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA` | Required alongside the stub flag: confirms synthetic rows in `analysis` and `summary_snapshot` are acceptable. |
 | `ANALYSIS_MODEL_NAME` | Model id used by the Vertex and proxy providers. The stub ignores it and stamps summaries as `stub`. |
 | `ANALYSIS_REQUEST_DELAY` | Pause between per-thread LLM calls to stay under rate limits. |
 | `VERTEX_PROJECT_ID` | GCP project hosting Vertex AI. Required when the vertex provider is enabled. |
@@ -488,39 +476,35 @@ Set these on the **API**:
 
 ## Support Summary
 
-The **Support Summary** page (`/summary`) shows, for a chosen date window, how many tickets
-were raised and how they break down by driver, category, platform feature and team, plus a
-short LLM-written narrative. It reuses the analysis feature above: visiting the page classifies
-any closed-but-unclassified tickets in the window (the same job `POST /analysis/run` triggers;
-there is no longer a button for it in the UI), then asks the model for the narrative. Results
-are cached per window and prompt version, and recomputed only when the window's
-classifications change.
+The **Support Summary** page (`/summary`) breaks a date window's tickets down and adds an
+LLM-written narrative. It reuses the analysis feature above: serving the page classifies the
+window's closed-but-unclassified tickets (the same job `POST /analysis/run` runs), then asks the
+model for the narrative. What the page shows is described in the user guides
+([support engineer](../../../docs/user-guides/role-support-engineer.md#support-summary),
+[leadership](../../../docs/user-guides/role-leadership.md#support-summary)); rolling back past
+migration `V38`, re-running the classification by hand and how failed refreshes are retried are in
+the [Support Summary runbook](../../../docs/runbooks/support-summary.md).
 
-Windows are whole UTC calendar days, both ends inclusive. The default window is the last
-14 days ending yesterday (UTC), and a window may span at most 366 days; `GET /summary` rejects
-an inverted or longer window with `SUMMARY_WINDOW_INVALID`.
-
-The page replaced the earlier Support Area Summary page: `/knowledge-gaps` now redirects to
-`/summary`, and the tickets table that lived at `/tickets` moved to the home page (`/tickets`
-redirects there, keeping its query string).
-
-The feature is off by default. Enabling it requires the analysis feature to be enabled as well
-— `SUMMARY_ENABLED=true` with `ANALYSIS_PROMPT_ENABLED=false` fails startup. The summary
-prompt is stored in the database alongside the classification prompt (`analysis_prompt.type`).
-
-Access: the page and `GET /summary` are open to the `LEADERSHIP` and `SUPPORT_ENGINEER` roles;
-`GET /summary/enabled` is open to any authenticated user so the sidebar can decide whether to
-show the entry.
-
-A refresh that fails (LLM error, prompt missing) is remembered **in process**: per window, at most
-64 entries, and only until `SUMMARY_FAILURE_RETRY_DELAY` passes or the window's data or prompt
-changes. A restart forgets these failures, and each replica would keep its own set — the same
-trade-off the in-memory `GET /analysis/status` already makes. That is acceptable with the chart's
-single-replica API deployment (`helm-chart/templates/deployment.yaml` pins `replicas: 1`); if the
-API is ever scaled out, the worst case is one extra retry per replica after a failure.
-
-Rolling back past migration `V38` and re-running the classification by hand are covered in the
-[Support Summary runbook](../../../docs/runbooks/support-summary.md).
+- **Enabling.** Off by default. `SUMMARY_ENABLED=true` requires `ANALYSIS_PROMPT_ENABLED=true`;
+  the summary feature on with the analysis feature off fails startup. The summary prompt is stored
+  in the database alongside the classification prompt (`analysis_prompt.type`, seeded by `V38`).
+- **Windows.** Whole UTC calendar days, both ends inclusive. Default: the last 14 days ending
+  yesterday (UTC). Maximum: 92 days (about one quarter); `GET /summary` rejects an inverted or
+  longer window with `SUMMARY_WINDOW_INVALID`. The cap is there because the window's closed
+  tickets are handed to the model in a single call, bounded by `SUMMARY_MAX_REASONS`, whose
+  default is sized for a quarter at roughly 80 tickets a week. Longer windows need chunked
+  (map-reduce) summarisation, which is a follow-up.
+- **Roles.** The page, `GET /summary` and `GET /summary/prompt` are open to `LEADERSHIP` and
+  `SUPPORT_ENGINEER`. `GET /summary/enabled` is open to any authenticated user so the sidebar can
+  decide whether to show the entry. `/summary` is not support-engineer-only even though serving it
+  starts the classification backfill: leadership must be able to view the page without holding the
+  `/analysis/run` permission.
+- **Cache.** Summaries are stored per window in `summary_snapshot`, keyed on the in-use
+  classification and summary prompt versions plus a fingerprint of the window's tickets, their
+  attribution (team, status, tags) and their classifications. A snapshot is regenerated when any of
+  those change, and a snapshot that still has unclassified closed tickets — or whose last refresh
+  failed — is retried after `SUMMARY_FAILURE_RETRY_DELAY`. Failed refreshes are remembered in
+  process only; see the runbook for the single-replica trade-off.
 
 ### Environment variables
 
@@ -529,7 +513,7 @@ Set these on the **API**:
 | Variable | Description |
 |----------|-------------|
 | `SUMMARY_ENABLED` | Master switch for the Support Summary page. Requires `ANALYSIS_PROMPT_ENABLED=true`. |
-| `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons (newest first) included in the report sent to the model, so a very wide window cannot overflow its context. Default `400`. |
+| `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons (newest first) included in the report sent to the model, so a very wide window cannot overflow its context. Default `1000`, which covers the 92-day window cap at roughly 80 tickets a week. |
 | `SUMMARY_FAILURE_RETRY_DELAY` | How long a failed summary refresh is reported as an error before the next visit retries it. A change to the window's data or to the in-use summary prompt retries sooner. Default `15m`. |
 
 ## Single Sign-On (SSO)
