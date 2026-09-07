@@ -23,13 +23,13 @@ permissions:
 
 jobs:
   check:
-    name: agnostic + layout
-    runs-on: ubuntu-latest
+    name: layout
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v6
 
       - name: Layout — skill-relative paths resolve, agent prompts match, manifests and frontmatter valid
-        run: plugins/doc-tools/scripts/check-layout.sh
+        run: python3 plugins/doc-tools/scripts/check_layout.py
 
       - name: Agent Skills spec — gh skill publish dry run
         env:

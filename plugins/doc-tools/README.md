@@ -79,7 +79,7 @@ plugins/doc-tools/
   skills/doc-run/
     SKILL.md  README.md
     agents/doc-*.md                prompt files for the six general-purpose agents
-  scripts/check-layout.sh          paths resolve, agent prompts match, manifests and frontmatter valid, no machine-specific paths
+  scripts/check_layout.py          paths resolve, agent prompts match, manifests and frontmatter valid, no machine-specific paths
 ```
 
 Paths are written relative to a skill directory so they work in both layouts: inside a skill
@@ -95,7 +95,7 @@ The layout script runs in CI (`.github/workflows/doc-tools-plugin.yaml`) on any 
 locally from anywhere:
 
 ```bash
-plugins/doc-tools/scripts/check-layout.sh
+plugins/doc-tools/scripts/check_layout.py
 claude plugin validate plugins/doc-tools --strict
 gh skill publish --dry-run .
 ```
