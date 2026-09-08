@@ -2,11 +2,10 @@ suite: api deployment
 templates:
   - templates/deployment.yaml
 tests:
-  - it: recreates the pod instead of rolling so startup migrations never overlap an old reader
+  - it: runs a single replica with the default rolling update strategy
     asserts:
-      - equal:
-          path: spec.strategy.type
-          value: Recreate
+      - notExists:
+          path: spec.strategy
       - equal:
           path: spec.replicas
           value: 1

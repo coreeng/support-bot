@@ -9,15 +9,15 @@ classification when a window will not clear on its own. Settings are in
 ## Forward deployment
 
 `V38` runs with the new pod's Flyway migrations at startup and marks the summary prompt as in use.
-From that moment a pre-V38 pod cannot read the prompt table at all (see the rollback section for
-why), so the old pod must be gone before the migration runs. The chart therefore sets
-`strategy: Recreate` on the API Deployment (`helm-chart/templates/deployment.yaml`): Kubernetes
-stops the old pod, then starts the new one. Expect a few seconds of downtime per deploy; there is
-no overlap in which the old pod serves against migrated data.
+The API deploys as a single replica with the default rolling update, so for the few seconds
+between the migration and the new pod becoming ready, the old pod is still serving and cannot
+read the prompt table (see the rollback section for why). Fetching the prompt is rare, so this
+window is accepted rather than paid for with downtime on every deploy; a later migration that
+cannot tolerate an old reader should handle that on its own.
 
-If the new pod fails **after** migrating, the old one is not brought back automatically. Either
-roll forward (fix the new version and deploy it again — the migration is already applied and is
-idempotent), or, if you must go back to a pre-V38 release, run the rollback SQL below first.
+If the new pod fails **after** migrating, the old one keeps serving. Either roll forward (fix the
+new version and deploy it again — the migration is already applied and is idempotent), or, if you
+must go back to a pre-V38 release, run the rollback SQL below first.
 
 ## Rolling back to a release before V38
 
