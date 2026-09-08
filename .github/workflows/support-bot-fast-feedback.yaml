@@ -9,6 +9,7 @@ on:
     paths-ignore:
       - '.agents/**'
       - '.claude/**'
+      - 'skills/**'
       - 'api/k8s/dashboard/**'
       - 'ui/docs/**'
       - 'docs/**'
@@ -21,6 +22,7 @@ on:
     paths-ignore:
       - '.agents/**'
       - '.claude/**'
+      - 'skills/**'
 
 permissions:
   contents: write
