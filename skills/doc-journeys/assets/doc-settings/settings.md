@@ -43,6 +43,8 @@ source_exclude_paths:
   - site/content/docs/generated/
   - doc-tools/
   - .worktrees/
+  # - site/public/   # the site generator's build output (named in output.md), if a checkout can
+  #                  # ever contain one — discovery excludes it in every repo regardless
 
 # Site build. `<consumer root>` and `<scratch dir>` are substituted at run time. The command
 # must work from a RUN WORKTREE, which lacks anything gitignored (dependency directories live only
