@@ -1,6 +1,8 @@
 ---
 name: support-bot-review
 description: Use when reviewing a support-bot change, local branch, or GitHub PR before merge, especially when focused security, ADR, frontend, backend, or high-risk-surface feedback is needed.
+metadata:
+  internal: true   # repo-internal; hides it from `npx skills add coreeng/support-bot` listings
 ---
 
 # Support Bot Review

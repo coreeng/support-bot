@@ -1,0 +1,40 @@
+---
+name: doc-tools skills checks
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'skills/**'
+      - '.github/workflows/doc-tools-skills.yaml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'skills/**'
+      - '.github/workflows/doc-tools-skills.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: layout
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Layout — skill-relative paths resolve, agent prompts match, frontmatter valid, no machine paths
+        run: python3 skills/check_layout.py
+
+      - name: Agent Skills spec — gh skill publish dry run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh skill --help >/dev/null 2>&1; then
+            gh skill publish --dry-run .
+          else
+            echo "gh skill not available in this gh version; skipping"
+          fi
