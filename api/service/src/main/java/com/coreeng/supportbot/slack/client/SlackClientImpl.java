@@ -106,7 +106,14 @@ public class SlackClientImpl implements SlackClient {
                         .inclusive(true)
                         .build()),
                 r -> errorDetailsOrEmpty(r.getResponseMetadata()));
-        return response.getMessages().getFirst();
+        List<Message> messages = response.getMessages();
+        if (messages == null || messages.isEmpty()) {
+            // The message was deleted, or never existed (e.g. seeded local data). Callers already
+            // handle SlackException; a NoSuchElementException would escape as a 500.
+            throw new SlackException("No message found in channel " + request.channelId() + " at ts "
+                    + request.ts().ts());
+        }
+        return messages.getFirst();
     }
 
     @Override

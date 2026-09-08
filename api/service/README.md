@@ -45,6 +45,46 @@ make run
 > SPRING_PROFILES_ACTIVE=functionaltests
 > ```
 
+## 6. Stub LLM provider (optional)
+
+The analysis run and the Support Summary page need an LLM. To exercise them on a laptop with no
+credentials and no spend, enable the **stub** provider: it returns canned, deterministic text with
+no network call. It is a two-flag opt-in, and because Vertex defaults to on you must turn that off
+too — exactly one provider may be enabled:
+
+```yaml
+analysis:
+  prompt:
+    enabled: true
+  llm:
+    vertex:
+      enabled: false
+    stub:
+      enabled: true
+      acknowledge-synthetic-data: true
+summary:
+  enabled: true
+```
+
+Set these in a local override only (a local Spring profile, or the relaxed-binding environment
+variables `ANALYSIS_LLM_STUB_ENABLED` / `ANALYSIS_LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA` and
+`VERTEX_ENABLED=false`). Both stub flags are deliberately absent from `application.yaml` and from
+the Helm chart.
+
+What to know before switching it on:
+
+- `analysis.llm.stub.enabled=true` on its own fails startup: `acknowledge-synthetic-data=true`
+  must be set as well, and the failure message spells out why.
+- Its output is **synthetic data**. Classifications land in `analysis` and summaries in
+  `summary_snapshot` exactly like real ones, and nothing in the schema marks them as fake (only
+  `summary_snapshot.model`, which records `stub` in this mode). **Never point a stub-enabled
+  instance at a shared database** — use a throwaway local one.
+- The service logs a startup `WARN` whenever the stub is active.
+- `ANALYSIS_MODEL_NAME` is ignored; summaries are stamped with the model name `stub`.
+
+The rest of the LLM configuration (Vertex and proxy providers, model, delays) is described in
+[configuration.md](docs/configuration.md#analysis-knowledge-gap-llm).
+
 # CodeStyle and Linting
 
 ```bash

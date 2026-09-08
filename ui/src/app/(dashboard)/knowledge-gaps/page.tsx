@@ -1,12 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { RequireDashboardAccess } from "@/components/AccessDenied";
-import KnowledgeGapsPage from "@/components/knowledgegaps/knowledge-gaps";
-
+/** Support Area Summary is retired in favour of the Support Summary page; keep old links working. */
 export default function KnowledgeGaps() {
-  return (
-    <RequireDashboardAccess>
-      <KnowledgeGapsPage />
-    </RequireDashboardAccess>
-  );
+  redirect("/summary");
 }

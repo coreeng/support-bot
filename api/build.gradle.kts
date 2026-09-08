@@ -4,6 +4,15 @@ plugins {
 
 val jacksonVersion = "2.22.1"
 val jacksonBom = "com.fasterxml.jackson:jackson-bom:$jacksonVersion"
+
+// gRPC artifacts must move as a set. Pinning grpc-netty-shaded alone for a security alert (see
+// safeDependencyVersions below) left it ahead of grpc-core/grpc-api, which google-cloud-vertexai
+// still drags in at 1.71.0 — and the newer shaded Netty reads GrpcAttributes.ATTR_AUTHORITY_VERIFIER,
+// a field the older grpc-core does not have. Every Vertex call then died with a NoSuchFieldError at
+// TLS negotiation. The BOM keeps the whole family on one version so a future single-artifact bump
+// cannot split them again.
+val grpcVersion = "1.75.0"
+val grpcBom = "io.grpc:grpc-bom:$grpcVersion"
 val safeDependencyVersions =
     mapOf(
         "ch.qos.logback:logback-core" to "1.5.34",
@@ -12,7 +21,9 @@ val safeDependencyVersions =
         "com.nimbusds:nimbus-jose-jwt" to "10.0.2",
         "com.squareup.okhttp3:okhttp" to "4.12.0",
         "com.squareup.okio:okio" to "3.16.4",
-        "io.grpc:grpc-netty-shaded" to "1.75.0",
+        // Kept so the security requirement stays visible, but sourced from grpcVersion: the BOM above
+        // is what actually aligns the family, and a literal here could silently drift from it.
+        "io.grpc:grpc-netty-shaded" to grpcVersion,
         "io.netty:netty-codec" to "4.1.137.Final",
         "io.netty:netty-codec-dns" to "4.1.137.Final",
         "io.netty:netty-codec-http" to "4.1.137.Final",
@@ -71,8 +82,11 @@ subprojects {
         dependencies {
             add("implementation", enforcedPlatform(jacksonBom))
             add("testImplementation", enforcedPlatform(jacksonBom))
+            add("implementation", enforcedPlatform(grpcBom))
+            add("testImplementation", enforcedPlatform(grpcBom))
             configurations.findByName("api")?.let {
                 add("api", enforcedPlatform(jacksonBom))
+                add("api", enforcedPlatform(grpcBom))
             }
         }
     }

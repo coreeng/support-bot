@@ -58,14 +58,19 @@ class AnalysisPromptRepositoryPostgresTest {
     @BeforeEach
     @AfterEach
     void restoreSeededBaseline() {
+        // Scoped per type: V38 seeds a `summary` prompt alongside the `classification` one, and an
+        // unscoped reset would delete or re-flag rows this test never touched.
         // Delete first: flagging version 1 while a later version is still in use trips the unique index.
-        jdbcTemplate.update("DELETE FROM analysis_prompt WHERE version > 1");
-        jdbcTemplate.update("UPDATE analysis_prompt SET is_in_use = TRUE WHERE version = 1");
+        jdbcTemplate.update("DELETE FROM analysis_prompt WHERE type = 'classification' AND version > 1");
+        jdbcTemplate.update(
+                "UPDATE analysis_prompt SET is_in_use = TRUE WHERE type = 'classification' AND version = 1");
+        jdbcTemplate.update("DELETE FROM analysis_prompt WHERE type = 'summary' AND version > 1");
+        jdbcTemplate.update("UPDATE analysis_prompt SET is_in_use = TRUE WHERE type = 'summary' AND version = 1");
     }
 
     @Test
     void findInUse_returnsTheSeededPromptUnchanged() {
-        AnalysisPrompt prompt = repository.findInUse();
+        AnalysisPrompt prompt = repository.findInUse(AnalysisPromptType.CLASSIFICATION);
 
         assertThat(prompt).isNotNull();
         assertThat(prompt.version()).isEqualTo(1);
@@ -74,11 +79,12 @@ class AnalysisPromptRepositoryPostgresTest {
 
     @Test
     void findInUse_returnsTheFlaggedVersionWhenSeveralExist() {
-        jdbcTemplate.update("UPDATE analysis_prompt SET is_in_use = FALSE WHERE version = 1");
-        insertPrompt(2, "a newer draft", false);
-        insertPrompt(3, "the published one", true);
+        jdbcTemplate.update(
+                "UPDATE analysis_prompt SET is_in_use = FALSE WHERE type = 'classification' AND version = 1");
+        insertPrompt(AnalysisPromptType.CLASSIFICATION, 2, "a newer draft", false);
+        insertPrompt(AnalysisPromptType.CLASSIFICATION, 3, "the published one", true);
 
-        AnalysisPrompt prompt = repository.findInUse();
+        AnalysisPrompt prompt = repository.findInUse(AnalysisPromptType.CLASSIFICATION);
 
         assertThat(prompt).isNotNull();
         assertThat(prompt.version()).isEqualTo(3);
@@ -86,21 +92,50 @@ class AnalysisPromptRepositoryPostgresTest {
     }
 
     @Test
-    void onlyOneVersionCanBeInUse() {
-        assertThatThrownBy(() -> insertPrompt(2, "a competing version", true))
+    void onlyOneVersionOfATypeCanBeInUse() {
+        assertThatThrownBy(() -> insertPrompt(AnalysisPromptType.CLASSIFICATION, 2, "a competing version", true))
                 .isInstanceOf(DuplicateKeyException.class);
+    }
+
+    @Test
+    void eachTypeHasItsOwnInUseVersion() {
+        // The in-use index is partial on (type), so a summary prompt being in use must not conflict
+        // with the classification one — both seeds are flagged simultaneously.
+        AnalysisPrompt classification = repository.findInUse(AnalysisPromptType.CLASSIFICATION);
+        AnalysisPrompt summary = repository.findInUse(AnalysisPromptType.SUMMARY);
+
+        assertThat(classification).isNotNull();
+        assertThat(summary).isNotNull();
+        assertThat(summary.version()).isEqualTo(1);
+        assertThat(summary.content()).isNotEqualTo(classification.content());
+    }
+
+    @Test
+    void versionsAreScopedPerType() {
+        // Version 1 already exists for both seeded types, so a per-type unique constraint is the only
+        // reason this insert of classification version 2 can coexist with summary version 2.
+        insertPrompt(AnalysisPromptType.SUMMARY, 2, "a summary draft", false);
+        insertPrompt(AnalysisPromptType.CLASSIFICATION, 2, "a classification draft", false);
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM analysis_prompt WHERE version = 2", Integer.class))
+                .isEqualTo(2);
     }
 
     @Test
     void findInUse_returnsNullWhenNoVersionIsFlagged() {
         jdbcTemplate.update("UPDATE analysis_prompt SET is_in_use = FALSE");
 
-        assertThat(repository.findInUse()).isNull();
+        assertThat(repository.findInUse(AnalysisPromptType.CLASSIFICATION)).isNull();
+        assertThat(repository.findInUse(AnalysisPromptType.SUMMARY)).isNull();
     }
 
-    private void insertPrompt(int version, String content, boolean inUse) {
+    private void insertPrompt(AnalysisPromptType type, int version, String content, boolean inUse) {
         jdbcTemplate.update(
-                "INSERT INTO analysis_prompt (version, content, is_in_use) VALUES (?, ?, ?)", version, content, inUse);
+                "INSERT INTO analysis_prompt (type, version, content, is_in_use) VALUES (?, ?, ?, ?)",
+                type.dbValue(),
+                version,
+                content,
+                inUse);
     }
 
     @Configuration(proxyBeanMethods = false)

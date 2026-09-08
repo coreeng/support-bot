@@ -305,25 +305,40 @@ export default function StatsPage() {
     />
   );
 
-  if (isTicketsLoading) return <LoadingSkeleton />;
+  // The header stays mounted in every state: on the Home page the embedded ticket list defers to
+  // these date controls, so they must survive the stats failing or loading while the list did not.
+  const header = (
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <h1 className="text-foreground text-2xl font-bold">Support Dashboard</h1>
+        <p className="text-muted-foreground text-sm">Overview of your team&apos;s support load</p>
+      </div>
+      {dateFilterControls}
+    </div>
+  );
+
+  if (isTicketsLoading)
+    return (
+      <div className="space-y-6">
+        {header}
+        <LoadingSkeleton />
+      </div>
+    );
   if (ticketsError)
     return (
-      <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-4">
-        <p className="font-semibold">Error loading dashboard</p>
-        <p className="mt-1 text-sm">Unable to load dashboard data. Please try refreshing the page.</p>
+      <div className="space-y-6">
+        {header}
+        <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-4" role="alert">
+          <p className="font-semibold">Error loading dashboard</p>
+          <p className="mt-1 text-sm">Unable to load dashboard data. Please try refreshing the page.</p>
+        </div>
       </div>
     );
 
   if (isViewingAsEscalationTeam) {
     return (
       <div className="space-y-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-foreground text-2xl font-bold">Support Dashboard</h1>
-            <p className="text-muted-foreground text-sm">Overview of your team&apos;s support load</p>
-          </div>
-          {dateFilterControls}
-        </div>
+        {header}
 
         <section className="space-y-4">
           <h2 className="text-foreground text-base font-semibold">Escalations We Are Handling</h2>
@@ -349,13 +364,7 @@ export default function StatsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-foreground text-2xl font-bold">Support Dashboard</h1>
-          <p className="text-muted-foreground text-sm">Overview of your team&apos;s support load</p>
-        </div>
-        {dateFilterControls}
-      </div>
+      {header}
 
       {hasNoTeamScope && (
         <div className="border-warning/30 bg-warning/10 text-warning rounded-lg border p-4">

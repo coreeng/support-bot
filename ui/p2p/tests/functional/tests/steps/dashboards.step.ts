@@ -163,8 +163,8 @@ Given("User navigates to the dashboards page", async function (this: CustomWorld
     timeout: 10000,
   });
 
-  // Sidebar hydration sentinel: the Tickets nav link is always rendered.
-  await expect(this.page.getByRole("link", { name: /^Tickets$/i }).first()).toBeVisible({ timeout: 5000 });
+  // Sidebar hydration sentinel: the Escalations nav link is always rendered.
+  await expect(this.page.getByRole("link", { name: /^Escalations$/i }).first()).toBeVisible({ timeout: 5000 });
 
   const slaDashboardButton = this.page.getByRole("link", { name: /SLA Dashboard/i }).first();
   await expect(slaDashboardButton).toBeVisible({ timeout: 5000 });

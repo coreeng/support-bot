@@ -1,6 +1,6 @@
 import { useTeamFilter } from "@/contexts/TeamFilterContext";
 import { useAuth } from "@/hooks/useAuth";
-import { useElevateEnabled, useKnowledgeGapsEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
+import { useElevateEnabled, useSummaryEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
 import { render, screen, waitFor } from "@testing-library/react";
 import { useRouter } from "next/navigation";
 import DashboardLayoutComponent from "../(dashboard)/layout";
@@ -21,7 +21,7 @@ jest.mock("../../contexts/TeamFilterContext", () => ({
 }));
 
 jest.mock("../../lib/hooks", () => ({
-  useKnowledgeGapsEnabled: jest.fn(),
+  useSummaryEnabled: jest.fn(),
   useTenantInsightsEnabled: jest.fn(),
   useElevateEnabled: jest.fn(),
 }));
@@ -52,11 +52,6 @@ jest.mock("../../components/dashboards/dashboards", () => ({
   default: () => <div>Dashboards Page</div>,
 }));
 
-jest.mock("../../components/knowledgegaps/knowledge-gaps", () => ({
-  __esModule: true,
-  default: () => <div>Knowledge Gaps Page</div>,
-}));
-
 jest.mock("../../components/TeamSelector", () => ({
   __esModule: true,
   default: () => <div>Team Selector</div>,
@@ -76,7 +71,7 @@ const mockRouter = {
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseTeamFilter = useTeamFilter as jest.MockedFunction<typeof useTeamFilter>;
-const mockUseKnowledgeGapsEnabled = useKnowledgeGapsEnabled as jest.MockedFunction<typeof useKnowledgeGapsEnabled>;
+const mockUseSummaryEnabled = useSummaryEnabled as jest.MockedFunction<typeof useSummaryEnabled>;
 const mockUseTenantInsightsEnabled = useTenantInsightsEnabled as jest.MockedFunction<typeof useTenantInsightsEnabled>;
 const mockUseElevateEnabled = useElevateEnabled as jest.MockedFunction<typeof useElevateEnabled>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
@@ -90,10 +85,11 @@ const renderDashboard = () => {
   );
 };
 
-describe("Dashboard - Support Area Summary visibility", () => {
+describe("Dashboard - restricted tabs visibility", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseRouter.mockReturnValue(mockRouter as any);
+    mockUseSummaryEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseElevateEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTeamFilter.mockReturnValue({
@@ -110,242 +106,8 @@ describe("Dashboard - Support Area Summary visibility", () => {
     });
   });
 
-  describe("when feature and role capability are enabled", () => {
-    beforeEach(() => {
-      mockUseKnowledgeGapsEnabled.mockReturnValue({
-        data: true,
-        isLoading: false,
-        error: null,
-      } as any);
-      mockUseTeamFilter.mockReturnValue({
-        hasUnrestrictedDataScope: true,
-        selectedTeam: null,
-        setSelectedTeam: jest.fn(),
-        effectiveTeams: [],
-        allTeams: [],
-        initialized: true,
-        teamScope: { mode: "uninitialized" as const },
-        hasNoTeamScope: false,
-        isViewingAllTeams: false,
-        isViewingAsEscalationTeam: false,
-      });
-    });
-
-    it("shows Support Area Summary when leadership/support team is selected", async () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          id: "user@example.com",
-          name: "User",
-          email: "user@example.com",
-          roles: ["SUPPORT_ENGINEER"],
-          teams: [],
-        },
-        isLoading: false,
-        isAuthenticated: true,
-        logout: jest.fn(),
-        isLeadership: false,
-        isEscalationTeam: false,
-        isSupportEngineer: true,
-        actualEscalationTeams: [],
-      });
-
-      renderDashboard();
-
-      await waitFor(() => {
-        expect(screen.getByText("Support Area Summary")).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("when feature is enabled and a narrower data scope is selected", () => {
-    beforeEach(() => {
-      mockUseKnowledgeGapsEnabled.mockReturnValue({
-        data: true,
-        isLoading: false,
-        error: null,
-      } as any);
-      mockUseTeamFilter.mockReturnValue({
-        hasUnrestrictedDataScope: false,
-        selectedTeam: "tenant-team",
-        setSelectedTeam: jest.fn(),
-        effectiveTeams: ["tenant-team"],
-        allTeams: ["tenant-team"],
-        initialized: true,
-        teamScope: { mode: "selected_teams" as const, teams: ["tenant-team"] },
-        hasNoTeamScope: false,
-        isViewingAllTeams: false,
-        isViewingAsEscalationTeam: false,
-      });
-    });
-
-    it("keeps Support Area Summary visible for a support engineer viewing a tenant team", async () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          id: "support@example.com",
-          name: "Support User",
-          email: "support@example.com",
-          roles: ["SUPPORT_ENGINEER"],
-          teams: [],
-        },
-        isLoading: false,
-        isAuthenticated: true,
-        logout: jest.fn(),
-        isLeadership: false,
-        isEscalationTeam: false,
-        isSupportEngineer: true,
-        actualEscalationTeams: [],
-      });
-
-      renderDashboard();
-
-      await waitFor(() => {
-        expect(screen.getByText("Support Area Summary")).toBeInTheDocument();
-      });
-    });
-
-    it("keeps Support Area Summary visible for leadership viewing an escalation team", async () => {
-      mockUseTeamFilter.mockReturnValue({
-        hasUnrestrictedDataScope: false,
-        selectedTeam: "escalation-team",
-        setSelectedTeam: jest.fn(),
-        effectiveTeams: ["escalation-team"],
-        allTeams: ["tenant-team"],
-        initialized: true,
-        teamScope: { mode: "selected_teams" as const, teams: ["escalation-team"] },
-        hasNoTeamScope: false,
-        isViewingAllTeams: false,
-        isViewingAsEscalationTeam: true,
-      });
-      mockUseAuth.mockReturnValue({
-        user: {
-          id: "leader@example.com",
-          name: "Leadership User",
-          email: "leader@example.com",
-          roles: ["LEADERSHIP", "ESCALATION"],
-          teams: [],
-        },
-        isLoading: false,
-        isAuthenticated: true,
-        logout: jest.fn(),
-        isLeadership: true,
-        isEscalationTeam: true,
-        isSupportEngineer: false,
-        actualEscalationTeams: ["escalation-team"],
-      });
-
-      renderDashboard();
-
-      await waitFor(() => {
-        expect(screen.getByText("Support Area Summary")).toBeInTheDocument();
-      });
-
-      // Verify basic tabs are still visible
-      expect(screen.getByText("Home")).toBeInTheDocument();
-      expect(screen.getByText("Tickets")).toBeInTheDocument();
-    });
-  });
-
-  describe("when feature is disabled", () => {
-    beforeEach(() => {
-      mockUseKnowledgeGapsEnabled.mockReturnValue({
-        data: false,
-        isLoading: false,
-        error: null,
-      } as any);
-      mockUseTeamFilter.mockReturnValue({
-        hasUnrestrictedDataScope: true,
-        selectedTeam: null,
-        setSelectedTeam: jest.fn(),
-        effectiveTeams: [],
-        allTeams: [],
-        initialized: true,
-        teamScope: { mode: "uninitialized" as const },
-        hasNoTeamScope: false,
-        isViewingAllTeams: false,
-        isViewingAsEscalationTeam: false,
-      });
-    });
-
-    it("does NOT show Support Area Summary even with the role capability when feature is disabled", async () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          id: "user@example.com",
-          name: "User",
-          email: "user@example.com",
-          roles: ["SUPPORT_ENGINEER"],
-          teams: [],
-        },
-        isLoading: false,
-        isAuthenticated: true,
-        logout: jest.fn(),
-        isLeadership: false,
-        isEscalationTeam: false,
-        isSupportEngineer: true,
-        actualEscalationTeams: [],
-      });
-
-      renderDashboard();
-
-      await waitFor(() => {
-        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("when feature status is loading", () => {
-    beforeEach(() => {
-      mockUseKnowledgeGapsEnabled.mockReturnValue({
-        data: undefined,
-        isLoading: true,
-        error: null,
-      } as any);
-      mockUseTeamFilter.mockReturnValue({
-        hasUnrestrictedDataScope: true,
-        selectedTeam: null,
-        setSelectedTeam: jest.fn(),
-        effectiveTeams: [],
-        allTeams: [],
-        initialized: true,
-        teamScope: { mode: "uninitialized" as const },
-        hasNoTeamScope: false,
-        isViewingAllTeams: false,
-        isViewingAsEscalationTeam: false,
-      });
-    });
-
-    it("does NOT show Support Area Summary while its feature flag is loading", async () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          id: "user@example.com",
-          name: "User",
-          email: "user@example.com",
-          roles: ["SUPPORT_ENGINEER"],
-          teams: [],
-        },
-        isLoading: false,
-        isAuthenticated: true,
-        logout: jest.fn(),
-        isLeadership: false,
-        isEscalationTeam: false,
-        isSupportEngineer: true,
-        actualEscalationTeams: [],
-      });
-
-      renderDashboard();
-
-      await waitFor(() => {
-        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
-      });
-    });
-  });
-
   describe("restricted tabs visibility", () => {
     beforeEach(() => {
-      mockUseKnowledgeGapsEnabled.mockReturnValue({
-        data: true,
-        isLoading: false,
-        error: null,
-      } as any);
       mockUseTenantInsightsEnabled.mockReturnValue({ data: true, isLoading: false, error: null } as any);
     });
 
@@ -389,7 +151,6 @@ describe("Dashboard - Support Area Summary visibility", () => {
       await waitFor(() => {
         expect(screen.queryByText("Analytics & Operations")).not.toBeInTheDocument();
         expect(screen.queryByText("SLA Dashboard")).not.toBeInTheDocument();
-        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
         expect(screen.queryByText("Tenant Requests")).not.toBeInTheDocument();
       });
     });
@@ -443,11 +204,7 @@ describe("Dashboard - Support Area Summary visibility", () => {
     });
 
     it("keeps feature flags independent from the role capability", async () => {
-      mockUseKnowledgeGapsEnabled.mockReturnValue({
-        data: false,
-        isLoading: false,
-        error: null,
-      } as any);
+      mockUseSummaryEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
       mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
       mockUseElevateEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
 
@@ -486,7 +243,6 @@ describe("Dashboard - Support Area Summary visibility", () => {
       await waitFor(() => {
         expect(screen.getByText("Analytics & Operations")).toBeInTheDocument();
         expect(screen.getByText("SLA Dashboard")).toBeInTheDocument();
-        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
         expect(screen.queryByText("Tenant Requests")).not.toBeInTheDocument();
       });
     });
@@ -527,7 +283,6 @@ describe("Dashboard - Support Area Summary visibility", () => {
       await waitFor(() => {
         expect(screen.getByText("Analytics & Operations")).toBeInTheDocument();
         expect(screen.getByText("SLA Dashboard")).toBeInTheDocument();
-        expect(screen.getByText("Support Area Summary")).toBeInTheDocument();
         expect(screen.getByText("Tenant Requests")).toBeInTheDocument();
       });
     });
@@ -567,7 +322,6 @@ describe("Dashboard - Support Area Summary visibility", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Home")).toBeInTheDocument();
-        expect(screen.getByText("Tickets")).toBeInTheDocument();
         expect(screen.getByText("Escalations")).toBeInTheDocument();
       });
     });
@@ -578,7 +332,7 @@ describe("Dashboard - Elevate nav item visibility", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseRouter.mockReturnValue(mockRouter as any);
-    mockUseKnowledgeGapsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+    mockUseSummaryEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTeamFilter.mockReturnValue({
       hasUnrestrictedDataScope: true,

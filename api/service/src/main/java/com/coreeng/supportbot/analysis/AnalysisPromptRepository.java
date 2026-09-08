@@ -5,10 +5,11 @@ import org.jspecify.annotations.Nullable;
 public interface AnalysisPromptRepository {
 
     /**
-     * Finds the prompt version currently marked {@code is_in_use}. At most one row can hold that
-     * flag, enforced by a partial unique index.
+     * Finds the prompt version currently marked {@code is_in_use} for the given type. At most one row
+     * per type can hold that flag, enforced by a partial unique index.
      *
-     * @return the in-use prompt, or null if no version is marked as in use
+     * @param type the kind of prompt to load
+     * @return the in-use prompt of that type, or null if no version is marked as in use
      */
-    @Nullable AnalysisPrompt findInUse();
+    @Nullable AnalysisPrompt findInUse(AnalysisPromptType type);
 }

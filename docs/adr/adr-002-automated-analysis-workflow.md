@@ -2,6 +2,7 @@
 
 **Date:** 2026-02-23
 **Status:** Proposed
+**Amended:** 2026-09 — [PR #327](https://github.com/coreeng/support-bot/pull/327) retired the UI that triggered this pipeline (`/knowledge-gaps`, now redirecting to `/summary`); the backfill is triggered server-side while serving `GET /summary`, and `POST /analysis/run` remains as an API-only path. The Support Summary settings are documented in `api/service/docs/configuration.md`.
 
 ---
 
@@ -47,7 +48,7 @@ Compare current analysis to current prompt, if the same prompt was used for the 
 
 - **No new infrastructure.** The pipeline runs inside the existing Spring Boot pod; no queues, workers, or caches are needed.
 - **No new secrets.** Workload Identity Federation means Vertex AI credentials are handled by GKE, consistent with the existing GCP integration pattern.
-- **Incremental — existing import/export flows unchanged.** The offline workflow continues to work; this is an additive change.
+- **Incremental — existing import/export flows unchanged.** The offline workflow continues to work; this is an additive change. *(Amended 2026-09, PR #327: true for direct API calls only — the UI export/import surface was removed, so the offline workflow is `curl`-driven via `/summary-data/*` as documented in `api/service/README.md`.)*
 - **Progress is durable.** Counters in PostgreSQL survive pod restarts; the UI will resume polling the correct state after any disruption.
 - **Incremental persistence.** Each thread is persisted immediately after LLM analysis, so partial progress is never lost.
 - **Prompt versioning.** Skips re-analysis when the prompt hasn't changed, saving API costs and time.

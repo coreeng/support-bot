@@ -92,6 +92,8 @@ export type TicketTag = {
   code: string;
   label: string;
   active?: boolean;
+  /** Declared in `enums.tags[].product`; drives the Products View and the summary's product breakdown. */
+  product?: boolean;
 };
 
 export interface PaginatedTickets {
@@ -121,28 +123,6 @@ export interface SupportMember {
 
 export interface AssignmentStatus {
   enabled: boolean;
-}
-
-export interface KnowledgeGapsStatus {
-  enabled: boolean;
-}
-
-export interface QuerySummary {
-  text: string;
-  timestamp: string;
-  ticketId: string;
-}
-
-export interface DimensionSummary {
-  name: string;
-  coveragePercentage: number;
-  queryCount: number;
-  queries: QuerySummary[];
-}
-
-export interface AnalysisData {
-  knowledgeGaps: DimensionSummary[];
-  supportAreas: DimensionSummary[];
 }
 
 export interface BulkReassignRequest {

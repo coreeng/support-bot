@@ -3,6 +3,7 @@ package com.coreeng.supportbot.analysis;
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.google.common.collect.ImmutableList;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -37,5 +38,18 @@ public class ThreadsAwaitingAnalysisService {
      */
     public ImmutableList<ThreadToAnalyze> find(int days, String promptId) {
         return repository.findThreadsAwaitingAnalysis(days, promptId, channelRegistry.monitoredChannelIds());
+    }
+
+    /**
+     * Finds threads from closed tickets raised in the given inclusive day range that don't have an
+     * analysis record with the given prompt ID.
+     *
+     * @param from First day of the window (inclusive)
+     * @param to Last day of the window (inclusive)
+     * @param promptId The current prompt ID to check against existing analysis records
+     * @return Immutable list of threads that need analysis
+     */
+    public ImmutableList<ThreadToAnalyze> find(LocalDate from, LocalDate to, String promptId) {
+        return repository.findThreadsAwaitingAnalysis(from, to, promptId, channelRegistry.monitoredChannelIds());
     }
 }

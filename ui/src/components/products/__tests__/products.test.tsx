@@ -33,9 +33,9 @@ const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.us
 const mockRegistry = {
   impacts: [],
   tags: [
-    { code: "product-alpha", label: "Product - Alpha" },
-    { code: "product-beta", label: "Product - Beta" },
-    { code: "product-retired", label: "Product - Retired", active: false },
+    { code: "product-alpha", label: "Alpha", product: true },
+    { code: "product-beta", label: "Beta", product: true },
+    { code: "product-retired", label: "Retired", active: false, product: true },
     { code: "bug", label: "Bug" },
   ],
 };
@@ -93,7 +93,7 @@ describe("Products Component", () => {
     expect(screen.getByText("Ticket counts per product tag")).toBeInTheDocument();
   });
 
-  it("counts tickets per product tag with the prefix stripped", () => {
+  it("counts tickets per product tag under the tag's label", () => {
     renderProducts();
 
     const alphaRow = screen.getByText("Alpha").closest("tr")!;
@@ -101,9 +101,6 @@ describe("Products Component", () => {
 
     const betaRow = screen.getByText("Beta").closest("tr")!;
     expect(within(betaRow).getByText("1")).toBeInTheDocument();
-
-    // Prefix is removed in the table
-    expect(screen.queryByText("Product - Alpha")).not.toBeInTheDocument();
   });
 
   it("excludes untagged tickets from rows and Totals, but keeps them in the percentage denominator", () => {
@@ -218,39 +215,44 @@ describe("Products Component", () => {
     expect(within(retiredRow).getByText("1")).toBeInTheDocument();
   });
 
-  it("tolerates case and dash variants in product tag labels", () => {
+  it("goes by the registry's product flag, not by the label", () => {
     mockUseRegistry.mockReturnValue({
       data: {
         impacts: [],
         tags: [
-          { code: "product-gamma", label: "Product – Gamma" }, // en dash
-          { code: "product-delta", label: "product - delta" }, // lowercase
+          // Flagged: shown under its label as-is, legacy prefix included
+          { code: "product-gamma", label: "Product - Gamma", product: true },
+          // Looks like a product by label but is not flagged: not a product
+          { code: "not-a-product", label: "Product - Delta" },
         ],
       },
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof hooks.useRegistry>);
     mockUseAllTickets.mockReturnValue({
-      data: getMockPaginatedTickets([createMockTicket("1", ["product-gamma"]), createMockTicket("2", ["product-delta"])]),
+      data: getMockPaginatedTickets([createMockTicket("1", ["product-gamma"]), createMockTicket("2", ["not-a-product"])]),
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof hooks.useAllTickets>);
 
     renderProducts();
 
-    const gammaRow = screen.getByText("Gamma").closest("tr")!;
+    const gammaRow = screen.getByText("Product - Gamma").closest("tr")!;
     expect(within(gammaRow).getByText("1")).toBeInTheDocument();
-    const deltaRow = screen.getByText("delta").closest("tr")!;
-    expect(within(deltaRow).getByText("1")).toBeInTheDocument();
+    expect(screen.queryByText("Gamma")).not.toBeInTheDocument();
+    expect(screen.queryByText("Product - Delta")).not.toBeInTheDocument();
+    expect(screen.queryByText("Delta")).not.toBeInTheDocument();
+    const totalsRow = screen.getByText("Total Product Tickets").closest("tr")!;
+    expect(within(totalsRow).getByText("1")).toBeInTheDocument();
   });
 
-  it("treats prefix-only labels as non-product tags", () => {
+  it("ignores flagged tags with a blank label", () => {
     mockUseRegistry.mockReturnValue({
       data: {
         impacts: [],
         tags: [
-          { code: "product-alpha", label: "Product - Alpha" },
-          { code: "product-empty", label: "Product -" },
+          { code: "product-alpha", label: "Alpha", product: true },
+          { code: "product-empty", label: "  ", product: true },
         ],
       },
       isLoading: false,
@@ -264,7 +266,7 @@ describe("Products Component", () => {
 
     renderProducts();
 
-    // The prefix-only tag seeds no blank row; its ticket counts as untagged
+    // The blank-label tag seeds no blank row; its ticket counts as untagged
     // and is excluded entirely, leaving only the seeded Alpha row at zero
     expect(screen.queryByText("None")).not.toBeInTheDocument();
     const totalsRow = screen.getByText("Total Product Tickets").closest("tr")!;
@@ -272,16 +274,20 @@ describe("Products Component", () => {
   });
 
   describe("hasActiveProductTags", () => {
-    it("ignores prefix-only labels", () => {
-      expect(hasActiveProductTags({ tags: [{ code: "p", label: "Product -" }] })).toBe(false);
+    it("ignores tags without the product flag, whatever their label", () => {
+      expect(hasActiveProductTags({ tags: [{ code: "p", label: "Product - Alpha" }] })).toBe(false);
     });
 
-    it("accepts case and dash variants", () => {
-      expect(hasActiveProductTags({ tags: [{ code: "p", label: "product – alpha" }] })).toBe(true);
+    it("ignores flagged tags with a blank label", () => {
+      expect(hasActiveProductTags({ tags: [{ code: "p", label: " ", product: true }] })).toBe(false);
+    });
+
+    it("accepts an active flagged tag", () => {
+      expect(hasActiveProductTags({ tags: [{ code: "p", label: "Alpha", product: true }] })).toBe(true);
     });
 
     it("ignores inactive product tags", () => {
-      expect(hasActiveProductTags({ tags: [{ code: "p", label: "Product - Alpha", active: false }] })).toBe(false);
+      expect(hasActiveProductTags({ tags: [{ code: "p", label: "Alpha", active: false, product: true }] })).toBe(false);
     });
   });
 

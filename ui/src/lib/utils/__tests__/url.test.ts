@@ -26,7 +26,7 @@ describe("sanitizeCallbackUrl", () => {
   });
 
   it("should allow valid relative URL", () => {
-    expect(sanitizeCallbackUrl("/knowledge-gaps")).toBe("/knowledge-gaps");
+    expect(sanitizeCallbackUrl("/escalations")).toBe("/escalations");
   });
 
   it("should allow valid relative URL with query params", () => {
