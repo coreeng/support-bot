@@ -241,8 +241,9 @@ on the site with nothing marking which is current.
 **Declarations** are the one write outside `output_root` and `proposals_root`: where the
 request names a product or journey the definition does not declare, the skill drafts it, prints
 it in full at the confirmation gate, and writes it under `product-definition/` before any page.
-Existing declarations and briefs are never modified; the consumer's authorisations file says
-whether this is permitted at all.
+Existing declarations and briefs are never modified. The consumer's authorisations file
+records that an unattended run may expand the definition this way; strike that grant there
+if you want every declaration written by a human.
 
 ---
 

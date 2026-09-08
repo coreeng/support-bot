@@ -78,7 +78,8 @@ Before the first run, work through the checklist in the starter's
 [`assets/doc-settings/README.md`](../doc-journeys/assets/doc-settings/README.md#before-your-first-run).
 The items that bite `doc-run` specifically: `worktree_dir` gitignored, `base_branch` existing,
 and a `build_command` that points at the consumer root's dependency directory — a worktree has
-none, and a build that only works from the main checkout fails the structural gate.
+none, and the structure reviewer runs `build_command` inside the worktree — a build that
+assumes it runs from the main checkout will not find its dependencies there.
 
 ---
 

@@ -32,8 +32,9 @@ main checkout — because that is where a run resolves them.
     `EDIT` markers or Foglight values.
   * **`product-definition/` exists at the consumer root** and validates against the skill's
     `references/product-definition.md` — every `product.md` has a `name`, journey names are
-    unique across the whole definition, and each product you intend to run has a brief or at
-    least `features`.
+    unique across the whole definition. Recommended, not required: each product you intend
+    to run has a brief or at least `features` — without them the skill still runs, but discovery
+    vocabulary is thinner and the report says so.
   * **`base_branch` exists** (`git rev-parse --verify <base_branch>`). A run worktree branches
     from it and the finished branch merges back into it.
   * **The directory named by `worktree_dir` is gitignored** (`git check-ignore <worktree_dir>`
