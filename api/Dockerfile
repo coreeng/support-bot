@@ -48,3 +48,4 @@ CMD ["java", "-jar", "/app/service.jar"]
 
 EXPOSE 8080 8081
 USER 185
+
