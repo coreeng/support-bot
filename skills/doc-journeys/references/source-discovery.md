@@ -49,6 +49,8 @@ build/  dist/  target/  out/  bin/  .gradle/  .idea/  .mypy_cache/
 testdata/  fixtures/  *.min.js  *.lock  *.sum  go.sum  package-lock.json
 ```
 
+Also exclude, in every repo, **the site generator's build output directory** — wherever the consumer's site adapter says a local build lands (`public/` on many generators) — together with any generated search index inside it. A built site is every page of the site concatenated and stripped of its provenance, so it matches almost any term set: one run found the build output matched 39 of 40 discovery terms and had to collapse it by hand. It is derived from prose that is already in scope as a source, so excluding it loses nothing.
+
 In the consumer repo only, additionally exclude the skill's own output — every path in `source_exclude_paths` (see Repo scope).
 
 `test/` and `tests/` are **not** excluded — test names and fixtures are often the clearest statement of intended behaviour.

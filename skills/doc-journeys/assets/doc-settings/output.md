@@ -22,6 +22,12 @@ build needs a dependency directory, `build_command` in `settings.md` must point 
 `<consumer root>`'s copy — a published re-derive command naming `<repo root>`'s copy cannot
 reproduce from a worktree.
 
+`EDIT:` name the **build output directory** a local build writes — `site/public/` here — and any
+generated search index inside it. Discovery excludes it in every repository (the skill's
+`references/source-discovery.md`, *Path exclusions*): a built site matches almost every discovery
+term and would swamp the shortlist. Keep it gitignored, and if a checkout can ever contain one,
+list it under `source_exclude_paths` in `settings.md` as well.
+
 ## Output root and section furniture
 
 `output_root` is `site/content/docs/generated/`. It is deliberately **inside** the content tree so

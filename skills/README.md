@@ -51,8 +51,10 @@ will not run the pipeline.
 1. Copy `doc-journeys/assets/doc-settings/` to `<consumer root>/.doc-settings/` and edit every
    value marked `EDIT` — the starter's README lists what each file is for.
 2. Create `product-definition/` per `doc-journeys/references/product-definition.md`.
-3. Check the prerequisites: `worktree_dir` gitignored, `base_branch` exists, the site's dependency
-   directory present at the consumer root, `build_command` green from a worktree.
+3. Work through the **Before your first run** checklist in
+   [`doc-journeys/assets/doc-settings/README.md`](doc-journeys/assets/doc-settings/README.md#before-your-first-run)
+   — required keys, gitignored worktree directory, build dependencies at the consumer root,
+   toolchain shim, and the rest.
 4. Run `/doc-journeys plan mode for <product>` before anything writes.
 
 ## Layout
