@@ -15,6 +15,14 @@ public class SlackException extends RuntimeException {
 
     @Nullable private final Integer retryAfterSeconds;
 
+    /** The call itself succeeded, but the result was unusable — {@code detail} says why. */
+    public SlackException(String detail) {
+        super(detail);
+        this.response = null;
+        this.errorDetails = ImmutableList.of(detail);
+        this.retryAfterSeconds = null;
+    }
+
     public SlackException(Throwable cause) {
         super(cause);
         if (cause instanceof SlackApiException exc) {
@@ -63,6 +71,8 @@ public class SlackException extends RuntimeException {
                     response.getWarning(),
                     response.getNeeded(),
                     response.getProvided());
+        } else if (getCause() == null && !errorDetails.isEmpty()) {
+            return errorDetails.getFirst();
         } else {
             return "Couldn't call Slack API";
         }

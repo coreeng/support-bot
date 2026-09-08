@@ -52,32 +52,21 @@ function SortableHeader({
   );
 }
 
-// Product tags are detected by their label prefix ("Product - <name>") — a UI
-// convention until the registry can declare a tag category. Matching tolerates
-// case, spacing, and hyphen/en/em dash variants so a slightly different label
-// doesn't silently drop a product; a label that is only the prefix (empty
-// product name) is not a product tag.
-const PRODUCT_TAG_PREFIX_RE = /^\s*product\s*[-–—]\s*/i;
+// A product tag is one the registry flags as such (`enums.tags[].product: true`
+// in the API config). The label is the product's display name exactly as
+// configured — nothing is inferred from or stripped off it, so a label that
+// still reads "Product - Alpha" is shown that way until the config drops the
+// prefix. A flagged tag with a blank label has no name to show and is ignored.
+const productName = (tag: TicketTag): string => tag.label.trim();
 
-const stripProductPrefix = (label: string): string => label.replace(PRODUCT_TAG_PREFIX_RE, "").trim();
-
-const isProductLabel = (label: string): boolean => PRODUCT_TAG_PREFIX_RE.test(label) && stripProductPrefix(label) !== "";
+const isProductTag = (tag: TicketTag): boolean => tag.product === true && productName(tag) !== "";
 
 // Used by the Analytics & Operations page to hide the Products View tab
 // entirely when the registry has no active product tags.
 export const hasActiveProductTags = (registryData?: { tags?: TicketTag[] }): boolean =>
-  (registryData?.tags ?? []).some((tag) => tag.active !== false && isProductLabel(tag.label));
+  (registryData?.tags ?? []).some((tag) => tag.active !== false && isProductTag(tag));
 
 const formatPercentage = (count: number, total: number): string => (total > 0 ? `${((count / total) * 100).toFixed(1)}%` : "0.0%");
-
-const getTagLabel = (tag: unknown): string => {
-  if (typeof tag === "string") return tag;
-  if (tag && typeof tag === "object") {
-    const obj = tag as { label?: string; code?: string };
-    return obj.label || obj.code || "";
-  }
-  return "";
-};
 
 export default function ProductsPage({ dateRange }: { dateRange?: { from?: string; to?: string } }) {
   const registryQuery = useRegistry();
@@ -112,9 +101,9 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
   const ticketsData = ticketsQuery.data as PaginatedTickets | undefined;
   const visibleTickets = useMemo(() => (ticketsData?.content as TicketWithLogs[] | undefined) ?? [], [ticketsData]);
 
-  // Product bucketing needs the registry's code→label map, so the view is not
-  // ready until BOTH queries resolve — rendering on tickets alone would bucket
-  // every ticket under "None" and present it as final data.
+  // Product bucketing needs the registry's code→product map, so the view is not
+  // ready until BOTH queries resolve — rendering on tickets alone would find no
+  // product on any ticket and present that as final data.
   const isLoading = ticketsQuery.isLoading || registryQuery.isLoading;
   const loadError = ticketsQuery.error || registryQuery.error;
 
@@ -127,8 +116,12 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
   // mostly-untagged data the percentages are deliberately small and don't sum
   // to 100%.
   const { productCounts, taggedTicketCount } = useMemo(() => {
-    const labelByCode = new Map<string, string>();
-    (registryData?.tags ?? []).forEach((tag: TicketTag) => labelByCode.set(tag.code, tag.label));
+    // Only registry tags can be products: a ticket tag code the registry does
+    // not know carries no flag and so names no product.
+    const productByCode = new Map<string, string>();
+    (registryData?.tags ?? []).forEach((tag: TicketTag) => {
+      if (isProductTag(tag)) productByCode.set(tag.code, productName(tag));
+    });
 
     const counts = new Map<string, number>();
     // Seed with active registry product tags so products with no tickets in
@@ -136,8 +129,8 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
     // seeded, but tickets carrying them still count below — a retired product
     // surfaces only for date ranges that contain its tickets.
     (registryData?.tags ?? []).forEach((tag: TicketTag) => {
-      if (tag.active !== false && isProductLabel(tag.label)) {
-        counts.set(stripProductPrefix(tag.label), 0);
+      if (tag.active !== false && isProductTag(tag)) {
+        counts.set(productName(tag), 0);
       }
     });
 
@@ -146,8 +139,8 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
       // A ticket counts once per distinct product, even if tagged twice.
       const products = new Set<string>();
       (t.tags ?? []).forEach((code) => {
-        const label = labelByCode.get(code as string) || getTagLabel(code);
-        if (isProductLabel(label)) products.add(stripProductPrefix(label));
+        const product = productByCode.get(code as string);
+        if (product !== undefined) products.add(product);
       });
       if (products.size === 0) return;
       taggedTicketCount++;
@@ -168,13 +161,9 @@ export default function ProductsPage({ dateRange }: { dateRange?: { from?: strin
   // so a product keeps its color when counts shift between date ranges, even
   // when a retired product's row only exists for some ranges.
   const colorByProduct = useMemo(() => {
-    const products = Array.from(
-      new Set(
-        (registryData?.tags ?? [])
-          .filter((tag: TicketTag) => isProductLabel(tag.label))
-          .map((tag: TicketTag) => stripProductPrefix(tag.label))
-      )
-    ).sort((a, b) => a.localeCompare(b));
+    const products = Array.from(new Set((registryData?.tags ?? []).filter(isProductTag).map(productName))).sort((a, b) =>
+      a.localeCompare(b)
+    );
     return new Map(products.map((p, idx) => [p, CHART_COLORS[idx % CHART_COLORS.length]]));
   }, [registryData]);
 

@@ -7,6 +7,7 @@ import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadT
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.google.common.collect.ImmutableList;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,22 @@ class ThreadsAwaitingAnalysisServiceTest {
         // then
         assertThat(result).isEqualTo(expectedThreads);
         verify(repository).findThreadsAwaitingAnalysis(days, promptId, List.of("C123456"));
+    }
+
+    @Test
+    void find_shouldPassTheWindowThroughToTheRepository() {
+        LocalDate from = LocalDate.of(2026, 3, 10);
+        LocalDate to = LocalDate.of(2026, 3, 23);
+        String promptId = "prompt-v1.0";
+        ImmutableList<ThreadToAnalyze> expectedThreads =
+                ImmutableList.of(new ThreadToAnalyze(1L, "1234.5678", "C123456"));
+        when(repository.findThreadsAwaitingAnalysis(from, to, promptId, List.of("C123456")))
+                .thenReturn(expectedThreads);
+
+        ImmutableList<ThreadToAnalyze> result = service.find(from, to, promptId);
+
+        assertThat(result).isEqualTo(expectedThreads);
+        verify(repository).findThreadsAwaitingAnalysis(from, to, promptId, List.of("C123456"));
     }
 
     @Test

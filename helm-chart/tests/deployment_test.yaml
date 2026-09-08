@@ -2,6 +2,14 @@ suite: api deployment
 templates:
   - templates/deployment.yaml
 tests:
+  - it: runs a single replica with the default rolling update strategy
+    asserts:
+      - notExists:
+          path: spec.strategy
+      - equal:
+          path: spec.replicas
+          value: 1
+
   - it: reports the chart app version when the image tag is empty
     asserts:
       - contains:

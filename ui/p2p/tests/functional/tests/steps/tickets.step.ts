@@ -310,17 +310,13 @@ Given("Tickets API endpoints are mocked with summaries", async function (this: C
 
 // Navigation
 When("User navigates to the tickets page", async function (this: CustomWorld) {
+  // The tickets table now lives on the home page, below the Support Dashboard.
   await this.page.goto(`${BASE_URL}/`, {
     waitUntil: "domcontentloaded",
     timeout: 10000,
   });
 
-  // Sidebar hydration sentinel: the Tickets nav link is always rendered.
-  const ticketsNav = this.page.getByRole("link", { name: /^Tickets$/i });
-  await ticketsNav.waitFor({ state: "visible", timeout: 5000 });
-  await ticketsNav.click();
-
-  // Wait for page to load
+  await this.page.locator("table").waitFor({ state: "visible", timeout: 10000 });
   await this.page.waitForTimeout(500);
 });
 

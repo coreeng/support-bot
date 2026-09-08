@@ -78,7 +78,7 @@ describe("HealthPage", () => {
         impacts: [{ code: "high", label: "High" }],
         tags: [
           { code: "bug", label: "Bug" },
-          { code: "product-alpha", label: "Product - Alpha" },
+          { code: "product-alpha", label: "Alpha", product: true },
         ],
       },
       isLoading: false,
@@ -179,7 +179,7 @@ describe("HealthPage", () => {
       mockUseRegistry.mockReturnValue({
         data: {
           impacts: [],
-          tags: [{ code: "product-retired", label: "Product - Retired", active: false }],
+          tags: [{ code: "product-retired", label: "Retired", active: false, product: true }],
         },
         isLoading: false,
         error: null,

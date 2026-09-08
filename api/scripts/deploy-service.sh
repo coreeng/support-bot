@@ -42,9 +42,33 @@ reset_db_schema() {
   log_success "Database schema reset complete"
 }
 
+# Print the status of a release from `helm list -o json`, empty when it does not
+# exist. Uses sed only, as the rest of this script does (no jq: the
+# integration-tests image is a bare ubi9 runtime, and the script also runs from
+# there).
+release_status() {
+  local ns="$1" release="$2"
+  helm list -n "$ns" -a -f "^${release}\$" -o json 2>/dev/null \
+    | sed -n 's/.*"status":"\([^"]*\)".*/\1/p'
+}
+
+# A cancelled CI run kills helm mid-install, leaving the release stuck in a
+# pending-* state that blocks every subsequent install with "another operation
+# (install/upgrade/rollback) is in progress". P2P serialises the runs that
+# deploy into a namespace, so a pending-* release found here cannot be a live
+# operation from another run: it is a wreck, uninstall it before deploying.
+clear_stuck_release() {
+  local ns="$1" release="$2" status
+  status=$(release_status "$ns" "$release")
+  [[ "$status" == pending-* ]] || return 0
+  log "Release ${release} is stuck in ${status}; uninstalling it first..."
+  helm uninstall "$release" -n "$ns" --wait --timeout=2m || true
+}
+
 deploy_db() {
   local ns="$1" release="$2"
   log "Installing PostgreSQL [${release}] in namespace ${ns}..."
+  clear_stuck_release "$ns" "$release"
   helm repo add bitnami https://charts.bitnami.com/bitnami
   helm repo update bitnami
   helm upgrade --install "$release" bitnami/postgresql -n "$ns" \
@@ -86,6 +110,7 @@ deploy_service() {
   local ns="$1" release="$2" chart_path="$3" image_repo="$4" image_tag="$5"
   ensure_chart_deps "$chart_path"
   log "Installing service [${release}] in ${ns} from ${chart_path}..."
+  clear_stuck_release "$ns" "$release"
   local args=(upgrade --install "$release" "$chart_path" -n "$ns" \
     --set image.repository="$image_repo" \
     --set image.tag="$image_tag" \
@@ -95,6 +120,17 @@ deploy_service() {
   fi
   helm "${args[@]}"
   log_success "Service deployed"
+}
+
+# deploy_db drops and recreates the schema. If a service pod is already running (a rerun
+# of a failed workflow keeps the namespace), it keeps serving against the now-empty
+# schema, and helm only restarts it when the rendered spec changes -- which a rerun with
+# the same image tag does not. Roll the deployment so Flyway runs again.
+restart_service() {
+  local ns="$1" release="$2"
+  local deploy_name="${RELEASE_DEPLOYMENT_NAME:-$release}"
+  log "Deployment/${deploy_name} predates the schema reset; restarting it so migrations run again..."
+  kubectl rollout restart deployment/"$deploy_name" -n "$ns"
 }
 
 wait_for_service() {
@@ -136,10 +172,18 @@ main() {
         fi
       fi
 
+      local service_existed=false
+      if [[ "$DEPLOY_DB" == "true" ]] \
+        && kubectl get deployment/"${RELEASE_DEPLOYMENT_NAME:-$SERVICE_RELEASE}" -n "$NAMESPACE" >/dev/null 2>&1; then
+        service_existed=true
+      fi
       if [[ "$DEPLOY_DB" == "true" ]]; then
         deploy_db "$NAMESPACE" "$DB_RELEASE"
       fi
       deploy_service "$NAMESPACE" "$SERVICE_RELEASE" "$SERVICE_CHART_PATH" "$IMAGE_REPOSITORY" "$IMAGE_TAG"
+      if [[ "$service_existed" == "true" ]]; then
+        restart_service "$NAMESPACE" "$SERVICE_RELEASE"
+      fi
       wait_for_service "$NAMESPACE" "$SERVICE_RELEASE" "$WAIT_TIMEOUT"
       ;;
     delete)

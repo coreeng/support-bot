@@ -19,29 +19,32 @@ public class TagsRepository {
     private final DSLContext dsl;
 
     public ImmutableList<Tag> listAll() {
-        return fetchTags(dsl.select(TAG.LABEL, TAG.CODE).from(TAG));
+        return fetchTags(dsl.select(TAG.LABEL, TAG.CODE, TAG.PRODUCT).from(TAG));
     }
 
     public ImmutableList<Tag> listAllActive() {
-        return fetchTags(dsl.select(TAG.LABEL, TAG.CODE).from(TAG).where(TAG.DELETED_AT.isNull()));
+        return fetchTags(dsl.select(TAG.LABEL, TAG.CODE, TAG.PRODUCT).from(TAG).where(TAG.DELETED_AT.isNull()));
     }
 
     public ImmutableList<Tag> listByCodes(ImmutableCollection<String> codes) {
         if (codes.isEmpty()) {
             return ImmutableList.of();
         }
-        return fetchTags(dsl.select(TAG.LABEL, TAG.CODE).from(TAG).where(TAG.CODE.in(codes)));
+        return fetchTags(dsl.select(TAG.LABEL, TAG.CODE, TAG.PRODUCT).from(TAG).where(TAG.CODE.in(codes)));
     }
 
     public int insertOrActivate(ImmutableList<Tag> tags) {
         if (tags.isEmpty()) {
             return 0;
         }
-        return dsl.insertInto(TAG, TAG.LABEL, TAG.CODE)
-                .valuesOfRows(tags.stream().map(t -> row(t.label(), t.code())).toList())
+        return dsl.insertInto(TAG, TAG.LABEL, TAG.CODE, TAG.PRODUCT)
+                .valuesOfRows(tags.stream()
+                        .map(t -> row(t.label(), t.code(), t.product()))
+                        .toList())
                 .onConflict(TAG.CODE)
                 .doUpdate()
                 .set(TAG.LABEL, excluded(TAG.LABEL))
+                .set(TAG.PRODUCT, excluded(TAG.PRODUCT))
                 .setNull(TAG.DELETED_AT)
                 .execute();
     }
@@ -58,7 +61,8 @@ public class TagsRepository {
 
     private ImmutableList<Tag> fetchTags(ResultQuery<?> query) {
         try (var stream = query.stream()) {
-            return stream.map(r -> new Tag(r.get(TAG.LABEL), r.get(TAG.CODE))).collect(toImmutableList());
+            return stream.map(r -> new Tag(r.get(TAG.LABEL), r.get(TAG.CODE), Boolean.TRUE.equals(r.get(TAG.PRODUCT))))
+                    .collect(toImmutableList());
         }
     }
 }

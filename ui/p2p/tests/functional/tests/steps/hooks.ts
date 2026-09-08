@@ -117,7 +117,7 @@ Before(async function (this: CustomWorld) {
     });
   });
 
-  await this.page.route("**/api/knowledge-gaps/enabled", async (route) => {
+  await this.page.route("**/api/tenant-insights/enabled", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -125,7 +125,9 @@ Before(async function (this: CustomWorld) {
     });
   });
 
-  await this.page.route("**/api/tenant-insights/enabled", async (route) => {
+  // The sidebar asks for this on every page; unmocked it reaches the real backend, whose 401
+  // signs the mocked session out and bounces the scenario to /login.
+  await this.page.route("**/api/summary/enabled", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",

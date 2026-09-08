@@ -21,6 +21,6 @@ Feature: Authentication and Session Expiry
     Then I should be redirected to the home page
 
   Scenario: Login page with callback URL parameter is accessible
-    When I visit the login page with callback URL "/knowledge-gaps"
+    When I visit the login page with callback URL "/escalations"
     Then the page should load without errors
 

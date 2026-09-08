@@ -34,31 +34,30 @@ public class SummaryExportControllerFunctionalTests {
     // a non-support-engineer principal. "escalation" has neither.
     private static final String NON_SUPPORT_ENGINEER_ROLE = "escalation";
 
-    // 401, not 403: the default access-denied path (AccessDeniedHandlerImpl, the delegating
-    // handler's fallback in SecurityConfig) sendErrors a 403 whose ERROR dispatch re-enters the
-    // filter chain unauthenticated and lands in the authenticationEntryPoint. Only
-    // /analysis/prompt opts out via a scoped handler.
+    // The default access-denied path (AccessDeniedHandlerImpl) sendErrors a 403, which the container
+    // re-dispatches to /error. SecurityConfig permits ERROR dispatches, so that 403 reaches the
+    // caller instead of being turned into a 401 by the authentication entry point.
     @Test
-    void start_returns401_forNonSupportEngineerRole() {
+    void start_returns403_forNonSupportEngineerRole() {
         int statusCode =
                 supportBotClient.postStatusCodeAsRole("/summary-data/export/start?days=7", NON_SUPPORT_ENGINEER_ROLE);
 
-        assertThat(statusCode).isEqualTo(401);
+        assertThat(statusCode).isEqualTo(403);
     }
 
     @Test
-    void status_returns401_forNonSupportEngineerRole() {
+    void status_returns403_forNonSupportEngineerRole() {
         int statusCode = supportBotClient.getStatusCodeAsRole("/summary-data/export/status", NON_SUPPORT_ENGINEER_ROLE);
 
-        assertThat(statusCode).isEqualTo(401);
+        assertThat(statusCode).isEqualTo(403);
     }
 
     @Test
-    void download_returns401_forNonSupportEngineerRole() {
+    void download_returns403_forNonSupportEngineerRole() {
         int statusCode =
                 supportBotClient.getStatusCodeAsRole("/summary-data/export/download", NON_SUPPORT_ENGINEER_ROLE);
 
-        assertThat(statusCode).isEqualTo(401);
+        assertThat(statusCode).isEqualTo(403);
     }
 
     @Test

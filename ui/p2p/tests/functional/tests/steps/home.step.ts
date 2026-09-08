@@ -16,6 +16,5 @@ Then("It should show the banner {string}", async function (this: CustomWorld, ex
 Then("It should show navigation tabs", async function (this: CustomWorld) {
   // Sidebar navigation sub-items are now links in the Support section
   await expect(this.page.getByRole("link", { name: /^Home$/i })).toBeVisible();
-  await expect(this.page.getByRole("link", { name: /^Tickets$/i })).toBeVisible();
   await expect(this.page.getByRole("link", { name: /^Escalations$/i })).toBeVisible();
 });

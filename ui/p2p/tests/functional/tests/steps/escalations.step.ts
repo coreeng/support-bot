@@ -302,7 +302,7 @@ When("user logs in", async function (this: CustomWorld) {
   await this.page.goto(BASE_URL, { waitUntil: "domcontentloaded", timeout: 10000 });
 
   await this.page
-    .getByRole("link", { name: /^Tickets$/i })
+    .getByRole("link", { name: /^Escalations$/i })
     .first()
     .waitFor({ state: "visible", timeout: 5000 });
 });
@@ -372,7 +372,7 @@ When("user logs in and selects {string} from dropdown", async function (this: Cu
   await this.page.goto(BASE_URL, { waitUntil: "domcontentloaded", timeout: 10000 });
 
   await this.page
-    .getByRole("link", { name: /^Tickets$/i })
+    .getByRole("link", { name: /^Escalations$/i })
     .first()
     .waitFor({ state: "visible", timeout: 10000 });
 

@@ -9,9 +9,12 @@ import static org.jooq.impl.DSL.selectOne;
 import com.coreeng.supportbot.dbschema.enums.TicketStatus;
 import com.google.common.collect.ImmutableList;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.impl.DSL;
@@ -27,6 +30,9 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>Filtering for closed tickets in the specified time range</li>
  *   <li>Excluding tickets that already have an analysis record with the current prompt ID</li>
  * </ol>
+ *
+ * <p>Both overloads run the same query; only the time predicate differs, so the two callers cannot
+ * drift apart on the status/channel/prompt filters.
  */
 @Repository
 @RequiredArgsConstructor
@@ -47,13 +53,43 @@ public class JdbcThreadsAwaitingAnalysisRepository implements ThreadsAwaitingAna
             int days, String promptId, Collection<String> channelIds) {
         log.info("Finding threads awaiting analysis: channelIds={}, days={}, promptId={}", channelIds, days, promptId);
 
-        if (channelIds.isEmpty()) {
-            return ImmutableList.of();
-        }
-
         // Postgres-specific interval arithmetic kept as a typed, parameterised plain-SQL fragment
         // (there is no portable jOOQ DSL equivalent): midnight today minus `days` days.
         Field<Instant> cutoff = DSL.field("now()::date - ({0} * interval '1 day')", Instant.class, DSL.val(days));
+
+        return find(TICKET.LAST_INTERACTED_AT.gt(cutoff), promptId, channelIds);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The window is applied to {@code query.date} as a half-open interval of UTC instants, with the
+     * bound — not the column — converted, keeping the predicate sargable against {@code query_date_idx}.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public ImmutableList<ThreadToAnalyze> findThreadsAwaitingAnalysis(
+            LocalDate from, LocalDate to, String promptId, Collection<String> channelIds) {
+        log.info(
+                "Finding threads awaiting analysis: channelIds={}, from={}, to={}, promptId={}",
+                channelIds,
+                from,
+                to,
+                promptId);
+
+        // Bind explicit UTC instants: the rest of the summary flow (controller clock, UI formatting) is
+        // UTC, so the window must not shift with the JVM/session time zone.
+        Condition window = QUERY.DATE
+                .ge(from.atStartOfDay().toInstant(ZoneOffset.UTC))
+                .and(QUERY.DATE.lt(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)));
+
+        return find(window, promptId, channelIds);
+    }
+
+    private ImmutableList<ThreadToAnalyze> find(Condition timeWindow, String promptId, Collection<String> channelIds) {
+        if (channelIds.isEmpty()) {
+            return ImmutableList.of();
+        }
 
         ImmutableList<ThreadToAnalyze> threads = dsl
                 .selectDistinct(TICKET.ID, QUERY.TS, QUERY.CHANNEL_ID)
@@ -62,7 +98,7 @@ public class JdbcThreadsAwaitingAnalysisRepository implements ThreadsAwaitingAna
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
                 .where(TICKET.STATUS.eq(TicketStatus.closed))
                 .and(QUERY.CHANNEL_ID.in(channelIds))
-                .and(TICKET.LAST_INTERACTED_AT.gt(cutoff))
+                .and(timeWindow)
                 .and(notExists(selectOne()
                         .from(ANALYSIS)
                         .where(ANALYSIS.TICKET_ID.eq(TICKET.ID.coerce(ANALYSIS.TICKET_ID)))

@@ -100,8 +100,57 @@ class LlmConfigTest {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .rootCause()
-                            .hasMessageContaining(
-                                    "exactly one of analysis.llm.vertex.enabled and analysis.llm.proxy.enabled");
+                            .hasMessageContaining("exactly one of analysis.llm.vertex.enabled,");
+                });
+    }
+
+    @Test
+    void createsOnlyStubModelWhenStubEnabled() {
+        // Vertex and proxy settings deliberately absent: the stub must need no credentials at all —
+        // that is the whole point of it.
+        contextRunner
+                .withPropertyValues(stubProperties())
+                .withPropertyValues("analysis.prompt.enabled=true")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ChatModel.class);
+                    assertThat(context.getBean(ChatModel.class)).isInstanceOf(StubChatModel.class);
+                });
+    }
+
+    @Test
+    void failsStartupWhenStubEnabledWithoutSyntheticDataAcknowledgement() {
+        // The provider flag on its own must not start: a config copied from a laptop into a shared
+        // environment would otherwise write synthetic rows there.
+        contextRunner
+                .withPropertyValues(
+                        "analysis.prompt.enabled=true",
+                        "analysis.llm.vertex.enabled=false",
+                        "analysis.llm.stub.enabled=true",
+                        "analysis.llm.model-name=stub-local")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .rootCause()
+                            .hasMessageContaining("analysis.llm.stub.acknowledge-synthetic-data=true")
+                            .hasMessageContaining("synthetic rows into analysis and summary_snapshot")
+                            .hasMessageContaining("never be enabled against a shared database");
+                });
+    }
+
+    @Test
+    void failsStartupWhenStubAndProxyBothEnabled() {
+        contextRunner
+                .withPropertyValues(stubProperties())
+                .withPropertyValues(
+                        "analysis.prompt.enabled=true",
+                        "analysis.llm.proxy.enabled=true",
+                        "analysis.llm.proxy.base-url=https://llm-proxy.example.test/proxy/v1beta",
+                        "analysis.llm.proxy.auth.basic-auth-token=dXNlcjpwYXNz")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .rootCause()
+                            .hasMessageContaining("exactly one of analysis.llm.vertex.enabled,");
                 });
     }
 
@@ -111,6 +160,15 @@ class LlmConfigTest {
                 .withPropertyValues(vertexProperties())
                 .withPropertyValues("analysis.prompt.enabled=true", "analysis.llm.vertex.enabled=false")
                 .run(context -> assertThat(context).hasFailed());
+    }
+
+    private static String[] stubProperties() {
+        return new String[] {
+            "analysis.llm.vertex.enabled=false",
+            "analysis.llm.stub.enabled=true",
+            "analysis.llm.stub.acknowledge-synthetic-data=true",
+            "analysis.llm.model-name=stub-local"
+        };
     }
 
     private static String[] vertexProperties() {

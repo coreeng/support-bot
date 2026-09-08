@@ -1,0 +1,48 @@
+package com.coreeng.supportbot.summary;
+
+import com.google.common.collect.ImmutableList;
+
+/**
+ * The live aggregations for one window. Computed from SQL on every request — unlike the prose
+ * summary, they are cheap and never cached.
+ *
+ * <p>Two totals matter and they are deliberately different:
+ * <ul>
+ *   <li>{@code totalTickets} — every ticket raised in the window in a monitored channel.
+ *   <li>{@code classifiedTickets} — those with an {@code analysis} row for the <em>current</em>
+ *       prompt. {@code drivers}, {@code categories} and {@code features} only exist for these, so
+ *       each of those breakdowns sums to {@code classifiedTickets}, and
+ *       {@code unclassifiedTickets()} is the explicit remainder (still open, or awaiting backfill).
+ * </ul>
+ *
+ * <p>{@code knowledgeGaps} is the categories breakdown restricted to tickets whose driver is
+ * {@code Knowledge Gap} — the same widget the knowledge-gaps page shows, scoped to the window — so
+ * it sums to that driver's count.
+ *
+ * <p>{@code teams} comes from {@code ticket.team}, which is known for every ticket, so it sums to
+ * {@code totalTickets}.
+ *
+ * <p>{@code products} comes from the product tags on each ticket (labels prefixed "Product - "),
+ * counted once per ticket per distinct product. Untagged tickets have no row there, so it reconciles
+ * against neither total; it mirrors the UI's Products View, which the page hides when no product
+ * tags are configured.
+ *
+ * <p>Every row of every breakdown carries its newest few example tickets ({@link SummaryCount#recent}),
+ * including the explicit blank buckets.
+ */
+public record SummaryBreakdowns(
+        SummaryWindow window,
+        long totalTickets,
+        long classifiedTickets,
+        ImmutableList<SummaryCount> drivers,
+        ImmutableList<SummaryCount> categories,
+        ImmutableList<SummaryCount> knowledgeGaps,
+        ImmutableList<SummaryCount> features,
+        ImmutableList<SummaryCount> teams,
+        ImmutableList<SummaryCount> products) {
+
+    /** Tickets in the window with no analysis for the current prompt: still open, or not yet backfilled. */
+    public long unclassifiedTickets() {
+        return Math.max(0L, totalTickets - classifiedTickets);
+    }
+}

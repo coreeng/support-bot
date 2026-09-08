@@ -10,6 +10,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ProblemDetail;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -22,7 +23,12 @@ public class JsonMapper {
             .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
             .configure(SerializationFeature.FAIL_ON_UNWRAPPED_TYPE_IDENTIFIERS, false)
             .registerModule(new JavaTimeModule())
-            .registerModule(new GuavaModule());
+            .registerModule(new GuavaModule())
+            // This mapper replaces Spring Boot's, which carries this mix-in by default. Without it
+            // the field-visibility rules above serialise ProblemDetail's extension map as a nested
+            // "properties" object instead of flattening it per RFC 9457, so `code` never reaches
+            // the UI.
+            .addMixIn(ProblemDetail.class, ProblemDetailMixin.class);
 
     @VisibleForTesting
     public ObjectMapper getObjectMapper() {

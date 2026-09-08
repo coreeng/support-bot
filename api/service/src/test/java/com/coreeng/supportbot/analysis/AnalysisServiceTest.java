@@ -9,23 +9,22 @@ import com.coreeng.supportbot.analysis.AnalysisService.AnalysisStatus;
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
 import com.coreeng.supportbot.analysis.llm.LlmAnalysisService;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
-import com.coreeng.supportbot.asyncjob.AsyncJobRepository.AsyncJob;
 import com.coreeng.supportbot.config.AnalysisProps;
 import com.coreeng.supportbot.config.AnalysisProps.Bundle;
 import com.coreeng.supportbot.config.AnalysisProps.Llm;
 import com.coreeng.supportbot.config.AnalysisProps.Prompt;
 import com.coreeng.supportbot.config.AnalysisProps.Proxy;
+import com.coreeng.supportbot.config.AnalysisProps.Stub;
 import com.coreeng.supportbot.config.AnalysisProps.Vertex;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
-import java.time.Instant;
+import java.util.concurrent.Executor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationContext;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.dao.DataAccessResourceFailureException;
 
@@ -47,8 +46,9 @@ class AnalysisServiceTest {
     @Mock
     private AnalysisPromptRepository analysisPromptRepository;
 
+    /** Stands in for the {@code analysisTaskExecutor}; nothing runs unless a test runs it. */
     @Mock
-    private ApplicationContext applicationContext;
+    private Executor analysisExecutor;
 
     private static final String PROMPT_TEXT = "Test prompt content";
 
@@ -61,7 +61,8 @@ class AnalysisServiceTest {
                 "gemini-2.5-flash",
                 Duration.ofMillis(100),
                 new Vertex(true, "test-project", "europe-west2"),
-                new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)));
+                new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)),
+                new Stub(false, false));
         Bundle bundle = new Bundle("classpath:placeholder-analysis-bundle.zip");
         Prompt prompt = new Prompt(true);
         analysisProps = new AnalysisProps(llm, bundle, prompt);
@@ -73,70 +74,87 @@ class AnalysisServiceTest {
                 analysisRepository,
                 analysisPromptRepository,
                 analysisProps,
-                applicationContext);
+                analysisExecutor);
+    }
+
+    private static String daysPayload(int days) {
+        return AnalysisJobData.days(days);
     }
 
     private void givenPromptInUse() {
-        when(analysisPromptRepository.findInUse()).thenReturn(new AnalysisPrompt(1, PROMPT_TEXT));
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenReturn(new AnalysisPrompt(1, PROMPT_TEXT));
     }
 
     @Test
     void start_shouldStartJobWhenNotRunning() {
         // given
         int days = 7;
-        when(asyncJobRepository.tryStartJob("analysis", "7")).thenReturn(true);
-        when(applicationContext.getBean(AnalysisService.class)).thenReturn(service);
+        when(asyncJobRepository.tryStartJob("analysis", daysPayload(7))).thenReturn(true);
 
         // when
         boolean result = service.start(days);
 
         // then
         assertThat(result).isTrue();
-        verify(asyncJobRepository).tryStartJob("analysis", "7");
-        verify(applicationContext).getBean(AnalysisService.class);
+        verify(asyncJobRepository).tryStartJob("analysis", daysPayload(7));
+        verify(analysisExecutor).execute(any());
+    }
+
+    @Test
+    void start_shouldRunTheAnalysisOnTheExecutorNotInline() {
+        // The request thread must return as soon as the run is handed over; the analysis itself
+        // happens when the executor gets round to the task.
+        givenPromptInUse();
+        when(asyncJobRepository.tryStartJob("analysis", daysPayload(7))).thenReturn(true);
+        when(threadsAwaitingAnalysisService.find(eq(7), anyString())).thenReturn(ImmutableList.of());
+
+        service.start(7);
+
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(analysisExecutor).execute(task.capture());
+        verifyNoInteractions(threadsAwaitingAnalysisService, analysisRepository);
+
+        task.getValue().run();
+
+        verify(threadsAwaitingAnalysisService).find(eq(7), anyString());
+        verify(asyncJobRepository).deleteJob("analysis");
     }
 
     @Test
     void start_shouldReturnFalseWhenJobAlreadyRunning() {
         // given
         int days = 7;
-        when(asyncJobRepository.tryStartJob("analysis", "7")).thenReturn(false);
+        when(asyncJobRepository.tryStartJob("analysis", daysPayload(7))).thenReturn(false);
 
         // when
         boolean result = service.start(days);
 
         // then
         assertThat(result).isFalse();
-        verify(asyncJobRepository).tryStartJob("analysis", "7");
-        verifyNoInteractions(applicationContext);
+        verify(asyncJobRepository).tryStartJob("analysis", daysPayload(7));
+        verifyNoInteractions(analysisExecutor);
     }
 
     @Test
-    void resumeAnalysisOnStartup_shouldResumeWhenJobExists() {
-        // given
-        AsyncJob existingJob = new AsyncJob("analysis", "14", Instant.now());
-        when(asyncJobRepository.findJob("analysis")).thenReturn(existingJob);
-        when(applicationContext.getBean(AnalysisService.class)).thenReturn(service);
+    void resume_shouldRunOnTheExecutorWithoutClaimingTheLock() {
+        // The startup resume already found the lock row; claiming it again would fail on the unique
+        // constraint and never run the job.
+        assertThat(service.resume(14)).isTrue();
 
-        // when
-        service.resumeAnalysisOnStartup();
-
-        // then
-        verify(asyncJobRepository).findJob("analysis");
-        verify(applicationContext).getBean(AnalysisService.class);
+        verify(analysisExecutor).execute(any());
+        verify(asyncJobRepository, never()).tryStartJob(any(), any());
     }
 
     @Test
-    void resumeAnalysisOnStartup_shouldDoNothingWhenNoJobExists() {
-        // given
-        when(asyncJobRepository.findJob("analysis")).thenReturn(null);
+    void resume_shouldDeleteJobAndReturnFalseWhenExecutorRejects() {
+        doThrow(new TaskRejectedException("Executor queue full"))
+                .when(analysisExecutor)
+                .execute(any());
 
-        // when
-        service.resumeAnalysisOnStartup();
+        assertThat(service.resume(7)).isFalse();
 
-        // then
-        verify(asyncJobRepository).findJob("analysis");
-        verifyNoInteractions(applicationContext);
+        verify(asyncJobRepository).deleteJob("analysis");
     }
 
     @Test
@@ -182,42 +200,25 @@ class AnalysisServiceTest {
     @Test
     void start_shouldUseCorrectDaysParameter() {
         // given
-        when(asyncJobRepository.tryStartJob("analysis", "30")).thenReturn(true);
-        when(applicationContext.getBean(AnalysisService.class)).thenReturn(service);
+        when(asyncJobRepository.tryStartJob("analysis", daysPayload(30))).thenReturn(true);
 
         // when
         service.start(30);
 
         // then
-        verify(asyncJobRepository).tryStartJob("analysis", "30");
+        verify(asyncJobRepository).tryStartJob("analysis", daysPayload(30));
     }
 
     @Test
     void start_shouldHandleSingleDayParameter() {
         // given
-        when(asyncJobRepository.tryStartJob("analysis", "1")).thenReturn(true);
-        when(applicationContext.getBean(AnalysisService.class)).thenReturn(service);
+        when(asyncJobRepository.tryStartJob("analysis", daysPayload(1))).thenReturn(true);
 
         // when
         service.start(1);
 
         // then
-        verify(asyncJobRepository).tryStartJob("analysis", "1");
-    }
-
-    @Test
-    void resumeAnalysisOnStartup_shouldParseJobDataCorrectly() {
-        // given
-        AsyncJob existingJob = new AsyncJob("analysis", "365", Instant.now());
-        when(asyncJobRepository.findJob("analysis")).thenReturn(existingJob);
-        when(applicationContext.getBean(AnalysisService.class)).thenReturn(service);
-
-        // when
-        service.resumeAnalysisOnStartup();
-
-        // then
-        verify(asyncJobRepository).findJob("analysis");
-        verify(applicationContext).getBean(AnalysisService.class);
+        verify(asyncJobRepository).tryStartJob("analysis", daysPayload(1));
     }
 
     @Test
@@ -232,13 +233,13 @@ class AnalysisServiceTest {
     @Test
     void start_shouldNotInteractWithRepositoryWhenJobStartFails() {
         // given
-        when(asyncJobRepository.tryStartJob("analysis", "7")).thenReturn(false);
+        when(asyncJobRepository.tryStartJob("analysis", daysPayload(7))).thenReturn(false);
 
         // when
         service.start(7);
 
         // then
-        verify(asyncJobRepository).tryStartJob("analysis", "7");
+        verify(asyncJobRepository).tryStartJob("analysis", daysPayload(7));
         verifyNoInteractions(threadsAwaitingAnalysisService);
         verifyNoInteractions(llmAnalysisService);
         verifyNoInteractions(analysisRepository);
@@ -266,10 +267,10 @@ class AnalysisServiceTest {
         assertThat(hash1).isNotEqualTo(hash2);
     }
 
-    // --- runAsyncAnalysis tests ---
+    // --- runAnalysis tests (the body the executor runs) ---
 
     @Test
-    void runAsyncAnalysis_analyzesThreadsAndPersists() {
+    void runAnalysis_analyzesThreadsAndPersists() {
         // given
         givenPromptInUse();
         when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
@@ -281,7 +282,7 @@ class AnalysisServiceTest {
                 .thenReturn(new AnalysisRecord(2, "Knowledge Gap", "Monitoring", "compute", "Issue 2", null));
 
         // when
-        service.runAsyncAnalysis(7);
+        service.runAnalysis(7);
 
         // then — both records upserted with promptId stamped (SHA-256 = 64-char hex)
         ArgumentCaptor<AnalysisRecord> captor = ArgumentCaptor.forClass(AnalysisRecord.class);
@@ -303,7 +304,7 @@ class AnalysisServiceTest {
     }
 
     @Test
-    void runAsyncAnalysis_skipsInvalidRecords() {
+    void runAnalysis_skipsInvalidRecords() {
         // given — first thread returns null (LLM failure), second returns valid record
         givenPromptInUse();
         when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
@@ -315,7 +316,7 @@ class AnalysisServiceTest {
                 .thenReturn(new AnalysisRecord(2, "Bug", "Config", "networking", "Issue", null));
 
         // when
-        service.runAsyncAnalysis(7);
+        service.runAnalysis(7);
 
         // then — only 1 upsert (the valid record)
         verify(analysisRepository, times(1)).upsert(any(AnalysisRecord.class));
@@ -329,9 +330,10 @@ class AnalysisServiceTest {
     @Test
     void start_shouldDeleteJobAndReturnFalse_whenExecutorRejectsTask() {
         // given
-        when(asyncJobRepository.tryStartJob("analysis", "7")).thenReturn(true);
-        when(applicationContext.getBean(AnalysisService.class))
-                .thenThrow(new TaskRejectedException("Executor queue full"));
+        when(asyncJobRepository.tryStartJob("analysis", daysPayload(7))).thenReturn(true);
+        doThrow(new TaskRejectedException("Executor queue full"))
+                .when(analysisExecutor)
+                .execute(any());
 
         // when
         boolean result = service.start(7);
@@ -342,36 +344,7 @@ class AnalysisServiceTest {
     }
 
     @Test
-    void resumeAnalysisOnStartup_shouldDeleteJobWhenDataIsCorrupt() {
-        // given
-        AsyncJob corruptJob = new AsyncJob("analysis", "not-a-number", Instant.now());
-        when(asyncJobRepository.findJob("analysis")).thenReturn(corruptJob);
-
-        // when
-        service.resumeAnalysisOnStartup();
-
-        // then
-        verify(asyncJobRepository).deleteJob("analysis");
-        verifyNoInteractions(applicationContext);
-    }
-
-    @Test
-    void resumeAnalysisOnStartup_shouldDeleteJobWhenExecutorRejects() {
-        // given
-        AsyncJob existingJob = new AsyncJob("analysis", "7", Instant.now());
-        when(asyncJobRepository.findJob("analysis")).thenReturn(existingJob);
-        when(applicationContext.getBean(AnalysisService.class))
-                .thenThrow(new TaskRejectedException("Executor queue full"));
-
-        // when
-        service.resumeAnalysisOnStartup();
-
-        // then
-        verify(asyncJobRepository).deleteJob("analysis");
-    }
-
-    @Test
-    void runAsyncAnalysis_continuesAfterPerThreadException() {
+    void runAnalysis_continuesAfterPerThreadException() {
         // given — first thread throws, second and third return valid records
         givenPromptInUse();
         when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
@@ -387,7 +360,7 @@ class AnalysisServiceTest {
                 .thenReturn(new AnalysisRecord(3, "Knowledge Gap", "Monitoring", "compute", "Issue 3", null));
 
         // when
-        service.runAsyncAnalysis(7);
+        service.runAnalysis(7);
 
         // then — 2 records persisted (skipping the failed one)
         verify(analysisRepository, times(2)).upsert(any(AnalysisRecord.class));
@@ -400,12 +373,13 @@ class AnalysisServiceTest {
     }
 
     @Test
-    void runAsyncAnalysis_setsErrorOnPromptLoadFailure() {
+    void runAnalysis_setsErrorOnPromptLoadFailure() {
         // given — no prompt version is marked as in use
-        when(analysisPromptRepository.findInUse()).thenReturn(null);
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenReturn(null);
 
         // when
-        service.runAsyncAnalysis(7);
+        service.runAnalysis(7);
 
         // then — error status set, job still cleaned up
         AnalysisStatus status = service.getStatus();
@@ -424,7 +398,8 @@ class AnalysisServiceTest {
 
     @Test
     void loadPrompt_throwsWhenNoVersionIsInUse() {
-        when(analysisPromptRepository.findInUse()).thenReturn(null);
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenReturn(null);
 
         assertThatThrownBy(service::loadPrompt)
                 .isInstanceOf(AnalysisPromptLoadException.class)
@@ -434,10 +409,44 @@ class AnalysisServiceTest {
     @Test
     void loadPrompt_wrapsDatabaseFailure() {
         // Keeps the ANALYSIS_PROMPT_LOAD_FAILED contract the UI relies on when the DB is unreachable.
-        when(analysisPromptRepository.findInUse()).thenThrow(new DataAccessResourceFailureException("db down"));
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
 
         assertThatThrownBy(service::loadPrompt)
                 .isInstanceOf(AnalysisPromptLoadException.class)
+                .hasRootCauseInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void currentPromptId_isTheHashOfThePromptInUse() {
+        givenPromptInUse();
+
+        assertThat(service.currentPromptId()).isEqualTo(AnalysisService.computePromptId(PROMPT_TEXT));
+    }
+
+    @Test
+    void currentPromptId_throwsWhenNoVersionIsInUse() {
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.CLASSIFICATION))
+                .thenReturn(null);
+
+        assertThatThrownBy(service::currentPromptId).isInstanceOf(AnalysisPromptLoadException.class);
+    }
+
+    @Test
+    void inUsePrompt_returnsNullWhenNoVersionOfThatTypeIsInUse() {
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY)).thenReturn(null);
+
+        assertThat(service.inUsePrompt(AnalysisPromptType.SUMMARY)).isNull();
+    }
+
+    @Test
+    void inUsePrompt_wrapsDatabaseFailure() {
+        when(analysisPromptRepository.findInUse(AnalysisPromptType.SUMMARY))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+
+        assertThatThrownBy(() -> service.inUsePrompt(AnalysisPromptType.SUMMARY))
+                .isInstanceOf(AnalysisPromptLoadException.class)
+                .hasMessageContaining("summary")
                 .hasRootCauseInstanceOf(DataAccessResourceFailureException.class);
     }
 }
