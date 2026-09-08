@@ -1,7 +1,6 @@
 import { clearMockUrlParamsInitial, useMockUrlParams as mockUseUrlParams, setMockUrlParamsInitial } from "@/test-utils/mock-url-params";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import React from "react";
 import { PRESET_DAYS } from "../../../lib/dateRange";
 import * as hooks from "../../../lib/hooks";
@@ -182,36 +181,24 @@ describe("Tickets Component", () => {
     // Regression: "Any Date" used to be represented by an empty-string dateFilter,
     // which the real useUrlParams strips from the URL — the filter silently
     // snapped back to the default "Last Week" and kept the bounded date range.
-    it('requests an unbounded date range when "Any Date" is selected', async () => {
-      const user = userEvent.setup();
-      const mockTickets = getMockPaginatedTickets([createMockTicket("1", "opened", "Team A", "high")]);
-
+    it('requests an unbounded date range when the dashboard selects "Any Date"', () => {
+      setMockUrlParamsInitial({ dateFilter: "all" });
       mockUseTickets.mockReturnValue({
-        data: mockTickets,
+        data: getMockPaginatedTickets([createMockTicket("1", "opened", "Team A", "high")]),
         isLoading: false,
         error: null,
       } as unknown as ReturnType<typeof hooks.useTickets>);
 
       render(<Tickets />, { wrapper: Wrapper });
 
-      // Default "Last Week" filter passes a bounded range to the backend hook.
-      let [, , dateFrom, dateTo] = mockUseTickets.mock.lastCall ?? [];
-      expect(dateFrom).toEqual(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
-      expect(dateTo).toEqual(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
-
-      // The date Select is the only combobox on the page (faceted filters are buttons).
-      await user.click(screen.getByRole("combobox"));
-      await user.click(await screen.findByRole("option", { name: "Any Date" }));
-
-      // The selection must stick and drop the date bounds from the backend query.
-      expect(screen.getByRole("combobox")).toHaveTextContent("Any Date");
-      [, , dateFrom, dateTo] = mockUseTickets.mock.lastCall ?? [];
+      // The host page owns the date filter; "all" drops the date bounds from the backend query.
+      const [, , dateFrom, dateTo] = mockUseTickets.mock.lastCall ?? [];
       expect(dateFrom).toBeUndefined();
       expect(dateTo).toBeUndefined();
     });
   });
 
-  describe("Embedded mode", () => {
+  describe("Home page section", () => {
     const dateFilterValidator = () => {
       const validator = mockCapturedValidators.at(-1)?.dateFilter;
       if (!validator) throw new Error("TicketsPage passed no dateFilter validator to useUrlParams");
@@ -225,7 +212,7 @@ describe("Tickets Component", () => {
         error: null,
       } as unknown as ReturnType<typeof hooks.useTickets>);
 
-      render(<Tickets embedded />, { wrapper: Wrapper });
+      render(<Tickets />, { wrapper: Wrapper });
 
       expect(screen.getByRole("heading", { level: 2, name: "Tickets" })).toBeInTheDocument();
       expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
@@ -235,21 +222,17 @@ describe("Tickets Component", () => {
       expect(screen.getByRole("table")).toBeInTheDocument();
     });
 
-    it("accepts the lastYear preset only when embedded", () => {
+    it("accepts the dashboard's lastYear preset", () => {
       mockUseTickets.mockReturnValue({
         data: getMockPaginatedTickets([]),
         isLoading: false,
         error: null,
       } as unknown as ReturnType<typeof hooks.useTickets>);
 
-      const { unmount } = render(<Tickets embedded />, { wrapper: Wrapper });
+      render(<Tickets />, { wrapper: Wrapper });
       expect(dateFilterValidator()("lastYear", "lastWeek")).toBe("lastYear");
       expect(dateFilterValidator()("lastMonth", "lastWeek")).toBe("lastMonth");
-      unmount();
-
-      render(<Tickets />, { wrapper: Wrapper });
-      expect(dateFilterValidator()("lastYear", "lastWeek")).toBe("lastWeek");
-      expect(dateFilterValidator()("lastMonth", "lastWeek")).toBe("lastMonth");
+      expect(dateFilterValidator()("bogus", "lastWeek")).toBe("lastWeek");
     });
 
     it("requests a 365-day range for the shared lastYear preset", () => {
@@ -260,7 +243,7 @@ describe("Tickets Component", () => {
         error: null,
       } as unknown as ReturnType<typeof hooks.useTickets>);
 
-      render(<Tickets embedded />, { wrapper: Wrapper });
+      render(<Tickets />, { wrapper: Wrapper });
 
       const [, , dateFrom, dateTo] = mockUseTickets.mock.lastCall ?? [];
       expect(dateFrom).toEqual(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
