@@ -22,7 +22,6 @@ on:
     paths-ignore:
       - '.agents/**'
       - '.claude/**'
-      - 'skills/**'
 
 permissions:
   contents: write
