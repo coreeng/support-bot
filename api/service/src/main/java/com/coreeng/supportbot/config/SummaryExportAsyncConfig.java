@@ -7,7 +7,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * Unlike {@link AsyncConfig}'s {@code analysisTaskExecutor}, this executor must always be
- * available — the async thread export isn't gated behind {@code analysis.prompt.enabled}.
+ * available — the async thread export isn't gated behind {@code llm.provider}.
  */
 @Configuration
 public class SummaryExportAsyncConfig {

@@ -12,7 +12,7 @@ import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.coreeng.supportbot.config.SummaryProps;
+import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -71,7 +71,10 @@ class SummaryServiceTest {
                 summarySnapshotRepository,
                 summaryRefresher,
                 channelRegistry,
-                new SummaryProps(true, 400, RETRY_DELAY),
+                new SummaryAreaProps(
+                        new SummaryAreaProps.Sanitisation(List.of(), List.of()),
+                        new SummaryAreaProps.Page(400, RETRY_DELAY),
+                        new SummaryAreaProps.OfflineExport("classpath:placeholder-analysis-bundle.zip")),
                 clock);
 
         lenient().when(clock.instant()).thenReturn(NOW);

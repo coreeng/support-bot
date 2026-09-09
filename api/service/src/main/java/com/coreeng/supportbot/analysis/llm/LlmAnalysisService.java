@@ -1,12 +1,12 @@
 package com.coreeng.supportbot.analysis.llm;
 
 import com.coreeng.supportbot.analysis.AnalysisRecord;
+import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import dev.langchain4j.model.chat.ChatModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
@@ -30,7 +30,7 @@ import org.springframework.stereotype.Service;
  * </pre>
  */
 @Service
-@ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
+@ConditionalOnLlmEnabled
 @RequiredArgsConstructor
 @Slf4j
 public class LlmAnalysisService {

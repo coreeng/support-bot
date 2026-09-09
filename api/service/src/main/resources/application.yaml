@@ -392,29 +392,35 @@ metrics:
   enabled: false
   refresh-interval: 60s
 
-# Analysis configuration
-analysis:
-  llm:
-    model-name: ${ANALYSIS_MODEL_NAME:gemini-2.5-flash}
-    request-delay: ${ANALYSIS_REQUEST_DELAY:500ms}
-    vertex:
-      enabled: ${VERTEX_ENABLED:true}
-      project-id: ${VERTEX_PROJECT_ID:support-bot-cecg-efb3c84c}
-      location: ${VERTEX_LOCATION:europe-west2}
-    proxy:
-      enabled: ${AI_PROXY_ENABLED:false}
-      base-url: ${AI_PROXY_BASE_URL:}
-      auth:
-        basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:}
-      timeout: ${AI_PROXY_TIMEOUT:20s}
-  bundle:
-    path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip}
-  prompt:
-    enabled: ${ANALYSIS_PROMPT_ENABLED:false}
+# LLM configuration, shared by the knowledge-gap analysis run and the Support Summary page (/summary).
+# `provider` is the one switch for both features: `none` (default) turns them off and builds no
+# LLM client; `vertex` or `proxy` turns them on. Only the selected provider's settings are validated.
+# `stub` is a local-development provider (canned, synthetic output) that additionally needs
+# llm.stub.acknowledge-synthetic-data=true; that key is deliberately absent here.
+llm:
+  provider: ${LLM_PROVIDER:none} # none | vertex | proxy | stub
+  model-name: ${LLM_MODEL_NAME:gemini-2.5-flash}
+  request-delay: ${LLM_REQUEST_DELAY:500ms}
+  vertex:
+    project-id: ${VERTEX_PROJECT_ID:support-bot-cecg-efb3c84c}
+    location: ${VERTEX_LOCATION:europe-west2}
+  proxy:
+    base-url: ${AI_PROXY_BASE_URL:}
+    auth:
+      basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:}
+    timeout: ${AI_PROXY_TIMEOUT:20s}
 
-# Support Summary page (/summary): windowed breakdowns plus an LLM-written summary.
-# Requires analysis.prompt.enabled. Off by default.
-summary:
-  enabled: ${SUMMARY_ENABLED:false}
-  max-reasons: ${SUMMARY_MAX_REASONS:1000} # Newest per-ticket reasons fed to the summary model; sized for the 92-day window cap
-  failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried
+# Support Summary area: the /summary page and the /summary-data thread export.
+summary-area:
+  # Patterns scrubbed from thread text before it reaches the page's classifier or the export file.
+  # Deployments set their own (see docs/adr/adr-005-configurable-thread-sanitisation.md).
+  sanitisation:
+    patterns: []
+    exceptions: []
+  # The page. On whenever llm.provider is not `none`; no switch of its own.
+  page:
+    max-reasons: ${SUMMARY_MAX_REASONS:1000} # Newest per-ticket reasons fed to the summary model; sized for the 92-day window cap
+    failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried
+  # The offline analysis kit served next to the export. Always on; can be dropped wholesale when retired.
+  offline-export:
+    analysis-bundle-path: ${OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip}

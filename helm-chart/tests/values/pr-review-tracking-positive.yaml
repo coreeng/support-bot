@@ -1,6 +1,6 @@
 configMap:
   config:
-    summary-data:
+    summary-area:
       sanitisation:
         patterns:
           - secret-[0-9]+

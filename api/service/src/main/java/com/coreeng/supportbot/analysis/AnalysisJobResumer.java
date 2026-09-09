@@ -1,10 +1,10 @@
 package com.coreeng.supportbot.analysis;
 
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
+import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
  * serves the summary and resolves its implementation would be a dependency cycle.
  */
 @Component
-@ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
+@ConditionalOnLlmEnabled
 @RequiredArgsConstructor
 @Slf4j
 public class AnalysisJobResumer {

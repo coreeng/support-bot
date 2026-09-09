@@ -4,15 +4,15 @@ import com.coreeng.supportbot.analysis.AnalysisPrompt;
 import com.coreeng.supportbot.analysis.AnalysisPromptLoadException;
 import com.coreeng.supportbot.analysis.AnalysisPromptType;
 import com.coreeng.supportbot.analysis.AnalysisService;
+import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
-import com.coreeng.supportbot.config.SummaryProps;
+import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.google.common.collect.ImmutableList;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
@@ -27,7 +27,7 @@ import org.springframework.stereotype.Service;
  * state.
  */
 @Service
-@ConditionalOnProperty(name = "summary.enabled", havingValue = "true")
+@ConditionalOnLlmEnabled
 @RequiredArgsConstructor
 @Slf4j
 public class SummaryService {
@@ -37,7 +37,7 @@ public class SummaryService {
     private final SummarySnapshotRepository summarySnapshotRepository;
     private final SummaryRefreshService summaryRefresher;
     private final SlackChannelRegistry channelRegistry;
-    private final SummaryProps summaryProps;
+    private final SummaryAreaProps summaryAreaProps;
     private final Clock clock;
 
     /** Breakdowns plus whatever can be said about the prose summary right now. */
@@ -117,7 +117,7 @@ public class SummaryService {
      * <p>A gap is a closed ticket the backfill could not classify. Some never will be (the Slack
      * thread is gone), but many are transient — a rate limit, a timeout — and pinning them into the
      * fingerprint until the window's data happens to change would leave a finished window
-     * permanently short. So once the snapshot is older than {@link SummaryProps#failureRetryDelay()}
+     * permanently short. So once the snapshot is older than {@link SummaryAreaProps.Page#failureRetryDelay()}
      * its gaps are treated as stale and the next visit starts a refresh that attempts them again. The
      * refresh stores a new snapshot either way, and its {@code generatedAt} restarts the clock, so a
      * gap that still cannot be filled costs one retry per delay rather than one per poll.
@@ -127,14 +127,15 @@ public class SummaryService {
         if (fingerprint.gapCount() == 0 || generatedAt == null) {
             return false;
         }
-        boolean due = !clock.instant().isBefore(generatedAt.plus(summaryProps.failureRetryDelay()));
+        boolean due = !clock.instant()
+                .isBefore(generatedAt.plus(summaryAreaProps.page().failureRetryDelay()));
         if (due) {
             log.info(
                     "Snapshot for window {}..{} carries {} classification gap(s) and is older than {}; retrying them",
                     snapshot.window().from(),
                     snapshot.window().to(),
                     fingerprint.gapCount(),
-                    summaryProps.failureRetryDelay());
+                    summaryAreaProps.page().failureRetryDelay());
         }
         return due;
     }

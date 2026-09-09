@@ -2,7 +2,8 @@ package com.coreeng.supportbot.summary.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.coreeng.supportbot.config.SummaryProps;
+import com.coreeng.supportbot.config.LlmProps;
+import com.coreeng.supportbot.config.LlmProvider;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -11,7 +12,7 @@ import org.springframework.http.ResponseEntity;
 class SummaryEnabledControllerTest {
 
     @Test
-    void returnsEnabled_whenSummaryEnabled() {
+    void returnsEnabled_whenProviderSelected() {
         ResponseEntity<SummaryStatusUI> response = controllerWithEnabled(true).getSummaryEnabled();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -20,7 +21,7 @@ class SummaryEnabledControllerTest {
     }
 
     @Test
-    void returnsDisabled_whenSummaryDisabled() {
+    void returnsDisabled_whenNoProviderSelected() {
         // The point of the endpoint: with the feature off it must still answer, so the sidebar gets a
         // usable false instead of a 404 it would have to interpret.
         ResponseEntity<SummaryStatusUI> response = controllerWithEnabled(false).getSummaryEnabled();
@@ -31,6 +32,12 @@ class SummaryEnabledControllerTest {
     }
 
     private static SummaryEnabledController controllerWithEnabled(boolean enabled) {
-        return new SummaryEnabledController(new SummaryProps(enabled, 400, Duration.ofMinutes(15)));
+        return new SummaryEnabledController(new LlmProps(
+                enabled ? LlmProvider.VERTEX : LlmProvider.NONE,
+                "gemini-2.5-flash",
+                Duration.ofMillis(100),
+                new LlmProps.Vertex("test-project", "europe-west2"),
+                new LlmProps.Proxy("", new LlmProps.Proxy.Auth(""), Duration.ofSeconds(30)),
+                new LlmProps.Stub(false)));
     }
 }

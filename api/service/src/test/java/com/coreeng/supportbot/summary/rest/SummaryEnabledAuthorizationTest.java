@@ -5,7 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.coreeng.supportbot.config.SummaryProps;
+import com.coreeng.supportbot.config.LlmProps;
 import com.coreeng.supportbot.security.AllowListService;
 import com.coreeng.supportbot.security.AuthCodeStore;
 import com.coreeng.supportbot.security.JwtAuthenticationToken;
@@ -40,15 +40,17 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @WebMvcTest(
         controllers = SummaryEnabledController.class,
         properties = {
-            "summary.enabled=true",
-            "analysis.prompt.enabled=true",
+            "llm.provider=vertex",
+            "llm.model-name=gemini-2.5-flash",
+            "llm.vertex.project-id=test-project",
+            "llm.vertex.location=europe-west2",
             "security.jwt.secret=test-jwt-secret-for-unit-tests-minimum-256-bits",
             "security.test-bypass.enabled=false"
         })
 @Import(SecurityConfig.class)
-// A @WebMvcTest slice does not run the application's @ConfigurationPropertiesScan, so the flag the
-// controller reads has to be bound explicitly.
-@EnableConfigurationProperties(SummaryProps.class)
+// A @WebMvcTest slice does not run the application's @ConfigurationPropertiesScan, so the provider
+// switch the controller reads has to be bound explicitly.
+@EnableConfigurationProperties(LlmProps.class)
 class SummaryEnabledAuthorizationTest {
 
     @Autowired
