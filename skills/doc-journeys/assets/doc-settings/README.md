@@ -54,6 +54,10 @@ main checkout — because that is where a run resolves them.
     use `rg`; if your adapters or reports pin `rg` or `grep` commands, check the named binary is
     on the PATH and behaves as the template expects (a shell alias or wrapper is not the same
     thing).
+  * **The skills sit where your agent looks, and the session started after they landed.** Most
+    agents read `.agents/skills/` (`gh skill install --agent universal`); Claude Code reads
+    `.claude/skills/`, and a symlink from there to `.agents/skills` works. Discovery happens when
+    a session starts, so restart an open session after installing or updating.
 
 Then run the skill in plan mode before anything writes:
 

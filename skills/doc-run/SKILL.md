@@ -48,7 +48,8 @@ Every run gets its own worktree and branch so several runs can proceed in parall
 workstation and each lands as a mergeable unit. Four roots, carried in **every** spawn prompt:
 
 - **Tools root** — the directory holding the `doc-run` and `doc-journeys` skill directories:
-  `${CLAUDE_SKILL_DIR}/..` (substituted into this file when the skill loads; `.claude/skills/` in a consumer). Resolve it once and pin the absolute
+  `${CLAUDE_SKILL_DIR}/..` (substituted into this file when the skill loads; if it still reads
+  literally, it means the directory containing this `SKILL.md`). Resolve it once and pin the absolute
   path in every spawn prompt as "tools root" — prompt files get no substitution, so every
   `<tools root>` path an agent reads resolves against the value you pinned. Agents load
   doc-journeys and its references from here, so a run always uses the pipeline as currently

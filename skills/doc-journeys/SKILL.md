@@ -12,6 +12,8 @@ Given a product and its user journeys, this skill **consolidates documentation t
 
 The skill is **consumer-agnostic**. Everything about a particular repository, site and estate — where output goes, which repositories are sources, how the site builds, what has been authorised — lives in that repository's `.doc-settings/` directory and is read per `${CLAUDE_SKILL_DIR}/references/settings.md`. Nothing in this skill names a real repository, site or team.
 
+Paths in this skill and its references are written as `${CLAUDE_SKILL_DIR}/…`. Claude Code substitutes that with the directory containing this file when the skill loads. If it reaches you literally — an agent that does not substitute it, or a human reading the source — it means exactly that: the absolute path of the directory this `SKILL.md` is in.
+
 It is a reorganiser, not an author. Prose, structure and framing are written fresh; **claims are never invented and never derived from code**. Where a capability is documented only in source, the skill writes nothing and reports the gap.
 
 The flow is:
