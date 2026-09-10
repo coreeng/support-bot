@@ -25,16 +25,32 @@ Both skills follow the [Agent Skills](https://agentskills.io) standard and live 
 the layout every installer discovers. **Install both**: `doc-run` needs `doc-journeys` beside it
 and stops if it is missing.
 
-With the GitHub CLI, vendored into the consumer's `.claude/skills/`:
+With the GitHub CLI, vendored into the consumer repository and committed there, so a clone has
+the skills without installing anything. Two locations, depending on which agents the consumer
+runs:
 
 ```bash
-gh skill install coreeng/support-bot doc-journeys --agent claude-code
-gh skill install coreeng/support-bot doc-run --agent claude-code
-gh skill update --all           # later
+# Agent-neutral: .agents/skills/, the directory Copilot, Codex, Cursor, Gemini CLI, Amp,
+# OpenCode and others share. Recommended when the agent is not fixed (a CI/CD pipeline, say).
+gh skill install coreeng/support-bot doc-journeys --agent universal --scope project
+gh skill install coreeng/support-bot doc-run      --agent universal --scope project
+ln -s ../.agents/skills .claude/skills            # Claude Code reads only .claude/skills/
+
+# Claude Code only: straight into .claude/skills/
+gh skill install coreeng/support-bot doc-journeys --agent claude-code --scope project
+gh skill install coreeng/support-bot doc-run      --agent claude-code --scope project
+
+gh skill update --all                             # later
 ```
+
+Claude Code follows the symlink and reads `${CLAUDE_SKILL_DIR}` as the symlinked path, so
+`doc-run` still finds `doc-journeys` beside it. Skills are discovered when a session starts:
+restart an open session after installing or updating, or `/doc-run` reports an unknown skill.
 
 Pin a release with `--pin <tag>`; releases are cut with `gh skill publish --tag doc-tools/vX.Y.Z`
 (prefixed, because plain `v*` tags belong to the application pipeline in this repository).
+Re-pin with the same command plus `--force`. Never edit the vendored copies: change them here,
+release, re-install.
 
 With the `skills` CLI, which also targets other agents and keeps a `skills-lock.json`:
 
@@ -42,9 +58,11 @@ With the `skills` CLI, which also targets other agents and keeps a `skills-lock.
 npx skills add coreeng/support-bot --skill doc-journeys --skill doc-run -a claude-code -y
 ```
 
-The skills are written for Claude Code — doc-run drives its Agent, SendMessage and Skill tools,
-and `${CLAUDE_SKILL_DIR}` is a Claude Code substitution. Other agents receive the same files but
-will not run the pipeline.
+`${CLAUDE_SKILL_DIR}` is a Claude Code substitution — the directory containing the `SKILL.md`
+being read. Both skills say so near the top, so an agent that does not substitute it (or a human)
+can read the paths literally and still resolve them. `doc-journeys` is usable that way from any
+agent that follows a `SKILL.md`. `doc-run` is not: it drives Claude Code's Agent, SendMessage and
+Skill tools to spawn and steer its builder and reviewers.
 
 ## Setting up a consumer
 
