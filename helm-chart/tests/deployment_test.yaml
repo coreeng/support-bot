@@ -87,7 +87,7 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
-            name: SUMMARY_DATA_ANALYSIS_BUNDLE_PATH
+            name: OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH
             value: /app/analysis.zip
       - contains:
           path: spec.template.spec.volumes

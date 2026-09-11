@@ -5,61 +5,50 @@ import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Locale;
-import java.util.stream.Stream;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
-@ConfigurationProperties(prefix = "analysis")
-public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
+/**
+ * LLM configuration shared by the analysis run and the Support Summary page.
+ *
+ * <p>{@link #provider()} is the only feature flag: {@link LlmProvider#NONE} (the default) switches
+ * both features off, anything else switches them on and names the client to build. Only the
+ * selected provider's settings are validated, so a deployment with the feature off is never blocked
+ * from starting by provider config it does not use.
+ */
+@ConfigurationProperties(prefix = "llm")
+public record LlmProps(
+        @DefaultValue("none") LlmProvider provider,
+        @DefaultValue("") String modelName,
+        @DefaultValue("500ms") Duration requestDelay,
+        @DefaultValue Vertex vertex,
+        @DefaultValue Proxy proxy,
+        @DefaultValue Stub stub) {
 
-    public AnalysisProps {
-        // LLM settings are only consulted when the analysis feature is on; a deployment with the
-        // feature off must not be blocked from starting by provider config it never uses.
-        if (prompt.enabled()) {
-            llm.validate();
+    public LlmProps {
+        modelName = modelName.trim();
+        if (provider != LlmProvider.NONE) {
+            if (modelName.isEmpty()) {
+                throw new IllegalArgumentException("llm.model-name must not be blank");
+            }
+            if (requestDelay.isNegative()) {
+                throw new IllegalArgumentException("llm.request-delay must not be negative");
+            }
+            switch (provider) {
+                case VERTEX -> vertex.validate();
+                case PROXY -> proxy.validate();
+                case STUB -> stub.validate();
+                case NONE -> throw new AssertionError("unreachable");
+            }
         }
     }
 
-    public record Llm(
-            @DefaultValue("") String modelName,
-            @DefaultValue("500ms") Duration requestDelay,
-            @DefaultValue Vertex vertex,
-            @DefaultValue Proxy proxy,
-            @DefaultValue Stub stub) {
-
-        public Llm {
-            modelName = modelName.trim();
-        }
-
-        void validate() {
-            if (modelName.isEmpty()) {
-                throw new IllegalArgumentException("analysis.llm.model-name must not be blank");
-            }
-            if (requestDelay.isNegative()) {
-                throw new IllegalArgumentException("analysis.llm.request-delay must not be negative");
-            }
-            // Only the enabled provider's settings are required; the others may stay blank. Note that
-            // vertex defaults to enabled, so selecting another provider means turning vertex off
-            // explicitly — the same step proxy mode has always needed.
-            long enabledProviders = Stream.of(vertex.enabled(), proxy.enabled(), stub.enabled())
-                    .filter(Boolean::booleanValue)
-                    .count();
-            if (enabledProviders != 1) {
-                throw new IllegalArgumentException("exactly one of analysis.llm.vertex.enabled,"
-                        + " analysis.llm.proxy.enabled and analysis.llm.stub.enabled must be true");
-            }
-            if (vertex.enabled()) {
-                vertex.validate();
-            } else if (proxy.enabled()) {
-                proxy.validate();
-            } else {
-                stub.validate();
-            }
-        }
+    /** Whether the LLM-backed features (analysis run, Support Summary page) are on. */
+    public boolean enabled() {
+        return provider != LlmProvider.NONE;
     }
 
     public record Vertex(
-            @DefaultValue("true") boolean enabled,
             @DefaultValue("") String projectId,
             @DefaultValue("") String location) {
 
@@ -70,18 +59,15 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
 
         void validate() {
             if (projectId.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "analysis.llm.vertex.project-id is required when analysis.llm.vertex.enabled=true");
+                throw new IllegalArgumentException("llm.vertex.project-id is required when llm.provider=vertex");
             }
             if (location.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "analysis.llm.vertex.location is required when analysis.llm.vertex.enabled=true");
+                throw new IllegalArgumentException("llm.vertex.location is required when llm.provider=vertex");
             }
         }
     }
 
     public record Proxy(
-            @DefaultValue("false") boolean enabled,
             @DefaultValue("") String baseUrl,
             @DefaultValue Auth auth,
             @DefaultValue("20s") Duration timeout) {
@@ -92,17 +78,16 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
 
         void validate() {
             if (baseUrl.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "analysis.llm.proxy.base-url is required when analysis.llm.proxy.enabled=true"
-                                + " (full URL including the /v1beta suffix)");
+                throw new IllegalArgumentException("llm.proxy.base-url is required when llm.provider=proxy"
+                        + " (full URL including the /v1beta suffix)");
             }
-            URI baseUri = validateHttpUrl("analysis.llm.proxy.base-url", baseUrl);
+            URI baseUri = validateHttpUrl("llm.proxy.base-url", baseUrl);
             if (baseUri.getQuery() != null || baseUri.getFragment() != null) {
-                throw new IllegalArgumentException("analysis.llm.proxy.base-url must not contain a query or fragment");
+                throw new IllegalArgumentException("llm.proxy.base-url must not contain a query or fragment");
             }
             auth.validate();
             if (timeout.isZero() || timeout.isNegative()) {
-                throw new IllegalArgumentException("analysis.llm.proxy.timeout must be positive");
+                throw new IllegalArgumentException("llm.proxy.timeout must be positive");
             }
         }
 
@@ -141,13 +126,13 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
             void validate() {
                 if (basicAuthToken.isEmpty()) {
                     throw new IllegalArgumentException(
-                            "analysis.llm.proxy.auth.basic-auth-token is required when analysis.llm.proxy.enabled=true");
+                            "llm.proxy.auth.basic-auth-token is required when llm.provider=proxy");
                 }
                 try {
                     Base64.getDecoder().decode(basicAuthToken);
                 } catch (IllegalArgumentException e) {
                     throw new IllegalArgumentException(
-                            "analysis.llm.proxy.auth.basic-auth-token must be a Base64-encoded credential", e);
+                            "llm.proxy.auth.basic-auth-token must be a Base64-encoded credential", e);
                 }
             }
 
@@ -163,18 +148,16 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
      * all. Takes no credentials, which is the point — neither GCP IAM nor the internal proxy's token
      * is needed to exercise the analysis and Support Summary features end to end.
      *
-     * <p>Local-only. Its output is stored exactly like real model output, so enabling it is a
-     * two-step opt-in: {@code enabled} selects the provider and {@code acknowledgeSyntheticData}
-     * confirms the operator knows the database will receive synthetic rows. Startup fails with the
-     * first flag alone, so a copied-over {@code enabled=true} cannot quietly reach a shared
-     * environment.
+     * <p>Local-only. Its output is stored exactly like real model output, so selecting it is a
+     * two-step opt-in: {@code llm.provider=stub} picks the provider and
+     * {@code acknowledgeSyntheticData} confirms the operator knows the database will receive
+     * synthetic rows. Startup fails with the provider alone, so a copied-over
+     * {@code LLM_PROVIDER=stub} cannot quietly reach a shared environment.
      */
-    public record Stub(
-            @DefaultValue("false") boolean enabled,
-            @DefaultValue("false") boolean acknowledgeSyntheticData) {
+    public record Stub(@DefaultValue("false") boolean acknowledgeSyntheticData) {
 
         static final String SYNTHETIC_DATA_GUARD =
-                "analysis.llm.stub.enabled=true also requires analysis.llm.stub.acknowledge-synthetic-data=true:"
+                "llm.provider=stub also requires llm.stub.acknowledge-synthetic-data=true:"
                         + " the stub LLM provider writes synthetic rows into analysis and summary_snapshot,"
                         + " is for local development only and must never be enabled against a shared database";
 
@@ -184,8 +167,4 @@ public record AnalysisProps(Llm llm, Bundle bundle, Prompt prompt) {
             }
         }
     }
-
-    public record Bundle(String path) {}
-
-    public record Prompt(boolean enabled) {}
 }

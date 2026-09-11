@@ -9,13 +9,8 @@ import com.coreeng.supportbot.analysis.AnalysisService.AnalysisStatus;
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
 import com.coreeng.supportbot.analysis.llm.LlmAnalysisService;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
-import com.coreeng.supportbot.config.AnalysisProps;
-import com.coreeng.supportbot.config.AnalysisProps.Bundle;
-import com.coreeng.supportbot.config.AnalysisProps.Llm;
-import com.coreeng.supportbot.config.AnalysisProps.Prompt;
-import com.coreeng.supportbot.config.AnalysisProps.Proxy;
-import com.coreeng.supportbot.config.AnalysisProps.Stub;
-import com.coreeng.supportbot.config.AnalysisProps.Vertex;
+import com.coreeng.supportbot.config.LlmProps;
+import com.coreeng.supportbot.config.LlmProvider;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.util.concurrent.Executor;
@@ -52,20 +47,18 @@ class AnalysisServiceTest {
 
     private static final String PROMPT_TEXT = "Test prompt content";
 
-    private AnalysisProps analysisProps;
+    private LlmProps llmProps;
     private AnalysisService service;
 
     @BeforeEach
     void setUp() {
-        Llm llm = new Llm(
+        llmProps = new LlmProps(
+                LlmProvider.VERTEX,
                 "gemini-2.5-flash",
                 Duration.ofMillis(100),
-                new Vertex(true, "test-project", "europe-west2"),
-                new Proxy(false, "", new Proxy.Auth(""), Duration.ofSeconds(30)),
-                new Stub(false, false));
-        Bundle bundle = new Bundle("classpath:placeholder-analysis-bundle.zip");
-        Prompt prompt = new Prompt(true);
-        analysisProps = new AnalysisProps(llm, bundle, prompt);
+                new LlmProps.Vertex("test-project", "europe-west2"),
+                new LlmProps.Proxy("", new LlmProps.Proxy.Auth(""), Duration.ofSeconds(30)),
+                new LlmProps.Stub(false));
 
         service = new AnalysisService(
                 asyncJobRepository,
@@ -73,7 +66,7 @@ class AnalysisServiceTest {
                 llmAnalysisService,
                 analysisRepository,
                 analysisPromptRepository,
-                analysisProps,
+                llmProps,
                 analysisExecutor);
     }
 

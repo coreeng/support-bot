@@ -16,7 +16,17 @@ In the next section, you'll find default values and configuration options specif
 > Note: Spring Boot provides a lot of configuration options. Address Spring documentation for more information.
 
 # Default Configuration
+
+The block below mirrors the shipped `application.yaml`. Spring's own `spring.security.oauth2.client`
+registrations are omitted: they are driven entirely by the SSO environment variables documented
+under [Single Sign-On](#single-sign-on-sso).
+
 ```yaml
+server:
+  port: 8080
+  shutdown: graceful
+  max-http-request-header-size: 65536 # 64KB
+
 management:
   server:
     port: 8081
@@ -32,7 +42,27 @@ management:
           server:
             requests: true
 
+security:
+  jwt:
+    secret: ${JWT_SECRET} # Required; at least 256 bits
+    expiration: 24h
+  oauth2:
+    # Proxied OAuth: the API validates redirect_uri origin against this URL — set UI_ORIGIN to match NEXTAUTH_URL on the UI.
+    redirect-uri: ${UI_ORIGIN:http://localhost:3000}/login
+    # Omit login-providers to register every IdP with full credentials; a non-empty list restricts to those ids, e.g. [dex].
+    # login-providers:
+    #   - dex
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:} # Comma-separated domains allowed to call the API from a browser (https root + subdomains); "*" = any; empty = no CORS headers
+  test-bypass:
+    enabled: false # Never enable outside automated tests
+  allow-list: # Who may log in. Leave both empty to allow every authenticated identity.
+    emails: ${ALLOWED_EMAILS:}
+    domains: ${ALLOWED_DOMAINS:}
+
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   main:
     banner-mode: off
   application:
@@ -55,8 +85,16 @@ spring:
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     hikari:
+      connection-init-sql: SET search_path TO "${app.db.schema}"
       data-source-properties:
         reWriteBatchedInserts: true
+  flyway:
+    default-schema: ${app.db.schema}
+    schemas: ${app.db.schema}
+
+app:
+  db:
+    schema: ${DB_SCHEMA:public} # Postgres schema for all tables and migrations; use a dedicated one on a shared database
 
 elevate:
   base-url: ${ELEVATE_BASE_URL:}
@@ -81,6 +119,10 @@ elevate:
   version: ${SUPPORT_BOT_VERSION:dev}
 
 slack:
+  mode: socket # socket (default, no public ingress needed) or http
+  enable-request-verification: true # Verify Slack signatures on incoming requests (http mode)
+  client:
+    methods-base-url: "" # Override the Slack API base URL; only for tests against a mock
   creds: # Credentials of Slack App
     token: ${SLACK_TOKEN} # Token like: xoxb-abc-def
     socket-token: ${SLACK_SOCKET_TOKEN} # Token like: xapp-1-abc-def-ghi
@@ -107,7 +149,7 @@ slack:
     expected-initial-reaction: eyes # Reaction to trigger ticket creation -- emoji name needs to already exist in slack
     response-initial-reaction: ticket # Reaction posted when ticket is created -- emoji name needs to already exist in slack
     resolved-reaction: white_check_mark # Reaction posted when ticket is resolved -- emoji name needs to already exist in slack
-    escalation-reaction: warning # Reaction posted when ticket is escalated -- emoji name needs to already exist in slack
+    escalated-reaction: rocket # Reaction posted when ticket is escalated -- emoji name needs to already exist in slack
 
 ticket:
   staleness-check-job: # Job that check for stale tickets – open tickets that didn't have any interactions over some period
@@ -128,12 +170,17 @@ enums:
   escalation-teams: # Teams available for query escalation
     - label: wow # Label showed on the UI
       code: wow # Team ID. Must be unique. Have to match a platform team code unless platform-integration.fetch.ignore-unknown-teams is set to true
-      slack-group-id: S08948NBMED # Slack group ID that will be tagged on escalations
+      group-ref: "slack:S08948NBMED" # Slack usergroup tagged on escalations. For a non-Slack ref (google:/azure:/static:) also set slack-mention-group-id.
+      # slack-mention-group-id: S08948NBMED # Slack usergroup to mention when group-ref is not a slack: ref
+      # slack-group-id: S08948NBMED # Deprecated alias for group-ref: "slack:<id>"; logs a warning, removed in a future release
   tags: # Ticket tags
     - label: Ingresses # Label showed on the UI
       code: ingresses # Tag ID
     - label: Networking
       code: networking
+    # - label: Product A
+    #   code: product-a
+    #   product: true # Marks a tag as a product; the Support Summary page breaks tickets down by product tags
     - label: Persistence/Brokers
       code: persistence-brokers
     - label: Observability
@@ -156,30 +203,44 @@ platform-integration: # Whether to enable platform integration to automatically 
     ignore-unknown-teams: false # Whether to allow escalation teams that don't exist in platform teams.
                                  # If false, startup will fail if any escalation team is not found in platform teams.
                                  # If true, escalation-only teams are allowed (they will have only 'escalation' type).
+  kubernetes: # Client settings for the core-platform / k8s-generic scrapers
+    disable-http-proxy: false
+    base-url: "" # Empty = in-cluster / kubeconfig discovery
+  static-user: # Explicit email -> group map; the simplest identity source. Groups are referenced as group-ref: static:<group>
+    enabled: true
+    users:
+      wow-group:
+        - wow1@test.com
   jwt-groups: # Optional: map Dex ID-token group claims (LDAP) into platform tenant teams
     enabled: false # When true, merges mapped teams for OAuth provider "dex" only; Google/Azure still use static-user / Azure / GCP below
     claim-name: groups # OIDC claim to read (Dex LDAP connector should populate this)
-    mappings: # Each LDAP group value Dex puts in `groups` matches at most one mapping (first match wins per value). Use separate LDAP groups if you need several jwt-mapped teams.
-      - claim-values: [developers] # Example: LDAP group cn when Dex groupSearch nameAttr is cn (or full DN if Dex emits that)
+    mappings: # One mapping per LDAP group value Dex puts in `groups`; a value matches at most one mapping
+      - group-ref: "jwt:developers" # LDAP group cn when Dex groupSearch nameAttr is cn (or full DN if Dex emits that)
         team-code: wow # Platform/escalation team code from teams-scraping / enums (adds TENANT + ESCALATION → ESCALATION app role)
-      - claim-values: [support-admins]
+      - group-ref: "jwt:support-admins"
         team-code: support # Must match team.support.code (→ SUPPORT_ENGINEER role)
-      - claim-values: [ldap-leadership]
+      - group-ref: "jwt:ldap-leadership"
         team-code: support-leadership # Must match team.leadership.code (→ LEADERSHIP role)
+      # claim-values: [<group>] is the deprecated form of group-ref: "jwt:<group>"; only its first entry is honoured
   gcp:
     app-name: Support Bot # Used by GCP client
-    enabled: true
+    enabled: false
+    client:
+      base-url: "" # Override only for testing against a mock
   azure:
     enabled: false
+    client:
+      base-url: "" # Override only for testing against a mock
+      log-level: ${AZURE_CLIENT_LOG_LEVEL:NONE} # Graph client HTTP logging (OkHttp): NONE | BASIC | HEADERS | BODY
   teams-scraping: # team-name <-> cloud group id scrapper configuration
     static: # Explicitly-listed teams (no cloud scraping); each team's members come from its group-ref
       enabled: true
       teams:
         - name: My Team # display value shown in the UI
           code: my-team # optional immutable identity used for mapping (ticket/escalation refs + escalation<->platform join); defaults to name
-          group-ref: my-group # group whose members belong to the team
+          group-ref: static:my-group # group whose members belong to the team: static:<group>, slack:<usergroup id>, google:<group email>, azure:<group id>
     core-platform: # Scraper specific to CECG's Core Platform
-      enabled: true
+      enabled: false
     k8s-generic: # A generic scraper that might be used in any K8S environment
       enabled: false
       config:
@@ -198,10 +259,20 @@ platform-integration: # Whether to enable platform integration to automatically 
 team:
   support:
     name: Core Support # Label showed on the UI
-    slack-group-id: S08948NBMED # Slack group ID of the support team
+    code: support # Immutable team code; jwt-groups mappings and escalation refs point at it
+    group-ref: "slack:S08948NBMED" # Members get ROLE_SUPPORT_ENGINEER. Deprecated alias: slack-group-id: <id>
+    static: # Optional explicit roster instead of group resolution
+      enabled: false
+      members:
+        - email: someone@company.com
+          slack-id: U0123456781
   leadership:
     name: Support Leadership # Label showed on the UI
-    code: support-leadership # Slack group ID of the support leadership team
+    code: support-leadership # Immutable team code
+    group-ref: "slack:S08948NBMED" # Members get ROLE_LEADERSHIP
+    static:
+      enabled: false
+      members: []
 
 homepage: # Bot homepage configuration
   useful-links: # Adds a "Useful Links" section to the Slack Home tab
@@ -229,7 +300,7 @@ mock-data: # Generate mock data in case DB is empty. Purely for testing/demo pur
   enabled: false
 
 metrics: # Prometheus metrics populated from database
-  enabled: true # Set to false to disable
+  enabled: false # Off by default; set to true to publish ticket metrics
   refresh-interval: 60s # How often to refresh ticket metrics e.g. 60s
 
 # PR review tracking — detects PR/MR links in support threads and manages their lifecycle
@@ -248,6 +319,8 @@ pr-review-tracking:
       owning-team: <team-code> # Team code from enums.escalation-teams — chased when the SLA is breached
       sla:
         default: 48h # SLA duration (e.g. 48h, 7d). See the reference below for file-based and per-path SLAs.
+  sla-discovery:
+    cache: PT24H # How long to cache SLA files fetched from repositories
   github: # Required only if any repo uses provider: github
     api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
     auth-mode: ${GITHUB_AUTH_MODE:token} # token | app
@@ -260,36 +333,35 @@ pr-review-tracking:
     api-base-url: ${GITLAB_API_BASE_URL:https://gitlab.com/api/v4} # must include /api/v4, no trailing slash
     token: ${GITLAB_TOKEN:}
 
-# Knowledge-gap analysis of support threads via an LLM.
-# Full operator reference is in the "Analysis (knowledge-gap LLM)" section under Integrations below.
-analysis:
-  llm:
-    model-name: ${ANALYSIS_MODEL_NAME:gemini-2.5-flash} # Model id, used by both providers
-    request-delay: ${ANALYSIS_REQUEST_DELAY:500ms} # Pause between per-thread LLM calls (rate-limit mitigation)
-    vertex: # Hosted Vertex AI via ADC. Exactly one of vertex/proxy/stub may be enabled.
-      enabled: ${VERTEX_ENABLED:true}
-      project-id: ${VERTEX_PROJECT_ID:} # Required when enabled
-      location: ${VERTEX_LOCATION:europe-west2} # Required when enabled
-    proxy: # Internal LLM proxy speaking the native Gemini REST API
-      enabled: ${AI_PROXY_ENABLED:false}
-      base-url: ${AI_PROXY_BASE_URL:} # Full URL including the /v1beta suffix; required when enabled
-      auth:
-        basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:} # Base64 user:password — deliver via a Secret
-      timeout: ${AI_PROXY_TIMEOUT:20s} # Connect + read timeout per proxy call
-    stub: # LOCAL DEVELOPMENT ONLY: canned responses that write synthetic data. Not in application.yaml on purpose.
-      enabled: false # Set in a local override only; never against a shared database
-      acknowledge-synthetic-data: false # Must also be true or startup fails
-  bundle:
-    path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip served by the summary-data download endpoint
-  prompt:
-    enabled: ${ANALYSIS_PROMPT_ENABLED:false} # Master switch for the analysis feature
+# LLM configuration, shared by the knowledge-gap analysis run and the Support Summary page (/summary).
+# `provider` is the one switch for both features. Full operator reference is in the
+# "Analysis (knowledge-gap LLM)" section under Integrations below.
+llm:
+  provider: ${LLM_PROVIDER:none} # none (off, default) | vertex | proxy | stub (local development only)
+  model-name: ${LLM_MODEL_NAME:gemini-2.5-flash} # Model id, used by the vertex and proxy providers
+  request-delay: ${LLM_REQUEST_DELAY:500ms} # Pause between per-thread LLM calls (rate-limit mitigation)
+  vertex: # Hosted Vertex AI via ADC. Validated only when provider=vertex.
+    project-id: ${VERTEX_PROJECT_ID:} # Required when provider=vertex
+    location: ${VERTEX_LOCATION:europe-west2} # Required when provider=vertex
+  proxy: # Internal LLM proxy speaking the native Gemini REST API. Validated only when provider=proxy.
+    base-url: ${AI_PROXY_BASE_URL:} # Full URL including the /v1beta suffix; required when provider=proxy
+    auth:
+      basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:} # Base64 user:password — deliver via a Secret
+    timeout: ${AI_PROXY_TIMEOUT:20s} # Connect + read timeout per proxy call
+  stub: # LOCAL DEVELOPMENT ONLY: canned responses that write synthetic data. Not in application.yaml on purpose.
+    acknowledge-synthetic-data: false # Must be true when provider=stub or startup fails; set in a local override only
 
-# Support Summary page (/summary). Requires analysis.prompt.enabled.
+# Support Summary area: the /summary page and the /summary-data thread export.
 # Full operator reference is in the "Support Summary" section under Integrations below.
-summary:
-  enabled: ${SUMMARY_ENABLED:false}
-  max-reasons: ${SUMMARY_MAX_REASONS:1000} # Newest per-ticket reasons fed to the summary model; sized for the 92-day window cap
-  failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried
+summary-area:
+  sanitisation: # Scrubbed from thread text before it reaches the page's classifier or the export (ADR-005)
+    patterns: [] # Regexes; every match is removed
+    exceptions: [] # Matches to keep, compared case-insensitively
+  page: # On whenever llm.provider is not `none`; no switch of its own
+    max-reasons: ${SUMMARY_MAX_REASONS:1000} # Newest per-ticket reasons fed to the summary model; sized for the 92-day window cap
+    failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried
+  offline-export: # The offline analysis kit served next to the export; independent of llm.*
+    analysis-bundle-path: ${OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip (or directory to zip on the fly)
 ```
 
 For deployment versatility across different secret delivery mechanisms, you can base64-encode the PEM file into a single line before storing it:
@@ -423,30 +495,32 @@ Leadership and support-engineer users can inspect the connection, last attempts,
 
 Support Bot can analyse closed support threads with an LLM to identify knowledge gaps
 (the classification behind the Support Summary page below, also triggerable through
-`POST /analysis/run`). The feature is off by default; enable it with
-`ANALYSIS_PROMPT_ENABLED=true`. The analysis prompt itself is stored in the database
+`POST /analysis/run`). The feature is off by default; enable it by selecting a
+provider with `LLM_PROVIDER` (for example `LLM_PROVIDER=vertex`). The analysis prompt itself is stored in the database
 (versioned, with one version per type marked in use) — there is no prompt file or environment
 variable, and the UI only displays it.
 
-When enabled, the service builds exactly one LLM client at startup. Each provider block
-has an `enabled` flag and exactly one of them must be true — enabling both or neither
-fails startup:
+`llm.provider` (`LLM_PROVIDER`) is the one switch for every LLM-backed feature — the analysis
+run and the Support Summary page below turn on and off together. It names the single LLM client
+built at startup:
 
-- **`analysis.llm.vertex.enabled`** (default `true`) — calls Vertex AI directly using
-  Application Default Credentials. No credential is configured in the app: on GKE the
-  pod's ServiceAccount must be correctly configured.
-- **`analysis.llm.proxy.enabled`** (default `false`) — sends native Gemini REST requests
-  through an internal LLM proxy and authenticates with a static
-  `Authorization: Basic <token>` header instead of cloud credentials. No GCP credential
-  discovery happens in this mode, and there is no silent fallback between providers.
-- **`analysis.llm.stub.enabled`** (default `false`) — **local development only**: canned
-  responses that write synthetic data, never for a deployed instance. See
+- **`none`** (default) — both features off. No LLM client is created, no provider setting is
+  validated, and `GET /analysis/enabled` / `GET /summary/enabled` report `false`.
+- **`vertex`** — calls Vertex AI directly using Application Default Credentials. No credential is
+  configured in the app: on GKE the pod's ServiceAccount must be correctly configured.
+- **`proxy`** — sends native Gemini REST requests through an internal LLM proxy and
+  authenticates with a static `Authorization: Basic <token>` header instead of cloud credentials.
+  No GCP credential discovery happens in this mode, and there is no silent fallback between
+  providers.
+- **`stub`** — **local development only**: canned responses that write synthetic data, never for
+  a deployed instance. Also requires `llm.stub.acknowledge-synthetic-data=true`. See
   [Running bot locally → Stub LLM provider](../README.md#6-stub-llm-provider-optional).
 
-While the feature is enabled, configuration is validated at startup: only the enabled
-provider's settings are required, and the service fails fast naming the offending property
-(for example `analysis.llm.proxy.base-url is required when analysis.llm.proxy.enabled=true`).
-With the feature off, LLM settings are not validated and cannot block startup.
+With a provider selected, configuration is validated at startup: only that provider's settings
+are required, and the service fails fast naming the offending property (for example
+`llm.proxy.base-url is required when llm.provider=proxy`). A value that is not one of the four
+names also fails startup rather than silently meaning "off". With `none`, LLM settings are not
+validated and cannot block startup.
 
 ### Environment variables
 
@@ -454,25 +528,37 @@ Set these on the **API**:
 
 | Variable | Description |
 |----------|-------------|
-| `ANALYSIS_PROMPT_ENABLED` | Master switch for the analysis feature. No LLM client is created when off. |
-| `VERTEX_ENABLED` | Enables the hosted Vertex AI provider. |
-| `AI_PROXY_ENABLED` | Enables the LLM proxy provider. Exactly one of `VERTEX_ENABLED`, `AI_PROXY_ENABLED` and the stub must be true. |
-| `ANALYSIS_LLM_STUB_ENABLED` | **Local development only** (see [Stub LLM provider](../README.md#6-stub-llm-provider-optional)). Enables the stub provider, which writes synthetic classifications and summaries; fails startup unless the acknowledgement below is also set. Not wired in the Helm chart. |
-| `ANALYSIS_LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA` | Required alongside the stub flag: confirms synthetic rows in `analysis` and `summary_snapshot` are acceptable. |
-| `ANALYSIS_MODEL_NAME` | Model id used by the Vertex and proxy providers. The stub ignores it and stamps summaries as `stub`. |
-| `ANALYSIS_REQUEST_DELAY` | Pause between per-thread LLM calls to stay under rate limits. |
-| `VERTEX_PROJECT_ID` | GCP project hosting Vertex AI. Required when the vertex provider is enabled. |
-| `VERTEX_LOCATION` | Vertex AI region, e.g. `europe-west2`. Required when the vertex provider is enabled. |
-| `AI_PROXY_BASE_URL` | Proxy base URL **including the `/v1beta` suffix**, e.g. `https://<proxy-host>/platform/google-vertex/proxy/v1beta`; the client appends `/models/<model>:generateContent`. Must be an absolute HTTP(S) URL without query or fragment; trailing slashes are stripped. Plain `http` is accepted for in-cluster proxies — note the Basic credential then travels unencrypted. Required when the proxy provider is enabled. |
+| `LLM_PROVIDER` | `none` (default), `vertex`, `proxy` or `stub`. Turns the analysis run and the Support Summary page on together and picks the LLM client. Case-insensitive. |
+| `LLM_MODEL_NAME` | Model id used by the Vertex and proxy providers. Default `gemini-2.5-flash`. The stub ignores it and stamps summaries as `stub`. |
+| `LLM_REQUEST_DELAY` | Pause between per-thread LLM calls to stay under rate limits. Default `500ms`. |
+| `VERTEX_PROJECT_ID` | GCP project hosting Vertex AI. Required when `LLM_PROVIDER=vertex`. |
+| `VERTEX_LOCATION` | Vertex AI region, e.g. `europe-west2`. Required when `LLM_PROVIDER=vertex`. |
+| `AI_PROXY_BASE_URL` | Proxy base URL **including the `/v1beta` suffix**, e.g. `https://<proxy-host>/platform/google-vertex/proxy/v1beta`; the client appends `/models/<model>:generateContent`. Must be an absolute HTTP(S) URL without query or fragment; trailing slashes are stripped. Plain `http` is accepted for in-cluster proxies — note the Basic credential then travels unencrypted. Required when `LLM_PROVIDER=proxy`. |
 | `AI_PROXY_BASIC_AUTH_TOKEN` | Base64-encoded `user:password` proxy credential, sent as `Authorization: Basic <token>`. |
 | `AI_PROXY_TIMEOUT` | Connect and read timeout applied to each proxy HTTP call. |
-| `ANALYSIS_BUNDLE_PATH` | Analysis bundle zip (or directory to zip on the fly) served by the summary-data download endpoint. |
+| `LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA` | **Local development only** (see [Stub LLM provider](../README.md#6-stub-llm-provider-optional)). Required alongside `LLM_PROVIDER=stub`: confirms synthetic rows in `analysis` and `summary_snapshot` are acceptable. Relaxed-binding name for `llm.stub.acknowledge-synthetic-data`; not wired in the Helm chart. |
+| `OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH` | Analysis bundle zip (or directory to zip on the fly) served by the summary-data download endpoint. Not an LLM setting: it belongs to the offline export (`summary-area.offline-export`), and the Helm chart sets it when `analysisBundle.enabled` is on. |
 
-> **Migration note:** earlier releases read the model and delay from `VERTEX_MODEL_NAME` and
-> `VERTEX_REQUEST_DELAY`. These were renamed to `ANALYSIS_MODEL_NAME` / `ANALYSIS_REQUEST_DELAY`
-> (they now apply to both providers, not just Vertex). The old names are silently ignored, so a
-> deployment that sets them keeps running on the defaults — move any explicit values to the new
-> names when upgrading.
+> **Migration note (`llm.provider`):** the five feature flags `ANALYSIS_PROMPT_ENABLED`,
+> `SUMMARY_ENABLED`, `VERTEX_ENABLED`, `AI_PROXY_ENABLED` and `ANALYSIS_LLM_STUB_ENABLED` are
+> gone, and so is the "exactly one provider" rule. The `analysis.*` prefix is now `llm.*`, and the
+> bundle path moved out of it. Old names are silently ignored, so an upgraded deployment that still
+> sets them comes up with the feature **off** — set `LLM_PROVIDER` explicitly when upgrading:
+>
+> | Before | After |
+> |--------|-------|
+> | `ANALYSIS_PROMPT_ENABLED=true` (Vertex by default) | `LLM_PROVIDER=vertex` |
+> | `ANALYSIS_PROMPT_ENABLED=true`, `VERTEX_ENABLED=false`, `AI_PROXY_ENABLED=true` | `LLM_PROVIDER=proxy` |
+> | `SUMMARY_ENABLED=true` | nothing — the page follows `LLM_PROVIDER` |
+> | `ANALYSIS_MODEL_NAME`, `ANALYSIS_REQUEST_DELAY` | `LLM_MODEL_NAME`, `LLM_REQUEST_DELAY` |
+> | `ANALYSIS_LLM_STUB_ENABLED=true`, `ANALYSIS_LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA=true` | `LLM_PROVIDER=stub`, `LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA=true` |
+> | `ANALYSIS_BUNDLE_PATH` | `OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH` (set by the Helm chart when `analysisBundle.enabled` is on) |
+> | `summary-data.sanitisation` (yaml, typically in a configmap) | `summary-area.sanitisation` — **must be moved**, or exports and prompts go unsanitised |
+> | `summary.max-reasons`, `summary.failure-retry-delay` (yaml) | `summary-area.page.*`; the `SUMMARY_*` env names are unchanged |
+>
+> The `VERTEX_PROJECT_ID`, `VERTEX_LOCATION` and `AI_PROXY_*` settings keep their names. (This
+> follows the earlier `VERTEX_MODEL_NAME` / `VERTEX_REQUEST_DELAY` → `ANALYSIS_*` rename; the
+> names are not expected to move again.)
 
 ## Support Summary
 
@@ -485,9 +571,10 @@ model for the narrative. What the page shows is described in the user guides
 migration `V38`, re-running the classification by hand and how failed refreshes are retried are in
 the [Support Summary runbook](../../../docs/runbooks/support-summary.md).
 
-- **Enabling.** Off by default. `SUMMARY_ENABLED=true` requires `ANALYSIS_PROMPT_ENABLED=true`;
-  the summary feature on with the analysis feature off fails startup. The summary prompt is stored
-  in the database alongside the classification prompt (`analysis_prompt.type`, seeded by `V38`).
+- **Enabling.** Off by default. The page has no switch of its own: it is on whenever
+  `LLM_PROVIDER` is not `none`, because it is the only consumer of the classification that
+  provider exists for. The summary prompt is stored in the database alongside the classification
+  prompt (`analysis_prompt.type`, seeded by `V38`).
 - **Windows.** Whole UTC calendar days, both ends inclusive. Default: the last 14 days ending
   yesterday (UTC). Maximum: 92 days (about one quarter); `GET /summary` rejects an inverted or
   longer window with `SUMMARY_WINDOW_INVALID`. The cap is there because the window's closed
@@ -512,7 +599,7 @@ Set these on the **API**:
 
 | Variable | Description |
 |----------|-------------|
-| `SUMMARY_ENABLED` | Master switch for the Support Summary page. Requires `ANALYSIS_PROMPT_ENABLED=true`. |
+| `LLM_PROVIDER` | Turns the page on (any value other than `none`); see [Analysis](#analysis-knowledge-gap-llm) above. |
 | `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons (newest first) included in the report sent to the model, so a very wide window cannot overflow its context. Default `1000`, which covers the 92-day window cap at roughly 80 tickets a week. |
 | `SUMMARY_FAILURE_RETRY_DELAY` | How long a failed summary refresh is reported as an error before the next visit retries it. A change to the window's data or to the in-use summary prompt retries sooner. Default `15m`. |
 
@@ -636,7 +723,7 @@ For Kubernetes deployment values (platform chart), see [`api/k8s/dex/README.md`]
    - `http://localhost:8080/login/oauth2/code/dex`
    - `https://<your-api-domain>/login/oauth2/code/dex`
 4. Ensure Dex is configured to return the claims Support Bot needs for login (`email` and `name`/`preferred_username`).
-5. For **LDAP → Dex → JWT groups → tenant teams**, enable `platform-integration.jwt-groups` and map claim values to `team-code` (see the `jwt-groups` block under `platform-integration` earlier in this document).
+5. For **LDAP → Dex → JWT groups → tenant teams**, enable `platform-integration.jwt-groups` and map each LDAP group (`group-ref: "jwt:<group>"`) to a `team-code` (see the `jwt-groups` block under `platform-integration` earlier in this document).
 
 > Note: Dex can be enabled alongside Google and Azure. By default (`login-providers` omitted or empty), the login screen lists **every** fully configured provider. When `login-providers` is non-empty, only those registration ids are shown.
 
@@ -646,7 +733,7 @@ For Kubernetes deployment values (platform chart), see [`api/k8s/dex/README.md`]
 |--------|----------------|
 | **`redirect_uri` / unregistered redirect** | Dex `staticClients.redirectURIs` must list both API callbacks (`/login/oauth2/code/dex`) and UI callbacks (`/api/oauth/callback/dex` on the UI origin). Match scheme, host, and port exactly. |
 | **`user_not_allowed`** | `security.allow-list` (`ALLOWED_EMAILS` / `ALLOWED_DOMAINS`) must include the user’s email or domain (e.g. LDAP users under `@supportbot.local`). |
-| **Missing or wrong teams after LDAP login** | Dex must emit the configured claim (default `groups`). `jwt-groups.mappings[].claim-values` must match those strings (case-insensitive). `team-code` must match a platform team. Only the **`dex`** registration uses `jwt-groups`; Google/Azure direct clients use static-user / Azure / GCP only. |
+| **Missing or wrong teams after LDAP login** | Dex must emit the configured claim (default `groups`). `jwt-groups.mappings[].group-ref` (`jwt:<group>`) must match those strings (case-insensitive); the deprecated `claim-values` form honours only its first entry. `team-code` must match a platform team. Only the **`dex`** registration uses `jwt-groups`; Google/Azure direct clients use static-user / Azure / GCP only. |
 
 Full operational order and integration sequencing: [auth Dex/LDAP runbook](../../../../docs/runbooks/auth-dex-ldap.md).
 
@@ -1237,9 +1324,9 @@ platform-integration:
     enabled: true
     claim-name: groups          # LDAP groups claim emitted by Dex
     mappings:
-      - claim-values: [support-admins]
+      - group-ref: "jwt:support-admins"
         team-code: support      # Must match team.support.code → ROLE_SUPPORT_ENGINEER
-      - claim-values: [support-leads]
+      - group-ref: "jwt:support-leads"
         team-code: support-leadership  # Must match team.leadership.code → ROLE_LEADERSHIP
 ```
 
@@ -1258,7 +1345,7 @@ enums:
   escalation-teams:
     - label: Platform Team
       code: platform-team                   # must match platform-integration.teams-scraping name below
-      group-ref: <CLOUD_GROUP_ID>           # Slack group ID tagged on escalation
+      group-ref: slack:<SLACK_GROUP_ID>     # Slack usergroup tagged on escalation (non-slack refs also need slack-mention-group-id)
 
 platform-integration:
   enabled: true

@@ -2,7 +2,8 @@ package com.coreeng.supportbot.analysis.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.LlmProps;
+import com.coreeng.supportbot.config.LlmProvider;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.model.vertexai.gemini.VertexAiGeminiChatModel;
@@ -17,19 +18,41 @@ class LlmConfigTest {
             new ApplicationContextRunner().withUserConfiguration(TestConfig.class, LlmConfig.class);
 
     @Test
-    void doesNotCreateChatModelWhenPromptDisabled() {
+    void doesNotCreateChatModelByDefault() {
+        // llm.provider unset: the feature is off and no client of any kind is built.
+        contextRunner.withPropertyValues(vertexProperties()).run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context).doesNotHaveBean(ChatModel.class);
+        });
+    }
+
+    @Test
+    void doesNotCreateChatModelWhenProviderIsNone() {
         contextRunner
                 .withPropertyValues(vertexProperties())
-                .withPropertyValues("analysis.prompt.enabled=false")
+                .withPropertyValues("llm.provider=none")
                 .run(context -> assertThat(context).doesNotHaveBean(ChatModel.class));
     }
 
     @Test
-    void startsCleanlyWhenPromptDisabledDespiteInvalidLlmConfig() {
-        // No model name and neither provider enabled: rejected when the feature is on, but with
-        // the feature off this config is never used and must not block startup.
+    void treatsBlankProviderAsNone() {
+        // LLM_PROVIDER set to an empty string (a common shape in env files) is the same as unset.
         contextRunner
-                .withPropertyValues("analysis.prompt.enabled=false", "analysis.llm.vertex.enabled=false")
+                .withPropertyValues(vertexProperties())
+                .withPropertyValues("llm.provider=")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean(ChatModel.class);
+                    assertThat(context.getBean(LlmProps.class).provider()).isEqualTo(LlmProvider.NONE);
+                });
+    }
+
+    @Test
+    void startsCleanlyWithNoProviderDespiteInvalidLlmConfig() {
+        // Rejected when a provider is selected, but with none selected this config is never used and
+        // must not block startup.
+        contextRunner
+                .withPropertyValues("llm.provider=none", "llm.model-name=", "llm.request-delay=-1s")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).doesNotHaveBean(ChatModel.class);
@@ -37,10 +60,10 @@ class LlmConfigTest {
     }
 
     @Test
-    void defaultsToVertexModelWhenProxyNotEnabled() {
+    void createsOnlyVertexModelWhenVertexSelected() {
         contextRunner
                 .withPropertyValues(vertexProperties())
-                .withPropertyValues("analysis.prompt.enabled=true")
+                .withPropertyValues("llm.provider=vertex")
                 .run(context -> {
                     assertThat(context).hasSingleBean(ChatModel.class);
                     assertThat(context.getBean(ChatModel.class)).isInstanceOf(VertexAiGeminiChatModel.class);
@@ -48,11 +71,21 @@ class LlmConfigTest {
     }
 
     @Test
-    void createsOnlyProxyModelWhenProxyEnabled() {
+    void providerNameIsCaseInsensitive() {
+        // LLM_PROVIDER=VERTEX from a shell must select the same bean as the lower-case yaml value.
+        contextRunner
+                .withPropertyValues(vertexProperties())
+                .withPropertyValues("llm.provider=VERTEX")
+                .run(context ->
+                        assertThat(context.getBean(ChatModel.class)).isInstanceOf(VertexAiGeminiChatModel.class));
+    }
+
+    @Test
+    void createsOnlyProxyModelWhenProxySelected() {
         // Vertex settings deliberately absent: proxy mode must not need them.
         contextRunner
                 .withPropertyValues(proxyProperties())
-                .withPropertyValues("analysis.prompt.enabled=true")
+                .withPropertyValues("llm.provider=proxy")
                 .run(context -> {
                     assertThat(context).hasSingleBean(ChatModel.class);
                     assertThat(context.getBean(ChatModel.class)).isInstanceOf(GoogleAiGeminiChatModel.class);
@@ -63,16 +96,12 @@ class LlmConfigTest {
     void failsStartupWhenProxyModeMissingBaseUrl() {
         contextRunner
                 .withPropertyValues(
-                        "analysis.prompt.enabled=true",
-                        "analysis.llm.vertex.enabled=false",
-                        "analysis.llm.proxy.enabled=true",
-                        "analysis.llm.model-name=gemini-2.5-flash",
-                        "analysis.llm.proxy.auth.basic-auth-token=dXNlcjpwYXNz")
+                        "llm.provider=proxy",
+                        "llm.model-name=gemini-2.5-flash",
+                        "llm.proxy.auth.basic-auth-token=dXNlcjpwYXNz")
                 .run(context -> {
                     assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .rootCause()
-                            .hasMessageContaining("analysis.llm.proxy.base-url");
+                    assertThat(context.getStartupFailure()).rootCause().hasMessageContaining("llm.proxy.base-url");
                 });
     }
 
@@ -80,116 +109,75 @@ class LlmConfigTest {
     void failsStartupWhenVertexModeMissingProjectId() {
         contextRunner
                 .withPropertyValues(
-                        "analysis.prompt.enabled=true",
-                        "analysis.llm.model-name=gemini-2.5-flash",
-                        "analysis.llm.vertex.location=europe-west2")
+                        "llm.provider=vertex", "llm.model-name=gemini-2.5-flash", "llm.vertex.location=europe-west2")
                 .run(context -> {
                     assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .rootCause()
-                            .hasMessageContaining("analysis.llm.vertex.project-id");
+                    assertThat(context.getStartupFailure()).rootCause().hasMessageContaining("llm.vertex.project-id");
                 });
     }
 
     @Test
-    void failsStartupWhenBothProvidersEnabled() {
+    void failsStartupOnUnknownProvider() {
+        // A typo must not silently mean "off": the choices are spelled out instead.
         contextRunner
                 .withPropertyValues(vertexProperties())
-                .withPropertyValues("analysis.prompt.enabled=true", "analysis.llm.proxy.enabled=true")
+                .withPropertyValues("llm.provider=vertexai")
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .rootCause()
-                            .hasMessageContaining("exactly one of analysis.llm.vertex.enabled,");
+                            .hasMessageContaining("llm.provider must be one of none, vertex, proxy, stub")
+                            .hasMessageContaining("vertexai");
                 });
     }
 
     @Test
-    void createsOnlyStubModelWhenStubEnabled() {
+    void createsOnlyStubModelWhenStubSelected() {
         // Vertex and proxy settings deliberately absent: the stub must need no credentials at all —
         // that is the whole point of it.
-        contextRunner
-                .withPropertyValues(stubProperties())
-                .withPropertyValues("analysis.prompt.enabled=true")
-                .run(context -> {
-                    assertThat(context).hasSingleBean(ChatModel.class);
-                    assertThat(context.getBean(ChatModel.class)).isInstanceOf(StubChatModel.class);
-                });
+        contextRunner.withPropertyValues(stubProperties()).run(context -> {
+            assertThat(context).hasSingleBean(ChatModel.class);
+            assertThat(context.getBean(ChatModel.class)).isInstanceOf(StubChatModel.class);
+        });
     }
 
     @Test
-    void failsStartupWhenStubEnabledWithoutSyntheticDataAcknowledgement() {
-        // The provider flag on its own must not start: a config copied from a laptop into a shared
+    void failsStartupWhenStubSelectedWithoutSyntheticDataAcknowledgement() {
+        // The provider on its own must not start: a config copied from a laptop into a shared
         // environment would otherwise write synthetic rows there.
         contextRunner
-                .withPropertyValues(
-                        "analysis.prompt.enabled=true",
-                        "analysis.llm.vertex.enabled=false",
-                        "analysis.llm.stub.enabled=true",
-                        "analysis.llm.model-name=stub-local")
+                .withPropertyValues("llm.provider=stub", "llm.model-name=stub-local")
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .rootCause()
-                            .hasMessageContaining("analysis.llm.stub.acknowledge-synthetic-data=true")
+                            .hasMessageContaining("llm.stub.acknowledge-synthetic-data=true")
                             .hasMessageContaining("synthetic rows into analysis and summary_snapshot")
                             .hasMessageContaining("never be enabled against a shared database");
                 });
     }
 
-    @Test
-    void failsStartupWhenStubAndProxyBothEnabled() {
-        contextRunner
-                .withPropertyValues(stubProperties())
-                .withPropertyValues(
-                        "analysis.prompt.enabled=true",
-                        "analysis.llm.proxy.enabled=true",
-                        "analysis.llm.proxy.base-url=https://llm-proxy.example.test/proxy/v1beta",
-                        "analysis.llm.proxy.auth.basic-auth-token=dXNlcjpwYXNz")
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .rootCause()
-                            .hasMessageContaining("exactly one of analysis.llm.vertex.enabled,");
-                });
-    }
-
-    @Test
-    void failsStartupWhenNeitherProviderEnabled() {
-        contextRunner
-                .withPropertyValues(vertexProperties())
-                .withPropertyValues("analysis.prompt.enabled=true", "analysis.llm.vertex.enabled=false")
-                .run(context -> assertThat(context).hasFailed());
-    }
-
     private static String[] stubProperties() {
         return new String[] {
-            "analysis.llm.vertex.enabled=false",
-            "analysis.llm.stub.enabled=true",
-            "analysis.llm.stub.acknowledge-synthetic-data=true",
-            "analysis.llm.model-name=stub-local"
+            "llm.provider=stub", "llm.stub.acknowledge-synthetic-data=true", "llm.model-name=stub-local"
         };
     }
 
     private static String[] vertexProperties() {
         return new String[] {
-            "analysis.llm.model-name=gemini-2.5-flash",
-            "analysis.llm.vertex.project-id=test-project",
-            "analysis.llm.vertex.location=europe-west2"
+            "llm.model-name=gemini-2.5-flash", "llm.vertex.project-id=test-project", "llm.vertex.location=europe-west2"
         };
     }
 
     private static String[] proxyProperties() {
         return new String[] {
-            "analysis.llm.vertex.enabled=false",
-            "analysis.llm.proxy.enabled=true",
-            "analysis.llm.model-name=gemini-2.5-flash",
-            "analysis.llm.proxy.base-url=http://localhost:9999/platform/google-vertex/proxy/v1beta",
-            "analysis.llm.proxy.auth.basic-auth-token=dXNlcjpwYXNz"
+            "llm.model-name=gemini-2.5-flash",
+            "llm.proxy.base-url=http://localhost:9999/platform/google-vertex/proxy/v1beta",
+            "llm.proxy.auth.basic-auth-token=dXNlcjpwYXNz"
         };
     }
 
     @Configuration
-    @EnableConfigurationProperties(AnalysisProps.class)
+    @EnableConfigurationProperties(LlmProps.class)
     static class TestConfig {}
 }

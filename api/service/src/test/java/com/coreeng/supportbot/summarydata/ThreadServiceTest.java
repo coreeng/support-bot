@@ -7,8 +7,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.coreeng.supportbot.config.SummaryDataProps;
-import com.coreeng.supportbot.config.SummaryDataProps.SanitisationProperties;
+import com.coreeng.supportbot.config.SummaryAreaProps;
+import com.coreeng.supportbot.config.SummaryAreaProps.Sanitisation;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.slack.api.methods.SlackApiException;
@@ -323,8 +323,11 @@ class ThreadServiceTest {
     }
 
     private ThreadService serviceWithSanitisation(List<String> patterns, List<String> exceptions) {
-        var sanitisation = new SanitisationProperties(patterns, exceptions);
-        var props = new SummaryDataProps(sanitisation);
+        var sanitisation = new Sanitisation(patterns, exceptions);
+        var props = new SummaryAreaProps(
+                sanitisation,
+                new SummaryAreaProps.Page(1000, java.time.Duration.ofMinutes(15)),
+                new SummaryAreaProps.OfflineExport("classpath:placeholder-analysis-bundle.zip"));
         return new ThreadService(slackClient, props);
     }
 

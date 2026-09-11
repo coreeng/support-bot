@@ -11,7 +11,7 @@ tests:
           pattern: '^\{\}'
       - matchRegex:
           path: data["application.yaml"]
-          pattern: 'summary-data:\n\s+sanitisation:'
+          pattern: 'summary-area:\n\s+sanitisation:'
       - matchRegex:
           path: data["application.yaml"]
           pattern: 'patterns:\n\s+- secret-\[0-9\]\+'

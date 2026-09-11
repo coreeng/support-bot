@@ -22,7 +22,7 @@ import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisService;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.coreeng.supportbot.config.SummaryProps;
+import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
@@ -125,7 +125,10 @@ class SummaryRefreshServiceTest {
                 summarySnapshotRepository,
                 llmSummaryService,
                 channelRegistry,
-                new SummaryProps(true, 400, RETRY_DELAY),
+                new SummaryAreaProps(
+                        new SummaryAreaProps.Sanitisation(List.of(), List.of()),
+                        new SummaryAreaProps.Page(400, RETRY_DELAY),
+                        new SummaryAreaProps.OfflineExport("classpath:placeholder-analysis-bundle.zip")),
                 executor,
                 clock);
     }

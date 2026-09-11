@@ -8,8 +8,9 @@ import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisService;
 import com.coreeng.supportbot.analysis.WindowAnalysisRunner;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
+import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
-import com.coreeng.supportbot.config.SummaryProps;
+import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
@@ -25,7 +26,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
@@ -42,7 +42,7 @@ import org.springframework.stereotype.Service;
  * days-based analysis uses, so the two kinds of run also never overlap on the LLM.
  */
 @Service
-@ConditionalOnProperty(name = "summary.enabled", havingValue = "true")
+@ConditionalOnLlmEnabled
 @Slf4j
 public class SummaryRefreshService implements WindowAnalysisRunner {
 
@@ -58,7 +58,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
     private final SummarySnapshotRepository summarySnapshotRepository;
     private final LlmSummaryService llmSummaryService;
     private final SlackChannelRegistry channelRegistry;
-    private final SummaryProps summaryProps;
+    private final SummaryAreaProps summaryAreaProps;
     private final Executor analysisExecutor;
     private final Clock clock;
 
@@ -70,7 +70,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
             SummarySnapshotRepository summarySnapshotRepository,
             LlmSummaryService llmSummaryService,
             SlackChannelRegistry channelRegistry,
-            SummaryProps summaryProps,
+            SummaryAreaProps summaryAreaProps,
             @Qualifier("analysisTaskExecutor") Executor analysisExecutor,
             Clock clock) {
         this.asyncJobRepository = asyncJobRepository;
@@ -80,7 +80,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
         this.summarySnapshotRepository = summarySnapshotRepository;
         this.llmSummaryService = llmSummaryService;
         this.channelRegistry = channelRegistry;
-        this.summaryProps = summaryProps;
+        this.summaryAreaProps = summaryAreaProps;
         this.analysisExecutor = analysisExecutor;
         this.clock = clock;
     }
@@ -103,7 +103,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
     /**
      * A failed attempt. It only applies while the input it failed on is unchanged — the window's
      * data fingerprint and the summary prompt version — and only for {@link
-     * SummaryProps#failureRetryDelay()}: a window whose data never changes again (last month's)
+     * SummaryAreaProps.Page#failureRetryDelay()}: a window whose data never changes again (last month's)
      * would otherwise stay pinned to a transient error until a restart.
      */
     private record Failure(String summaryPromptId, String fingerprint, String error, Instant recordedAt) {
@@ -112,7 +112,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
             return this.summaryPromptId.equals(summaryPromptId) && this.fingerprint.equals(fingerprint);
         }
 
-        boolean expiredAt(Instant now, SummaryProps props) {
+        boolean expiredAt(Instant now, SummaryAreaProps.Page props) {
             return !now.isBefore(recordedAt.plus(props.failureRetryDelay()));
         }
     }
@@ -196,7 +196,8 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
             if (failure == null) {
                 return null;
             }
-            if (!failure.matches(summaryPromptId, fingerprint) || failure.expiredAt(clock.instant(), summaryProps)) {
+            if (!failure.matches(summaryPromptId, fingerprint)
+                    || failure.expiredAt(clock.instant(), summaryAreaProps.page())) {
                 // Either the input moved on or the retry delay has passed: the next visit retries, and
                 // whatever comes of that replaces this entry.
                 failures.remove(window);
@@ -301,8 +302,11 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
                     window.from(),
                     window.to());
         }
-        ImmutableList<SummaryReason> reasons =
-                summaryReadRepository.reasons(window, classificationPromptId, channelIds, summaryProps.maxReasons());
+        ImmutableList<SummaryReason> reasons = summaryReadRepository.reasons(
+                window,
+                classificationPromptId,
+                channelIds,
+                summaryAreaProps.page().maxReasons());
 
         String content = llmSummaryService.generate(summaryPrompt.content(), breakdowns, reasons);
         if (content.isBlank()) {

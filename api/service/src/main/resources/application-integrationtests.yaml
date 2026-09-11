@@ -46,6 +46,6 @@ platform-integration:
         groupRef:
           cel-expression: resource.data.groupRef
 
-analysis:
-  prompt:
-    enabled: true
+# Vertex against the default project in application.yaml; also turns the Support Summary page on.
+llm:
+  provider: vertex

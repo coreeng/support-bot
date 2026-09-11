@@ -77,7 +77,7 @@ spec:
             {{- end }}
             {{- toYaml $apiEnv | nindent 12 }}
             {{- if .Values.analysisBundle.enabled }}
-            - name: SUMMARY_DATA_ANALYSIS_BUNDLE_PATH
+            - name: OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH
               value: {{ .Values.analysisBundle.mountPath | default "/app/analysis.zip" }}
             {{- end }}
           {{- with .Values.envFrom }}
