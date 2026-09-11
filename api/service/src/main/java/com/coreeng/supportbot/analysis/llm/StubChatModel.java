@@ -18,7 +18,7 @@ import java.util.List;
  * data fingerprint stable instead of invalidating the cache on every visit.
  *
  * <p>Local development and demo only. Its classifications and summaries are stored exactly like
- * real ones, so it must never run against a shared database; {@code AnalysisProps.Stub} enforces
+ * real ones, so it must never run against a shared database; {@code LlmProps.Stub} enforces
  * the explicit opt-in. Every response — and {@link #defaultRequestParameters()} — reports
  * {@value #MODEL_NAME} as the model name so stored rows carry the stub's name rather than whichever
  * real model id happens to be configured.

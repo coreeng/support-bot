@@ -1,12 +1,12 @@
 package com.coreeng.supportbot.summary.rest;
 
+import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
 import com.coreeng.supportbot.summary.SummaryService;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/summary")
-@ConditionalOnProperty(name = "summary.enabled", havingValue = "true")
+@ConditionalOnLlmEnabled
 @RequiredArgsConstructor
 public class SummaryController {
 

@@ -20,7 +20,7 @@ By default, no sanitisation is applied. Each deployment configures the rules app
 ### Example
 
 ```yaml
-summary-data:
+summary-area:
   sanitisation:
     patterns:
       - "<?@?[UW][A-Z0-9]{8,}>?"                            # slack mentions

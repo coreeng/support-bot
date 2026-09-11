@@ -12,7 +12,7 @@ import com.coreeng.supportbot.analysis.WindowAnalysisRunner;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.coreeng.supportbot.config.SummaryProps;
+import com.coreeng.supportbot.config.SummaryAreaProps;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -41,7 +41,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
  * executor rather than run inline on the request thread.
  */
 @SpringJUnitConfig(SummaryWiringTest.TestConfig.class)
-@TestPropertySource(properties = "summary.enabled=true")
+@TestPropertySource(properties = "llm.provider=vertex")
 class SummaryWiringTest {
 
     @Test
@@ -131,8 +131,11 @@ class SummaryWiringTest {
         }
 
         @Bean
-        SummaryProps summaryProps() {
-            return new SummaryProps(true, 400, Duration.ofMinutes(15));
+        SummaryAreaProps summaryAreaProps() {
+            return new SummaryAreaProps(
+                    new SummaryAreaProps.Sanitisation(List.of(), List.of()),
+                    new SummaryAreaProps.Page(400, Duration.ofMinutes(15)),
+                    new SummaryAreaProps.OfflineExport("classpath:placeholder-analysis-bundle.zip"));
         }
 
         @Bean

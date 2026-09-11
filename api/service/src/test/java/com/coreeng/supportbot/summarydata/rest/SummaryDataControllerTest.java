@@ -5,7 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.coreeng.supportbot.analysis.AnalysisRecord;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
-import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -36,17 +36,15 @@ class SummaryDataControllerTest {
     @Mock
     private AnalysisResultsService analysisResultsService;
 
-    private AnalysisProps analysisProps;
+    private SummaryAreaProps summaryAreaProps;
     private ObjectMapper objectMapper;
     private SummaryDataController controller;
 
     @BeforeEach
     void setUp() {
-        AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
-        AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(true);
-        analysisProps = new AnalysisProps(testLlm(), bundle, prompt);
+        summaryAreaProps = summaryAreaProps("classpath:placeholder-analysis-bundle.zip");
         objectMapper = new ObjectMapper();
-        controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
+        controller = new SummaryDataController(summaryAreaProps, analysisResultsService, objectMapper);
     }
 
     // --- Import tests ---
@@ -165,9 +163,8 @@ class SummaryDataControllerTest {
     @Test
     void download_shouldReturnNotFound_whenClasspathResourceDoesNotExist() {
         // given
-        analysisProps = new AnalysisProps(
-                testLlm(), new AnalysisProps.Bundle("classpath:nonexistent.zip"), new AnalysisProps.Prompt(true));
-        controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
+        summaryAreaProps = summaryAreaProps("classpath:nonexistent.zip");
+        controller = new SummaryDataController(summaryAreaProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -183,9 +180,8 @@ class SummaryDataControllerTest {
         Files.writeString(tempDir.resolve("file2.txt"), "Content of file 2");
         Files.writeString(tempDir.resolve("script.sh"), "#!/bin/bash\necho 'test'");
 
-        analysisProps = new AnalysisProps(
-                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true));
-        controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
+        summaryAreaProps = summaryAreaProps(tempDir.toString());
+        controller = new SummaryDataController(summaryAreaProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -217,9 +213,8 @@ class SummaryDataControllerTest {
     @Test
     void download_shouldReturnEmptyZip_whenDirectoryIsEmpty(@TempDir Path tempDir) throws IOException {
         // given - empty directory
-        analysisProps = new AnalysisProps(
-                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true));
-        controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
+        summaryAreaProps = summaryAreaProps(tempDir.toString());
+        controller = new SummaryDataController(summaryAreaProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -243,9 +238,8 @@ class SummaryDataControllerTest {
         Files.createDirectory(subDir);
         Files.writeString(subDir.resolve("file2.txt"), "Content 2");
 
-        analysisProps = new AnalysisProps(
-                testLlm(), new AnalysisProps.Bundle(tempDir.toString()), new AnalysisProps.Prompt(true));
-        controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
+        summaryAreaProps = summaryAreaProps(tempDir.toString());
+        controller = new SummaryDataController(summaryAreaProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -270,9 +264,8 @@ class SummaryDataControllerTest {
     @Test
     void download_shouldReturnNotFound_whenDirectoryDoesNotExist() {
         // given
-        analysisProps = new AnalysisProps(
-                testLlm(), new AnalysisProps.Bundle("/nonexistent/directory"), new AnalysisProps.Prompt(true));
-        controller = new SummaryDataController(analysisProps, analysisResultsService, objectMapper);
+        summaryAreaProps = summaryAreaProps("/nonexistent/directory");
+        controller = new SummaryDataController(summaryAreaProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -281,12 +274,10 @@ class SummaryDataControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
-    private static AnalysisProps.Llm testLlm() {
-        return new AnalysisProps.Llm(
-                "gemini-2.5-flash",
-                Duration.ofSeconds(1),
-                new AnalysisProps.Vertex(true, "test-project", "europe-west2"),
-                new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)),
-                new AnalysisProps.Stub(false, false));
+    private static SummaryAreaProps summaryAreaProps(String analysisBundlePath) {
+        return new SummaryAreaProps(
+                new SummaryAreaProps.Sanitisation(List.of(), List.of()),
+                new SummaryAreaProps.Page(1000, Duration.ofMinutes(15)),
+                new SummaryAreaProps.OfflineExport(analysisBundlePath));
     }
 }

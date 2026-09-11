@@ -7,7 +7,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.LlmProps;
+import com.coreeng.supportbot.config.LlmProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.http.client.HttpClient;
@@ -85,16 +86,13 @@ class ProxyChatModelContractTest {
 
     private ChatModel proxyModel(Duration timeout) {
         when(httpClientBuilder.build()).thenReturn(httpClient);
-        AnalysisProps.Llm llm = new AnalysisProps.Llm(
+        LlmProps llmProps = new LlmProps(
+                LlmProvider.PROXY,
                 "gemini-2.5-flash",
                 Duration.ofMillis(1),
-                new AnalysisProps.Vertex(false, "", ""),
-                new AnalysisProps.Proxy(true, BASE_URL, new AnalysisProps.Proxy.Auth(BASE64_TOKEN), timeout),
-                new AnalysisProps.Stub(false, false));
-        AnalysisProps analysisProps = new AnalysisProps(
-                llm,
-                new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip"),
-                new AnalysisProps.Prompt(true));
-        return new LlmConfig().proxyChatModel(analysisProps, httpClientBuilder);
+                new LlmProps.Vertex("", ""),
+                new LlmProps.Proxy(BASE_URL, new LlmProps.Proxy.Auth(BASE64_TOKEN), timeout),
+                new LlmProps.Stub(false));
+        return new LlmConfig().proxyChatModel(llmProps, httpClientBuilder);
     }
 }

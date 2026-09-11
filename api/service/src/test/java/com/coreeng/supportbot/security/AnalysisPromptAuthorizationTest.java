@@ -29,7 +29,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @WebMvcTest(
         controllers = AnalysisController.class,
         properties = {
-            "analysis.prompt.enabled=true",
+            "llm.provider=vertex",
             "security.jwt.secret=test-jwt-secret-for-unit-tests-minimum-256-bits",
             "security.test-bypass.enabled=false"
         })

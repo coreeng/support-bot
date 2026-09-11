@@ -1,11 +1,11 @@
 package com.coreeng.supportbot.summary;
 
-import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
+import com.coreeng.supportbot.config.LlmProps;
 import com.google.common.collect.ImmutableList;
 import dev.langchain4j.model.chat.ChatModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
@@ -16,19 +16,19 @@ import org.springframework.stereotype.Service;
  * migration) can be rewritten without changing what data it is given.
  */
 @Service
-@ConditionalOnProperty(name = "summary.enabled", havingValue = "true")
+@ConditionalOnLlmEnabled
 @RequiredArgsConstructor
 @Slf4j
 public class LlmSummaryService {
 
     private final ChatModel chatModel;
-    private final AnalysisProps analysisProps;
+    private final LlmProps llmProps;
 
     /**
      * The model name recorded alongside a generated summary, for traceability.
      *
      * <p>Prefers the name the {@link ChatModel} reports about itself over the configured
-     * {@code analysis.llm.model-name}, so a provider that is not the configured model — the stub in
+     * {@code llm.model-name}, so a provider that is not the configured model — the stub in
      * particular — is stamped as what it is rather than as e.g. {@code gemini-2.5-flash}. Falls back
      * to the configured name for providers that do not self-describe.
      */
@@ -37,7 +37,7 @@ public class LlmSummaryService {
         if (reported != null && !reported.isBlank()) {
             return reported;
         }
-        return analysisProps.llm().modelName();
+        return llmProps.modelName();
     }
 
     /**

@@ -2,7 +2,8 @@ package com.coreeng.supportbot.summary;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.LlmProps;
+import com.coreeng.supportbot.config.LlmProvider;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
@@ -70,16 +71,13 @@ class LlmSummaryServiceTest {
         return ChatResponse.builder().aiMessage(AiMessage.from(text)).build();
     }
 
-    private static AnalysisProps props() {
-        AnalysisProps.Llm llm = new AnalysisProps.Llm(
+    private static LlmProps props() {
+        return new LlmProps(
+                LlmProvider.VERTEX,
                 CONFIGURED_MODEL,
                 Duration.ofMillis(1),
-                new AnalysisProps.Vertex(true, "test-project", "europe-west2"),
-                new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)),
-                new AnalysisProps.Stub(false, false));
-        return new AnalysisProps(
-                llm,
-                new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip"),
-                new AnalysisProps.Prompt(true));
+                new LlmProps.Vertex("test-project", "europe-west2"),
+                new LlmProps.Proxy("", new LlmProps.Proxy.Auth(""), Duration.ofSeconds(30)),
+                new LlmProps.Stub(false));
     }
 }

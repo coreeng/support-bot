@@ -3,7 +3,8 @@ package com.coreeng.supportbot.analysis;
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
 import com.coreeng.supportbot.analysis.llm.LlmAnalysisService;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
-import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
+import com.coreeng.supportbot.config.LlmProps;
 import com.google.common.collect.ImmutableList;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -16,7 +17,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
@@ -42,7 +42,7 @@ import org.springframework.stereotype.Service;
  * prompt's text, so it auto-updates whenever the prompt changes.
  */
 @Service
-@ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
+@ConditionalOnLlmEnabled
 @Slf4j
 public class AnalysisService {
 
@@ -58,7 +58,7 @@ public class AnalysisService {
     private final LlmAnalysisService llmAnalysisService;
     private final AnalysisRepository analysisRepository;
     private final AnalysisPromptRepository analysisPromptRepository;
-    private final AnalysisProps analysisProps;
+    private final LlmProps llmProps;
 
     /** The single-threaded {@code analysisTaskExecutor}; every run, days-based or windowed, goes through it. */
     private final Executor analysisExecutor;
@@ -69,14 +69,14 @@ public class AnalysisService {
             LlmAnalysisService llmAnalysisService,
             AnalysisRepository analysisRepository,
             AnalysisPromptRepository analysisPromptRepository,
-            AnalysisProps analysisProps,
+            LlmProps llmProps,
             @Qualifier("analysisTaskExecutor") Executor analysisExecutor) {
         this.asyncJobRepository = asyncJobRepository;
         this.threadsAwaitingAnalysisService = threadsAwaitingAnalysisService;
         this.llmAnalysisService = llmAnalysisService;
         this.analysisRepository = analysisRepository;
         this.analysisPromptRepository = analysisPromptRepository;
-        this.analysisProps = analysisProps;
+        this.llmProps = llmProps;
         this.analysisExecutor = analysisExecutor;
     }
 
@@ -230,7 +230,7 @@ public class AnalysisService {
                 }
 
                 // Rate limiting delay to avoid hitting LLM API limits
-                Thread.sleep(analysisProps.llm().requestDelay().toMillis());
+                Thread.sleep(llmProps.requestDelay().toMillis());
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

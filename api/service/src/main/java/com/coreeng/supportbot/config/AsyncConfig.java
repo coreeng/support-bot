@@ -1,15 +1,14 @@
 package com.coreeng.supportbot.config;
 
 import java.util.concurrent.Executor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 // @EnableAsync lives on SupportBotApplication (must be unconditional — SummaryExportAsyncConfig's
-// executor needs it regardless of whether the analysis feature below is enabled).
+// executor needs it regardless of whether an LLM provider is selected).
 @Configuration
-@ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
+@ConditionalOnLlmEnabled
 public class AsyncConfig {
 
     @Bean(name = "analysisTaskExecutor")

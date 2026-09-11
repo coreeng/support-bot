@@ -2,7 +2,7 @@ package com.coreeng.supportbot.summarydata.rest;
 
 import com.coreeng.supportbot.analysis.AnalysisRecord;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
-import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.BufferedReader;
@@ -37,13 +37,13 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class SummaryDataController {
 
-    private final AnalysisProps analysisProps;
+    private final SummaryAreaProps summaryAreaProps;
     private final AnalysisResultsService analysisResultsService;
     private final ObjectMapper objectMapper;
 
     /**
      * Export analysis bundle analysis.zip containing AI prompt and script to run analysis on thread texts.
-     * The bundle path is configurable via {@code summary-data.analysis-bundle-path}.
+     * The bundle path is configurable via {@code summary-area.offline-export.analysis-bundle-path}.
      * By default, serves a classpath placeholder bundle.
      * If the path points to a directory, creates a zip file containing all files in that directory.
      *
@@ -51,7 +51,7 @@ public class SummaryDataController {
      */
     @GetMapping(value = "/analysis", produces = "application/zip")
     public ResponseEntity<?> download() {
-        String bundlePath = analysisProps.bundle().path();
+        String bundlePath = summaryAreaProps.offlineExport().analysisBundlePath();
         try {
             // Handle classpath resources
             if (bundlePath != null && bundlePath.startsWith("classpath:")) {

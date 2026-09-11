@@ -6,7 +6,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.analysis.AnalysisRecord;
-import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.LlmProps;
+import com.coreeng.supportbot.config.LlmProvider;
 import com.coreeng.supportbot.summary.LlmSummaryService;
 import com.coreeng.supportbot.summary.SummaryBreakdowns;
 import com.coreeng.supportbot.summary.SummaryCount;
@@ -80,7 +81,7 @@ class StubChatModelTest {
 
     @Test
     void summaryCallGetsProseRatherThanAClassificationBlock() {
-        LlmSummaryService summaryService = new LlmSummaryService(stub, analysisProps());
+        LlmSummaryService summaryService = new LlmSummaryService(stub, llmProps());
 
         String summary = summaryService.generate(
                 "Summarise the window.",
@@ -96,7 +97,7 @@ class StubChatModelTest {
 
     @Test
     void reportsItselfAsTheStubModelOnEveryResponse() {
-        // Whatever analysis.llm.model-name says, rows written from stub output must not carry a
+        // Whatever llm.model-name says, rows written from stub output must not carry a
         // real model id — the response metadata is what LlmSummaryService.modelName() consults.
         ChatResponse response = stub.chat(UserMessage.from("anything at all"));
 
@@ -106,7 +107,7 @@ class StubChatModelTest {
 
     @Test
     void summaryIsStampedWithTheStubModelNameNotTheConfiguredOne() {
-        LlmSummaryService summaryService = new LlmSummaryService(stub, analysisProps());
+        LlmSummaryService summaryService = new LlmSummaryService(stub, llmProps());
 
         assertThat(summaryService.modelName()).isEqualTo("stub").isNotEqualTo("stub-local");
     }
@@ -127,17 +128,14 @@ class StubChatModelTest {
         return record;
     }
 
-    private static AnalysisProps analysisProps() {
-        AnalysisProps.Llm llm = new AnalysisProps.Llm(
+    private static LlmProps llmProps() {
+        return new LlmProps(
+                LlmProvider.STUB,
                 "stub-local",
                 Duration.ofMillis(1),
-                new AnalysisProps.Vertex(false, "", ""),
-                new AnalysisProps.Proxy(false, "", new AnalysisProps.Proxy.Auth(""), Duration.ofSeconds(30)),
-                new AnalysisProps.Stub(true, true));
-        return new AnalysisProps(
-                llm,
-                new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip"),
-                new AnalysisProps.Prompt(true));
+                new LlmProps.Vertex("", ""),
+                new LlmProps.Proxy("", new LlmProps.Proxy.Auth(""), Duration.ofSeconds(30)),
+                new LlmProps.Stub(true));
     }
 
     private static SummaryBreakdowns breakdowns() {

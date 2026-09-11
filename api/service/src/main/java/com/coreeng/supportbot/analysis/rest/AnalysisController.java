@@ -1,11 +1,11 @@
 package com.coreeng.supportbot.analysis.rest;
 
 import com.coreeng.supportbot.analysis.AnalysisService;
+import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/analysis")
-@ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
+@ConditionalOnLlmEnabled
 @RequiredArgsConstructor
 @Slf4j
 public class AnalysisController {

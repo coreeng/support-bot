@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.analysis.llm;
 
-import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
+import com.coreeng.supportbot.config.LlmProps;
 import dev.langchain4j.http.client.HttpClientBuilder;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
@@ -12,19 +13,18 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Builds the one {@link ChatModel} named by {@code llm.provider}. With the provider set to
+ * {@code none} this configuration is not registered at all and no client exists.
+ */
 @Configuration
-@ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
+@ConditionalOnLlmEnabled
 @Slf4j
 public class LlmConfig {
 
     @Bean
-    @ConditionalOnProperty(
-            prefix = "analysis.llm.vertex",
-            name = "enabled",
-            havingValue = "true",
-            matchIfMissing = true)
-    public ChatModel vertexChatModel(AnalysisProps analysisProps) {
-        AnalysisProps.Llm llm = analysisProps.llm();
+    @ConditionalOnProperty(name = "llm.provider", havingValue = "vertex")
+    public ChatModel vertexChatModel(LlmProps llm) {
         log.info(
                 "Configuring Vertex AI model: project={}, location={}, model={}",
                 llm.vertex().projectId(),
@@ -44,12 +44,12 @@ public class LlmConfig {
      * callers apart.
      *
      * <p>Local-only: its output lands in {@code analysis} and {@code summary_snapshot} like real
-     * model output. {@link AnalysisProps.Stub#validate()} refuses to start unless
-     * {@code analysis.llm.stub.acknowledge-synthetic-data=true} is also set, so this bean only exists
-     * once an operator has opted in twice.
+     * model output. {@link LlmProps.Stub#validate()} refuses to start unless
+     * {@code llm.stub.acknowledge-synthetic-data=true} is also set, so this bean only exists once an
+     * operator has opted in twice.
      */
     @Bean
-    @ConditionalOnProperty(prefix = "analysis.llm.stub", name = "enabled", havingValue = "true")
+    @ConditionalOnProperty(name = "llm.provider", havingValue = "stub")
     public ChatModel stubChatModel() {
         log.warn("Using the STUB LLM provider: responses are canned and describe no real data;"
                 + " classifications and summaries written from here are synthetic");
@@ -57,15 +57,14 @@ public class LlmConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(prefix = "analysis.llm.proxy", name = "enabled", havingValue = "true")
-    public ChatModel proxyChatModel(AnalysisProps analysisProps) {
-        return proxyChatModel(analysisProps, null);
+    @ConditionalOnProperty(name = "llm.provider", havingValue = "proxy")
+    public ChatModel proxyChatModel(LlmProps llm) {
+        return proxyChatModel(llm, null);
     }
 
     // Test seam: the contract test injects a capturing HttpClientBuilder to assert the outgoing
     // request without a server. Null means the client's default HTTP transport.
-    ChatModel proxyChatModel(AnalysisProps analysisProps, @Nullable HttpClientBuilder httpClientBuilder) {
-        AnalysisProps.Llm llm = analysisProps.llm();
+    ChatModel proxyChatModel(LlmProps llm, @Nullable HttpClientBuilder httpClientBuilder) {
         log.info(
                 "Configuring proxied model: baseUrl={}, model={}, timeout={}",
                 llm.proxy().baseUrl(),

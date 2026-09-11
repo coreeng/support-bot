@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.summarydata;
 
-import com.coreeng.supportbot.config.SummaryDataProps;
+import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.google.common.collect.ImmutableList;
@@ -35,7 +35,7 @@ public class ThreadService {
     private final ImmutableList<Pattern> compiledPatterns;
     private final Set<String> exceptions;
 
-    public ThreadService(SlackClient slackClient, SummaryDataProps props) {
+    public ThreadService(SlackClient slackClient, SummaryAreaProps props) {
         this.slackClient = slackClient;
         var sanitisation = props.sanitisation();
         this.compiledPatterns = sanitisation.patterns().stream()
