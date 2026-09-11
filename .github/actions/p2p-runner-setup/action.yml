@@ -1,0 +1,20 @@
+name: Configure Support Bot P2P runner
+description: Configure the Docker builder used by P2P command execution jobs
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Blacksmith Docker builder
+      uses: useblacksmith/setup-docker-builder@5733de2ef2a4b92db67ba8d396b1e99db29a2631 # v1
+      with:
+        nofallback: "true"
+
+    - name: Select Blacksmith build arguments
+      shell: bash
+      run: echo "P2P_DOCKER_BUILD_ARGS=--load" >> "$GITHUB_ENV"
+
+    - name: Verify Docker builder
+      shell: bash
+      run: |
+        docker buildx version
+        docker buildx inspect --bootstrap
