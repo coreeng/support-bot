@@ -4,7 +4,7 @@
 export const toUtcDateString = (date: Date): string => date.toISOString().split("T")[0];
 
 /** The presets the Support Summary offers, each a whole business period before the current one. */
-export type SummaryPreset = "lastWeek" | "last2Weeks" | "lastMonth";
+export type SummaryWindowPreset = "lastWeek" | "last2Weeks" | "lastMonth";
 
 /** Midnight UTC on the Monday of the ISO week containing `date`. */
 function mondayOfWeek(date: Date): Date {
@@ -29,7 +29,7 @@ const plusDays = (date: Date, days: number): Date => new Date(date.getTime() + d
  * UTC so the result matches the server in every zone; mixing local-calendar arithmetic with
  * `toISOString()` would shift the window by a day across a local DST change.
  */
-export function presetWindow(preset: SummaryPreset, now: Date = new Date()): { from: string; to: string } {
+export function presetWindow(preset: SummaryWindowPreset, now: Date = new Date()): { from: string; to: string } {
   const thisMonday = mondayOfWeek(now);
   switch (preset) {
     case "lastWeek":

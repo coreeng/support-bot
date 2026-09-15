@@ -11,7 +11,7 @@ import { isApiError, MAX_SUMMARY_POLL_FAILURES, useRegistry, useSummary, useSumm
 import { enumValidator, isoDateValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
 import type { SummaryCount, SummaryData, SummarySection } from "@/lib/types/summary";
 import { cn, formatUtcDateTime } from "@/lib/utils";
-import { MAX_SUMMARY_WINDOW_DAYS, presetWindow, summaryWindowProblem } from "@/lib/utils/summary-window";
+import { MAX_SUMMARY_WINDOW_DAYS, presetWindow, summaryWindowProblem, type SummaryWindowPreset } from "@/lib/utils/summary-window";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Eye } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
@@ -20,10 +20,10 @@ import { useMemo, useState, type ReactNode } from "react";
  * The presets this page offers. Each named one is a whole business period before the current
  * one (see `presetWindow`); the default is the two weeks before this one.
  */
-const SUMMARY_PRESETS = ["lastWeek", "last2Weeks", "lastMonth", "custom"] as const;
-type SummaryPreset = (typeof SUMMARY_PRESETS)[number];
+const SUMMARY_PRESETS = ["lastWeek", "last2Weeks", "lastMonth", "custom"] as const satisfies readonly SummaryPreset[];
+type SummaryPreset = SummaryWindowPreset | "custom";
 
-const DEFAULT_PRESET: Exclude<SummaryPreset, "custom"> = "last2Weeks";
+const DEFAULT_PRESET: SummaryWindowPreset = "last2Weeks";
 
 const PRESET_LABELS: Record<SummaryPreset, string> = {
   lastWeek: "Last week",

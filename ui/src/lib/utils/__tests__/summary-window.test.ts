@@ -54,9 +54,11 @@ describe("presetWindow", () => {
       expect(presetWindow("lastMonth")).toEqual({ from: "2026-08-01", to: "2026-08-31" });
     });
 
-    it("handles short months and the year boundary", () => {
+    it("handles short months, leap years and the year boundary", () => {
       jest.setSystemTime(new Date("2026-03-01T00:10:00Z"));
       expect(presetWindow("lastMonth")).toEqual({ from: "2026-02-01", to: "2026-02-28" });
+      jest.setSystemTime(new Date("2028-03-01T00:10:00Z"));
+      expect(presetWindow("lastMonth")).toEqual({ from: "2028-02-01", to: "2028-02-29" });
       jest.setSystemTime(new Date("2026-01-31T23:50:00Z"));
       expect(presetWindow("lastMonth")).toEqual({ from: "2025-12-01", to: "2025-12-31" });
     });
