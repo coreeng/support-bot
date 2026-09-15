@@ -30,7 +30,7 @@ Service health indicators.
 
 ## Support Summary
 
-The **Support Summary** page (`/summary`) replaced the Knowledge Gaps page and is the best starting point for a periodic review. It is shown in the sidebar when the feature is enabled on your deployment. Pick a window (**Last Week**, **Last 2 Weeks**, **Last Month**, or a **Custom** from/to range of up to 92 days — about a quarter) and the page shows:
+The **Support Summary** page (`/summary`) replaced the Knowledge Gaps page and is the best starting point for a periodic review. It is shown in the sidebar when the feature is enabled on your deployment. Pick a window with the dropdown at the top right. **Last Week**, **Last 2 Weeks** and **Last Month** are the whole business period before the current one: Monday to Friday of last week, the two weeks before this one, or the previous calendar month. **Custom** takes a from/to range of up to 92 days — about a quarter. The page then shows:
 
 - How many tickets were raised in the window.
 - **At a glance** — a short LLM-written narrative of what tenants asked about and why, plus the top driver, subject, feature and tenant team.
