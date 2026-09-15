@@ -7,17 +7,19 @@ import EditTicketModal from "@/components/tickets/EditTicketModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PRESET_DAYS } from "@/lib/dateRange";
 import { isApiError, MAX_SUMMARY_POLL_FAILURES, useRegistry, useSummary, useSummaryEnabled } from "@/lib/hooks";
 import { enumValidator, isoDateValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
 import type { SummaryCount, SummaryData, SummarySection } from "@/lib/types/summary";
 import { cn, formatUtcDateTime } from "@/lib/utils";
-import { MAX_SUMMARY_WINDOW_DAYS, summaryWindowProblem, windowEndingYesterday } from "@/lib/utils/summary-window";
+import { MAX_SUMMARY_WINDOW_DAYS, presetWindow, summaryWindowProblem } from "@/lib/utils/summary-window";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Eye } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
-/** The presets this page offers; the default window is the last 2 weeks ending yesterday. */
+/**
+ * The presets this page offers. Each named one is a whole business period before the current
+ * one (see `presetWindow`); the default is the two weeks before this one.
+ */
 const SUMMARY_PRESETS = ["lastWeek", "last2Weeks", "lastMonth", "custom"] as const;
 type SummaryPreset = (typeof SUMMARY_PRESETS)[number];
 
@@ -54,14 +56,14 @@ function Metric({ children }: { children: ReactNode }) {
 }
 
 /**
- * The preset whose window (ending yesterday, UTC) is exactly this one, or `custom` when none is.
+ * The preset whose business period is exactly this window, or `custom` when none is.
  * Deriving the label from the window on screen keeps it honest while a newly chosen preset is
  * still loading and the previous window's figures are shown in its place.
  */
 function presetForWindow(from: string, to: string): SummaryPreset {
   for (const preset of SUMMARY_PRESETS) {
     if (preset === "custom") continue;
-    const window = windowEndingYesterday(PRESET_DAYS[preset]);
+    const window = presetWindow(preset);
     if (window.from === from && window.to === to) return preset;
   }
   return "custom";
@@ -312,7 +314,7 @@ export default function SupportSummaryPage() {
       return { from: params.dateFrom, to: params.dateTo };
     }
     const preset = dateFilter === "custom" ? DEFAULT_PRESET : dateFilter;
-    return windowEndingYesterday(PRESET_DAYS[preset]);
+    return presetWindow(preset);
   }, [dateFilter, params.dateFrom, params.dateTo]);
 
   // The sidebar hides the entry while the feature is off, but a direct visit must not fall through
