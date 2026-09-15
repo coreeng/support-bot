@@ -90,11 +90,12 @@ can trigger the same job through the API:
 ```bash
 # 202 Accepted: job started. 409 Conflict: a run is already in progress (see below).
 # 400: days outside 1..365.
-curl -i -X POST "$API_URL/analysis/run?days=14" -H "Authorization: Bearer $TOKEN"
+curl -i -X POST "$API_URL/analysis/run?days=21" -H "Authorization: Bearer $TOKEN"
 ```
 
 `days` counts back from now over closed tickets, so pick a value that covers the window that is
-stuck. Watch progress with:
+stuck. The default **Last 2 Weeks** preset starts on the Monday two weeks back, up to 20 days ago
+when viewed on a Sunday, so 21 covers it whichever day it is. Watch progress with:
 
 ```bash
 curl -s "$API_URL/analysis/status" -H "Authorization: Bearer $TOKEN"
