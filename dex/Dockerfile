@@ -9,12 +9,12 @@ USER root
 RUN apk add --no-cache \
     alpine-baselayout=3.7.2-r0 \
     alpine-baselayout-data=3.7.2-r0 \
-    alpine-release=3.23.5-r0 \
-    apk-tools=3.0.6-r0 \
-    ca-certificates-bundle=20260611-r0 \
-    libapk=3.0.6-r0 \
-    libcrypto3=3.5.7-r0 \
-    libssl3=3.5.7-r0 \
+    alpine-release=3.23.6-r0 \
+    apk-tools=3.0.8-r0 \
+    ca-certificates-bundle=20260909-r0 \
+    libapk=3.0.8-r0 \
+    libcrypto3=3.5.9-r0 \
+    libssl3=3.5.9-r0 \
     musl=1.2.5-r23 \
     musl-utils=1.2.5-r23 \
     zlib=1.3.2-r0
