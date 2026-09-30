@@ -64,7 +64,7 @@ known" if there is none, so a run can tell an empty section from an unwritten on
 
 State whether the theme renders the title field as the page heading (then pages carry **no body
 `H1`**, and two pages in one directory must not share a title) and whether front matter must
-start on line 1 (then the generation notice goes **below** the closing `---`).
+start on line 1.
 
 ## Template tags and markers
 

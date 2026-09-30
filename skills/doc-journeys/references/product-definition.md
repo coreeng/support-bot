@@ -149,7 +149,7 @@ A brief is normally a **snapshot of a page that lives elsewhere**, so it carries
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| `source` | Yes | Human-readable name of where it came from, e.g. `Product Hub — Foglight`. |
+| `source` | Yes | Human-readable name of where it came from, e.g. `Product catalogue — Foglight`. |
 | `source_url` | No | The original URL, where one is known and stable. |
 | `source_updated` | No | The **source page's own** last-updated date, when it publishes one. Not the capture date. |
 | `source_updated_by` | No | Who last updated the source page, when published. |
@@ -160,7 +160,7 @@ A brief whose `captured` date is more than **180 days** old is flagged in the re
 
 ### The extraction procedure
 
-The skill cannot reach the wiki or product hub these come from. Extraction is therefore **human-triggered input preparation, not part of a run**: it always begins with a person supplying a file.
+The skill cannot reach the product catalogue these come from. Extraction is therefore **human-triggered input preparation, not part of a run**: it always begins with a person supplying a file.
 
 1. A human exports the page — MHTML preserves a page that requires authentication, which is the usual case.
 2. Decode it: MHTML parts are quoted-printable or base64, so raw text search over the file finds nothing and reading it undecoded is worthless. Walk the `text/html` and `text/plain` parts, decode each, strip `script`/`style`/`nav`/`footer`, remove tags, unescape HTML entities, and collapse the whitespace.

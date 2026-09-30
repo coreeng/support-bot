@@ -27,9 +27,13 @@ For each product, each journey under it, and each cross-product journey, produce
 | --- | --- | --- | --- |
 | `<product>/_index.md` | explanation | Yes | What the product is, who it is for, why it exists, what it groups together, who owns it, and an index of its journeys. See *The product page is the point* below. Navigation-only when the product has no brief. |
 | `<product>/tutorial/*.md` | tutorial | When prose supports it | A newcomer's first guided pass at the product, end to end, one linear path, no branches. |
-| `<product>/how-to/*.md` | how-to | When prose supports it | Task recipes that are not tied to one journey. A task that belongs to a journey goes in the journey directory instead. |
+| `<product>/how-to/*.md` | how-to | When prose supports it | Task recipes. Only the task a declared journey *is* goes in that journey's directory; every other task stays here. |
 | `<product>/reference/*.md` | reference | When prose supports it | Configuration keys, CRD fields, CLI flags, API surfaces, defaults. Tables and field lists, no narrative. **Every field must already be described in prose somewhere** — a schema or CRD may confirm it but may never be the origin of it. A field the code defines and no documentation mentions is reported as undocumented surface area, not written. |
 | `<product>/explanation/*.md` | explanation | When prose supports it | Architecture, key concepts, design decisions, boundaries with adjacent systems. One concept per page. |
+
+**Journeys add pages; they never take pages away from the product.** Plan the product page and the four buckets from the product-wide discovery pass exactly as a product-only run would, then add each journey's pages. A journey page walks its own path end to end and links to the product pages for detail rather than absorbing them. The one exception is the product's central end-to-end path, which moves into the journey that declares it (below).
+
+**The product's central end-to-end path is always written.** In a product-only run, the path a reader follows to adopt the product from start to finish (set it up, configure it, go live) is written as a product-level how-to when prose supports it, and the report suggests declaring it as a journey. When that journey is later declared, the run that writes the journey **moves** the page: the journey's spine page is written from it, and the product-level page is deleted in the same run — never left beside the spine page as a duplicate. Every link to it on a skill-owned page is retargeted to the spine page, and each such page's `content_hash` is recomputed (a link retarget is not a human edit). This is the one deletion a run makes of a page an earlier run wrote, and only when that page is skill-owned: if its body no longer matches its `content_hash`, a human has edited it, so it stays, a sidecar proposal records the move, and the report asks a human to remove it. Record the move in the report: the deleted path, the spine page that replaced it, and the pages whose links were retargeted.
 
 These are the **four Diátaxis buckets**. Every one is assessed for every product in the report, whether or not pages landed in it — an empty bucket is a reported gap, never a stub. Do not manufacture a page to fill a bucket; `${CLAUDE_SKILL_DIR}/references/quality-flags.md` will flag it `hollow`, and a hollow page is a defect the skill deletes rather than ships.
 
@@ -256,7 +260,7 @@ Rules:
   * **Two sources naming different channels is a conflict**, resolved per *Conflicts between sources* above — not a list of alternatives to hand the reader.
   * **Attribute the contact, do not generalise it.** A channel registered by one tenant is that tenant's channel. It becomes the way to reach a *product's* team only where a source says so for that purpose.
 
-This rule exists because a product hub page stated two channels, only one of which was real, and the invented one reached a published page correctly cited. Citation was never the weak link.
+This rule exists because a source page once named two chat channels, only one of which existed, and the non-existent one reached a published page correctly cited. Citation was never the weak link.
 
 ### Version and staleness
 
@@ -322,33 +326,18 @@ If a required page cannot be written at all because no evidence exists, **do not
 Any page computing to `low` confidence carries the consumer's `low_confidence_banner` immediately after its frontmatter, before the first heading, wrapping this text:
 
 ```
-**Low confidence — needs review.** This page was generated from limited source evidence. Check every command and value against the sources listed at the bottom before relying on it.
+**Low confidence — needs review.** This page was generated from limited source evidence. Check every command and value before relying on it.
 ```
 
 Pages at `medium` and `high` do not carry a banner; their confidence is recorded in frontmatter and the report only.
 
 ## Citing sources
 
-Every authored page ends with a `## Sources` section — the last section on the page, after all content.
+Every contributing file is recorded in the page's `doc_journeys.sources` frontmatter — one entry per evidence file that contributed a fact, ordered by relevance (`high` first), each with a `contributed` clause stating what the file contributed, not what the file is. See `${CLAUDE_SKILL_DIR}/references/output.md`. Files read but not used are left out. The run report lists the same evidence per page.
 
-```markdown
-## Sources
+The page body carries **no** `## Sources` section. Frontmatter is not rendered, so the reader sees only the documentation, and reviewers read the sources from frontmatter.
 
-This page was generated from the following files. Paths are relative to each repository root.
-
-  * `foglight-agent` — `docs/forwarding.md` — the forwarder configuration keys and restart step
-  * `foglight-agent` — `README.md` — the agent version prerequisite
-  * `foglight-platform` — `docs/retention.md` — how long forwarded records are kept
-```
-
-Rules:
-
-- One bullet per evidence file that contributed a fact. Files read but not used are excluded.
-- Order by relevance: `high` first, then `medium`, then `low`.
-- The trailing clause states what the file contributed, not what the file is.
-- The same list, in the same order, goes in the page's `sources:` frontmatter — see `${CLAUDE_SKILL_DIR}/references/output.md`.
-
-Do not link source paths. These repositories are private and the rendered site has no resolvable target; a broken link is worse than plain text.
+Do not link source paths anywhere. These repositories are private and the rendered site has no resolvable target.
 
 ## Voice and style
 
@@ -360,17 +349,17 @@ Authored pages must read like the rest of the site, not like generated output.
 - Do not open a page by restating its own title, and do not write "This document describes…".
 - Do not include a changelog, a "last updated" line, or an author byline. Provenance lives in frontmatter.
 
-### The generation notice
+### Write for the reader
 
-Every authored page carries this HTML comment as the **first line of the body — immediately after the closing `---` of the frontmatter**, never before the opening one:
+The pages are read by the people who use the product, and only by them.
 
-```
-<!-- Generated by doc-journeys from source repositories. Review before relying on it; see the Sources section. -->
-```
+- Address the reader as "you". Never name the readers as a group ("our users", "customers", or the estate's own word for them), and never say who a page is for — the page is simply for whoever is reading it.
+- Never write about how the page was made: no generation notice or HTML comment, no mention of the run, the report, sources, "the estate", "existing documentation", or what could or could not be found. A gap or a conflict is recorded in the report and left off the page.
+- Links to pages under `prior_art_roots` follow `prior_art_policy` (see `${CLAUDE_SKILL_DIR}/references/settings.md`):
+  - **`replace`** — never link to them. The output replaces them, and a link sends the reader back to what is being retired. Carry the content over instead.
+  - **`coexist`** (the default) — the existing documentation stays, so link each page you declare `prior_art` with `overlap: full` or `partial` from the body, where the overlap is, as further reading. The page still carries the content in full.
 
-Static-site generators only recognise front matter when it begins on the very first line of the file. A comment placed above the opening `---` means the page has no front matter at all: the title, the weight, and the whole `doc_journeys` block are silently discarded, the delimiters render as horizontal rules, and the page appears untitled in the sidebar. Because the notice sits in the body it is covered by `content_hash`, which is correct — it is a constant, so it does not make the hash unstable.
-
-This differs from the base skill's notice, which tells the reader to edit the source file instead. Here there is no source document to edit — the sources are code. Edits to these pages are legitimate and expected.
+  Otherwise link only to pages in the output root, or to another product's documentation outside `prior_art_roots` where a source links to it.
 
 ## What this skill still does not do
 

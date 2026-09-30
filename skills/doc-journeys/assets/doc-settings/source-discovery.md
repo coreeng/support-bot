@@ -34,8 +34,9 @@ resolved list and count before discovery begins. `EDIT:` state how many reposito
 today, so a run that finds a very different number knows something moved.
 
 **This repository is a source repo like any other**, including its existing documentation under
-`prior_art_roots`. `EDIT:` say whether the output is intended to sit beside that documentation or
-eventually replace it — the routing reviewer treats overlap differently in the two cases. Three
+`prior_art_roots`. Whether the output sits beside that documentation or replaces it is set by
+`prior_art_policy` in `settings.md`; `EDIT:` add any detail here (for example, which sections are
+retired first). Three
 subtrees are **excluded as sources** (`source_exclude_paths`), because they are the pipeline's
 own output and would let a run cite itself:
 
@@ -57,6 +58,57 @@ anything under a prior-art root, including content an authored page supersedes. 
 existing page is a human decision the report may recommend.
 
 Prior-art hits are cited with `repo: <this repository's directory name under the source root>`.
+
+## Per-product sections (template)
+
+Add one section per product here, before its first run, when you declare the product under
+`product-definition/`. It tells discovery what to read for that product — generic ranking
+cannot tell a page written for the product's users from the owning team's own notes, and source
+repositories usually hold both. A product can run without one; its output is better with one.
+`EDIT:` delete this Foglight example once you have written your own.
+
+### Foglight Alerting: the existing pages it replaces
+
+**Scope.** One paragraph: what the product covers, in the terms its documentation uses, and
+which existing pages under `prior_art_roots` its output replaces. Example: Foglight Alerting
+covers alert rules, notifiers, silences and escalation; it replaces the existing site's
+`alerting/` section.
+
+**Read in full.** Every file listed is read and recorded as used or not used, with a one-line
+reason, whatever its rank. List the existing pages being replaced, and any file written for the
+product's users that sits among internal material:
+
+  * `site/content/docs/alerting/` — every page
+  * `foglight-alerting/docs/rules.md`, `foglight-alerting/docs/notifiers.md`
+  * `foglight-config/.github/ISSUE_TEMPLATE/escalation-request.yml` — a request form is a
+    procedure: document what the user fills in and what happens next
+
+**Verify only.** Internal files that state facts a page can be checked against, but that no
+procedure may be written from: `foglight-alerting/docs/design/routing.md`, the rule schema
+under `foglight-alerting/schema/`.
+
+**Left out.** Material that is not for the product's users; do not use it and do not report it as
+a gap: runbooks and on-call procedures, design documents and decision records, CI and
+infrastructure-as-code internals, migration trackers and finished migrations (document the end
+state only), and anything marked team-internal. Name the directories:
+`foglight-alerting/runbooks/`, `foglight-alerting/docs/adr/`.
+
+**Duplicates and dating.** Where the same page exists in two places, say which copy is maintained
+(for example, `foglight-alerting/docs/` over an older copy in another repository). Conflicting
+statements are dated with git history, and the most recently maintained one wins.
+
+**Instance data.** Per-tenant or per-environment files that must never be printed as defaults —
+read one or two to learn the shape. Also list them under *Instance directories* below.
+
+**Other products' material.** What neighbouring products own, so pages link to them rather than
+restate them. Example: dashboards are Foglight Dashboards'; collectors are Foglight Agent's.
+
+**Contacts.** Which contact points pages may publish, if the sources name others. Example: only
+`#foglight-support` for questions; requests made through an issue template or pull request are
+described as that, with no channel.
+
+When the section is written, check that every path in it exists, and add the product's words to
+*Term expansion vocabulary* below.
 
 ## Always-add candidates
 
