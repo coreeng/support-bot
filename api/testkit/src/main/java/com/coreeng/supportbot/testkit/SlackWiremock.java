@@ -379,12 +379,26 @@ public class SlackWiremock implements WireMockBackend {
             String createdAtIso,
             boolean mergeable,
             String reviewsJson) {
+        return stubGitHubGetPullRequest(
+                description, repositoryName, pullNumber, state, createdAtIso, mergeable, reviewsJson, false);
+    }
+
+    /** As above, with GitHub's {@code draft} flag — hub4j reads it for {@code GHPullRequest#isDraft()}. */
+    public Stub stubGitHubGetPullRequest(
+            String description,
+            String repositoryName,
+            int pullNumber,
+            String state,
+            String createdAtIso,
+            boolean mergeable,
+            String reviewsJson,
+            boolean draft) {
         StubMapping repoStub = stubRepoMetadata(description, repositoryName);
 
         String prPath = "/repos/" + repositoryName + "/pulls/" + pullNumber;
         String prBody = """
-                {"state":"%s","created_at":"%s","title":"PR title","user":{"login":"test"},"number":%d,"requested_teams":[],"mergeable":%b,"mergeable_state":"unknown"}
-                """.formatted(state, createdAtIso, pullNumber, mergeable);
+                {"state":"%s","created_at":"%s","title":"PR title","user":{"login":"test"},"number":%d,"requested_teams":[],"mergeable":%b,"mergeable_state":"unknown","draft":%b}
+                """.formatted(state, createdAtIso, pullNumber, mergeable, draft);
         StubMapping prStub = givenThat(get(prPath)
                 .withName(description)
                 .willReturn(aResponse()
