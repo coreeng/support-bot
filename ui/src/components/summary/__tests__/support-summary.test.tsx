@@ -11,10 +11,9 @@ import { clearMockUrlParamsInitial, useMockUrlParams as mockUseUrlParams, setMoc
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PRESET_DAYS } from "../../../lib/dateRange";
 import { ApiError, MAX_SUMMARY_POLL_FAILURES } from "../../../lib/hooks";
 import type { SummaryData, SummarySection, SummaryTicket } from "../../../lib/types/summary";
-import { MAX_SUMMARY_WINDOW_DAYS, windowEndingYesterday } from "../../../lib/utils/summary-window";
+import { MAX_SUMMARY_WINDOW_DAYS, presetWindow } from "../../../lib/utils/summary-window";
 import SupportSummaryPage, { SUMMARY_NOT_ENABLED, summaryErrorMessage } from "../support-summary";
 
 // useSummary sends the CSRF token with the summary request; the global next-auth mock has no getCsrfToken.
@@ -168,7 +167,7 @@ const enabledRequests = () =>
     .filter((url) => url === "/api/summary/enabled");
 
 const summaryUrl = (from: string, to: string) => `/api/summary?from=${from}&to=${to}`;
-const defaultWindow = () => windowEndingYesterday(PRESET_DAYS.last2Weeks);
+const defaultWindow = () => presetWindow("last2Weeks");
 
 // ===== Rendering =====
 
@@ -652,7 +651,7 @@ describe("SupportSummaryPage", () => {
   });
 
   describe("Date window", () => {
-    it("requests the last 2 weeks ending yesterday (UTC) by default", async () => {
+    it("requests the two business weeks before the current one by default", async () => {
       renderPage();
       await findAtAGlance();
 
@@ -668,7 +667,7 @@ describe("SupportSummaryPage", () => {
       renderPage();
       const strip = await screen.findByTestId("summary-window");
 
-      const { from, to } = windowEndingYesterday(PRESET_DAYS.lastWeek);
+      const { from, to } = presetWindow("lastWeek");
       expect(summaryRequests()).toEqual([summaryUrl(from, to)]);
       expect(screen.getByTestId("summary-date-filter")).toHaveTextContent("Last Week");
       expect(within(strip).getByText("Last week")).toBeInTheDocument();
@@ -695,7 +694,7 @@ describe("SupportSummaryPage", () => {
       await user.click(screen.getByTestId("summary-date-filter"));
       await user.click(await screen.findByRole("option", { name: "Last Month" }));
 
-      const month = windowEndingYesterday(PRESET_DAYS.lastMonth);
+      const month = presetWindow("lastMonth");
       await waitFor(() => expect(summaryRequests()).toContain(summaryUrl(month.from, month.to)));
       expect(screen.getByTestId("summary-date-filter")).toHaveTextContent("Last Month");
 
@@ -716,7 +715,7 @@ describe("SupportSummaryPage", () => {
     it("dims the previous window and labels it honestly while a newly chosen preset loads", async () => {
       const user = userEvent.setup();
       let releaseMonth: (() => void) | undefined;
-      const month = windowEndingYesterday(PRESET_DAYS.lastMonth);
+      const month = presetWindow("lastMonth");
       mockApi((url) => {
         if (url === summaryUrl(month.from, month.to)) {
           return new Promise((resolve) => {
@@ -764,7 +763,7 @@ describe("SupportSummaryPage", () => {
       await user.click(await screen.findByRole("option", { name: "Last Week" }));
 
       expect(screen.queryByLabelText("From date")).not.toBeInTheDocument();
-      const week = windowEndingYesterday(PRESET_DAYS.lastWeek);
+      const week = presetWindow("lastWeek");
       await waitFor(() => expect(summaryRequests()).toContain(summaryUrl(week.from, week.to)));
     });
 

@@ -49,6 +49,9 @@ public class PrTrackingFunctionalTests {
     private static final String ADMITTED_AUTHOR_REPO = "test-org/pr-author-admitted-repo";
     private static final String ADMITTED_AUTHOR_PR = "https://github.com/" + ADMITTED_AUTHOR_REPO + "/pull/501";
 
+    private static final String CODEOWNERS_REPO = "test-org/pr-codeowners-repo";
+    private static final String CODEOWNERS_DRAFT_PR = "https://github.com/" + CODEOWNERS_REPO + "/pull/601";
+
     /** Returns a PR created-at timestamp 1 hour ago — safely within the 24h SLA window. */
     private static String recentCreatedAt() {
         return java.time.Instant.now().minus(Duration.ofHours(1)).toString();
@@ -608,6 +611,84 @@ public class PrTrackingFunctionalTests {
                 .atMost(Duration.ofSeconds(3))
                 .untilAsserted(() -> creationStubs.ticketMessagePosted().assertIsNotCalled());
 
+        creationStubs.cleanUp();
+    }
+
+    /**
+     * A draft PR linked in a requires-codeowners repo gets the "still a draft" copy, not the code-owner
+     * chase copy. Models the state a draft reaches the bot in: the gate is definitely unsatisfied
+     * (reviewDecision REVIEW_REQUIRED) but the pending list is empty, so the chase copy would imply
+     * somebody had already been asked.
+     *
+     * <p>Runs through real detection rather than a seeded record, so it covers the whole path the unit
+     * tests mock out: hub4j parsing GitHub's {@code draft} flag off the REST payload, and that flag
+     * surviving the GraphQL code-owner enrichment that happens afterwards.
+     */
+    @Test
+    public void whenDraftPrPostedForCodeownersRepo_postsDraftCopyRatherThanChaseCopy() {
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        SlackTestKit asTenantSlack = asTenant.slack();
+        String channelId = testKit.config().mocks().slack().supportChannelId();
+
+        MessageTs queryTs = MessageTs.now();
+        MessageTs ticketMessageTs = MessageTs.now();
+
+        // The PR is a draft (draft=true) and open. reviewDecision REVIEW_REQUIRED with an EMPTY reviewer
+        // list is the shape under test: the gate is definitely unsatisfied, but nobody is pending.
+        var githubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest(
+                        "Codeowner draft PR", CODEOWNERS_REPO, 601, "open", recentCreatedAt(), false, "[]", true);
+        var graphQlStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGraphQlReviewDecision(
+                        "Codeowner draft reviewDecision REVIEW_REQUIRED", "REVIEW_REQUIRED", List.of());
+
+        SlackMessage messageForStubs = SlackMessage.builder()
+                .slackWiremock(testKit.slack().wiremock())
+                .ts(queryTs)
+                .channelId(channelId)
+                .build();
+        var creationStubs = messageForStubs.stubTicketCreationFlow("codeowner draft ticket", ticketMessageTs);
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("PR reaction on query")
+                        .reaction("pr")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Eyes reaction on query")
+                        .reaction("eyes")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        // Matching on the copy itself is the point of the test: this stub only matches a chat.postMessage
+        // whose body carries the draft wording, so either chase variant would leave it uncalled. Matched on
+        // the single token "draft" because the body is form-encoded (spaces arrive as "+"), and neither
+        // chase variant contains that word at all, so one token is enough to tell the copies apart.
+        var draftMessageStub =
+                testKit.slack().wiremock().stubChatPostMessage("draft-pending notification", channelId, "draft");
+
+        // when — the tenant links the draft PR
+        asTenantSlack.postMessage(queryTs, "Please review " + CODEOWNERS_DRAFT_PR);
+
+        // then — the PR is detected (both provider reads made, PR reaction added) and the draft copy is
+        // the message that gets posted.
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            githubStub.assertIsCalled();
+            graphQlStub.assertIsCalled();
+            prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
+            draftMessageStub.assertIsCalled();
+        });
+
+        draftMessageStub.cleanUp();
+        graphQlStub.cleanUp();
+        githubStub.cleanUp();
         creationStubs.cleanUp();
     }
 
