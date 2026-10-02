@@ -18,6 +18,11 @@ plan_file: doc-tools/plan.md
 prior_art_roots:
   - site/content/docs
 
+# What happens to that existing documentation. `coexist` (the default): it stays, and pages link
+# to the existing page they overlap. `replace`: the output is meant to replace it, so pages never
+# link to it and carry its content over instead. Pages are complete either way. EDIT.
+prior_art_policy: coexist
+
 # The only paths a run may write. The orchestrator baselines and cross-checks `git status` over
 # exactly these. Keep product-definition/ in the list: a run may declare there. EDIT the first two.
 write_locations:

@@ -67,6 +67,7 @@ paths are relative to the **repo root**.
 | `proposals_root` | path | sidecar proposals for human-edited pages; **outside** `output_root` |
 | `plan_file` | path | where the builder persists its plan before stopping at the gate; outside `output_root` |
 | `prior_art_roots` | list of paths | existing documentation the output may overlap — scanned as tier-5 prose, cited, never edited; `output_root` is always excluded from them |
+| `prior_art_policy` | `replace` or `coexist`, optional | whether the output **replaces** the documentation under `prior_art_roots` (pages never link to it; its content is carried over) or **coexists** with it (pages still carry the content in full, and link the overlapping existing page from the body). Default `coexist` |
 | `write_locations` | list of paths | the only paths a run may write; the orchestrator's `git status` scope |
 | `base_branch` | string | the branch run worktrees branch from |
 | `worktree_dir` | path | where run worktrees are created; must be gitignored |

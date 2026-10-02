@@ -61,16 +61,16 @@ The consumer repo is a source repo, so its existing documentation reaches the fu
 
 Before authoring, additionally scan every `prior_art_roots` entry — **always excluding the output root** — for pages matching the journey's term set. For each hit, record path and title.
 
-**Prior art is citable evidence.** An existing page is a real file with real content, and for many journeys it holds facts that exist nowhere else in the estate: install commands, portal URLs, application IDs, request wording. Consolidating it into the output is in scope — the estate adapter says whether the output is intended to eventually replace the prior art, in which case lifting its content forward (duplicating it, since the original may later be removed) is the job, not a hazard.
+**Prior art is citable evidence.** An existing page is a real file with real content, and for many journeys it holds facts that exist nowhere else in the estate: install commands, portal URLs, application IDs, request wording. Consolidating it into the output is in scope — `prior_art_policy` in settings says whether the output is intended to replace the prior art (`replace`) or sit beside it (`coexist`); either way lifting its content forward (duplicating it, since the original may later be removed or drift) is the job, not a hazard.
 
   * It ranks at **authority tier 5 (prose)** — the lowest. When a prior-art page and a manifest disagree, the manifest wins and the discrepancy is recorded as a quality flag.
-  * It appears in the page's `## Sources` section and in `doc_journeys.sources`, with `repo:` set to the consumer repo's directory name under the source root.
+  * It appears in `doc_journeys.sources`, with `repo:` set to the consumer repo's directory name under the source root.
   * It **also** appears in `doc_journeys.prior_art`, which records overlap rather than contribution. A page can legitimately appear in both.
   * It counts toward the confidence rubric exactly as a prose source does — no bonus, no penalty. Prior art alone will not lift a page to `high`, because it cannot satisfy the authoritative-tier condition.
 
 **Authoring in full is the default, and duplication is accepted.** Do not reduce a page to a stub of links because existing content covers the ground. Author the complete page — self-contained, so it survives the original's removal.
 
-  * Cross-link to the covering pages from the body, so a reader can reach the canonical detail while it still exists.
+  * Linking to the covering pages follows `prior_art_policy` in settings. Under **`replace`**, do not link to them: the output replaces them, so carry their content over instead. Under **`coexist`** (the default), link each covering page from the body where the overlap is — the page is still complete without it.
   * Record every overlap in the report's Prior art section with an `overlap` of `full` or `partial`, whether or not you linked to it.
   * `${CLAUDE_SKILL_DIR}/references/duplication.md` will flag the overlap. Against prior art that flag is **reportable, not a defect** — it does not cause the page to be deleted or shortened. Overlap between two pages this skill authored in the same run is still a defect.
 
@@ -131,6 +131,8 @@ Two consequences worth expecting rather than discovering:
 **Ownership never narrows the scan.** A journey declared under one product is still searched for across every source repo, exactly as a cross-product journey is. What a product declaration changes is the vocabulary the search uses, not its reach — which is why a single-product journey can, and often does, find most of its evidence outside its own product's repositories. `${CLAUDE_SKILL_DIR}/references/gap-analysis.md` Part D reports when it does.
 
 **Expansion.** For each term set, add plausible synonyms, abbreviations, and the concrete technology names the journey implies. This is a judgement step and is expected to be non-deterministic. The shape of the reasoning: a journey mentioning "deploy a workload" expands to `helm`, `chart`, `deployment.yaml`, `kustomize`, `pipeline`; one mentioning "ingress" expands to the estate's ingress controller and proxy names as well as `gateway` and `route`. The estate adapter carries the estate-specific vocabulary — component names a term like "ingress" should expand to here — and is the place to record expansions that proved productive.
+
+**The product term set is searched on its own as well, in every run.** Journeys add searches; they never replace the product-wide one. The product-wide pass feeds the product page and the four product buckets; each journey's pass feeds that journey's pages. The 40-term cap below applies to each set separately, so a journey's terms never push the product's features out.
 
 Cap the expanded per-journey term set at 40 terms. Beyond that, precision collapses and every pass returns noise. If you have more than 40 candidate terms, keep the ones most specific to this journey and drop the generic ones (`config`, `service`, `platform`, `app` are almost always worth dropping).
 
@@ -196,13 +198,17 @@ Record the collapse in the per-journey discovery record: path prefix, count coll
 
 Never write a per-instance value from a collapsed directory onto a page as though it were a general default. One tenant's quota is that tenant's quota. Defaults come from the schema or chart, not from an instance.
 
-Shortlist the **top 25 candidates per journey**, hard cap 40. If more than 40 score above zero, keep the top 40 and record the number dropped in the report — never silently truncate.
+**There is no shortlist cap.** Every candidate that qualifies is read in Pass 4 and recorded as used or not used, with a one-line reason; a count limit only ever loses documentation, and loses the most on the products with the most of it. A candidate qualifies when it has a path hit on a term in the set, or matches at least two distinct terms in its content. The score orders the reading — most relevant first — and never decides what is left out. Candidates below the threshold are listed in the discovery record with their score, so a reader can see what the search found and did not read.
+
+Reading everything that qualifies does not mean giving every file the same attention. Open each one; a file that turns out to be about something else — another product, a passing mention — is recorded as not used, with that reason, as soon as that is clear. A large qualifying set is read in batches until it is done; never stop early, and never leave a qualifying file without an outcome.
+
+**The product's own repositories are always read.** Every documentation file — `README.md`, anything under `docs/`, and other prose Markdown — in a repository listed in the product's `repos` is read in Pass 4 whatever it scores. These files are the product's core material; left to compete, they lose places to the far larger body of prior art that merely mentions the product. List them in the discovery record as a separate *product repositories* set, and record each one as used or, with a one-line reason, not used (a test fixture, a template, a file about something else). A product that declares no `repos` has no such set.
 
 If fewer than 5 candidates score above zero, the journey has thin evidence. Do not pad the shortlist with low scorers. Proceed, and expect the confidence rubric below to return `low`.
 
 ### Pass 4 — Read and extract
 
-Read every shortlisted file in full. While reading, follow one hop outward when a file points at something more authoritative: a README naming a chart directory, a Taskfile target naming a script, a Go file naming a config struct. One hop only — do not walk the graph.
+Read every qualifying file; a file that proves off-topic is recorded as not used as soon as that is clear, and every other one is read in full. While reading, follow one hop outward when a file points at something more authoritative: a README naming a chart directory, a Taskfile target naming a script, a Go file naming a config struct. One hop only — do not walk the graph.
 
 **Authoritative file types.** This ordering ranks how close a file sits to the running system:
 
@@ -347,7 +353,7 @@ Per-journey confidence is the **lowest** confidence among its authored pages, no
 
 Discovery output feeds two consumers. Produce both:
 
-1. **Per-page evidence list** — for frontmatter and the page's Sources section: repo, path, relevance, and one line on what it contributed.
-2. **Per-journey discovery record** — for the report: term set used, candidates found per pass, shortlist size, number dropped at the cap, repos that yielded nothing.
+1. **Per-page evidence list** — for frontmatter and the report: repo, path, relevance, and one line on what it contributed.
+2. **Per-journey discovery record** — for the report: term set used, candidates found per pass, the candidates read and their outcomes, the candidates below the threshold, repos that yielded nothing.
 
 A repo that yielded nothing for a journey is a reportable finding, not an omission. It tells the reader where the skill did not look successfully.

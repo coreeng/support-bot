@@ -32,8 +32,8 @@ existing journey declarations stay human-owned.
    level down.
 
 Paths and settings: your spawn prompt supplies the repo root (in an orchestrated run, a git
-worktree), the consumer root (the main checkout, where `.doc-settings/` lives), the tools root (the directory holding the `doc-journeys` and `doc-run` skills; every `<tools root>` path in this file resolves against it), and the pinned docs root (`output_root`) and
-`prior_art_roots`. If any is missing, read `<consumer root>/.doc-settings/settings.md`; never
+worktree), the consumer root (the main checkout, where `.doc-settings/` lives), the tools root (the directory holding the `doc-journeys` and `doc-run` skills; every `<tools root>` path in this file resolves against it), and the pinned docs root (`output_root`),
+`prior_art_roots` and `prior_art_policy` (`coexist` when absent). If any path is missing, read `<consumer root>/.doc-settings/settings.md`; never
 guess.
 
 Load `<tools root>/doc-journeys/references/duplication.md` first — its Rule 1 (overlap)
@@ -44,12 +44,12 @@ grading anything against comparison set 1.** `duplication.md` says which overlap
 `source-discovery.md` constrains what may be done about the ones found against **prior art**,
 and the two are not interchangeable. Against prior art, "authoring in full is the default, and
 duplication is accepted. Do not reduce a page to a stub of links because existing content
-covers the ground" — all the more so where the consumer's estate adapter says the output is
-intended to eventually replace the prior art, so the copy must survive the original's removal. The overlap flag there
-is **reportable, not a defect — it does not cause the page to be deleted or shortened**. What
-the same section *does* require is a body cross-link to the covering page. So against prior
-art the actionable defect is almost always the **missing cross-link**, never the presence of
-the content.
+covers the ground" — all the more so under `prior_art_policy: replace`, where the copy must
+survive the original's removal. The overlap flag there is **reportable, not a defect — it does
+not cause the page to be deleted or shortened**. What the section does require about links
+depends on `prior_art_policy` (pinned in your spawn context; default `coexist`): under `replace`
+a body link to a prior-art page is the defect; under `coexist` a declared overlap with no body
+link is. Never the presence of the content.
 
 Note also the scope limits in `duplication.md` itself, which are easy to miss and change the
 answer wholesale: Rule 2 (line 74) runs **only** when the run authored cross-product journey
@@ -60,11 +60,15 @@ than applying the rules anyway; you may still run their *mechanics* as an indepe
 check, but report the results as observations and label them as such.
 
 One check DOES fire on every run, product-only included, as its own rule rather than a
-freelance drift observation: **a page declaring `prior_art` with `overlap: full` or
-`partial` must link that destination from its body.** A declared overlap with zero body
-links is a `shipped` finding, `check: missing-prior-art-link`, `fix: add-body-cross-link` —
-the one remedy the prior-art rules always require. (One run's reviewer found exactly these
-three real defects but had to file them under a rule it had just said doesn't apply.)
+freelance drift observation, and its direction follows `prior_art_policy`:
+
+  * **`replace`** — **no page body links to a page under `prior_art_roots`.** Such a link is a
+    `shipped` finding, `check: prior-art-link`, `fix: carry-content-and-remove-link` — carry over
+    whatever the reader needs from the linked page, then remove the link. A page that declares
+    `prior_art` and does not link it is correct.
+  * **`coexist`** (the default) — **a page declaring `prior_art` with `overlap: full` or
+    `partial` links that page from its body.** A declared overlap with no body link is a
+    `shipped` finding, `check: missing-prior-art-link`, `fix: add-body-cross-link`.
 
 **Never flag a link as broken from source syntax alone.** Sites commonly rewrite markdown links
 at render time (the consumer's site adapter says whether this one does), so a relative form that
@@ -83,7 +87,7 @@ wrong about what follows from it.
 Overlap between two pages **the same run authored** is a different matter and *is* a genuine
 defect — `source-discovery.md:63` says so in the same breath. That is comparison set 3, and it is
 your sharpest instrument. Note too that a **repo path is not a rendered site destination**: a page
-drawing on a source repository has nothing to `relref`, and citing it under `## Sources` is what
+drawing on a source repository has nothing to `relref`, and recording it in `doc_journeys.sources` is what
 the authoring rules prescribe. Do not grade that as a missing cross-link.
 
 Use the run report's prior-art table as a starting map of destinations, but verify
@@ -133,7 +137,7 @@ Return ONLY this report:
   pages: <manifest page> vs <destination / other page>
   claim: <one sentence — what is duplicated or restated>
   evidence: <the reproduced fragment(s) with line refs on both sides>
-  fix: add-body-cross-link | move-fact-to-destination | replace-with-link | merge-pages
+  fix: add-body-cross-link | carry-content-and-remove-link | move-fact-to-destination | replace-with-link | merge-pages
     | acceptable-with-reason   (owner: builder | human)
   needs_verification: <true only where the fix would delete substantial content;
     false for mechanical duplication with line refs on both sides>
@@ -158,9 +162,10 @@ overlap as an observation with `add-body-cross-link` and propose no deletion. Re
 clause in `duplication.md` before choosing a removing fix — a remedy applied where no rule fires
 is one you invented, and the one time it happened the cut would have deleted framing this
 reviewer's own analysis had listed as material that must survive.
-Against **prior art** they are forbidden by `source-discovery.md`'s *Prior-art pass* section; use
-`add-body-cross-link`, or `acceptable-with-reason` where the overlap is inherent and the link
-already exists. If you believe a prior-art page genuinely should be shortened, that is a
+Against **prior art** they are forbidden by `source-discovery.md`'s *Prior-art pass* section.
+Overlap with prior art is expected; the only prior-art defect is the link one in the check above
+(`carry-content-and-remove-link` under `replace`, `add-body-cross-link` under `coexist`);
+otherwise use `acceptable-with-reason`. If you believe a prior-art page genuinely should be shortened, that is a
 canonical-copy decision: raise it as `acceptable-with-reason (owner: human)` with your reasoning,
 and let a human retire the prior-art page. The skill never does it.
 

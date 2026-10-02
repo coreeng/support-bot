@@ -6,6 +6,14 @@ license: Apache-2.0
 
 # doc-run
 
+**Request:** $ARGUMENTS
+
+> The line above is the documentation request this run was invoked with — agents substitute the
+> invocation's arguments there. If it shows text, that text is the request. Only if it is empty or
+> still shows the literal placeholder, take the request from the text after `/doc-run`, a notice
+> such as *Running custom command "doc-run" with arguments: "…"*, or the message that invoked the
+> run. Never ask the user for it.
+
 You are the **orchestrator** of an unattended documentation pipeline. You do not author,
 review, or verify anything yourself — you spawn the agents that do, relay between them, and
 resolve on your own every decision the pipeline used to put to the user. The run must never
@@ -87,10 +95,10 @@ writes nothing needs no branch; use the main checkout as the repo root and end a
 
 ## Step 1 — resolve the request
 
-The skill argument is the documentation request, passed to doc-journeys verbatim (it resolves
-products, journeys, and mode itself). If no argument was given, ask the user what to run before
-creating the worktree or spawning anything — an empty request is the one thing this pipeline
-cannot default.
+The documentation request is the **Request** line at the top of this file, passed to
+doc-journeys verbatim (it resolves products, journeys, and mode itself). If there is genuinely no
+request anywhere in the invocation, do not ask — write nothing, and close out saying the run needs
+a request (`/doc-run <documentation request>`).
 
 Two doc-journeys modes never reach the build. If the request resolves to **`plan`** mode, the
 pipeline ends at step 3 — the plan is the deliverable and no `CONFIRMED` is ever sent. If it
@@ -314,16 +322,7 @@ present the state in the close-out rather than looping or improvising. Structura
 change page bodies and sidebar labels; deep-reviewing output that is about to change wastes
 the reviews.
 
-**Report-only findings do not gate.** A `shipped` finding whose every path sits under
-`reports_dir` is a defect in a diagnostic, not in documentation — the deep
-reviewers read pages, not report prose, so nothing they do is wasted by a report that will
-change. Hold report-only findings back and batch them into the step 8 fix loop with the deep
-review's findings, one fix round instead of a gate round per defect. This is a recorded
-failure mode: two runs hard-stopped at this gate on report-figure defects alone — five found,
-five fixed, nine new ones minted by the fixing — while their pages were clean and the deep
-review never ran. The gate's two-round bound applies to page defects only; report defects
-surviving step 9's bound are listed in the close-out as unresolved, which is acceptable for a
-diagnostic the user reviews at merge anyway.
+**The run report is not reviewed and never goes back to the builder.** Reviewers check pages, and the report is a diagnostic the user reads at merge. If a reviewer does raise something about the report, list it in the close-out as one line and move on; no fix round is ever spent on a report. Two runs once hard-stopped here on report figures alone while their pages were clean, and a later one spent half an hour recounting report tallies.
 
 `latent` findings do not block — carry them to step 7. A defect the run merely reproduced
 from mandated section furniture or an estate-wide template (the site adapter lists the known
@@ -331,11 +330,7 @@ ones — a recorded case was a report banner's landing-page link, identical in e
 the site) is `latent` by definition — pre-existing template defects are reported upstream,
 never held against this run.
 
-**A report-only patch round and the deep reviews run in parallel.** Since report findings
-cannot change a page, there is nothing serial between fixing them and deep-reviewing the
-pages — one run proved this ordering ("no page can change, so I'm sending the patches and
-releasing the deep reviews in parallel") and it saves a full round of wall-clock. And the
-deep review runs **whenever pages exist and the site builds**, including after a hard stop on
+The deep review runs **whenever pages exist and the site builds**, including after a hard stop on
 page defects that the two rounds could not clear: the reviewers are read-only and
 independent, and a stopped run whose pages were never adversarially reviewed is the worst
 recorded outcome of this pipeline.
@@ -397,18 +392,13 @@ with them, but repeat them — they are load-bearing):
 - treat `verifier_verdict: CONFIRMED` and mechanically-evidenced findings as ground truth; a
   disagreement is recorded in the run report with evidence, never silently declined
 - apply fixes through the skill's own machinery — refresh rules, `content_hash` recomputed
-- record every correction in the run report under `## Post-run corrections`
-- findings owned by humans are acknowledged in the report, not applied
-- a fix round that touches any page body ends by re-running every pinned command in the
-  reports and updating the affected figures **before** returning — two runs' final gates were
-  filled entirely with report figures the page fixes had silently staled
-- before returning, grep your own diff for fresh figures and verify each — the recorded
-  pattern is a fix round minting the defect class it was fixing
+- list every correction in the returned manifest, one line each; the close-out records them,
+  the run report does not
+- findings owned by humans go in the report's suggested actions, not applied
+- do not edit the run report for any other reason in a fix round
 
 The builder returns (via SendMessage) a manifest of what the fix round changed; merge it into
-the run manifest per step 4. When spot-checking a fix yourself, run the report's **pinned
-command verbatim** — a paraphrased derivation (different scope, unstripped `## Sources`) has
-produced false mismatches that cost a round to un-raise.
+the run manifest per step 4.
 
 ## Step 9 — re-verify
 
@@ -428,11 +418,11 @@ declarations — goes in one commit on `doc-run/<run-id>` in the worktree, with 
 the request and the mode. Stage by `write_locations`, but **only the entries that exist on disk**
 — `proposals_root` is legitimately absent when no sidecar was written, and `git add` aborts on a
 missing pathspec (`for p in <write_locations>; do [ -e "$p" ] && git add -- "$p"; done`). A branch with uncommitted work is not mergeable and defeats the
-point of step 0. Leave the worktree in place; the user removes it (`git worktree remove`)
+point of step 0. The plan is a working file: first check that the run report's evidence summary itself lists every file read but not used, with its reason (have the builder copy it in if not), then remove the plan before staging (`git rm -q --ignore-unmatch -- "<plan_file>"; rm -f "<plan_file>"`) — the run report is the one record the branch carries. Leave the worktree in place; the user removes it (`git worktree remove`)
 after merging. **Do not push the branch and do not open a PR** — the user merges locally.
 
 Before writing the close-out, sweep for **run-owned corrections you have already proven** — a
-stale line in a declaration Notes field the build disproved, a report figure you re-derived —
+stale line in a declaration Notes field the build disproved —
 and have the builder apply them now. Offering a proven one-line fix ("say the word and I'll
 correct it") is a recorded anti-pattern: it converts finished work into a question.
 
@@ -475,7 +465,8 @@ not as open questions back to the user. Then:
   content from the repo root; nothing in a run reads or writes the main checkout's content tree.
 - Every spawn prompt also pins the settings values every agent otherwise rediscovers or gets
   wrong: `output_root`, `reports_dir`, `proposals_root`, `plan_file`, `write_locations`,
-  `prior_art_roots`, `source_exclude_paths`, `preview_path`, `render_check`, and the exact
+  `prior_art_roots`, `prior_art_policy` (`coexist` when absent), `source_exclude_paths`,
+  `preview_path`, `render_check`, and the exact
   **build command** — `build_command` with `<consumer root>` substituted for real (a
   dependency directory such as `node_modules` lives only in the main checkout, never in a
   worktree; a published re-derive command naming `<repo root>/node_modules` cannot reproduce)
