@@ -33,7 +33,8 @@ see Phase 3 — you are the recovery path for a lost builder, and that is legiti
   guess one. All guardrails in the skill bind you: write only to its permitted locations
   (`output_root`, `proposals_root`, and `product-definition/` within the bound below), never
   touch source repos, never overwrite human-edited pages, never delete pages from previous
-  runs. (Deleting a page THIS run wrote — a hollow page or shipped stub — is not only permitted
+  runs — except moving a skill-owned product page into a newly declared journey, which the skill
+  prescribes (`authoring.md`). (Deleting a page THIS run wrote — a hollow page or shipped stub — is not only permitted
   but what the skill prescribes: delete it and record the journey as uncovered.)
 - **`product-definition/` writes are permitted within a stated bound.** If the request names a
   journey or product that `product-definition/` does not declare, you propose the missing
@@ -209,24 +210,13 @@ For the findings:
 - Apply each fix through the skill's own rules: refresh rules for page edits, `content_hash`
   recomputed for any body you change, frontmatter provenance kept accurate. Never fix a page by
   bypassing the machinery that generated it.
-- **Record every correction in the run report** in a `## Post-run corrections` section — a
-  **table** (finding, what was wrong, what changed), never narrative prose. This is the
-  convention that makes defects auditable later; a silent fix destroys the audit trail, and
-  correction *prose* is where new figure defects breed.
-- **Fixing a report figure means deleting the restatement, not correcting it in place.** The
-  one-figure-one-place rule (`<tools root>/doc-journeys/references/output.md`, report rule 7) applies with force in
-  this phase: where a finding names a prose figure that a table also carries, the fix is to cut
-  the sentence's number (point at the table or go qualitative), and where a section is
-  superseded, rewrite it rather than appending a correction below the live old claim. Then
-  re-derive by command every figure remaining in any paragraph you touched — one run minted
-  nine fresh figure defects while fixing five, because each corrected sentence trusted a
-  remembered number.
+- **List every correction in your returned manifest**, one line each (finding, what changed). The close-out records corrections; do not edit the run report in a fix round except to add a human-owned finding to its suggested actions.
 - Findings whose `fix` names a source repository are NOT yours to apply — source repos are
   read-only. Acknowledge them in the report's suggested actions instead.
 - **Under `product-definition/`, this phase carries the same bound as Phase 2.** A finding in
   the `FINDINGS` package whose fix creates a journey declaration or amends a `product.md` — with
   the exact contents or diff stated — you apply, list under `declarations:` in the manifest,
-  and record in `## Post-run corrections`. A finding whose fix would touch a brief, modify an
+  and list it in the manifest. A finding whose fix would touch a brief, modify an
   existing journey or cross-product-journey declaration, or delete anything is NOT yours to
   apply: the fix is a report entry naming the file and the change — and, where the pages were
   framed against a value now in doubt, say which pages a human would need to revisit if they

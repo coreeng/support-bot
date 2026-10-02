@@ -166,7 +166,7 @@ The distinction that carries the weight is **why** a bucket is empty:
 | Reason | Meaning | Actionable by |
 | --- | --- | --- |
 | `no prose found` | Documentation for this type exists nowhere in the estate | A human writing docs |
-| `prose found, not consolidated` | Material exists but was dropped at the shortlist cap or scored too low | Re-running with a better term set |
+| `prose found, not consolidated` | Material exists but scored below the reading threshold, so the search did not reach it | Re-running with a better term set |
 | `journey-shaped, no journey declared` | Material exists and is good, but the page it belongs on is a journey page, and no journey is declared to hold it | A human declaring the journey |
 | `code-only` | The material exists but only as code, so strict provenance forbade writing it | A human documenting the code — see *undocumented surface area* |
 | `not applicable` | The product genuinely has no material of this type | Nobody; this is fine |
@@ -176,9 +176,9 @@ The distinction that carries the weight is **why** a bucket is empty:
 **Pick the reason that matches the facts, and check it against the rest of the report.** These strings are not interchangeable labels for "empty"; each names a different owner, which is the whole point of the vocabulary. Two failure modes to avoid, both observed:
 
   * **`no prose found` while another section of the same report describes the prose.** If *Journeys not covered* says material is "spread across four documents in three directories", the bucket cannot also claim it exists nowhere in the estate. Grep your own report before choosing.
-  * **`prose found, not consolidated` when the cap was never reached.** Its definition is cap-or-score driven. If the report also states "dropped at the cap: 0", the string contradicts itself and the honest reason is a different one — most often `journey-shaped, no journey declared`.
+  * **`prose found, not consolidated` when the material was read.** Its definition is threshold driven. If the report lists the material as read, the string contradicts itself and the honest reason is a different one — most often `journey-shaped, no journey declared`.
 
-`journey-shaped, no journey declared` exists because a product-only run has nowhere correct to put a product's central end-to-end path: writing it as a product-level how-to pre-empts the journey page and mis-tiers its audience, while calling the bucket empty for want of prose is false. It is actionable by declaring the journey and re-running, and it belongs in *suggested actions* naming the journey that would hold it. Do not stretch it to cover material that is **not** journey-shaped — a maintainer-tier task recipe tied to no journey belongs in the how-to bucket, and reporting the bucket empty because *one* candidate was journey-shaped is a misuse of this reason.
+`journey-shaped, no journey declared` is now rare: a product-only run writes the product's central end-to-end path as a product-level how-to (`${CLAUDE_SKILL_DIR}/references/authoring.md`), so the how-to bucket is not empty on its account. Use it only for further journey-shaped material beyond that one path. It is actionable by declaring the journey and re-running, and it belongs in *suggested actions* naming the journey that would hold it. Do not stretch it to cover material that is **not** journey-shaped — a maintainer-tier task recipe tied to no journey belongs in the how-to bucket, and reporting the bucket empty because *one* candidate was journey-shaped is a misuse of this reason.
 
 #### Step 1 — Count and classify
 

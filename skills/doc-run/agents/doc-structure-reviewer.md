@@ -1,6 +1,6 @@
 # doc-structure-reviewer — spawn prompt
 
-_Mechanical structure and navigation review of pages a doc-journeys run just wrote — title collisions, stubs, Weight churn, frontmatter sanity, template tag escaping, run-report self-consistency, and a full site build verified at render level. Runs first in the /doc-run review pipeline and acts as a gate. Deterministic checks only; no judgement calls._
+_Mechanical structure and navigation review of pages a doc-journeys run just wrote — title collisions, stubs, Weight churn, frontmatter sanity, and a full site build verified at render level. Runs first in the /doc-run review pipeline and acts as a gate. Deterministic checks only; no judgement calls._
 
 This file is the full prompt for a `general-purpose` subagent spawned by doc-run; the orchestrator appends the spawn context (roots, pinned settings, manifest) after it. Paths written as `<tools root>/…` resolve against the tools root pinned in that context.
 
@@ -10,11 +10,7 @@ not trust any claim its run report makes about structure ("the site builds", "al
 resolve", "0 code fences") — re-derive every one you rely on. History here: the defects that
 shipped passed every check the run itself performed.
 
-**The run report is itself output you review** (check 7). It is published, it is the artefact
-reviewers read first, and it is the only one nothing else in the pipeline verifies — every other
-check reads pages, while the report is unverified prose *about* those pages. Across three
-consecutive products every defect that reached the gate was the report misdescribing the pages or
-the estate; not one claim about how a product behaves was wrong. Weight your attention that way.
+**You review pages, not the run report.** The report is a diagnostic the user reads at merge; checks 6 and 7 are retired and nothing you return names a report.
 
 **Read-only.** You modify nothing. Build artifacts you create go under your scratchpad or are
 deleted before you finish (the build output directory and any lock file).
@@ -35,15 +31,13 @@ If the spawn prompt says **`scope: delta`** — a re-run after a fix round — d
 the full suite. One recorded run spent 94 of 202 minutes on three full structural passes,
 two of them re-verifying pages the fix round never touched. Under `scope: delta` the spawn
 prompt carries the previous pass's findings and the fix round's changed-file list, and you
-do exactly four things:
+do exactly three things:
 
 1. **One site build** (this is never skippable — any edit can break it).
 2. **Re-check each previous finding is actually gone**, by its own reproduce command.
 3. **Full per-page checks over the changed files only** — a fix can mint a fresh defect, but
    only in a file it touched. Relational checks (collisions, Weight) still compare changed
    files against all siblings.
-4. **Report-consistency checks (check 7) only over report sections the diff touched**, plus
-   any figure whose derivation scope includes a changed file.
 
 Unchanged files inherit the previous pass's clean verdicts — state that inheritance
 explicitly in your output ("N pages inherited clean from the prior pass, untouched since"),
@@ -67,7 +61,8 @@ known template defects.
    spine page both titled with the journey name, rendering as identical parent and child sidebar
    entries. Compare rendered sidebar labels where possible, not just frontmatter.
 2. **Stub and hollow pages.** Flag any manifest page whose body, after stripping the generation
-   notice, template tags, and a `## Sources` section, amounts to a title plus a disclaimer.
+   notice and `## Sources` section (older pages may still carry them) and template tags,
+   amounts to a title plus a disclaimer.
    **Exemption — do not flag:** an unbriefed product's `_index.md` is REQUIRED by the skill to
    be navigation-only (title, a one-line statement that no description is available, and the
    journey index); that page is mandated, not a stub. What IS a defect: a hollow content page
@@ -87,100 +82,11 @@ known template defects.
    regenerated. Known latent instance: the alphabetical product-numbering rule renumbers existing
    products when a new one lands ahead of them alphabetically.
 5. **Frontmatter sanity** on every manifest page: parses as YAML delimited from line 1; carries
-   the site's title and weight fields; the generation notice is the first body line (the recorded failure mode
-   silently discards frontmatter); generated pages carry the `doc_journeys:` provenance block
+   the site's title and weight fields; nothing precedes the opening `---` (the recorded failure mode
+   silently discards frontmatter); the body carries no generation notice and no `## Sources` section; generated pages carry the `doc_journeys:` provenance block
    including `content_hash`.
-6. **Quoted-template tag escaping in reports.** Template tags meant to RENDER — the mandated
-   `report_banner`, section listings, paired `unverified_marker` blocks — are correct unescaped;
-   never flag them. The defect is template tag syntax QUOTED as text: a hit from the site adapter's
-   check command over `reports_dir` (a search for the tag's opening delimiter that lacks the adapter's
-   escaped form) that sits inside a backtick span or fenced code block is a finding — the generator
-   expands template tags even there, and an unclosed quoted marker fails the whole site build. (Check 8 catches the fatal case at build time;
-   this catches it without waiting for a build.)
-7. **Run-report self-consistency.** Re-derive every quantitative and enumerative claim the run
-   report makes from disk; never read one number and accept it. Nothing else in the pipeline does
-   this, and it is where the defects live. Four shapes, all mechanical:
-
-   a. **Headline vs list.** Any sentence stating a count immediately above or below the thing it
-      counts — table rows, numbered subsections, bullets, list items. Derive both sides with a
-      command and compare. Recorded instances: "Fifteen partial overlaps, tabled above" over a
-      table of 14 `partial` + 1 `none`; a *Source conflicts* section opening "Four." above five
-      `###` subsections, in a report that elsewhere states it was adding the fifth; a fix-round
-      summary reading "Fifteen findings applied across two categories… none was declined" above
-      20 finding IDs in three subsections, the third of which lists seven declined. A headline
-      number goes stale the moment anything beneath it is edited, so **re-check every count on
-      every round, including counts that verified clean in an earlier round.**
-
-   b. **Tables asserting facts about pages.** Where a report table claims pages link somewhere,
-      cite something, or overlap something, verify each row against the pages. Extract body
-      hyperlinks with frontmatter and `## Sources` stripped — "cited as a source" and "linked
-      from the body" are different claims and conflating them is a recorded defect (a prior-art
-      table asserted cross-links from eleven wiki pages where six existed, including two rows
-      claiming a product index that contained no such link at all). Check both directions:
-      claimed-but-absent AND present-but-unclaimed. **The counting rule is pinned, for you and
-      the builder both:** a page's link count = internal body links after stripping
-      frontmatter and the `## Sources` section; "unique" = resolved destinations, not distinct
-      strings; external URLs (including Slack permalinks) are excluded. Two agents deriving
-      different true numbers under unpinned rules cost a run an arbitration round and a
-      shipped unresolved defect. Where a report states a pair like "N links
-      across M targets", confirm N and M share one scope — mixing prior-art-only with
-      all-targets produced a wrong M while N was right.
-
-   c. **Internal cross-references.** Resolve every "see above/below", "as stated in the previous
-      section", and named-section pointer against the actual document order. A report rewritten
-      across rounds accumulates directional references that reverse when sections move.
-
-      Resolve **ordinal** pointers too — "the eighth suggested action" — against the rendered list,
-      not the source. These break whenever the list grows, which it does every fix round.
-
-   d. **Counts embedded in prose — check these specifically.** Tables and re-derivation grids
-      get verified because they look like data; the same figures restated inside sentences do not,
-      and that is where every count defect in one five-round run actually lived. A first pass that
-      verified every tabular count still missed four prose restatements, and two further gate
-      rounds came from that single blind spot.
-
-      Enumerate every number, share, weight and ordinal that appears in report **prose** — including
-      inside `## Post-run corrections`, which is prose about earlier figures and goes stale the
-      moment those figures are revised — and re-derive each against disk. Then check it agrees with
-      every other statement of the same figure in both reports. Specifically flag:
-
-        * a figure stated in a sentence that disagrees with the same figure in a table
-        * a superseded figure left in present tense, so a reader takes a retracted claim as live
-          (a retraction stated in one section does not correct a copy of the claim in another)
-        * a retracted *grading* or classification — not just numbers — surviving elsewhere
-        * a pair of numbers that reproduces under no single scope, because its halves came from
-          different filters
-        * a figure in `batch.md` contradicting the per-product report, which is the higher-cost
-          direction: `batch.md` is the more widely read of the two
-
-      e. **Markdown table integrity, at rendered level.** The recurring hazard: a blank line
-      before an appended row splits the table and renders literal pipe text; a separator
-      removed after the last row absorbs the following paragraph as bogus rows. It bit one
-      run in three separate rounds, in both directions. Check every table that was appended
-      to this run, and check at rendered HTML with the `render_check` selector from settings —
-      themes add classes to `<table>`, so a bare `<table>` regex "finds" zero tables on a page
-      that has 22.
-
-      Also flag the **restatement itself**, not only the mismatch: `<tools root>/doc-journeys/references/output.md`
-      report rule 7 says a figure lives in exactly one place, so a prose sentence restating a
-      number any table carries is a finding even while the two still agree — it is the drift
-      seed every recorded figure defect grew from. Fix is `remove-prose-figure`, and it is the
-      cheapest finding in this list to apply. The same rule makes a narrative (non-table)
-      `## Post-run corrections` section a finding.
-
-      Report these as `shipped`. If more than two or three turn up, say so explicitly in your
-      findings — the orchestrator's remedy is a re-derivation sweep of the whole document rather
-      than a patch list, and it needs to know which it is looking at.
-
-   e. **Report heading nesting.** Headings on the report page must nest consistently — a `###`
-      whose siblings are its own logical children renders an empty TOC entry and lifts the
-      children to the level of their parent. Verify against rendered HTML (check 8), not source.
-
-   Scope this to reports in the manifest. Report every count you derived and the command that
-   derived it, so the next round can re-run it. Findings here are `shipped` when the report is
-   published output; a count the builder asserted only to the orchestrator and never wrote to
-   disk is `latent`.
-
+6. *(retired — reports are not reviewed)*
+7. *(retired — reports are not reviewed)*
 8. **Full site build, verified at render level.** Run the pinned `build_command` **verbatim**
    from your spawn prompt, from the repo root, with `<scratch dir>` substituted for a directory
    under your scratchpad — wrapped in `build_toolchain` (`mise exec -- …`) where one is set.
@@ -190,9 +96,7 @@ known template defects.
    for this site).
 
    Require exit 0 and zero warnings. Then read the rendered HTML for each manifest page: correct
-   `<title>`, expanded template tags, for check 1 the actual sidebar labels, and for check 7e the
-   report's heading levels. Report page count
-   against the previous build if the run report states one. Delete the scratch destination and
+   `<title>`, expanded template tags, and for check 1 the actual sidebar labels. Delete the scratch destination and
    any build lock file afterwards.
 
 ## Output

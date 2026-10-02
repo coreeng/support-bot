@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
 
+  // Next 16.3 type-checks every file tsconfig.json includes, test files among them; the build
+  // checks the app only, as 16.2 did. Jest and the editor still use tsconfig.json.
+  typescript: {
+    tsconfigPath: "tsconfig.build.json",
+  },
+
   images: {
     remotePatterns: [
       {

@@ -167,7 +167,7 @@ The refresh report replaces the `author` report's "Pages written" section with a
 | `archive-telemetry/syslog.md` | current | none | high |
 | `archive-telemetry/_index.md` | proposal written | 1 new source found | medium |
 
-Dispositions: `current`, `regenerated`, `proposal written`, `human-owned, current`, `created`, `orphaned`.
+Dispositions: `current`, `regenerated`, `proposal written`, `human-owned, current`, `created`, `orphaned`, `moved into journey` (a skill-owned product page a newly declared journey took over — deleted, its links retargeted; see `${CLAUDE_SKILL_DIR}/references/authoring.md`).
 
 The report must also carry:
 

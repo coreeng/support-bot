@@ -81,6 +81,22 @@ is present but empty counts as absent, and a missing key stops the run with the 
 [`assets/doc-settings/`](assets/doc-settings/) is a documented starter: copy it to
 `<consumer root>/.doc-settings/` and edit every value marked `EDIT`.
 
+### Replace or coexist: `prior_art_policy`
+
+Most consumers already have documentation — the pages under `prior_art_roots` — and the output
+will overlap it. Decide up front what happens to it, and set `prior_art_policy` in `settings.md`:
+
+| | `coexist` (default) | `replace` |
+| --- | --- | --- |
+| The existing documentation | stays, beside the output | is retired as the output takes over |
+| Authored pages | complete and self-contained; overlap is accepted | complete and self-contained; overlap is accepted |
+| Links from a page to the existing page it overlaps | **required**, from the body where the overlap is | **never** — the content is carried over instead, so the page survives the original's removal |
+| What the routing reviewer flags | a declared overlap with no body link | any body link to an existing page |
+
+In both cases the skill never edits, moves or deletes the existing documentation, and every
+overlap is listed in the run report so a human can reconcile or retire the pair. Leaving the key
+out means `coexist`.
+
 ### `product-definition/`
 
 The products and journeys to document. A human owns this directory; the skill only ever adds to
@@ -112,9 +128,10 @@ Three things about the definition matter more than the schema:
 
   * **The brief is the highest-value input.** A product is an umbrella over several
     repositories, and no repository says what the product *is* — each explains its own
-    component. A `brief.md`, written by the product owner, is the only source that can answer
-    "what is this and is it for me?". Without one the product page is navigation-only, because
-    inventing a description is exactly what the grounding contract forbids.
+    component. A `brief.md` — written by the product owner, or rendered verbatim from your
+    product catalogue if you keep one — is the only source that can answer "what is this and is
+    it for me?". Without one the product page is navigation-only, because inventing a
+    description is exactly what the grounding contract forbids.
   * **Journey prose is load-bearing.** Discovery terms come largely from a journey's
     `description` and body. A journey defined by name alone finds little and produces
     low-confidence pages or none. Name the outcome, list the `variations`, describe the systems
@@ -161,12 +178,14 @@ not read them all. Per journey it runs a five-pass funnel:
      component usually is that component, so path hits rank above content hits.
   3. **Content signal** — search for terms, counting *distinct* terms matched per file rather than
      total matches.
-  4. **Rank and shortlist** — score candidates, take the top 25 (hard cap 40), collapse
-     directories of near-identical per-instance files, and report anything dropped at the cap.
-  5. **Read** — read the shortlist in full, following one hop outward to more authoritative
+  4. **Rank** — score candidates, collapse directories of near-identical per-instance files, and
+     keep every candidate that qualifies. There is no cap: all of them are read.
+  5. **Read** — read every qualifying candidate, following one hop outward to more authoritative
      sources.
 
 Every git repository directly under the source root is in scope, minus `source_exclude_repos`.
+Which of their files are read in full, used only to verify, or left out is refined per product
+in the estate adapter; see [Declaring a product](../README.md#declaring-a-product).
 The consumer repository is normally one of them — its existing documentation is what the output
 consolidates — with only the pipeline's own output trees (`source_exclude_paths`) excluded, so a
 run can never cite itself. Pages under `prior_art_roots` additionally get a **prior-art pass**
@@ -294,8 +313,10 @@ content nobody has read. Details in [`references/refresh.md`](references/refresh
     and the bounded declaration writes under `product-definition/` described above.
   * **Overwrite a human-edited page**, in any mode, with any flag.
   * **Rewrite a page whose evidence did not change**, so diffs stay reviewable.
-  * **Delete anything.** Orphaned directories from a previous run are reported for a human to
-    remove.
+  * **Delete anything**, with one exception. Orphaned directories from a previous run are
+    reported for a human to remove. The exception: when a newly declared journey takes over the
+    product-level page for the product's central path, that skill-owned page moves into the
+    journey (see `references/authoring.md`).
   * **Publish an uncorroborated contact point.** Chat channels, group handles and distribution
     lists name things outside the repositories; a citation alone cannot prove one still exists.
   * **Push or open a pull request.** Output lands in the working tree; what happens next is the

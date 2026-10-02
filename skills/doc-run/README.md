@@ -25,7 +25,7 @@ fictional observability product from
 /doc-run <documentation request>
 ```
 
-The argument is a plain-language documentation request, passed to `doc-journeys` verbatim. It
+Type it in your agent's chat or session. The argument is a plain-language documentation request, passed to `doc-journeys` verbatim. It
 names one of:
 
   * **a product** — `/doc-run document Foglight`
@@ -62,7 +62,7 @@ the settings, the orchestrator itself uses:
 | --- | --- |
 | `base_branch`, `worktree_dir` | where run worktrees branch from and are created; `worktree_dir` must be gitignored |
 | `write_locations` | the `git status` scope for the pre-run baseline and the manifest cross-check |
-| `output_root`, `reports_dir`, `proposals_root`, `plan_file`, `prior_art_roots`, `source_exclude_paths` | pinned into every agent's spawn prompt so no agent rediscovers or guesses a path |
+| `output_root`, `reports_dir`, `proposals_root`, `plan_file`, `prior_art_roots`, `prior_art_policy`, `source_exclude_paths` | pinned into every agent's spawn prompt so no agent rediscovers or guesses a path |
 | `build_command`, `build_toolchain`, `render_check` | the site build the structure reviewer runs, with `<consumer root>` substituted, wrapped in the toolchain shim where one is set |
 | `preview_path` | the direct link reviewers are given to the output |
 | `authorisations` | the file recording what an unattended run may do here — declare, amend, and so on — and who granted it; the close-out cites it |
@@ -139,9 +139,8 @@ builder's context contains its own rationalisations, and independent eyes are th
 
 6. **Structural gate** — spawn `doc-structure-reviewer`: mechanical checks only — a full site
    build verified at render level, title collisions, stubs, frontmatter sanity, template tag
-   escaping, report self-consistency. Shipped-severity page defects go back to the builder for
-   one fix round before anything else runs; report-only defects do not gate and are batched
-   into the later fix loop.
+   escaping. Shipped-severity page defects go back to the builder for one fix round before
+   anything else runs. The run report is not reviewed; it is a diagnostic read at merge.
 
 7. **Deep review (parallel)** — three independent, read-only reviewers spawned together:
      * `doc-gap-auditor` — adversarially audits every claim of absence ("undocumented", "no prose
@@ -161,10 +160,10 @@ builder's context contains its own rationalisations, and independent eyes are th
    findings, kept for transparency.
 
 9. **Fix loop** — verified and mechanically-evidenced findings go to the builder, which applies
-   them through the skill's own machinery (refresh rules, recomputed hashes) and records each
-   in the report's corrections table. A delta-scoped structure re-run spot-checks the fixes; one
-   more round at most, after which anything still standing is named as unresolved rather than
-   looped on.
+   them through the skill's own machinery (refresh rules, recomputed hashes) and lists each in
+   its returned manifest; the close-out records them, the run report does not. A delta-scoped
+   structure re-run spot-checks the fixes; one more round at most, after which anything still
+   standing is named as unresolved rather than looped on.
 
 10. **Commit and close out** — one commit on the run branch, then the close-out summary. Hard
     stops mid-pipeline produce the same commit-and-summary shape, opening with why the run
@@ -197,6 +196,27 @@ installed beyond the two skills.
     evidenced, and a real finding whose fix would break a pipeline rule is handed to a human
     rather than applied.
   * **Push or open a pull request.** The human gate is the local merge.
+
+---
+
+## If a run stops early
+
+A run can end before its close-out — the agent session errors, times out or runs out of budget.
+Look at the worktree before re-running: the pages and report are written to disk as the run goes,
+so a run that stopped after review is usually complete and only needs closing out.
+
+  1. **Find where it stopped.** In the worktree, `git status` shows what was written;
+     `plan_file` still present means the close-out did not run. Pages under `output_root`, a run
+     report that mentions review findings and a clean `build_command` mean writing and review
+     finished.
+  2. **Close it out by hand.** Check that the run report's evidence summary lists every file read
+     but not used, with its reason; if it only points at the plan, copy that list from
+     `plan_file` into the report and remove the pointer. Then delete `plan_file`, stage only the
+     `write_locations` that exist, and commit on the run branch.
+  3. **Merge and tidy up** as for a finished run.
+
+If it stopped before pages were written, re-run the same request: the worktree is disposable
+(`git worktree remove --force`, `git branch -D`) and nothing outside it was touched.
 
 ---
 
