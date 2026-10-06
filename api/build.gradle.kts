@@ -2,7 +2,7 @@ plugins {
     id("com.diffplug.spotless") version "8.0.0" apply false
 }
 
-val jacksonVersion = "2.22.1"
+val jacksonVersion = "2.22.3"
 val jacksonBom = "com.fasterxml.jackson:jackson-bom:$jacksonVersion"
 
 // gRPC artifacts must move as a set. Pinning grpc-netty-shaded alone for a security alert (see
@@ -17,9 +17,6 @@ val safeDependencyVersions =
     mapOf(
         "ch.qos.logback:logback-core" to "1.5.34",
         "com.github.jknack:handlebars" to "4.5.2",
-        "com.microsoft.kiota:microsoft-kiota-abstractions" to "1.9.1",
-        "com.nimbusds:nimbus-jose-jwt" to "10.0.2",
-        "com.squareup.okhttp3:okhttp" to "4.12.0",
         "com.squareup.okio:okio" to "3.16.4",
         // Kept so the security requirement stays visible, but sourced from grpcVersion: the BOM above
         // is what actually aligns the family, and a literal here could silently drift from it.
@@ -35,8 +32,6 @@ val safeDependencyVersions =
         "io.netty:netty-transport-native-epoll" to "4.1.137.Final",
         "io.netty:netty-transport-native-kqueue" to "4.1.137.Final",
         "io.opentelemetry:opentelemetry-api" to "1.62.0",
-        "io.vertx:vertx-core" to "4.5.27",
-        "io.vertx:vertx-web" to "4.5.22",
         "net.minidev:json-smart" to "2.5.2",
         "net.sourceforge.pmd:pmd-core" to "7.22.0",
         "org.apache.commons:commons-compress" to "1.26.0",
@@ -44,10 +39,8 @@ val safeDependencyVersions =
         "org.apache.httpcomponents.client5:httpclient5" to "5.4.3",
         "org.apache.logging.log4j:log4j-api" to "2.25.5",
         "org.apache.logging.log4j:log4j-core" to "2.25.5",
-        "org.apache.opennlp:opennlp-tools" to "2.5.9",
-        "org.assertj:assertj-core" to "3.27.7",
-        "org.bouncycastle:bcpkix-jdk18on" to "1.84",
-        "org.bouncycastle:bcprov-jdk18on" to "1.84",
+        "org.bouncycastle:bcpkix-jdk18on" to "1.85",
+        "org.bouncycastle:bcprov-jdk18on" to "1.85",
         "org.codehaus.plexus:plexus-utils" to "4.0.3",
         "org.eclipse.jetty:jetty-http" to "12.0.36",
         "org.eclipse.jetty:jetty-security" to "12.0.36",
