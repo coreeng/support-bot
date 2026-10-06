@@ -1,4 +1,4 @@
-FROM gradle:9.8.0-jdk25 AS builder
+FROM gradle:9.8.0-jdk25-noble AS builder
 WORKDIR /home/gradle/project
 
 # Install Helm and kubectl with pinned versions and checksum verification

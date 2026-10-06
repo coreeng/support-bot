@@ -1,5 +1,5 @@
 ## Build stage
-FROM gradle:9.8.0-jdk25 AS build
+FROM gradle:9.8.0-jdk25-noble AS build
 WORKDIR /build
 
 # hadolint ignore=DL3008
