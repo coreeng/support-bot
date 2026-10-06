@@ -24,11 +24,17 @@ make codegen
 ```
 
 ## 3. Run DB.
-This line of code will start a Postgres instance,
-expose port 5432 and mount data to `./db-data` folder, so it will persist between runs.
+This line of code will start PostgreSQL 18.6, expose port 5432, and persist data under
+`./db-data-pg18`. Existing data under `./db-data` is left untouched; PostgreSQL 17 data
+must be deliberately migrated before it can be used by PostgreSQL 18.
 ```bash
 make db-run
 ```
+
+Cluster test scripts use the project-owned PostgreSQL 18.6 chart with ephemeral `emptyDir`
+storage. They refuse to adopt or delete existing Bitnami, unknown, or persistent database
+releases; use a fresh test namespace or migrate data explicitly. Shared and deployed database
+versions are not verified here, and no PostgreSQL data migration runs automatically.
 
 ## 4. Identity Provider Integrations
 Identity Provider integrations are disabled by default for local runs. What you can do instead, is look at the [app config](src/main/resources/application.yaml)
@@ -148,4 +154,3 @@ This will merge analysis records with the records in the database by ticket ID
 ```bash
 curl http://localhost:8080/summary-data/results
 ```
-

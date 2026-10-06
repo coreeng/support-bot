@@ -350,7 +350,7 @@ tasks.named<JavaCompile>("compileJava") {
 }
 
 abstract class PostgresService : BuildService<BuildServiceParameters.None>, AutoCloseable {
-    val container = PostgreSQLContainer("postgres:17.2-alpine").apply {
+    val container = PostgreSQLContainer("postgres:18.6-alpine3.23").apply {
         withDatabaseName("postgres")
         withUsername("postgres")
         withPassword("postgres")

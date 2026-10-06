@@ -50,6 +50,7 @@ COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 COPY --from=builder /home/gradle/project/integration-tests/build/libs/integration-tests.jar .
 
 COPY --from=builder /home/gradle/project/helm-chart helm-chart
+COPY api/k8s/test-postgres18 k8s/test-postgres18
 COPY api/scripts scripts
 
 ENV INTEGRATION_TEST_CONFIG=integration-test-docker.yaml

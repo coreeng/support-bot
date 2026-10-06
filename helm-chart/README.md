@@ -20,6 +20,12 @@ Notes:
 
 Support Bot requires PostgreSQL. One simple option is to install Bitnami PostgreSQL and use the default service name expected by this chart’s default `DB_URL`:
 
+The API's jOOQ 3.21.9 OSS runtime requires PostgreSQL 18 or newer. At this change's verification,
+the floating Bitnami chart used below resolved to PostgreSQL 17.6.0, which is below that requirement.
+Project tests use the guarded, ephemeral PostgreSQL 18.6 chart in `api/k8s/test-postgres18`;
+shared and deployed database versions still need to be verified by their owners. Existing data is
+never upgraded automatically, and PostgreSQL 17 data files must not be mounted as PostgreSQL 18 data.
+
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm install support-bot-db bitnami/postgresql \

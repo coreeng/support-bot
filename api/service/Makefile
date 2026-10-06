@@ -43,5 +43,4 @@ db-run:
 
 .PHONY: db-clean
 db-clean:
-	rm -rf ./db-data
-
+	rm -rf ./db-data-pg18
