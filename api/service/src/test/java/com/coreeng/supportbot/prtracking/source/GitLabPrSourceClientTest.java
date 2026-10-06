@@ -10,9 +10,6 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -20,7 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -38,12 +35,12 @@ class GitLabPrSourceClientTest {
 
     @BeforeEach
     void setUp() {
-        RestClient.Builder builder = RestClient.builder()
-                .messageConverters(ImmutableList.of(
-                        new MappingJackson2HttpMessageConverter(
-                                new ObjectMapper().registerModule(new JavaTimeModule())),
-                        new org.springframework.http.converter.StringHttpMessageConverter(
-                                java.nio.charset.StandardCharsets.UTF_8)));
+        RestClient.Builder builder = RestClient.builder().configureMessageConverters(c -> c.disableDefaults()
+                .withJsonConverter(new JacksonJsonHttpMessageConverter(
+                        tools.jackson.databind.json.JsonMapper.builderWithJackson2Defaults()
+                                .build()))
+                .withStringConverter(new org.springframework.http.converter.StringHttpMessageConverter(
+                        java.nio.charset.StandardCharsets.UTF_8)));
         server = MockRestServiceServer.bindTo(builder).build();
         RestClient restClient = builder.build();
         memberCache = new GitLabGroupMemberCache(Duration.ofMinutes(5));
@@ -397,12 +394,12 @@ class GitLabPrSourceClientTest {
                 new PrTrackingProps.Gitlab(API, TOKEN),
                 new PrTrackingProps.SlaDiscovery(Duration.ofHours(1)));
 
-        RestClient.Builder builder = RestClient.builder()
-                .messageConverters(ImmutableList.of(
-                        new MappingJackson2HttpMessageConverter(
-                                new ObjectMapper().registerModule(new JavaTimeModule())),
-                        new org.springframework.http.converter.StringHttpMessageConverter(
-                                java.nio.charset.StandardCharsets.UTF_8)));
+        RestClient.Builder builder = RestClient.builder().configureMessageConverters(c -> c.disableDefaults()
+                .withJsonConverter(new JacksonJsonHttpMessageConverter(
+                        tools.jackson.databind.json.JsonMapper.builderWithJackson2Defaults()
+                                .build()))
+                .withStringConverter(new org.springframework.http.converter.StringHttpMessageConverter(
+                        java.nio.charset.StandardCharsets.UTF_8)));
         MockRestServiceServer overrideServer =
                 MockRestServiceServer.bindTo(builder).build();
         GitLabPrSourceClient overrideClient =
@@ -596,12 +593,12 @@ class GitLabPrSourceClientTest {
     private record CodeownerHarness(MockRestServiceServer server, GitLabPrSourceClient client) {}
 
     private static CodeownerHarness codeownerHarness() {
-        RestClient.Builder builder = RestClient.builder()
-                .messageConverters(ImmutableList.of(
-                        new MappingJackson2HttpMessageConverter(
-                                new ObjectMapper().registerModule(new JavaTimeModule())),
-                        new org.springframework.http.converter.StringHttpMessageConverter(
-                                java.nio.charset.StandardCharsets.UTF_8)));
+        RestClient.Builder builder = RestClient.builder().configureMessageConverters(c -> c.disableDefaults()
+                .withJsonConverter(new JacksonJsonHttpMessageConverter(
+                        tools.jackson.databind.json.JsonMapper.builderWithJackson2Defaults()
+                                .build()))
+                .withStringConverter(new org.springframework.http.converter.StringHttpMessageConverter(
+                        java.nio.charset.StandardCharsets.UTF_8)));
         MockRestServiceServer codeownerServer =
                 MockRestServiceServer.bindTo(builder).build();
         GitLabPrSourceClient codeownerClient = new GitLabPrSourceClient(

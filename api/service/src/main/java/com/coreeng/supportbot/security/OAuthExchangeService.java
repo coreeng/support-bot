@@ -86,8 +86,9 @@ public class OAuthExchangeService {
             var accessToken = (String) response.get("access_token");
 
             // Fetch user info
-            var userInfoUri =
-                    registration.getProviderDetails().getUserInfoEndpoint().getUri();
+            var userInfoUri = java.util.Objects.requireNonNull(
+                    registration.getProviderDetails().getUserInfoEndpoint().getUri(),
+                    "OAuth provider user-info URI is required");
             var userInfoHeaders = new HttpHeaders();
             userInfoHeaders.setBearerAuth(accessToken);
             var userInfoRequest = new HttpEntity<>(userInfoHeaders);

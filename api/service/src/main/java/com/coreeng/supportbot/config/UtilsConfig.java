@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.config;
 
 import com.coreeng.supportbot.util.JsonMapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -13,7 +12,7 @@ public class UtilsConfig {
     }
 
     @Bean
-    public ObjectMapper objectMapper() {
+    public tools.jackson.databind.json.JsonMapper objectMapper() {
         return jsonMapper().getObjectMapper();
     }
 }

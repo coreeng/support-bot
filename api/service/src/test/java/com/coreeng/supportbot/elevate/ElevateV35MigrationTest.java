@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -119,7 +120,7 @@ class ElevateV35MigrationTest {
     }
 
     private static void assertNormalizedBackfill(JdbcTemplate database, String schema) {
-        Map<String, Object> product = database.queryForMap("""
+        Map<String, @Nullable Object> product = database.queryForMap("""
                 SELECT slug, name, customer
                   FROM %s.elevate_products
                  WHERE resource_id = 'product-1'
@@ -129,7 +130,7 @@ class ElevateV35MigrationTest {
                 .containsEntry("name", "Product One")
                 .containsEntry("customer", "Customer One");
 
-        Map<String, Object> user = database.queryForMap("""
+        Map<String, @Nullable Object> user = database.queryForMap("""
                 SELECT product_id, name, description
                   FROM %s.elevate_users
                  WHERE resource_id = '11111111-1111-1111-1111-111111111111'
@@ -139,7 +140,7 @@ class ElevateV35MigrationTest {
                 .containsEntry("name", "Stored User")
                 .containsEntry("description", "Description");
 
-        Map<String, Object> journey = database.queryForMap("""
+        Map<String, @Nullable Object> journey = database.queryForMap("""
                 SELECT slug, name, product_id, product_slug, user_description, primary_problems
                   FROM %s.elevate_journeys
                  WHERE resource_id = 'journey-1'
@@ -189,7 +190,7 @@ class ElevateV35MigrationTest {
     }
 
     private static void assertIntegrityBackfill(JdbcTemplate database, String schema) {
-        Map<String, Object> item = database.queryForMap("""
+        Map<String, @Nullable Object> item = database.queryForMap("""
                 SELECT type, journey_id, journey_name, journey_product_id, user_id, search_text
                   FROM %s.elevate_integrity_items
                 """.formatted(schema));
