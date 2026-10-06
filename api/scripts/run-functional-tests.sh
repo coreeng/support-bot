@@ -84,6 +84,10 @@ main() {
   log "  Timeout:       ${TIMEOUT}s"
   log "  Cleanup:       $CLEANUP"
 
+  if [[ "$CLEAN_DEPLOY_DB" == "true" && ( "$DEPLOY_SERVICE" == "true" || "$CLEANUP" == "true" ) ]]; then
+    NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=check "${SCRIPT_DIR}/deploy-test-db.sh"
+  fi
+
   kubectl get ns "$NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$NAMESPACE" >/dev/null
 
   # Drop any existing job release
