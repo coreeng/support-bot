@@ -33,8 +33,8 @@ dependencies {
 
     testImplementation(project(":testkit"))
     testImplementation("org.scala-lang:scala-library:2.13.18")
-    testImplementation(platform("org.junit:junit-bom:5.13.+"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.13.+")
+    testImplementation(platform("org.junit:junit-bom:6.0.3"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
 // Ensure testkit classes are included in Gatling runtime classpath

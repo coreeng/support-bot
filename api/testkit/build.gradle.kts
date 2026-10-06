@@ -37,9 +37,9 @@ dependencies {
     api("commons-codec:commons-codec:1.18.+")
 
     // JUnit platform (for LauncherSessionListener)
-    api(platform("org.junit:junit-bom:5.13.+"))
-    api("org.junit.jupiter:junit-jupiter:5.13.+")
-    api("org.junit.platform:junit-platform-launcher:1.13.+")
+    api(platform("org.junit:junit-bom:6.0.3"))
+    api("org.junit.jupiter:junit-jupiter")
+    api("org.junit.platform:junit-platform-launcher")
 
     // Testing utilities
     api("org.awaitility:awaitility:4.3.+")

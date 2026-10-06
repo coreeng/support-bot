@@ -45,8 +45,8 @@ dependencies {
     testAnnotationProcessor("org.projectlombok:lombok:1.18.+")
 
     // JUnit (needed for @Test annotation and test execution)
-    testImplementation(platform("org.junit:junit-bom:5.13.+"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.13.+")
+    testImplementation(platform("org.junit:junit-bom:6.0.3"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-console")
 
     // JSpecify for null annotations
