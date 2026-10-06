@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.github;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Reads GitHub's computed code-owner review state for a PR via the GraphQL API — the REST/hub4j path

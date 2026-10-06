@@ -27,7 +27,9 @@ public class OAuthUrlService {
             throw new IllegalArgumentException("Unknown OAuth provider: " + provider);
         }
 
-        var authorizationUri = registration.getProviderDetails().getAuthorizationUri();
+        var authorizationUri = java.util.Objects.requireNonNull(
+                registration.getProviderDetails().getAuthorizationUri(),
+                "OAuth provider authorization URI is required");
         var clientId = registration.getClientId();
         var scopes = String.join(" ", registration.getScopes());
         // State is verified client-side (cookie) — server-side store requires shared cache (Redis)

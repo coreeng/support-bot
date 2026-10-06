@@ -5,8 +5,6 @@ import com.coreeng.supportbot.sentiment.rest.SentimentAnalysisController;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.ticket.TicketQueryService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
@@ -16,14 +14,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JettyClientHttpRequestFactory;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
 
 @Configuration
 @RequiredArgsConstructor
 @ConditionalOnProperty("ai.sentiment-analysis.enabled")
 public class SentimentConfig {
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
     @NonNull private static JettyClientHttpRequestFactory requestFactory() {
         HttpClient httpClient = new HttpClient();
@@ -38,7 +37,8 @@ public class SentimentConfig {
         return RestClient.builder()
                 .baseUrl("http://localhost:8081")
                 .requestFactory(requestFactory())
-                .messageConverters(ImmutableList.of(new MappingJackson2HttpMessageConverter(objectMapper)))
+                .configureMessageConverters(
+                        c -> c.disableDefaults().withJsonConverter(new JacksonJsonHttpMessageConverter(objectMapper)))
                 .build();
     }
 

@@ -5,9 +5,6 @@ import com.coreeng.supportbot.prtracking.source.PrSourceClient;
 import com.coreeng.supportbot.prtracking.source.PrSourceClients;
 import com.coreeng.supportbot.prtracking.source.RepoCoord;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.DateTimeException;
@@ -21,6 +18,10 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.util.AntPathMatcher;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.dataformat.yaml.YAMLMapper;
 
 @Service
 @ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
@@ -29,7 +30,9 @@ public class SlaLookup {
 
     private final PrSourceClients prSourceClients;
     private final String durationUnit;
-    private final ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
+    private final ObjectMapper yamlMapper = YAMLMapper.builder()
+            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build();
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
     private final Cache<String, Optional<ParsedSlaFile>> fileCache;
 
@@ -152,7 +155,7 @@ public class SlaLookup {
         RawSlaFile raw;
         try {
             raw = yamlMapper.readValue(content, RawSlaFile.class);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new InvalidSlaFileException(
                     "Failed to parse SLA file %s from %s".formatted(filePath, coord.name()), e);
         }

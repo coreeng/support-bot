@@ -3,8 +3,6 @@ package com.coreeng.supportbot.elevate;
 import com.coreeng.supportbot.config.ElevateProps;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,7 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
+import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -49,6 +47,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 @Slf4j
@@ -93,8 +93,8 @@ public final class ElevateClient {
                 .build();
     }
 
-    static ClientHttpRequestFactorySettings requestFactorySettings(ElevateProps props) {
-        return ClientHttpRequestFactorySettings.defaults().withTimeouts(props.connectTimeout(), props.readTimeout());
+    static HttpClientSettings requestFactorySettings(ElevateProps props) {
+        return HttpClientSettings.defaults().withTimeouts(props.connectTimeout(), props.readTimeout());
     }
 
     private static RestClient createRestClient(

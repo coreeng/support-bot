@@ -4,8 +4,6 @@ import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.prtracking.source.GitLabGroupMemberCache;
 import com.coreeng.supportbot.prtracking.source.GitLabPrSourceClient;
 import com.coreeng.supportbot.prtracking.source.PrSourceClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -13,8 +11,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Wires the GitLab adapter for PR tracking. Only activates when at least one repository uses
@@ -37,11 +36,11 @@ public class PrTrackingGitLabConfig {
      * ({@code /repository/files/:path/raw}), which serves {@code text/plain} content.
      */
     @Bean
-    public RestClient gitLabRestClient(ObjectMapper objectMapper) {
+    public RestClient gitLabRestClient(JsonMapper objectMapper) {
         return RestClient.builder()
-                .messageConverters(ImmutableList.of(
-                        new MappingJackson2HttpMessageConverter(objectMapper),
-                        new StringHttpMessageConverter(StandardCharsets.UTF_8)))
+                .configureMessageConverters(c -> c.disableDefaults()
+                        .withJsonConverter(new JacksonJsonHttpMessageConverter(objectMapper))
+                        .withStringConverter(new StringHttpMessageConverter(StandardCharsets.UTF_8)))
                 .build();
     }
 

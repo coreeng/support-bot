@@ -11,7 +11,6 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.coreeng.supportbot.config.ElevateProps;
 import com.coreeng.supportbot.util.JsonMapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.SocketTimeoutException;
 import java.time.Clock;
 import java.time.Duration;
@@ -31,6 +30,7 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 class ElevateClientTest {
     private static final String BASE_URL = "https://elevate.example.test";

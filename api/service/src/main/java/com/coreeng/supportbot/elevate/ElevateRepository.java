@@ -17,9 +17,6 @@ import com.coreeng.supportbot.dbschema.tables.ElevateJourneys;
 import com.coreeng.supportbot.dbschema.tables.ElevateProducts;
 import com.coreeng.supportbot.dbschema.tables.ElevateUsers;
 import com.coreeng.supportbot.util.Page;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -43,6 +40,9 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @Repository
 @RequiredArgsConstructor
@@ -796,7 +796,7 @@ public class ElevateRepository {
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new ElevateApiException("Could not serialize Elevate snapshot", e);
         }
     }
@@ -804,7 +804,7 @@ public class ElevateRepository {
     private <T> T fromJson(String value, Class<T> type) {
         try {
             return objectMapper.readValue(value, type);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new ElevateApiException("Could not deserialize stored Elevate snapshot", e);
         }
     }

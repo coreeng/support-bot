@@ -1,15 +1,15 @@
 package com.coreeng.supportbot.stats;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.DatabindContext;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
-import com.fasterxml.jackson.databind.jsontype.impl.TypeIdResolverBase;
 import java.time.LocalDate;
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.DatabindContext;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.annotation.JsonTypeIdResolver;
+import tools.jackson.databind.jsontype.impl.TypeIdResolverBase;
 
 @Getter
 @SuperBuilder(toBuilder = true)
@@ -97,7 +97,7 @@ public class StatsRequest {
         }
 
         @Override
-        public String idFromValue(Object value) {
+        public String idFromValue(DatabindContext context, Object value) {
             if (value instanceof StatsRequest req) {
                 return req.type().label();
             }
@@ -105,8 +105,8 @@ public class StatsRequest {
         }
 
         @Override
-        public String idFromValueAndType(Object value, Class<?> suggestedType) {
-            return idFromValue(value);
+        public String idFromValueAndType(DatabindContext context, Object value, Class<?> suggestedType) {
+            return idFromValue(context, value);
         }
 
         @Override

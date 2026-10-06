@@ -4,13 +4,13 @@ import static java.util.Objects.requireNonNull;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.time.LocalDate;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Encoding of the {@code async_job.data} payload for the shared {@link #JOB_ID analysis} job.
@@ -33,13 +33,13 @@ public final class AnalysisJobData {
     /** The id of the one {@code async_job} row every analysis run — days-based or windowed — claims. */
     public static final String JOB_ID = "analysis";
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+    private static final ObjectMapper MAPPER = JsonMapper.builderWithJackson2Defaults()
+            .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
             // A field added by a newer version must not make an older one delete the in-flight run...
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             // ...but a field this version needs must be there, not silently zero or null.
-            .enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES);
+            .enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)
+            .build();
 
     private AnalysisJobData() {}
 
@@ -56,7 +56,7 @@ public final class AnalysisJobData {
     private static String encode(Parsed payload) {
         try {
             return MAPPER.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Could not encode async job payload " + payload, e);
         }
     }
@@ -67,7 +67,7 @@ public final class AnalysisJobData {
         if (trimmed.startsWith("{")) {
             try {
                 return MAPPER.readValue(trimmed, Parsed.class);
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 return null;
             }
         }

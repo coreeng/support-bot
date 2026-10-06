@@ -18,10 +18,10 @@ plugins {
     checkstyle
 
     id("net.ltgt.errorprone") version "4.3.0"
-    id("org.springframework.boot") version "3.5.15"
+    id("org.springframework.boot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
 
-    id("org.flywaydb.flyway") version "12.0.0"
+    id("org.flywaydb.flyway") version "12.4.0"
     id("org.jooq.jooq-codegen-gradle") version "3.21.9"
 }
 
@@ -58,14 +58,14 @@ repositories {
     mavenCentral()
 }
 
-val lombokVersion = "1.18.42"
+val lombokVersion = "1.18.46"
 val errorProneVersion = "2.47.0"
 val nullAwayVersion = "0.13.1"
 
 dependencies {
     implementation("org.jspecify:jspecify:1.0.0")
 
-    implementation("org.springframework.boot:spring-boot-starter-web") {
+    implementation("org.springframework.boot:spring-boot-starter-webmvc") {
         exclude(group = "org.springframework.boot", module = "spring-boot-starter-tomcat")
     }
     implementation("org.springframework.boot:spring-boot-starter-jetty")
@@ -73,7 +73,7 @@ dependencies {
 
     // Security + OAuth2 + JWT
     implementation("org.springframework.boot:spring-boot-starter-security")
-    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+    implementation("org.springframework.boot:spring-boot-starter-security-oauth2-client")
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
@@ -82,6 +82,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-cache")
 
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
+    implementation("org.springframework.boot:spring-boot-starter-jooq")
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
+    implementation("org.springframework.boot:spring-boot-starter-restclient")
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("org.flywaydb:flyway-core")
@@ -101,9 +104,9 @@ dependencies {
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     annotationProcessor("org.springframework:spring-context-indexer")
-    implementation("com.fasterxml.jackson.core:jackson-databind")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-guava")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+    implementation("tools.jackson.core:jackson-databind")
+    implementation("tools.jackson.datatype:jackson-datatype-guava")
+    implementation("tools.jackson.dataformat:jackson-dataformat-yaml")
     implementation("com.slack.api:bolt-jakarta-socket-mode:1.49.0")
     implementation("com.slack.api:bolt-jakarta-servlet:1.49.0")
     compileOnly("jakarta.websocket:jakarta.websocket-client-api:2.2.0")
@@ -118,22 +121,25 @@ dependencies {
 
     implementation("dev.cel:cel:0.11.1")
 
-    implementation("com.google.cloud:spring-cloud-gcp-starter:5.10.0")
+    implementation(platform("com.google.cloud:spring-cloud-gcp-dependencies:8.2.2"))
+    implementation("com.google.cloud:spring-cloud-gcp-starter:8.2.2")
     implementation("com.google.apis:google-api-services-cloudidentity:v1-rev20241208-2.0.0")
 
     implementation("com.microsoft.graph:microsoft-graph:6.36.0")
-    implementation("com.azure.spring:spring-cloud-azure-starter:5.22.0")
+    implementation(platform("com.azure.spring:spring-cloud-azure-dependencies:7.4.0"))
+    implementation("com.azure.spring:spring-cloud-azure-starter:7.4.0")
 
     implementation(platform("dev.langchain4j:langchain4j-bom:1.18.0"))
     implementation("dev.langchain4j:langchain4j")
     implementation("dev.langchain4j:langchain4j-vertex-ai-gemini")
     implementation("dev.langchain4j:langchain4j-google-ai-gemini")
 
-    implementation("net.logstash.logback:logstash-logback-encoder:8.0")
+    implementation("net.logstash.logback:logstash-logback-encoder:9.0")
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-security-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-security-oauth2-client-test")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
@@ -222,7 +228,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("org.flywaydb:flyway-database-postgresql:12.0.0")
+        classpath("org.flywaydb:flyway-database-postgresql:12.4.0")
         classpath("org.postgresql:postgresql:42.7.12")
         classpath("org.testcontainers:testcontainers-postgresql:2.0.5")
         classpath("org.jooq:jooq-codegen:3.21.9")
