@@ -1,13 +1,13 @@
 ## Build stage
-FROM gradle:9.8.0-jdk25-noble AS build
+FROM gradle:9.8.0-jdk25-resolute AS build
 WORKDIR /build
 
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql postgresql-contrib && \
     rm -rf /var/lib/apt/lists/*
 
-RUN sed -i 's/peer/trust/' '/etc/postgresql/16/main/pg_hba.conf' && \
-    sed -i 's/md5/trust/' '/etc/postgresql/16/main/pg_hba.conf'
+RUN sed -i 's/peer/trust/' '/etc/postgresql/18/main/pg_hba.conf' && \
+    sed -i 's/md5/trust/' '/etc/postgresql/18/main/pg_hba.conf'
 
 COPY gradlew .
 COPY settings.gradle.kts .

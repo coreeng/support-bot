@@ -33,11 +33,15 @@ cleanup_job() {
     log_warning "  Local log snapshot: ${TEST_LOGS_DIR}/"
     log_warning "  Inspect pods:       kubectl get pods -n ${NAMESPACE}"
     log_warning "  Tail logs:          kubectl logs -n ${NAMESPACE} -l job-name=${RELEASE_NAME} --tail=-1"
-    log_warning "  Manual cleanup:     helm uninstall ${RELEASE_NAME} support-bot-dex support-bot-ldap support-bot ${DB_RELEASE:-support-bot-db} -n ${NAMESPACE}"
+    log_warning "  Manual DB cleanup: NAMESPACE=${NAMESPACE} DB_RELEASE=${DB_RELEASE:-support-bot-db} ACTION=delete ${SCRIPT_DIR}/deploy-test-db.sh"
     return 0
   fi
 
   if [[ "$CLEANUP" == "true" ]]; then
+    if [[ "$DEPLOY_DB" == "true" && "$DELETE_DB" == "true" ]] && ! NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=check "${SCRIPT_DIR}/deploy-test-db.sh"; then
+      log_warning "Leaving test releases in place because the DB release is not a verified disposable PostgreSQL 18 test DB."
+      return 0
+    fi
     sleep_for_log_flush
     log "Cleaning up Helm releases in namespace: $NAMESPACE"
     helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --ignore-not-found || true
@@ -50,7 +54,7 @@ cleanup_job() {
 
   if [[ "$DELETE_DB" == "true" && "$DEPLOY_DB" == "true" ]]; then
     log "Cleaning up DB release: $DB_RELEASE"
-    helm uninstall "$DB_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
+    NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=delete "${SCRIPT_DIR}/deploy-test-db.sh" || true
   fi
 }
 
@@ -109,7 +113,7 @@ main() {
 
   # Optionally deploy database first
   if [[ "$DEPLOY_DB" == "true" ]]; then
-    deploy_db "$NAMESPACE" "$DB_RELEASE"
+    NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=deploy "${SCRIPT_DIR}/deploy-test-db.sh"
   else
     log_warning "DEPLOY_DB is false; assuming database already available in $NAMESPACE"
   fi
