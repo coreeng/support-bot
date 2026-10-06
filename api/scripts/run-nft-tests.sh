@@ -169,6 +169,10 @@ main() {
   log "WireMock values: ${WIREMOCK_VALUES_FILE}"
   log "WireMock image: ${WIREMOCK_IMAGE_REPOSITORY}:${WIREMOCK_IMAGE_TAG}"
 
+  if [[ "${CLEANUP}" == "true" || ( "${DEPLOY_SERVICE}" == "true" && -n "${SERVICE_IMAGE_REPOSITORY}" && -n "${SERVICE_IMAGE_TAG}" ) ]]; then
+    NAMESPACE="${NAMESPACE}" DB_RELEASE="${DB_RELEASE}" ACTION=check "${SCRIPT_DIR}/deploy-test-db.sh"
+  fi
+
   # Ensure namespace exists
   if ! kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
     log "Namespace ${NAMESPACE} does not exist, creating..."
