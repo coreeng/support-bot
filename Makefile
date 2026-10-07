@@ -127,28 +127,23 @@ helm-chart-deps: ## Vendor the chart's subchart dependencies into helm-chart/cha
 lint-chart: helm-chart-deps ## Lint the Helm chart
 	helm lint $(HELM_CHART_PATH)
 
-.PHONY: ensure-helm-unittest
-ensure-helm-unittest: ## Install the helm-unittest plugin when missing or at the wrong version
-	@set -eu; \
-	current_version="$$(helm plugin list 2>/dev/null | awk '$$1=="unittest" { print $$2 }')"; \
-	if [ "$$current_version" = "1.0.3" ]; then \
-		echo "helm-unittest 1.0.3 already installed"; \
-	else \
-		if [ -n "$$current_version" ]; then \
-			echo "Replacing helm-unittest $$current_version with 1.0.3"; \
-			helm plugin uninstall unittest; \
-		else \
-			echo "Installing helm-unittest 1.0.3"; \
-		fi; \
-			install_verify_args=""; \
-			if helm plugin install --help 2>/dev/null | grep -q -- '--verify'; then \
-				install_verify_args="--verify=false"; \
-			fi; \
-			helm plugin install $$install_verify_args https://github.com/helm-unittest/helm-unittest.git --version 1.0.3; \
-	fi
-
 .PHONY: test-chart
-test-chart: ensure-helm-unittest ## Run Helm chart unit tests
+test-chart: ## Run Helm chart unit tests with a verified, task-local plugin install
+	@set -eu; \
+	temp_dir="$$(mktemp -d)"; \
+	trap 'rm -rf "$$temp_dir"' EXIT; \
+	export GNUPGHOME="$$temp_dir/gnupg"; \
+	export HELM_CACHE_HOME="$$temp_dir/cache"; \
+	export HELM_CONFIG_HOME="$$temp_dir/config"; \
+	export HELM_DATA_HOME="$$temp_dir/data"; \
+	export HELM_PLUGINS="$$HELM_DATA_HOME/plugins"; \
+	mkdir -m 700 -p "$$GNUPGHOME" "$$HELM_CACHE_HOME" "$$HELM_CONFIG_HOME" "$$HELM_DATA_HOME" "$$HELM_PLUGINS"; \
+	curl -fsSL https://raw.githubusercontent.com/helm-unittest/helm-unittest/v1.1.2/public-key.asc -o "$$temp_dir/helm-unittest-public-key.asc"; \
+	curl -fsSL https://github.com/helm-unittest/helm-unittest/releases/download/v1.1.2/unittest-1.1.2.tgz -o "$$temp_dir/unittest-1.1.2.tgz"; \
+	curl -fsSL https://github.com/helm-unittest/helm-unittest/releases/download/v1.1.2/unittest-1.1.2.tgz.prov -o "$$temp_dir/unittest-1.1.2.tgz.prov"; \
+	gpg --batch --homedir "$$GNUPGHOME" --import "$$temp_dir/helm-unittest-public-key.asc"; \
+	gpg --batch --homedir "$$GNUPGHOME" --export > "$$temp_dir/pubring.gpg"; \
+	helm plugin install "$$temp_dir/unittest-1.1.2.tgz" --keyring "$$temp_dir/pubring.gpg"; \
 	helm unittest $(HELM_CHART_PATH)
 
 .PHONY: validate-chart-values
