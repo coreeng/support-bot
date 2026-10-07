@@ -1,9 +1,10 @@
 package com.coreeng.supportbot.testkit;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.util.stream.Collectors;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 public interface ViewSubmission {
     String triggerId();
@@ -46,12 +47,12 @@ public interface ViewSubmission {
     }
 
     private static String renderMultiSelectJson(String type, ImmutableList<String> values) {
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = JsonMapper.builder().build();
         String selectedOptions = values.stream()
                 .map(v -> {
                     try {
                         return "{\"value\":" + mapper.writeValueAsString(v) + "}";
-                    } catch (JsonProcessingException e) {
+                    } catch (JacksonException e) {
                         throw new RuntimeException(e);
                     }
                 })

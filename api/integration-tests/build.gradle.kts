@@ -19,7 +19,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testImplementation("io.fabric8:kubernetes-client:7.7.0")
-    testImplementation("io.rest-assured:rest-assured:5.5.+")
+    testImplementation("io.rest-assured:rest-assured:6.0.1")
 
     // Avoiding vulnerability reports from rest-assured
     testImplementation("org.apache.commons:commons-lang3:3.18.+")

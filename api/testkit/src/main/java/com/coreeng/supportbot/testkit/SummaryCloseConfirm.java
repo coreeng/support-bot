@@ -4,14 +4,15 @@ import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @RequiredArgsConstructor
 public class SummaryCloseConfirm {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
 
     private final long ticketId;
     private final long numberOfOpenEscalations;
@@ -21,13 +22,13 @@ public class SummaryCloseConfirm {
     public SummaryCloseConfirm assertMatches(FullSummaryFormSubmission.Values expected) {
         assertThat(viewJson.get("callback_id").asText()).isEqualTo("ticket-summary-confirm");
         assertThat(viewJson.get("type").asText()).isEqualTo("modal");
-        assertThatJson(viewJson.get("title")).isEqualTo("""
+        assertThatJson(viewJson.get("title").toString()).isEqualTo("""
             { "type": "plain_text", "text": "Closing Ticket", "emoji": false }
         """);
-        assertThatJson(viewJson.get("submit")).isEqualTo("""
+        assertThatJson(viewJson.get("submit").toString()).isEqualTo("""
             { "type": "plain_text", "text": "Confirm", "emoji": false }
         """);
-        assertThatJson(viewJson.get("close")).isEqualTo("""
+        assertThatJson(viewJson.get("close").toString()).isEqualTo("""
             { "type": "plain_text", "text": "Cancel", "emoji": false }
         """);
 
@@ -43,7 +44,7 @@ public class SummaryCloseConfirm {
         text.put("text", expectedText);
         section.set("text", text);
         expectedBlocks.add(section);
-        assertThatJson(viewJson.get("blocks")).isEqualTo(expectedBlocks);
+        assertThatJson(viewJson.get("blocks").toString()).isEqualTo(expectedBlocks.toString());
 
         assertThatNoException().isThrownBy(() -> {
             JsonNode pm = OBJECT_MAPPER.readTree(privateMetadataRaw);
