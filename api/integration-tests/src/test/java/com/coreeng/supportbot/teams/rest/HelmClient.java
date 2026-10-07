@@ -28,7 +28,7 @@ public class HelmClient {
                 command.add(entry.getKey() + "=" + entry.getValue());
             }
         }
-        command.add("--atomic");
+        command.add("--rollback-on-failure");
         command.add("--wait");
 
         ProcessBuilder helmProcessBuilder = new ProcessBuilder(command);
