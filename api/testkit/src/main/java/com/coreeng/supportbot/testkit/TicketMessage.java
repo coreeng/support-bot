@@ -4,9 +4,6 @@ import static net.javacrumbs.jsonunit.assertj.JsonAssertions.JSON;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.http.FormParameter;
 import com.github.tomakehurst.wiremock.matching.AnythingPattern;
@@ -21,6 +18,10 @@ import java.util.regex.Pattern;
 import lombok.Builder;
 import lombok.Getter;
 import org.apache.commons.text.StringSubstitutor;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @Builder
 @Getter
@@ -45,7 +46,7 @@ public class TicketMessage {
     }
 
     public static class Receiver implements StubWithResult.Receiver<TicketMessage> {
-        private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+        private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
         private static final Pattern HEADER_REGEX = Pattern.compile("^Ticket Created: ID-(?<id>\\d+)$");
         private static final Pattern STATUS_REGEX = Pattern.compile(
                 "^(?<status>Opened|Closed): <!date\\^(?<ts>[^\\^]+)\\^\\{date_short_pretty} at \\{time}\\|(?<tsString>[^>]+)>$");
@@ -98,7 +99,7 @@ public class TicketMessage {
         }
 
         private AttachmentView assertAttachmentsAndReturnView(FormParameter attachmentsParam, long ticketId)
-                throws JsonProcessingException {
+                throws JacksonException {
             assertThat(attachmentsParam).isNotNull();
             assertThat(attachmentsParam.getValues()).hasSize(1);
             String attachmentsRaw = attachmentsParam.getValues().getFirst();
@@ -146,7 +147,7 @@ public class TicketMessage {
                    }
                 ]""", Map.of("expectedColor", expectedStatus.colorHex(), "buttonElements", buttonElements));
 
-            assertThatJson(attachmentsJson).isEqualTo(expectedJson);
+            assertThatJson(attachmentsJson.toString()).isEqualTo(expectedJson);
 
             String fallback = JsonPath.read(attachmentsRaw, "$[0].fallback");
             String messageHeader = JsonPath.read(attachmentsRaw, "$[0].blocks[1].text.text");

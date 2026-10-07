@@ -3,8 +3,6 @@ package com.coreeng.supportbot.testkit;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.matching.AnythingPattern;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
@@ -13,11 +11,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.Builder;
 import lombok.Getter;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @Builder
 @Getter
 public class EscalationMessage {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
     private static final Pattern GROUP_PATTERN =
             Pattern.compile("\\nEscalated to team: (?<team>[^(]+)\\(<!subteam\\^(?<group>[^>]+)>\\)");
 
@@ -90,7 +91,7 @@ public class EscalationMessage {
                   }
                 ]
                 """, teamLabel, groupId);
-            assertThatJson(OBJECT_MAPPER.readTree(blocksRaw)).isEqualTo(expectedBlocks);
+            assertThatJson(OBJECT_MAPPER.readTree(blocksRaw).toString()).isEqualTo(expectedBlocks);
 
             JsonNode responseBody =
                     OBJECT_MAPPER.readTree(servedStub.getResponse().getBody());
