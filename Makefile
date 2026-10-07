@@ -132,6 +132,25 @@ test-chart: ## Run Helm chart unit tests with a verified, task-local plugin inst
 	@set -eu; \
 	temp_dir="$$(mktemp -d)"; \
 	trap 'rm -rf "$$temp_dir"' EXIT; \
+	case "$$(uname -s):$$(uname -m)" in \
+		Darwin:arm64|Darwin:aarch64) helm_platform=darwin-arm64; checksum_tool=shasum ;; \
+		Darwin:x86_64) helm_platform=darwin-amd64; checksum_tool=shasum ;; \
+		Linux:x86_64|Linux:amd64) helm_platform=linux-amd64; checksum_tool=sha256sum ;; \
+		Linux:aarch64|Linux:arm64) helm_platform=linux-arm64; checksum_tool=sha256sum ;; \
+		*) echo "Unsupported platform for pinned Helm test runner: $$(uname -s) $$(uname -m)" >&2; exit 1 ;; \
+	esac; \
+	helm_version=4.3.0; \
+	helm_archive="helm-v$$helm_version-$$helm_platform.tar.gz"; \
+	curl -fsSL "https://get.helm.sh/$$helm_archive" -o "$$temp_dir/$$helm_archive"; \
+	curl -fsSL "https://get.helm.sh/$$helm_archive.sha256sum" -o "$$temp_dir/$$helm_archive.sha256sum"; \
+	if [ "$$checksum_tool" = shasum ]; then \
+		(cd "$$temp_dir" && shasum -a 256 -c "$$helm_archive.sha256sum"); \
+	else \
+		(cd "$$temp_dir" && sha256sum -c "$$helm_archive.sha256sum"); \
+	fi; \
+	tar -xzf "$$temp_dir/$$helm_archive" -C "$$temp_dir" "$$helm_platform/helm"; \
+	helm_bin="$$temp_dir/$$helm_platform/helm"; \
+	"$$helm_bin" version --short; \
 	export GNUPGHOME="$$temp_dir/gnupg"; \
 	export HELM_CACHE_HOME="$$temp_dir/cache"; \
 	export HELM_CONFIG_HOME="$$temp_dir/config"; \
@@ -143,8 +162,8 @@ test-chart: ## Run Helm chart unit tests with a verified, task-local plugin inst
 	curl -fsSL https://github.com/helm-unittest/helm-unittest/releases/download/v1.1.2/unittest-1.1.2.tgz.prov -o "$$temp_dir/unittest-1.1.2.tgz.prov"; \
 	gpg --batch --homedir "$$GNUPGHOME" --import "$$temp_dir/helm-unittest-public-key.asc"; \
 	gpg --batch --homedir "$$GNUPGHOME" --export > "$$temp_dir/pubring.gpg"; \
-	helm plugin install "$$temp_dir/unittest-1.1.2.tgz" --keyring "$$temp_dir/pubring.gpg"; \
-	helm unittest $(HELM_CHART_PATH)
+	"$$helm_bin" plugin install "$$temp_dir/unittest-1.1.2.tgz" --keyring "$$temp_dir/pubring.gpg"; \
+	"$$helm_bin" unittest $(HELM_CHART_PATH)
 
 .PHONY: validate-chart-values
 validate-chart-values: helm-chart-deps ## Validate Helm values files against the chart schema by linting and rendering
