@@ -68,7 +68,7 @@ public class SummaryCloseConfirm {
                     OBJECT_MAPPER.writeValueAsString(expected.tags()),
                     expected.impact(),
                     assignedToJson);
-            assertThatJson(pm).isEqualTo(expectedPmJson);
+            assertThatJson(pm.toString()).isEqualTo(expectedPmJson);
         });
         return this;
     }
