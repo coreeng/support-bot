@@ -33,7 +33,16 @@ public class KubernetesTestClient implements AutoCloseable {
     private LocalPortForward localPortForward;
 
     public KubernetesTestClient() {
-        this.client = new KubernetesClientBuilder().build();
+        this(new KubernetesClientBuilder().build());
+    }
+
+    KubernetesTestClient(KubernetesClient client) {
+        this(client, null);
+    }
+
+    KubernetesTestClient(KubernetesClient client, LocalPortForward localPortForward) {
+        this.client = client;
+        this.localPortForward = localPortForward;
     }
 
     public void waitUntilDeploymentReady(String deploymentName, String namespace) {
