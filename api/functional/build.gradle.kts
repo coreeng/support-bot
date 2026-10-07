@@ -31,7 +31,7 @@ repositories {
 }
 
 checkstyle {
-    toolVersion = "10.25.0"
+    toolVersion = "14.3.0"
     isIgnoreFailures = false
     configFile = rootProject.file("config/checkstyle/checkstyle.xml")
 }
