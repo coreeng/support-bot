@@ -60,7 +60,7 @@ dependencies {
     }
 
     // JSON unit for assertions
-    api("net.javacrumbs.json-unit:json-unit-assertj:4.1.+")
+    api("net.javacrumbs.json-unit:json-unit-assertj:6.3.0")
 
     // DataFaker for test data generation
     api("net.datafaker:datafaker:2.4.3")
