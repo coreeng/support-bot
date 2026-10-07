@@ -18,7 +18,8 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:6.0.3"))
     testImplementation("org.junit.jupiter:junit-jupiter-api")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
-    testImplementation("io.fabric8:kubernetes-client:7.7.0")
+    testImplementation("io.fabric8:kubernetes-client:8.0.0")
+    testImplementation("io.fabric8:kubernetes-server-mock:8.0.0")
     testImplementation("io.rest-assured:rest-assured:6.0.1")
 
     // Avoiding vulnerability reports from rest-assured

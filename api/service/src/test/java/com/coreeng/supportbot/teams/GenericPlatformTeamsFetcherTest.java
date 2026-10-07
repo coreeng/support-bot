@@ -3,10 +3,13 @@ package com.coreeng.supportbot.teams;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.coreeng.supportbot.util.JsonMapper;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
 import io.fabric8.kubernetes.api.model.Namespace;
 import io.fabric8.kubernetes.api.model.NamespaceBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.dsl.NonDeletingOperation;
+import io.fabric8.kubernetes.client.dsl.base.ResourceDefinitionContext;
 import io.fabric8.kubernetes.client.server.mock.EnableKubernetesMockClient;
 import java.util.List;
 import java.util.Map;
@@ -186,6 +189,54 @@ class GenericPlatformTeamsFetcherTest {
         // then
         assertEquals(
                 List.of(new PlatformTeamsFetcher.TeamAndGroupTuple("team-no-annotations", "default-group")), result);
+    }
+
+    @Test
+    void shouldFetchGenericResourcesWithMetadataAndSpecAndSkipMalformedGroupRefs() {
+        // given
+        ResourceDefinitionContext context = new ResourceDefinitionContext.Builder()
+                .withVersion("v1")
+                .withGroup("teams.example.com")
+                .withKind("Team")
+                .withPlural("teams")
+                .withNamespaced(true)
+                .build();
+        createGenericTeam(context, "team-one", "groups/one", "enabled", "true");
+        createGenericTeam(context, "team-malformed", "", "enabled", "true");
+        createGenericTeam(context, "not-a-team", "groups/filtered", "enabled", "true");
+        createGenericTeam(context, "team-disabled", "groups/disabled", "enabled", "false");
+        GenericPlatformTeamsFetcher fetcher = new GenericPlatformTeamsFetcher(
+                new GenericPlatformTeamsFetcher.Config(
+                        "v1",
+                        "teams.example.com",
+                        "Team",
+                        "test",
+                        new GenericPlatformTeamsFetcher.Filter("^team-.*$", "enabled=true"),
+                        new GenericPlatformTeamsFetcher.CelExpression("resource.metadata.name"),
+                        new GenericPlatformTeamsFetcher.CelExpression("resource.spec.groupRef")),
+                k8sClient,
+                new JsonMapper());
+
+        // when
+        List<PlatformTeamsFetcher.TeamAndGroupTuple> result = fetcher.fetchTeams();
+
+        // then
+        assertEquals(List.of(new PlatformTeamsFetcher.TeamAndGroupTuple("team-one", "groups/one")), result);
+    }
+
+    private void createGenericTeam(
+            ResourceDefinitionContext context, String name, String groupRef, String label, String labelValue) {
+        GenericKubernetesResource resource = new GenericKubernetesResourceBuilder()
+                .withApiVersion("teams.example.com/v1")
+                .withKind("Team")
+                .withNewMetadata()
+                .withName(name)
+                .withNamespace("test")
+                .addToLabels(label, labelValue)
+                .endMetadata()
+                .addToAdditionalProperties("spec", Map.of("groupRef", groupRef))
+                .build();
+        k8sClient.genericKubernetesResources(context).resource(resource).createOr(NonDeletingOperation::update);
     }
 
     private Namespace createMockNs(String teamName, String groupRef) {
