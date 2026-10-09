@@ -79,6 +79,10 @@ esac
 KUBECTL
 chmod +x "$TMP_DIR/bin/helm" "$TMP_DIR/bin/kubectl"
 
+long_release=release-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+long_service="${long_release}-postgresql-headless"
+long_service="${long_service:0:63}"
+
 run_case() {
   local name="$1" expected_status="$2" expected_operations="$3" actual_status actual_operations
   shift 3
@@ -101,6 +105,8 @@ run_case() {
 }
 
 run_case first-install 0 upgrade ACTION=deploy FAKE_PRESENT=false
+run_case max-length-fresh-install 0 upgrade ACTION=deploy DB_RELEASE=release-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa FAKE_PRESENT=false
+run_case overlength-deploy-refused 1 '' ACTION=deploy DB_RELEASE=release-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa FAKE_PRESENT=false
 run_case old-chart-recreate 0 $'uninstall\nupgrade' ACTION=deploy FAKE_PRESENT=true FAKE_SERVICE_NAME=support-bot-db-postgresql-hl
 run_case old-chart-uninstall-failure 1 uninstall ACTION=deploy FAKE_PRESENT=true FAKE_SERVICE_NAME=support-bot-db-postgresql-hl FAKE_UNINSTALL_FAIL=true
 run_case new-chart-upgrade 0 upgrade ACTION=deploy FAKE_PRESENT=true FAKE_CHART=supportbot-postgres18-test-1.1.0
@@ -109,5 +115,7 @@ run_case changed-image-rejected 1 '' ACTION=deploy FAKE_PRESENT=true FAKE_IMAGE=
 run_case pvc-rejected 1 '' ACTION=deploy FAKE_PRESENT=true FAKE_PVC=data
 run_case unknown-service-rejected 1 '' ACTION=deploy FAKE_PRESENT=true FAKE_SERVICE_NAME=unrelated-service
 run_case service-read-failure 1 '' ACTION=deploy FAKE_PRESENT=true FAKE_FAIL_FIELD=serviceName
+run_case long-release-check 0 '' ACTION=check DB_RELEASE="$long_release" FAKE_PRESENT=true FAKE_SERVICE_NAME="$long_service"
+run_case long-release-delete 0 uninstall ACTION=delete DB_RELEASE="$long_release" FAKE_PRESENT=true FAKE_SERVICE_NAME="$long_service"
 
 echo "Disposable PostgreSQL chart and release guard checks passed"

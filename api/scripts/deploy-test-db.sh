@@ -16,6 +16,10 @@ if [[ ! "$DB_RELEASE" =~ ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$ ]]; then
   log_error "Invalid Helm DB release name ${DB_RELEASE}; refusing database operation."
   exit 1
 fi
+if [[ "$ACTION" == deploy && ${#DB_RELEASE} -gt 43 ]]; then
+  log_error "Helm DB release name ${DB_RELEASE} is too long for the PostgreSQL headless Service; use at most 43 characters."
+  exit 1
+fi
 DB_RELEASE_FILTER="^${DB_RELEASE//./\\.}$"
 
 # Never adopt a release based only on its name. Existing releases must identify
