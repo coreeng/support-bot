@@ -1,4 +1,4 @@
-FROM gradle:9.3.1-jdk25 AS builder
+FROM gradle:9.8.0-jdk25-noble AS builder
 WORKDIR /home/gradle/project
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
