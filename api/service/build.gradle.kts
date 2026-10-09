@@ -22,7 +22,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
 
     id("org.flywaydb.flyway") version "12.0.0"
-    id("org.jooq.jooq-codegen-gradle") version "3.19.18"
+    id("org.jooq.jooq-codegen-gradle") version "3.21.9"
 }
 
 group = "com.coreeng"
@@ -85,16 +85,18 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("org.flywaydb:flyway-core")
-    implementation("org.jooq:jooq:3.19.18")
-    implementation("org.jooq:jooq-meta:3.19.18")
-    implementation("org.jooq:jooq-codegen:3.19.18")
+    implementation("org.jooq:jooq:3.21.9")
+    implementation("org.jooq:jooq-meta:3.21.9")
+    implementation("org.jooq:jooq-codegen:3.21.9")
 
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.microsoft.kiota:microsoft-kiota-http-okHttp:1.9.1")
 
     jooqCodegen("org.postgresql:postgresql:42.7.12")
     jooqCodegen("org.testcontainers:testcontainers-postgresql:2.0.5")
-    jooqCodegen("org.jooq:jooq-codegen:3.19.18")
+    jooqCodegen("org.jooq:jooq:3.21.9")
+    jooqCodegen("org.jooq:jooq-meta:3.21.9")
+    jooqCodegen("org.jooq:jooq-codegen:3.21.9")
 
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
@@ -223,7 +225,7 @@ buildscript {
         classpath("org.flywaydb:flyway-database-postgresql:12.0.0")
         classpath("org.postgresql:postgresql:42.7.12")
         classpath("org.testcontainers:testcontainers-postgresql:2.0.5")
-        classpath("org.jooq:jooq-codegen:3.19.18")
+        classpath("org.jooq:jooq-codegen:3.21.9")
     }
 }
 
@@ -348,7 +350,7 @@ tasks.named<JavaCompile>("compileJava") {
 }
 
 abstract class PostgresService : BuildService<BuildServiceParameters.None>, AutoCloseable {
-    val container = PostgreSQLContainer("postgres:17.2-alpine").apply {
+    val container = PostgreSQLContainer("postgres:18.6-alpine3.23").apply {
         withDatabaseName("postgres")
         withUsername("postgres")
         withPassword("postgres")

@@ -28,20 +28,6 @@ usage() {
   echo "  [DELETE_DB=true|false] [DEPLOY_DB=true|false]"
 }
 
-reset_db_schema() {
-  local ns="$1" release="$2"
-  log "Resetting database schema for release [${release}] in namespace ${ns}..."
-  local db_pod
-  db_pod=$(kubectl get pod -n "$ns" \
-    -l "app.kubernetes.io/instance=${release},app.kubernetes.io/name=postgresql" \
-    -o jsonpath='{.items[0].metadata.name}')
-  kubectl exec -n "$ns" "$db_pod" -- \
-    env PGPASSWORD=supportbotpassword \
-    psql -U supportbot -d supportbot -c \
-    "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-  log_success "Database schema reset complete"
-}
-
 # Print the status of a release from `helm list -o json`, empty when it does not
 # exist. Uses sed only, as the rest of this script does (no jq: the
 # integration-tests image is a bare ubi9 runtime, and the script also runs from
@@ -63,27 +49,6 @@ clear_stuck_release() {
   [[ "$status" == pending-* ]] || return 0
   log "Release ${release} is stuck in ${status}; uninstalling it first..."
   helm uninstall "$release" -n "$ns" --wait --timeout=2m || true
-}
-
-deploy_db() {
-  local ns="$1" release="$2"
-  log "Installing PostgreSQL [${release}] in namespace ${ns}..."
-  clear_stuck_release "$ns" "$release"
-  helm repo add bitnami https://charts.bitnami.com/bitnami
-  helm repo update bitnami
-  helm upgrade --install "$release" bitnami/postgresql -n "$ns" \
-    --set image.repository=bitnamilegacy/postgresql \
-    --set global.postgresql.auth.postgresPassword=rootpassword \
-    --set global.postgresql.auth.username=supportbot \
-    --set global.postgresql.auth.password=supportbotpassword \
-    --set global.postgresql.auth.database=supportbot \
-    --set primary.pdb.create=false \
-    --set primary.networkPolicy.enabled=false \
-    --set primary.resourcesPreset=small \
-    --set serviceAccount.create=false \
-    --wait --atomic --timeout=3m
-  log_success "PostgreSQL deployed"
-  reset_db_schema "$ns" "$release"
 }
 
 ensure_chart_deps() {
@@ -122,10 +87,12 @@ deploy_service() {
   log_success "Service deployed"
 }
 
-# deploy_db drops and recreates the schema. If a service pod is already running (a rerun
-# of a failed workflow keeps the namespace), it keeps serving against the now-empty
-# schema, and helm only restarts it when the rendered spec changes -- which a rerun with
-# the same image tag does not. Roll the deployment so Flyway runs again.
+# deploy_db provisions the guarded, disposable PostgreSQL 18 test chart and resets its
+# schema. Existing Bitnami/unknown releases and persistent workloads are refused.
+deploy_db() {
+  NAMESPACE="$1" DB_RELEASE="$2" ACTION=deploy "${SCRIPT_DIR}/deploy-test-db.sh"
+}
+
 restart_service() {
   local ns="$1" release="$2"
   local deploy_name="${RELEASE_DEPLOYMENT_NAME:-$release}"
@@ -166,9 +133,12 @@ main() {
       log "  Redeploy:         $REDEPLOY"
 
       if [[ "$REDEPLOY" == "true" ]]; then
+        if [[ "$DEPLOY_DB" == "true" ]]; then
+          NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=check "${SCRIPT_DIR}/deploy-test-db.sh"
+        fi
         helm_uninstall_if_exists "$SERVICE_RELEASE" "$NAMESPACE"
         if [[ "$DEPLOY_DB" == "true" ]]; then
-          helm_uninstall_if_exists "$DB_RELEASE" "$NAMESPACE"
+          NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=delete "${SCRIPT_DIR}/deploy-test-db.sh"
         fi
       fi
 
@@ -191,9 +161,12 @@ main() {
       log "  Namespace:        $NAMESPACE"
       log "  Service release:  $SERVICE_RELEASE"
       log "  Delete DB:        $DELETE_DB (release=$DB_RELEASE)"
+      if [[ "$DELETE_DB" == "true" && "$DEPLOY_DB" == "true" ]]; then
+        NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=check "${SCRIPT_DIR}/deploy-test-db.sh"
+      fi
       helm uninstall "$SERVICE_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
       if [[ "$DELETE_DB" == "true" && "$DEPLOY_DB" == "true" ]]; then
-        helm uninstall "$DB_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
+        NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=delete "${SCRIPT_DIR}/deploy-test-db.sh"
       fi
       log_success "Deletion finished"
       ;;

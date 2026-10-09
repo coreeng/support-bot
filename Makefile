@@ -280,32 +280,23 @@ deploy-integration: deploy-db-integration ## Deploy DB + LDAP + Dex infrastructu
 
 .PHONY: deploy-db-integration
 deploy-db-integration: ## Deploy PostgreSQL to integration namespace
-	@helm repo add bitnami https://charts.bitnami.com/bitnami 2>/dev/null || true
-	@helm repo update bitnami >/dev/null
-	helm upgrade --install $(INTEGRATION_DB_RELEASE) bitnami/postgresql \
-	  -n $(INTEGRATION_NAMESPACE) \
-	  --set image.repository=bitnamilegacy/postgresql \
-	  --set global.postgresql.auth.postgresPassword=rootpassword \
-	  --set global.postgresql.auth.username=supportbot \
-	  --set global.postgresql.auth.password=supportbotpassword \
-	  --set global.postgresql.auth.database=supportbot \
-	  --set primary.pdb.create=false \
-	  --set primary.networkPolicy.enabled=false \
-	  --set serviceAccount.create=false \
-	  --wait --atomic --timeout=3m
+	NAMESPACE="$(INTEGRATION_NAMESPACE)" DB_RELEASE="$(INTEGRATION_DB_RELEASE)" ACTION=deploy api/scripts/deploy-test-db.sh
 
 .PHONY: integration-test-local
 integration-test-local: deploy-integration ## Deploy infra and run integration tests locally
-	@api/gradlew -p api :integration-tests:test; rc=$$?; \
-	$(MAKE) undeploy-integration; \
-	exit $$rc
+	@api/gradlew -p api :integration-tests:test; test_rc=$$?; \
+	$(MAKE) undeploy-integration; cleanup_rc=$$?; \
+	if [ $$test_rc -ne 0 ]; then exit $$test_rc; fi; \
+	if [ $$cleanup_rc -ne 0 ]; then exit 1; fi; \
+	exit 0
 
 .PHONY: undeploy-integration
 undeploy-integration: ## Uninstall service + DB + LDAP + Dex from integration namespace
+	@NAMESPACE="$(INTEGRATION_NAMESPACE)" DB_RELEASE="$(INTEGRATION_DB_RELEASE)" ACTION=check api/scripts/deploy-test-db.sh
 	-HELM_DRIVER=configmap helm uninstall support-bot -n $(INTEGRATION_NAMESPACE) --ignore-not-found
 	-helm uninstall support-bot-dex -n $(INTEGRATION_NAMESPACE) --ignore-not-found
 	-helm uninstall support-bot-ldap -n $(INTEGRATION_NAMESPACE) --ignore-not-found
-	-helm uninstall $(INTEGRATION_DB_RELEASE) -n $(INTEGRATION_NAMESPACE) --ignore-not-found
+	NAMESPACE="$(INTEGRATION_NAMESPACE)" DB_RELEASE="$(INTEGRATION_DB_RELEASE)" ACTION=delete api/scripts/deploy-test-db.sh
 
 .PHONY: deploy-api-nft
 deploy-api-nft: ## Deploy service and DB for nft tests

@@ -25,6 +25,10 @@ TEST_LOGS_DIR="${TEST_LOGS_DIR:-${SCRIPT_DIR}/../../reports/integration}"
 JOB_FAILED=0
 
 cleanup_job() {
+  local original_status=$?
+  local cleanup_failed=false
+  local db_guard_refused=false
+
   print_grafana_logs_url "$NAMESPACE" "integration-tests" || true
   save_job_logs "$RELEASE_NAME" "$NAMESPACE" "integration-tests" "$TEST_LOGS_DIR" || true
 
@@ -33,25 +37,40 @@ cleanup_job() {
     log_warning "  Local log snapshot: ${TEST_LOGS_DIR}/"
     log_warning "  Inspect pods:       kubectl get pods -n ${NAMESPACE}"
     log_warning "  Tail logs:          kubectl logs -n ${NAMESPACE} -l job-name=${RELEASE_NAME} --tail=-1"
-    log_warning "  Manual cleanup:     helm uninstall ${RELEASE_NAME} support-bot-dex support-bot-ldap support-bot ${DB_RELEASE:-support-bot-db} -n ${NAMESPACE}"
-    return 0
+    log_warning "  Manual DB cleanup: NAMESPACE=${NAMESPACE} DB_RELEASE=${DB_RELEASE:-support-bot-db} ACTION=delete ${SCRIPT_DIR}/deploy-test-db.sh"
+    exit "$original_status"
   fi
 
   if [[ "$CLEANUP" == "true" ]]; then
-    sleep_for_log_flush
-    log "Cleaning up Helm releases in namespace: $NAMESPACE"
-    helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --ignore-not-found || true
-    helm uninstall support-bot-dex -n "$NAMESPACE" --ignore-not-found || true
-    helm uninstall support-bot-ldap -n "$NAMESPACE" --ignore-not-found || true
-    HELM_DRIVER=configmap helm uninstall support-bot -n "$NAMESPACE" --ignore-not-found || true
+    if [[ "$DEPLOY_DB" == "true" && "$DELETE_DB" == "true" ]] && ! NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=check "${SCRIPT_DIR}/deploy-test-db.sh"; then
+      log_warning "Leaving test releases in place because the DB release is not a verified disposable PostgreSQL 18 test DB."
+      log_error "Cleanup failed because the DB release could not be verified; no releases were removed."
+      cleanup_failed=true
+      db_guard_refused=true
+    else
+      sleep_for_log_flush
+      log "Cleaning up Helm releases in namespace: $NAMESPACE"
+      helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --ignore-not-found || true
+      helm uninstall support-bot-dex -n "$NAMESPACE" --ignore-not-found || true
+      helm uninstall support-bot-ldap -n "$NAMESPACE" --ignore-not-found || true
+      HELM_DRIVER=configmap helm uninstall support-bot -n "$NAMESPACE" --ignore-not-found || true
+    fi
   else
     log_warning "Cleanup disabled. Helm releases will remain in namespace $NAMESPACE"
   fi
 
-  if [[ "$DELETE_DB" == "true" && "$DEPLOY_DB" == "true" ]]; then
+  if [[ "$db_guard_refused" != "true" && "$DELETE_DB" == "true" && "$DEPLOY_DB" == "true" ]]; then
     log "Cleaning up DB release: $DB_RELEASE"
-    helm uninstall "$DB_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
+    if ! NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=delete "${SCRIPT_DIR}/deploy-test-db.sh"; then
+      log_error "Failed to clean up DB release ${DB_RELEASE} in namespace ${NAMESPACE}."
+      cleanup_failed=true
+    fi
   fi
+
+  if [[ "$cleanup_failed" == "true" && "$original_status" -eq 0 ]]; then
+    exit 1
+  fi
+  exit "$original_status"
 }
 
 LOGS_START=$(date +%s)
@@ -109,7 +128,7 @@ main() {
 
   # Optionally deploy database first
   if [[ "$DEPLOY_DB" == "true" ]]; then
-    deploy_db "$NAMESPACE" "$DB_RELEASE"
+    NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=deploy "${SCRIPT_DIR}/deploy-test-db.sh"
   else
     log_warning "DEPLOY_DB is false; assuming database already available in $NAMESPACE"
   fi

@@ -36,6 +36,9 @@ TEST_LOGS_DIR="${TEST_LOGS_DIR:-${SCRIPT_DIR}/../../reports/functional}"
 JOB_FAILED=0
 
 cleanup_all() {
+  local original_status=$?
+  local cleanup_failed=false
+
   print_grafana_logs_url "$NAMESPACE" "functional-tests" || true
   save_job_logs "$JOB_RELEASE" "$NAMESPACE" "functional-tests" "$TEST_LOGS_DIR" || true
 
@@ -44,20 +47,35 @@ cleanup_all() {
     log_warning "  Local log snapshot: ${TEST_LOGS_DIR}/"
     log_warning "  Inspect pods:       kubectl get pods -n ${NAMESPACE}"
     log_warning "  Tail logs:          kubectl logs -n ${NAMESPACE} -l job-name=${JOB_RELEASE} --tail=-1"
-    log_warning "  Manual cleanup:     helm uninstall ${JOB_RELEASE} ${SERVICE_RELEASE} ${DB_RELEASE} -n ${NAMESPACE}"
-    return 0
+    log_warning "  Manual DB cleanup: NAMESPACE=${NAMESPACE} DB_RELEASE=${DB_RELEASE} ACTION=delete ${SCRIPT_DIR}/deploy-test-db.sh"
+    exit "$original_status"
   fi
 
   if [[ "$CLEANUP" == "true" ]]; then
-    sleep_for_log_flush
-    log "Cleaning up Helm releases in namespace: $NAMESPACE"
-    helm uninstall "$JOB_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
-    helm uninstall "$WIREMOCK_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
-    helm uninstall "$SERVICE_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
-    helm uninstall "$DB_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
+    if [[ "$CLEAN_DEPLOY_DB" == "true" ]] && ! NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=check "${SCRIPT_DIR}/deploy-test-db.sh"; then
+      log_warning "Leaving test releases in place because the DB release is not a verified disposable PostgreSQL 18 test DB."
+      log_error "Cleanup failed because the DB release could not be verified; no releases were removed."
+      cleanup_failed=true
+    else
+      sleep_for_log_flush
+      log "Cleaning up Helm releases in namespace: $NAMESPACE"
+      helm uninstall "$JOB_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
+      helm uninstall "$WIREMOCK_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
+      helm uninstall "$SERVICE_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
+      if [[ "$CLEAN_DEPLOY_DB" == "true" ]] \
+        && ! NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=delete "${SCRIPT_DIR}/deploy-test-db.sh"; then
+        log_error "Failed to clean up DB release ${DB_RELEASE} in namespace ${NAMESPACE}."
+        cleanup_failed=true
+      fi
+    fi
   else
     log_warning "Cleanup disabled. Releases will remain in namespace $NAMESPACE"
   fi
+
+  if [[ "$cleanup_failed" == "true" && "$original_status" -eq 0 ]]; then
+    exit 1
+  fi
+  exit "$original_status"
 }
 
 LOGS_START=$(date +%s)
@@ -77,6 +95,10 @@ main() {
   log "  Service Image: $SERVICE_IMAGE_REPOSITORY:$SERVICE_IMAGE_TAG"
   log "  Timeout:       ${TIMEOUT}s"
   log "  Cleanup:       $CLEANUP"
+
+  if [[ "$CLEAN_DEPLOY_DB" == "true" && ( "$DEPLOY_SERVICE" == "true" || "$CLEANUP" == "true" ) ]]; then
+    NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=check "${SCRIPT_DIR}/deploy-test-db.sh"
+  fi
 
   kubectl get ns "$NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$NAMESPACE" >/dev/null
 

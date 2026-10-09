@@ -18,7 +18,7 @@ env:
   - name: AI_PROXY_BASE_URL
     value: "http://support-bot-functional-tests-wiremock:8000/llm-proxy/v1beta"
   - name: DB_URL
-    value: "jdbc:postgresql://support-bot-db-postgresql-hl.support-bot-functional.svc.cluster.local:5432/supportbot?currentSchema=public"
+    value: "jdbc:postgresql://support-bot-db-postgresql-headless.support-bot-functional.svc.cluster.local:5432/supportbot?currentSchema=public"
   - name: DB_USERNAME
     value: "supportbot"
   - name: DB_PASSWORD

@@ -1,0 +1,81 @@
+core-platform-app:
+  replicaCount: 1
+
+  image:
+    repository: postgres
+    pullPolicy: IfNotPresent
+    tag: 18.6-alpine3.23
+
+  container:
+    name: postgres
+
+  service:
+    kind: StatefulSet
+    port: 5432
+
+  serviceAccount:
+    create: false
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 70
+    runAsGroup: 70
+    fsGroup: 70
+
+  readinessProbe:
+    exec:
+      command: [pg_isready, -U, supportbot, -d, supportbot]
+    initialDelaySeconds: 2
+    periodSeconds: 2
+    timeoutSeconds: 2
+    failureThreshold: 30
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  envVarsArr:
+    - name: POSTGRES_USER
+      valueFrom:
+        secretKeyRef:
+          name: support-bot-db-postgresql
+          key: username
+    - name: POSTGRES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: support-bot-db-postgresql
+          key: password
+    - name: POSTGRES_DB
+      valueFrom:
+        secretKeyRef:
+          name: support-bot-db-postgresql
+          key: database
+
+  volumeMounts:
+    - name: data
+      mountPath: /var/lib/postgresql
+
+  volumes:
+    - name: data
+      emptyDir: {}
+
+  topologySpreadConstraints: []
+  verticalPodAutoscaler:
+    enabled: false
+  podDisruptionBudget:
+    enabled: false
+
+  extraObjects:
+    - apiVersion: v1
+      kind: Secret
+      metadata:
+        name: '{{ include "app.fullname" . }}'
+      type: Opaque
+      stringData:
+        username: supportbot
+        password: supportbotpassword
+        database: supportbot
