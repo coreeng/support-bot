@@ -1,0 +1,6 @@
+dependencies:
+- name: core-platform-app
+  repository: https://coreeng.github.io/core-platform-assets
+  version: 0.18.0
+digest: sha256:dcfc93302cfcd85dfacfac7f3761772bd542f4ef12b934fad60955f8125ab01d
+generated: "2026-10-09T09:41:48.13313+01:00"
