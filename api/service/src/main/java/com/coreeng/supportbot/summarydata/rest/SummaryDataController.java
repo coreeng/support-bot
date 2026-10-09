@@ -3,8 +3,6 @@ package com.coreeng.supportbot.summarydata.rest;
 import com.coreeng.supportbot.analysis.AnalysisRecord;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.SummaryAreaProps;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -27,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * REST controller for summary data export and import operations.
@@ -205,7 +205,7 @@ public class SummaryDataController {
                         continue;
                     }
                     records.add(record);
-                } catch (JsonProcessingException e) {
+                } catch (JacksonException e) {
                     log.warn("Skipping malformed JSONL line: {} - error: {}", line, e.getOriginalMessage());
                 }
             }

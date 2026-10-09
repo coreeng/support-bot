@@ -6,17 +6,16 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
 
 class GitHubGraphQlClientTest {
 
@@ -27,12 +26,13 @@ class GitHubGraphQlClientTest {
 
     @BeforeEach
     void setUp() {
-        ObjectMapper objectMapper = new ObjectMapper();
+        JsonMapper objectMapper = tools.jackson.databind.json.JsonMapper.builderWithJackson2Defaults()
+                .build();
         RestClient.Builder builder = RestClient.builder()
                 .baseUrl(GRAPHQL_URL)
-                .messageConverters(ImmutableList.of(
-                        new MappingJackson2HttpMessageConverter(objectMapper),
-                        new StringHttpMessageConverter(StandardCharsets.UTF_8)));
+                .configureMessageConverters(c -> c.disableDefaults()
+                        .withJsonConverter(new JacksonJsonHttpMessageConverter(objectMapper))
+                        .withStringConverter(new StringHttpMessageConverter(StandardCharsets.UTF_8)));
         server = MockRestServiceServer.bindTo(builder).build();
         client = new GitHubGraphQlClient(builder.build());
     }

@@ -6,7 +6,6 @@ import static org.mockito.Mockito.*;
 import com.coreeng.supportbot.analysis.AnalysisRecord;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.SummaryAreaProps;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +28,7 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
+import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 class SummaryDataControllerTest {
@@ -43,7 +43,8 @@ class SummaryDataControllerTest {
     @BeforeEach
     void setUp() {
         summaryAreaProps = summaryAreaProps("classpath:placeholder-analysis-bundle.zip");
-        objectMapper = new ObjectMapper();
+        objectMapper = tools.jackson.databind.json.JsonMapper.builderWithJackson2Defaults()
+                .build();
         controller = new SummaryDataController(summaryAreaProps, analysisResultsService, objectMapper);
     }
 

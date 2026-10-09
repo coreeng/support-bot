@@ -6,8 +6,6 @@ import com.coreeng.supportbot.github.GitHubGraphQlClient;
 import com.coreeng.supportbot.github.Hub4jGitHubClient;
 import com.coreeng.supportbot.prtracking.source.GitHubPrSourceClient;
 import com.coreeng.supportbot.prtracking.source.PrSourceClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
 import io.jsonwebtoken.Jwts;
 import java.io.IOException;
 import java.io.StringReader;
@@ -31,8 +29,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Wires the GitHub adapter for PR tracking. Only activates when at least one repository uses
@@ -93,7 +92,7 @@ public class PrTrackingGitHubConfig {
      */
     @Bean
     public RestClient gitHubGraphQlRestClient(
-            PrTrackingProps props, AuthorizationProvider gitHubAuthorizationProvider, ObjectMapper objectMapper) {
+            PrTrackingProps props, AuthorizationProvider gitHubAuthorizationProvider, JsonMapper objectMapper) {
         ClientHttpRequestInterceptor authInterceptor = (request, body, execution) -> {
             String authorization = gitHubAuthorizationProvider.getEncodedAuthorization();
             if (authorization != null) {
@@ -103,9 +102,9 @@ public class PrTrackingGitHubConfig {
         };
         return RestClient.builder()
                 .baseUrl(GitHubGraphQlClient.graphqlEndpoint(props.github().apiBaseUrl()))
-                .messageConverters(ImmutableList.of(
-                        new MappingJackson2HttpMessageConverter(objectMapper),
-                        new StringHttpMessageConverter(StandardCharsets.UTF_8)))
+                .configureMessageConverters(c -> c.disableDefaults()
+                        .withJsonConverter(new JacksonJsonHttpMessageConverter(objectMapper))
+                        .withStringConverter(new StringHttpMessageConverter(StandardCharsets.UTF_8)))
                 .requestInterceptor(authInterceptor)
                 .build();
     }

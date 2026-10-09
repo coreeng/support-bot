@@ -9,8 +9,6 @@ import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.config.LlmProps;
 import com.coreeng.supportbot.config.LlmProvider;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.http.client.HttpClient;
 import dev.langchain4j.http.client.HttpClientBuilder;
 import dev.langchain4j.http.client.HttpMethod;
@@ -21,6 +19,7 @@ import java.time.Duration;
 import java.util.Locale;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Pins the wire contract with the LLM proxy at langchain4j's {@link HttpClient} boundary: the
@@ -69,7 +68,9 @@ class ProxyChatModelContractTest {
         assertThat(request.headers().keySet()).noneSatisfy(header -> assertThat(header.toLowerCase(Locale.ROOT))
                 .isEqualTo("x-goog-api-key"));
 
-        JsonNode body = new ObjectMapper().readTree(request.body());
+        JsonNode body = tools.jackson.databind.json.JsonMapper.builderWithJackson2Defaults()
+                .build()
+                .readTree(request.body());
         assertThat(body.at("/contents/0/role").asText()).isEqualTo("user");
         assertThat(body.at("/contents/0/parts/0/text").asText()).contains("hello proxy");
     }

@@ -37,7 +37,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     public void onAuthenticationSuccess(
             HttpServletRequest request, HttpServletResponse response, Authentication authentication)
             throws IOException {
-        var oauth2User = (OAuth2User) authentication.getPrincipal();
+        var oauth2User = (OAuth2User)
+                java.util.Objects.requireNonNull(authentication.getPrincipal(), "OAuth2 principal is required");
         var registrationId = authentication instanceof OAuth2AuthenticationToken token
                 ? token.getAuthorizedClientRegistrationId()
                 : "";

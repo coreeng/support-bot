@@ -3,10 +3,9 @@ package com.coreeng.supportbot.prtracking;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.prtracking.source.Provider;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class InFlightPrResponseTest {
 
@@ -248,7 +247,8 @@ class InFlightPrResponseTest {
                 null,
                 false);
         var response = new InFlightPrResponse(pr, "Team Label");
-        ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        ObjectMapper mapper = tools.jackson.databind.json.JsonMapper.builderWithJackson2Defaults()
+                .build();
         String json = mapper.writeValueAsString(response);
         assertThat(json).contains("\"githubRepo\":\"org/repo\"");
         assertThat(json).doesNotContain("\"repo\":");

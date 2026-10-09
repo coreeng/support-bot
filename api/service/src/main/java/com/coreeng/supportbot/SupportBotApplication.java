@@ -8,9 +8,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SuppressWarnings({"removal"})
 @SpringBootApplication(
-        exclude = {
-            org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration.class
-        })
+        exclude = {org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration.class})
 @EnableScheduling
 @EnableAsync
 @ConfigurationPropertiesScan("com.coreeng.supportbot.config")
