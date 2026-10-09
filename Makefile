@@ -284,9 +284,11 @@ deploy-db-integration: ## Deploy PostgreSQL to integration namespace
 
 .PHONY: integration-test-local
 integration-test-local: deploy-integration ## Deploy infra and run integration tests locally
-	@api/gradlew -p api :integration-tests:test; rc=$$?; \
-	$(MAKE) undeploy-integration; \
-	exit $$rc
+	@api/gradlew -p api :integration-tests:test; test_rc=$$?; \
+	$(MAKE) undeploy-integration; cleanup_rc=$$?; \
+	if [ $$test_rc -ne 0 ]; then exit $$test_rc; fi; \
+	if [ $$cleanup_rc -ne 0 ]; then exit 1; fi; \
+	exit 0
 
 .PHONY: undeploy-integration
 undeploy-integration: ## Uninstall service + DB + LDAP + Dex from integration namespace
@@ -294,7 +296,7 @@ undeploy-integration: ## Uninstall service + DB + LDAP + Dex from integration na
 	-HELM_DRIVER=configmap helm uninstall support-bot -n $(INTEGRATION_NAMESPACE) --ignore-not-found
 	-helm uninstall support-bot-dex -n $(INTEGRATION_NAMESPACE) --ignore-not-found
 	-helm uninstall support-bot-ldap -n $(INTEGRATION_NAMESPACE) --ignore-not-found
-	-NAMESPACE="$(INTEGRATION_NAMESPACE)" DB_RELEASE="$(INTEGRATION_DB_RELEASE)" ACTION=delete api/scripts/deploy-test-db.sh
+	NAMESPACE="$(INTEGRATION_NAMESPACE)" DB_RELEASE="$(INTEGRATION_DB_RELEASE)" ACTION=delete api/scripts/deploy-test-db.sh
 
 .PHONY: deploy-api-nft
 deploy-api-nft: ## Deploy service and DB for nft tests

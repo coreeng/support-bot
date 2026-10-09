@@ -37,6 +37,9 @@ WIREMOCK_CHART_VERSION="${WIREMOCK_CHART_VERSION:-1.11.0}"
 JOB_FAILED=0
 
 cleanup() {
+  local original_status=$?
+  local cleanup_failed=false
+
   print_grafana_logs_url "${NAMESPACE}" "nft-tests" || true
   save_job_logs "${JOB_RELEASE}" "${NAMESPACE}" "nft-tests" "${TEST_LOGS_DIR}/job" || true
 
@@ -46,25 +49,31 @@ cleanup() {
     log_warning "  Inspect pods:       kubectl get pods -n ${NAMESPACE}"
     log_warning "  Tail logs:          kubectl logs -n ${NAMESPACE} -l job-name=${JOB_RELEASE} --tail=-1"
     log_warning "  Manual DB cleanup: NAMESPACE=${NAMESPACE} DB_RELEASE=${DB_RELEASE} ACTION=delete ${SCRIPT_DIR}/deploy-test-db.sh"
-    return
+    exit "$original_status"
   fi
 
   if [[ "${CLEANUP}" != "true" ]]; then
     log_warning "CLEANUP=false - leaving resources in place"
-    return
-  fi
-
-  if ! NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=check "${SCRIPT_DIR}/deploy-test-db.sh"; then
+  elif ! NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=check "${SCRIPT_DIR}/deploy-test-db.sh"; then
     log_warning "Leaving test releases in place because the DB release is not a verified disposable PostgreSQL 18 test DB."
-    return
+    log_error "Cleanup failed because the DB release could not be verified; no releases were removed."
+    cleanup_failed=true
+  else
+    sleep_for_log_flush
+    log "Cleaning up Helm releases in namespace: ${NAMESPACE}"
+    helm uninstall "${JOB_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
+    helm uninstall "${WIREMOCK_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
+    helm uninstall "${SERVICE_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
+    if ! NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=delete "${SCRIPT_DIR}/deploy-test-db.sh"; then
+      log_error "Failed to clean up DB release ${DB_RELEASE} in namespace ${NAMESPACE}."
+      cleanup_failed=true
+    fi
   fi
 
-  sleep_for_log_flush
-  log "Cleaning up Helm releases in namespace: ${NAMESPACE}"
-  helm uninstall "${JOB_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
-  helm uninstall "${WIREMOCK_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
-  helm uninstall "${SERVICE_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
-  NAMESPACE="$NAMESPACE" DB_RELEASE="$DB_RELEASE" ACTION=delete "${SCRIPT_DIR}/deploy-test-db.sh" || true
+  if [[ "$cleanup_failed" == "true" && "$original_status" -eq 0 ]]; then
+    exit 1
+  fi
+  exit "$original_status"
 }
 
 LOGS_START=$(date +%s)
