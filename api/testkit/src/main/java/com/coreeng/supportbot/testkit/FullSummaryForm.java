@@ -3,19 +3,20 @@ package com.coreeng.supportbot.testkit;
 import static java.util.stream.Collectors.joining;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import com.google.common.collect.ImmutableMap;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.text.StringSubstitutor;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 public class FullSummaryForm {
     @RequiredArgsConstructor
     public static class Receiver implements StubWithResult.Receiver<FullSummaryForm> {
-        private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+        private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
         private final Ticket ticket;
         private final Config config;
 

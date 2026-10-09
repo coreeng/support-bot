@@ -49,17 +49,18 @@ dependencies {
     api("org.wiremock:wiremock-jetty12:3.13.+")
 
     // Jackson
-    api("com.fasterxml.jackson.core:jackson-databind")
-    api("com.fasterxml.jackson.datatype:jackson-datatype-guava")
-    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+    api(platform("tools.jackson:jackson-bom:3.1.5"))
+    api("tools.jackson.core:jackson-databind")
+    api("tools.jackson.datatype:jackson-datatype-guava")
+    api("com.fasterxml.jackson.core:jackson-annotations")
 
     // RestAssured
-    api("io.rest-assured:rest-assured:5.5.+") {
+    api("io.rest-assured:rest-assured:6.0.1") {
         exclude(group = "commons-logging", module = "commons-logging")
     }
 
     // JSON unit for assertions
-    api("net.javacrumbs.json-unit:json-unit-assertj:4.1.+")
+    api("net.javacrumbs.json-unit:json-unit-assertj:6.3.0")
 
     // DataFaker for test data generation
     api("net.datafaker:datafaker:2.4.3")

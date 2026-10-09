@@ -4,12 +4,6 @@ import static io.restassured.RestAssured.given;
 import static io.restassured.http.ContentType.JSON;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.guava.GuavaModule;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.collect.ImmutableList;
 import io.restassured.config.ObjectMapperConfig;
 import io.restassured.config.RestAssuredConfig;
@@ -26,20 +20,25 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.jackson.Jacksonized;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.core.StreamReadFeature;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.datatype.guava.GuavaModule;
 
 @RequiredArgsConstructor
 public class SupportBotClient {
     private static final String TEST_BYPASS_USER = "test@functional.test";
     private static final String TEST_BYPASS_ROLE = "support";
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .configure(JsonParser.Feature.INCLUDE_SOURCE_IN_LOCATION, true)
-            .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
-            .registerModule(new JavaTimeModule())
-            .registerModule(new GuavaModule());
+    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)
+            .changeDefaultVisibility(visibility -> visibility.withFieldVisibility(JsonAutoDetect.Visibility.ANY))
+            .addModule(new GuavaModule())
+            .build();
     private static final RestAssuredConfig REST_ASSURED_CONFIG = RestAssuredConfig.config()
             .objectMapperConfig(ObjectMapperConfig.objectMapperConfig()
-                    .jackson2ObjectMapperFactory((type, charset) -> OBJECT_MAPPER));
+                    .jackson3ObjectMapperFactory((type, charset) -> OBJECT_MAPPER));
 
     private final String baseUrl;
     private final SlackWiremock slackWiremock;
