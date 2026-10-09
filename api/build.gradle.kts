@@ -3,7 +3,9 @@ plugins {
 }
 
 val jackson2Version = "2.22.3"
-// SDKs and standalone test clients still use Jackson 2; application JSON uses Boot-managed Jackson 3.
+val jacksonVersion = "3.2.3"
+val vertxVersion = "5.2.0"
+// SDKs and WireMock still use Jackson 2; application and testkit JSON use Jackson 3.
 val jackson2Bom = "com.fasterxml.jackson:jackson-bom:$jackson2Version"
 // Preserve the patched transport floors as complete families rather than mixed-generation artifact pins.
 val jettyVersion = "12.1.12"
@@ -33,8 +35,9 @@ val safeDependencyVersions =
         "org.apache.httpcomponents.client5:httpclient5" to "5.4.3",
         "org.apache.logging.log4j:log4j-api" to "2.25.5",
         "org.apache.logging.log4j:log4j-core" to "2.25.5",
-        "org.bouncycastle:bcpkix-jdk18on" to "1.85",
-        "org.bouncycastle:bcprov-jdk18on" to "1.85",
+        "org.bouncycastle:bcpkix-jdk18on" to "1.86",
+        "org.bouncycastle:bcprov-jdk18on" to "1.86",
+        "org.bouncycastle:bcutil-jdk18on" to "1.86",
         "org.codehaus.plexus:plexus-utils" to "4.0.3",
         "org.postgresql:postgresql" to "42.7.12",
     )
@@ -56,6 +59,8 @@ subprojects {
     apply(plugin = "com.diffplug.spotless")
 
     extra["jackson-2-bom.version"] = jackson2Version
+    extra["jackson-bom.version"] = jacksonVersion
+    extra["vertx.version"] = vertxVersion
     extra["jooq.version"] = "3.21.9"
     managedDependencyVersions.forEach { (property, version) ->
         extra[property] = version

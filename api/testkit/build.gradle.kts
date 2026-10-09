@@ -49,7 +49,7 @@ dependencies {
     api("org.wiremock:wiremock-jetty12:3.13.+")
 
     // Jackson
-    api(platform("tools.jackson:jackson-bom:3.1.5"))
+    api(platform("tools.jackson:jackson-bom:3.2.3"))
     api("tools.jackson.core:jackson-databind")
     api("tools.jackson.datatype:jackson-datatype-guava")
     api("com.fasterxml.jackson.core:jackson-annotations")
