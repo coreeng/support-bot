@@ -3,6 +3,7 @@ package com.coreeng.supportbot.testkit;
 import java.lang.reflect.Field;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.ExtensionContext.StoreScope;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.TestInstancePostProcessor;
@@ -74,7 +75,9 @@ public class TestKitExtension implements TestInstancePostProcessor, ParameterRes
     }
 
     private Object getValueForField(Class<?> fieldType, ExtensionContext extensionContext) {
-        Object result = extensionContext.getStore(NAMESPACE).get(fieldType, fieldType);
+        Object result = extensionContext
+                .getStore(StoreScope.LAUNCHER_SESSION, NAMESPACE)
+                .get(fieldType, fieldType);
         if (result != null) {
             return result;
         }
