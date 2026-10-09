@@ -11,6 +11,7 @@ ACTION="${ACTION:-deploy}" # check|deploy|delete
 TEST_DB_CHART_PATH="${TEST_DB_CHART_PATH:-${SCRIPT_DIR}/../k8s/test-postgres18}"
 TEST_DB_CHART_NAME="supportbot-postgres18-test"
 TEST_DB_IMAGE="postgres:18.6-alpine3.23"
+DB_RELEASE_SERVICE_NAME=""
 if [[ ! "$DB_RELEASE" =~ ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$ ]]; then
   log_error "Invalid Helm DB release name ${DB_RELEASE}; refusing database operation."
   exit 1
@@ -20,7 +21,8 @@ DB_RELEASE_FILTER="^${DB_RELEASE//./\\.}$"
 # Never adopt a release based only on its name. Existing releases must identify
 # as our test chart and have the expected PostgreSQL image and emptyDir storage.
 check_db_release() {
-  local releases release_json chart status statefulset image claims data_volume data_mount
+  local releases release_json chart status statefulset image claims data_volume data_mount service_name
+  DB_RELEASE_SERVICE_NAME=""
   if ! releases=$(helm list --all -n "$NAMESPACE" -f "$DB_RELEASE_FILTER" -q); then
     log_error "Cannot inspect Helm releases in ${NAMESPACE}; refusing database operation."
     return 1
@@ -69,11 +71,36 @@ check_db_release() {
     log_error "Cannot verify PostgreSQL data mount for ${DB_RELEASE} in ${NAMESPACE}; refusing database operation."
     return 1
   fi
+  if ! service_name=$(kubectl get statefulset "$statefulset" -n "$NAMESPACE" \
+    -o jsonpath='{.spec.serviceName}'); then
+    log_error "Cannot verify PostgreSQL service name for ${DB_RELEASE} in ${NAMESPACE}; refusing database operation."
+    return 1
+  fi
 
   if [[ "$image" != "$TEST_DB_IMAGE" || -n "${claims// /}" || ( "$data_volume" != "{}" && "$data_volume" != "map[]" ) || "$data_mount" != "/var/lib/postgresql" ]]; then
     log_error "Refusing to modify DB release ${DB_RELEASE} in ${NAMESPACE}: the live workload is not the expected PostgreSQL 18.6 emptyDir test database."
     return 1
   fi
+
+  local old_service_name new_service_name
+  old_service_name="${DB_RELEASE}-postgresql-hl"
+  new_service_name="${DB_RELEASE}-postgresql-headless"
+  old_service_name="${old_service_name:0:63}"
+  new_service_name="${new_service_name:0:63}"
+  if [[ "$service_name" != "$old_service_name" && "$service_name" != "$new_service_name" ]]; then
+    log_error "Refusing to modify DB release ${DB_RELEASE} in ${NAMESPACE}: unexpected StatefulSet service name ${service_name:-unknown}."
+    return 1
+  fi
+  DB_RELEASE_SERVICE_NAME="$service_name"
+}
+
+ensure_chart_deps() {
+  if compgen -G "${TEST_DB_CHART_PATH}/charts/core-platform-app-*.tgz" > /dev/null 2>&1 \
+    || [[ -f "${TEST_DB_CHART_PATH}/charts/core-platform-app/Chart.yaml" ]]; then
+    return 0
+  fi
+  helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets >/dev/null 2>&1 || true
+  helm dependency build "$TEST_DB_CHART_PATH" >/dev/null
 }
 
 case "$ACTION" in
@@ -82,18 +109,34 @@ case "$ACTION" in
     ;;
   deploy)
     check_db_release
+    ensure_chart_deps
     if ! release_json=$(helm list --all -n "$NAMESPACE" -f "$DB_RELEASE_FILTER" -o json); then
       log_error "Cannot inspect DB release ${DB_RELEASE} in ${NAMESPACE}; refusing deployment."
       exit 1
     fi
     status=$(sed -n 's/.*"status":"\([^"]*\)".*/\1/p' <<< "$release_json")
-    if [[ "$status" == pending-* ]]; then
+    statefulset_name="${DB_RELEASE}-postgresql"
+    statefulset_name="${statefulset_name:0:63}"
+    old_service_name="${DB_RELEASE}-postgresql-hl"
+    old_service_name="${old_service_name:0:63}"
+    if [[ "$status" == pending-* || "$DB_RELEASE_SERVICE_NAME" == "$old_service_name" ]]; then
       helm uninstall "$DB_RELEASE" -n "$NAMESPACE" --wait --timeout=3m
     fi
     helm upgrade --install "$DB_RELEASE" "$TEST_DB_CHART_PATH" \
-      -n "$NAMESPACE" --wait --atomic --timeout=3m
+      -n "$NAMESPACE" \
+      --set "core-platform-app.fullnameOverride=${statefulset_name}" \
+      --set "core-platform-app.envVarsArr[0].name=POSTGRES_USER" \
+      --set "core-platform-app.envVarsArr[0].valueFrom.secretKeyRef.name=${statefulset_name}" \
+      --set "core-platform-app.envVarsArr[0].valueFrom.secretKeyRef.key=username" \
+      --set "core-platform-app.envVarsArr[1].name=POSTGRES_PASSWORD" \
+      --set "core-platform-app.envVarsArr[1].valueFrom.secretKeyRef.name=${statefulset_name}" \
+      --set "core-platform-app.envVarsArr[1].valueFrom.secretKeyRef.key=password" \
+      --set "core-platform-app.envVarsArr[2].name=POSTGRES_DB" \
+      --set "core-platform-app.envVarsArr[2].valueFrom.secretKeyRef.name=${statefulset_name}" \
+      --set "core-platform-app.envVarsArr[2].valueFrom.secretKeyRef.key=database" \
+      --wait --atomic --timeout=3m
     pod=$(kubectl get pod -n "$NAMESPACE" \
-      -l "app.kubernetes.io/instance=${DB_RELEASE},app.kubernetes.io/name=postgresql" \
+      -l "app.kubernetes.io/instance=${DB_RELEASE},app.kubernetes.io/name=core-platform-app" \
       -o jsonpath='{.items[0].metadata.name}')
     kubectl exec -n "$NAMESPACE" "$pod" -- \
       env PGPASSWORD=supportbotpassword \
