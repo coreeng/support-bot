@@ -325,7 +325,7 @@ For the chart options themselves, see [Bundled Dex](#bundled-dex) above. This se
 - A working Docker daemon (Docker Desktop, Colima, Rancher Desktop, or Lima — anything that gives you `docker` and an OCI runtime)
 - `kind` v0.20+
 - `kubectl` v1.28+
-- `helm` v3.13+
+- `helm` v4.3.0+
 - This repo checked out locally
 
 On macOS with Homebrew:

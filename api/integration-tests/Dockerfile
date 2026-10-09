@@ -2,7 +2,7 @@ FROM gradle:9.8.0-jdk25-noble AS builder
 WORKDIR /home/gradle/project
 
 # Install Helm and kubectl with pinned versions and checksum verification
-ARG HELM_VERSION=3.19.0
+ARG HELM_VERSION=4.3.0
 ARG KUBECTL_VERSION=v1.33.5
 
 # Must sit below the ARGs: hadolint 2.15.0 resets its tracked shell to POSIX sh
