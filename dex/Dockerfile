@@ -17,7 +17,7 @@ RUN apk add --no-cache \
     libssl3=3.5.9-r0 \
     musl=1.2.5-r23 \
     musl-utils=1.2.5-r23 \
-    zlib=1.3.2-r0
+    zlib=1.3.2-r1
 
 # Theme assets (whole directory) — referenced by frontend.theme=supportbot in the Dex config.
 COPY --chown=1001:1001 web/themes/supportbot/ /srv/dex/web/themes/supportbot/
