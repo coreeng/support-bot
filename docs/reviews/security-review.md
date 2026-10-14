@@ -16,6 +16,7 @@ When the change touches authentication, authorization, view permissions, or expo
 - `docs/adr/adr-008-single-oauth2-oidc-provider.md` — single OAuth2/OIDC provider for authentication.
 - `docs/adr/adr-005-configurable-thread-sanitisation.md` — configurable thread sanitisation for data export.
 - `docs/adr/adr-001-support-area-summary.md` — summary data export/import for knowledge gap analysis.
+- `docs/adr/adr-009-rating-feedback-anonymity.md` — anonymous vs named rating feedback; no names or Slack IDs stored.
 
 ## Scope Detection
 
