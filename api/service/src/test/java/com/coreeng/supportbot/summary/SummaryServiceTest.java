@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.summary;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -13,9 +14,12 @@ import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryAreaProps;
+import com.coreeng.supportbot.teamgroups.TeamGroup;
+import com.coreeng.supportbot.teamgroups.TeamGroupService;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedSet;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -33,6 +37,9 @@ class SummaryServiceTest {
     private static final LocalDate FROM = LocalDate.of(2026, 3, 10);
     private static final LocalDate TO = LocalDate.of(2026, 3, 23);
     private static final SummaryWindow WINDOW = new SummaryWindow(FROM, TO);
+    private static final SummaryScope SCOPE = SummaryScope.all(WINDOW);
+    private static final TeamGroup GROUP = new TeamGroup("area-a", "Area A", ImmutableSortedSet.of("team-a", "team-b"));
+    private static final SummaryScope GROUP_SCOPE = new SummaryScope(WINDOW, GROUP);
     private static final String CHANNEL = "C123456";
     private static final String CLASSIFICATION_PROMPT = "classify this";
     private static final String SUMMARY_PROMPT = "summarise this";
@@ -57,6 +64,9 @@ class SummaryServiceTest {
     private SummaryRefreshService summaryRefresher;
 
     @Mock
+    private TeamGroupService teamGroupService;
+
+    @Mock
     private Clock clock;
 
     private SummaryService service;
@@ -71,6 +81,7 @@ class SummaryServiceTest {
                 summarySnapshotRepository,
                 summaryRefresher,
                 channelRegistry,
+                teamGroupService,
                 new SummaryAreaProps(
                         new SummaryAreaProps.Sanitisation(List.of(), List.of()),
                         new SummaryAreaProps.Page(400, RETRY_DELAY),
@@ -83,10 +94,10 @@ class SummaryServiceTest {
                 .when(analysisService.inUsePrompt(AnalysisPromptType.SUMMARY))
                 .thenReturn(new AnalysisPrompt(1, SUMMARY_PROMPT));
         lenient()
-                .when(summaryReadRepository.breakdowns(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .when(summaryReadRepository.breakdowns(SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(breakdowns());
         lenient()
-                .when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .when(summaryReadRepository.fingerprint(SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(
                         new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT));
         lenient().when(summaryRefresher.status()).thenReturn(idle());
@@ -98,11 +109,11 @@ class SummaryServiceTest {
     @Test
     void servesTheCachedSummaryWhenTheFingerprintMatches() {
         // However old it is: a fully classified window has nothing to retry.
-        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
+        when(summarySnapshotRepository.find(SCOPE, SUMMARY_PROMPT_ID))
                 .thenReturn(new SummarySnapshot(
-                        WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "the prose", "model-a", Instant.EPOCH));
+                        WINDOW, "", SUMMARY_PROMPT_ID, FINGERPRINT, "the prose", "model-a", Instant.EPOCH));
 
-        SummaryService.SummaryResult result = service.get(FROM, TO);
+        SummaryService.SummaryResult result = service.get(FROM, TO, null);
 
         assertThat(result.summary()).isEqualTo(new SummaryState.Ready("the prose", "model-a", Instant.EPOCH));
         verify(summaryRefresher, never()).start(any());
@@ -110,11 +121,11 @@ class SummaryServiceTest {
 
     @Test
     void regeneratesWhenTheFingerprintNoLongerMatches() {
-        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
-                .thenReturn(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, "3/1@older", "stale", "model-a", null));
-        when(summaryRefresher.start(WINDOW)).thenReturn(true);
+        when(summarySnapshotRepository.find(SCOPE, SUMMARY_PROMPT_ID))
+                .thenReturn(new SummarySnapshot(WINDOW, "", SUMMARY_PROMPT_ID, "3/1@older", "stale", "model-a", null));
+        when(summaryRefresher.start(SCOPE)).thenReturn(true);
 
-        assertThat(service.get(FROM, TO).summary())
+        assertThat(service.get(FROM, TO, null).summary())
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.CLASSIFYING, null, null));
     }
 
@@ -122,19 +133,19 @@ class SummaryServiceTest {
     void backfillsWhenAClosedTicketAwaitsClassification() {
         // The analysis rows are unchanged since the snapshot, but a ticket has since closed unclassified:
         // the gap is part of the fingerprint, so the cached prose describes an incomplete window.
-        when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+        when(summaryReadRepository.fingerprint(SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(new SummaryFingerprint(
                         3,
                         2,
                         LocalDate.of(2026, 3, 23).atTime(10, 0),
                         TICKET_UPDATED_AT,
                         ImmutableSet.of(new TicketId(74))));
-        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
-                .thenReturn(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "prose", "model-a", null));
-        when(summaryRefresher.start(WINDOW)).thenReturn(true);
+        when(summarySnapshotRepository.find(SCOPE, SUMMARY_PROMPT_ID))
+                .thenReturn(new SummarySnapshot(WINDOW, "", SUMMARY_PROMPT_ID, FINGERPRINT, "prose", "model-a", null));
+        when(summaryRefresher.start(SCOPE)).thenReturn(true);
         when(analysisService.getStatus()).thenReturn(new AnalysisService.AnalysisStatus("analysis", 5, 2, true, null));
 
-        assertThat(service.get(FROM, TO).summary())
+        assertThat(service.get(FROM, TO, null).summary())
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.CLASSIFYING, 2, 5));
     }
 
@@ -142,12 +153,12 @@ class SummaryServiceTest {
     void ignoresThePreviousRunsCountsUntilTheNewClassificationStarts() {
         // The refresh is dispatched asynchronously, so the first poll can land before classify() has
         // reset the analysis status: it still holds the last run's final counts with running=false.
-        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID)).thenReturn(null);
-        when(summaryRefresher.start(WINDOW)).thenReturn(true);
+        when(summarySnapshotRepository.find(SCOPE, SUMMARY_PROMPT_ID)).thenReturn(null);
+        when(summaryRefresher.start(SCOPE)).thenReturn(true);
         when(analysisService.getStatus())
                 .thenReturn(new AnalysisService.AnalysisStatus("analysis", 40, 40, false, null));
 
-        assertThat(service.get(FROM, TO).summary())
+        assertThat(service.get(FROM, TO, null).summary())
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.CLASSIFYING, null, null));
     }
 
@@ -157,7 +168,7 @@ class SummaryServiceTest {
         // regenerating on every poll would re-run the same failing classification each time.
         givenASnapshotWithAGapGeneratedAt(NOW.minus(RETRY_DELAY).plusSeconds(1));
 
-        assertThat(service.get(FROM, TO).summary())
+        assertThat(service.get(FROM, TO, null).summary())
                 .isEqualTo(new SummaryState.Ready(
                         "the prose", "model-a", NOW.minus(RETRY_DELAY).plusSeconds(1)));
         verify(summaryRefresher, never()).start(any());
@@ -169,9 +180,9 @@ class SummaryServiceTest {
         // window's data happened to change — never, for last month's window — so once the delay has
         // passed the next visit starts a refresh that attempts it again.
         givenASnapshotWithAGapGeneratedAt(NOW.minus(RETRY_DELAY));
-        when(summaryRefresher.start(WINDOW)).thenReturn(true);
+        when(summaryRefresher.start(SCOPE)).thenReturn(true);
 
-        assertThat(service.get(FROM, TO).summary())
+        assertThat(service.get(FROM, TO, null).summary())
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.CLASSIFYING, null, null));
     }
 
@@ -182,26 +193,26 @@ class SummaryServiceTest {
         givenASnapshotWithAGapGeneratedAt(NOW);
         when(clock.instant()).thenReturn(NOW.plus(RETRY_DELAY).minusSeconds(1));
 
-        assertThat(service.get(FROM, TO).summary()).isInstanceOf(SummaryState.Ready.class);
+        assertThat(service.get(FROM, TO, null).summary()).isInstanceOf(SummaryState.Ready.class);
         verify(summaryRefresher, never()).start(any());
     }
 
     private void givenASnapshotWithAGapGeneratedAt(Instant generatedAt) {
         SummaryFingerprint withGap = new SummaryFingerprint(
                 3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT, ImmutableSet.of(new TicketId(74)));
-        when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+        when(summaryReadRepository.fingerprint(SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(withGap);
-        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID))
+        when(summarySnapshotRepository.find(SCOPE, SUMMARY_PROMPT_ID))
                 .thenReturn(new SummarySnapshot(
-                        WINDOW, SUMMARY_PROMPT_ID, withGap.value(), "the prose", "model-a", generatedAt));
+                        WINDOW, "", SUMMARY_PROMPT_ID, withGap.value(), "the prose", "model-a", generatedAt));
     }
 
     @Test
     void reportsTheRunningRefreshWithoutStartingASecondOne() {
         when(summaryRefresher.status())
-                .thenReturn(new SummaryRefreshStatus(WINDOW, SummaryState.Phase.SUMMARISING, true));
+                .thenReturn(new SummaryRefreshStatus(SCOPE, SummaryState.Phase.SUMMARISING, true));
 
-        assertThat(service.get(FROM, TO).summary())
+        assertThat(service.get(FROM, TO, null).summary())
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.SUMMARISING, null, null));
         verify(summaryRefresher, never()).start(any());
         // A poll during a run is the hot path: it must not pay for the summary prompt or the fingerprint.
@@ -211,10 +222,10 @@ class SummaryServiceTest {
 
     @Test
     void reportsAFailedAttemptInsteadOfRetryingItEveryPoll() {
-        when(summaryRefresher.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT))
-                .thenReturn("the model timed out");
+        when(summaryRefresher.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT)).thenReturn("the model timed out");
 
-        assertThat(service.get(FROM, TO).summary()).isEqualTo(new SummaryState.Unavailable("the model timed out"));
+        assertThat(service.get(FROM, TO, null).summary())
+                .isEqualTo(new SummaryState.Unavailable("the model timed out"));
         verify(summaryRefresher, never()).start(any());
     }
 
@@ -222,7 +233,7 @@ class SummaryServiceTest {
     void reportsUnavailableWhenNoSummaryPromptIsInUse() {
         when(analysisService.inUsePrompt(AnalysisPromptType.SUMMARY)).thenReturn(null);
 
-        SummaryService.SummaryResult result = service.get(FROM, TO);
+        SummaryService.SummaryResult result = service.get(FROM, TO, null);
 
         assertThat(result.summary()).isInstanceOf(SummaryState.Unavailable.class);
         // The breakdowns are unaffected: a broken summary must never cost the caller the rest of the page.
@@ -231,21 +242,77 @@ class SummaryServiceTest {
 
     @Test
     void reportsGeneratingWhenAnotherVisitorWinsTheLockRace() {
-        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID)).thenReturn(null);
-        when(summaryRefresher.start(WINDOW)).thenReturn(false);
+        when(summarySnapshotRepository.find(SCOPE, SUMMARY_PROMPT_ID)).thenReturn(null);
+        when(summaryRefresher.start(SCOPE)).thenReturn(false);
         when(summaryRefresher.status())
-                .thenReturn(idle(), new SummaryRefreshStatus(WINDOW, SummaryState.Phase.SUMMARISING, true));
+                .thenReturn(idle(), new SummaryRefreshStatus(SCOPE, SummaryState.Phase.SUMMARISING, true));
 
-        assertThat(service.get(FROM, TO).summary())
+        assertThat(service.get(FROM, TO, null).summary())
                 .isEqualTo(new SummaryState.Generating(SummaryState.Phase.SUMMARISING, null, null));
     }
 
     @Test
-    void alwaysReturnsTheBreakdownsForTheRequestedWindow() {
-        when(summarySnapshotRepository.find(WINDOW, SUMMARY_PROMPT_ID)).thenReturn(null);
-        when(summaryRefresher.start(WINDOW)).thenReturn(true);
+    void aBlankTeamGroupMeansTheWholeWindow() {
+        when(summarySnapshotRepository.find(SCOPE, SUMMARY_PROMPT_ID)).thenReturn(null);
+        when(summaryRefresher.start(SCOPE)).thenReturn(true);
 
-        SummaryBreakdowns result = service.get(FROM, TO).breakdowns();
+        SummaryService.SummaryResult result = service.get(FROM, TO, "  ");
+
+        assertThat(result.scope()).isEqualTo(SCOPE);
+        verify(teamGroupService, never()).find(any());
+    }
+
+    @Test
+    void anUnknownTeamGroupIsRejected() {
+        when(teamGroupService.find("nope")).thenReturn(null);
+
+        assertThatThrownBy(() -> service.get(FROM, TO, "nope")).isInstanceOf(UnknownTeamGroupException.class);
+    }
+
+    @Test
+    void aTeamGroupIsReadAndCachedUnderItsOwnScope() {
+        when(teamGroupService.find("area-a")).thenReturn(GROUP);
+        when(summaryReadRepository.breakdowns(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(breakdowns());
+        SummaryFingerprint groupFingerprint = new SummaryFingerprint(
+                1, 1, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT, ImmutableSet.of(), "d1");
+        when(summaryReadRepository.fingerprint(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(groupFingerprint);
+        when(summarySnapshotRepository.find(GROUP_SCOPE, SUMMARY_PROMPT_ID))
+                .thenReturn(new SummarySnapshot(
+                        WINDOW,
+                        "area-a",
+                        SUMMARY_PROMPT_ID,
+                        groupFingerprint.value(),
+                        "the group's prose",
+                        "model-a",
+                        Instant.EPOCH));
+
+        SummaryService.SummaryResult result = service.get(FROM, TO, "area-a");
+
+        assertThat(result.scope()).isEqualTo(GROUP_SCOPE);
+        assertThat(result.summary()).isEqualTo(new SummaryState.Ready("the group's prose", "model-a", Instant.EPOCH));
+        verify(summaryRefresher, never()).start(any());
+    }
+
+    @Test
+    void aTeamGroupWithNoUsableSnapshotStartsItsOwnRefresh() {
+        when(teamGroupService.find("area-a")).thenReturn(GROUP);
+        when(summaryReadRepository.fingerprint(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(new SummaryFingerprint(1, 1, null, null));
+        when(summarySnapshotRepository.find(GROUP_SCOPE, SUMMARY_PROMPT_ID)).thenReturn(null);
+        when(summaryRefresher.start(GROUP_SCOPE)).thenReturn(true);
+
+        assertThat(service.get(FROM, TO, "area-a").summary()).isInstanceOf(SummaryState.Generating.class);
+        verify(summaryRefresher).start(GROUP_SCOPE);
+    }
+
+    @Test
+    void alwaysReturnsTheBreakdownsForTheRequestedWindow() {
+        when(summarySnapshotRepository.find(SCOPE, SUMMARY_PROMPT_ID)).thenReturn(null);
+        when(summaryRefresher.start(SCOPE)).thenReturn(true);
+
+        SummaryBreakdowns result = service.get(FROM, TO, null).breakdowns();
 
         assertThat(result.window()).isEqualTo(WINDOW);
         assertThat(result.unclassifiedTickets()).isEqualTo(1);

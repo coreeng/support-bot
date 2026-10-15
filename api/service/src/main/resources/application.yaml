@@ -424,3 +424,14 @@ summary-area:
   # The offline analysis kit served next to the export. Always on; can be dropped wholesale when retired.
   offline-export:
     analysis-bundle-path: ${OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip}
+
+# Team groups: named sets of tenant teams (e.g. a client's business areas) that the Support Summary
+# page can be narrowed to. Keyed on team codes (ticket.team), so they work with any team provider.
+# No groups (the default) hides the selector. Not to be confused with the "Support Areas" breakdown,
+# which is the classifier's drivers. See docs/adr/adr-009-team-groups-for-support-summary.md.
+team-groups:
+  display-name: ${TEAM_GROUPS_DISPLAY_NAME:Area} # The noun the UI calls a group by, e.g. Area, Domain, Tribe
+  groups: []
+  # - code: payments-area        # lowercase letters, digits and hyphens; used in shareable links
+  #   label: Payments
+  #   team-codes: [payments-api, ledger, onboarding]

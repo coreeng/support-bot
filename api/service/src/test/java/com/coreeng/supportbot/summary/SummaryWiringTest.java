@@ -13,6 +13,10 @@ import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryAreaProps;
+import com.coreeng.supportbot.config.TeamGroupsProps;
+import com.coreeng.supportbot.teamgroups.StaticTeamGroupProvider;
+import com.coreeng.supportbot.teamgroups.TeamGroupService;
+import com.coreeng.supportbot.teams.TeamService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -57,7 +61,8 @@ class SummaryWiringTest {
         AsyncJobRepository asyncJobRepository = context.getBean(AsyncJobRepository.class);
         when(asyncJobRepository.tryStartJob(any(), any())).thenReturn(true);
 
-        assertThat(refresher.start(new SummaryWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23))))
+        assertThat(refresher.start(
+                        SummaryScope.all(new SummaryWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23)))))
                 .isTrue();
 
         // Dispatched to the analysis executor, and to that one only — not the other Executor bean,
@@ -80,7 +85,7 @@ class SummaryWiringTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableAsync
-    @Import({SummaryRefreshService.class, SummaryService.class})
+    @Import({SummaryRefreshService.class, SummaryService.class, TeamGroupService.class, StaticTeamGroupProvider.class})
     static class TestConfig {
 
         @Bean(name = "analysisTaskExecutor")
@@ -136,6 +141,16 @@ class SummaryWiringTest {
                     new SummaryAreaProps.Sanitisation(List.of(), List.of()),
                     new SummaryAreaProps.Page(400, Duration.ofMinutes(15)),
                     new SummaryAreaProps.OfflineExport("classpath:placeholder-analysis-bundle.zip"));
+        }
+
+        @Bean
+        TeamGroupsProps teamGroupsProps() {
+            return new TeamGroupsProps("Area", List.of());
+        }
+
+        @Bean
+        TeamService teamService() {
+            return mock(TeamService.class);
         }
 
         @Bean

@@ -40,6 +40,14 @@ Opening the page classifies any closed-but-unclassified tickets in the window au
 
 **View Prompts** shows the two prompts behind the page (ticket classification and summary generation), read-only.
 
+### Focusing on one area
+
+If your deployment has team groups configured, a selector next to the window dropdown narrows the whole page — narrative, chips and every breakdown — to one group of tenant teams. Most deployments call a group an **Area**, but the name is set per deployment. The strip above the cards shows which group is on screen (hover it to see its teams), and **Top Teams** ranks the teams within it. Clear the selector to go back to **All teams**.
+
+The group is part of the page's address, so you can share or bookmark a link that opens straight on, say, last month for one area — handy for starting a meeting with that area. Its first visit may take a moment while the narrative is written for that group; after that it loads instantly like any other window.
+
+A group's totals are lower than the whole window's: tickets with no team, or not raised by a tenant, belong to no group, and a team that sits in two groups is counted in both.
+
 ## What leadership cannot do
 
 - **Edit tickets** — requires `ROLE_SUPPORT_ENGINEER`

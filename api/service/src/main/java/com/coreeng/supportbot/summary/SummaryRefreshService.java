@@ -12,6 +12,8 @@ import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.teamgroups.TeamGroup;
+import com.coreeng.supportbot.teamgroups.TeamGroupService;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -29,7 +31,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 /**
- * Runs one window's refresh: backfill the classification gaps, then regenerate the prose summary.
+ * Runs one summary's refresh: backfill the window's classification gaps, then regenerate the prose
+ * summary for the scope — the whole window, or one team group within it.
+ *
+ * <p>The backfill always covers the whole window, whichever scope asked for it: every ticket is
+ * classified once, so another group's summary of the same window only has the prose left to write.
  *
  * <p>Both halves happen inside a single {@code async_job} claim on the shared {@code "analysis"}
  * lock. Splitting them would let a days-based run slip in between and change the very data the
@@ -58,6 +64,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
     private final SummarySnapshotRepository summarySnapshotRepository;
     private final LlmSummaryService llmSummaryService;
     private final SlackChannelRegistry channelRegistry;
+    private final TeamGroupService teamGroupService;
     private final SummaryAreaProps summaryAreaProps;
     private final Executor analysisExecutor;
     private final Clock clock;
@@ -70,6 +77,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
             SummarySnapshotRepository summarySnapshotRepository,
             LlmSummaryService llmSummaryService,
             SlackChannelRegistry channelRegistry,
+            TeamGroupService teamGroupService,
             SummaryAreaProps summaryAreaProps,
             @Qualifier("analysisTaskExecutor") Executor analysisExecutor,
             Clock clock) {
@@ -80,6 +88,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
         this.summarySnapshotRepository = summarySnapshotRepository;
         this.llmSummaryService = llmSummaryService;
         this.channelRegistry = channelRegistry;
+        this.teamGroupService = teamGroupService;
         this.summaryAreaProps = summaryAreaProps;
         this.analysisExecutor = analysisExecutor;
         this.clock = clock;
@@ -88,14 +97,16 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
     private final AtomicReference<SummaryRefreshStatus> status = new AtomicReference<>(SummaryRefreshStatus.IDLE);
 
     /**
-     * Failed attempts by window, remembered so the page reports the error instead of retrying on
-     * every 3s poll. Insertion-ordered and capped: a service that has failed for more windows than
+     * Failed attempts by scope, remembered so the page reports the error instead of retrying on
+     * every 3s poll. Keyed on the scope rather than the window so one group's failure does not block
+     * the whole window's summary or another group's. Insertion-ordered and capped: a service that
+     * has failed for more scopes than
      * fit here has bigger problems than a retry. Guarded by its own monitor — touched from the async
      * refresh thread and from every request thread that polls.
      */
-    private final Map<SummaryWindow, Failure> failures = new LinkedHashMap<>() {
+    private final Map<SummaryScope, Failure> failures = new LinkedHashMap<>() {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<SummaryWindow, Failure> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<SummaryScope, Failure> eldest) {
             return size() > MAX_REMEMBERED_FAILURES;
         }
     };
@@ -118,28 +129,51 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
     }
 
     /**
-     * Claims the shared {@code async_job} lock and kicks off a refresh for the window.
+     * Claims the shared {@code async_job} lock and kicks off a refresh for the scope.
      *
      * @return false when another run already holds the lock, or the executor is saturated
      */
-    public boolean start(SummaryWindow window) {
-        if (!asyncJobRepository.tryStartJob(ASYNC_ID, AnalysisJobData.window(window.from(), window.to()))) {
-            log.debug(
-                    "Summary refresh for {}..{} not started: a job already holds the lock", window.from(), window.to());
+    public boolean start(SummaryScope scope) {
+        SummaryWindow window = scope.window();
+        TeamGroup teamGroup = scope.teamGroup();
+        // The whole window's payload is the one earlier versions wrote, so a run claimed by this
+        // version resumes on one rolled back to.
+        String payload = teamGroup == null
+                ? AnalysisJobData.window(window.from(), window.to())
+                : AnalysisJobData.teamGroupWindow(window.from(), window.to(), teamGroup.code());
+        if (!asyncJobRepository.tryStartJob(ASYNC_ID, payload)) {
+            log.debug("Summary refresh for {} not started: a job already holds the lock", scope.describe());
             return false;
         }
-        log.info("Started summary refresh for window {}..{}", window.from(), window.to());
-        return runWindowRefresh(window.from(), window.to());
+        log.info("Started summary refresh for {}", scope.describe());
+        return dispatch(scope);
     }
 
     @Override
-    public boolean runWindowRefresh(LocalDate from, LocalDate to) {
+    public boolean runWindowRefresh(LocalDate from, LocalDate to, @Nullable String teamGroup) {
         SummaryWindow window = new SummaryWindow(from, to);
+        if (teamGroup == null) {
+            return dispatch(SummaryScope.all(window));
+        }
+        TeamGroup group = teamGroupService.find(teamGroup);
+        if (group == null) {
+            log.warn(
+                    "Resumed summary refresh for {}..{} names team group '{}', which is no longer configured;"
+                            + " refreshing the whole window instead",
+                    from,
+                    to,
+                    teamGroup);
+            return dispatch(SummaryScope.all(window));
+        }
+        return dispatch(new SummaryScope(window, group));
+    }
+
+    private boolean dispatch(SummaryScope scope) {
         try {
-            analysisExecutor.execute(() -> refresh(window));
+            analysisExecutor.execute(() -> refresh(scope));
             return true;
         } catch (RejectedExecutionException e) {
-            log.error("Executor rejected summary refresh for {}..{}, cleaning up DB record", from, to, e);
+            log.error("Executor rejected summary refresh for {}, cleaning up DB record", scope.describe(), e);
             asyncJobRepository.deleteJob(ASYNC_ID);
             return false;
         }
@@ -150,30 +184,29 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
      * breakdowns renderable, so the error is recorded for the page to show and the lock is always
      * released.
      */
-    private void refresh(SummaryWindow window) {
-        LocalDate from = window.from();
-        LocalDate to = window.to();
+    private void refresh(SummaryScope scope) {
+        String described = scope.describe();
         try {
-            status.set(new SummaryRefreshStatus(window, SummaryState.Phase.CLASSIFYING, true));
-            ImmutableSet<TicketId> attempted = backfill(window);
+            status.set(new SummaryRefreshStatus(scope, SummaryState.Phase.CLASSIFYING, true));
+            ImmutableSet<TicketId> attempted = backfill(scope.window());
             if (attempted == null) {
                 // The backfill stops early on interrupt (shutdown) and returns normally. Summarising now
                 // would store a snapshot whose fingerprint marks the unclassified tickets as gaps, and
                 // that snapshot would be served as ready after restart without ever retrying them.
                 // Nothing is recorded, so the next visit starts a fresh refresh. The flag is left set
                 // for the executor.
-                log.warn("Summary refresh for window {}..{} interrupted during backfill; not summarising", from, to);
+                log.warn("Summary refresh for {} interrupted during backfill; not summarising", described);
                 return;
             }
 
-            status.set(new SummaryRefreshStatus(window, SummaryState.Phase.SUMMARISING, true));
-            generate(window, attempted);
+            status.set(new SummaryRefreshStatus(scope, SummaryState.Phase.SUMMARISING, true));
+            generate(scope, attempted);
 
-            clearFailure(window);
-            log.info("Summary refresh for window {}..{} completed", from, to);
+            clearFailure(scope);
+            log.info("Summary refresh for {} completed", described);
         } catch (Exception e) {
-            log.error("Summary refresh for window {}..{} failed: {}", from, to, e.getMessage(), e);
-            recordFailure(window, e);
+            log.error("Summary refresh for {} failed: {}", described, e.getMessage(), e);
+            recordFailure(scope, e);
         } finally {
             status.set(SummaryRefreshStatus.IDLE);
             asyncJobRepository.deleteJob(ASYNC_ID);
@@ -186,13 +219,13 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
     }
 
     /**
-     * @return the recorded error for this window, summary prompt version and data fingerprint, or
+     * @return the recorded error for this scope, summary prompt version and data fingerprint, or
      *     null when the last attempt did not fail, its input has moved on since, or the retry delay
      *     has passed
      */
-    public @Nullable String failureFor(SummaryWindow window, String summaryPromptId, String fingerprint) {
+    public @Nullable String failureFor(SummaryScope scope, String summaryPromptId, String fingerprint) {
         synchronized (failures) {
-            Failure failure = failures.get(window);
+            Failure failure = failures.get(scope);
             if (failure == null) {
                 return null;
             }
@@ -200,7 +233,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
                     || failure.expiredAt(clock.instant(), summaryAreaProps.page())) {
                 // Either the input moved on or the retry delay has passed: the next visit retries, and
                 // whatever comes of that replaces this entry.
-                failures.remove(window);
+                failures.remove(scope);
                 return null;
             }
             return failure.error();
@@ -262,8 +295,12 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
     }
 
     /**
-     * Reads the window afresh — after the backfill, so the counts, the reasons and the fingerprint
+     * Reads the scope afresh — after the backfill, so the counts, the reasons and the fingerprint
      * stored with the summary all describe the same post-backfill state.
+     *
+     * <p>{@code attempted} comes from the whole window, so for a team group it is a superset of the
+     * group's gaps; narrowing the group's fingerprint to it keeps exactly the group gaps the backfill
+     * tried.
      *
      * <p>The stored fingerprint's gap component is narrowed to the gaps the backfill attempted. A gap
      * it attempted and could not fill is pinned into the fingerprint, so the page serves the snapshot
@@ -273,7 +310,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
      *
      * @param attempted the ids of the tickets the backfill set out to classify
      */
-    private void generate(SummaryWindow window, ImmutableSet<TicketId> attempted) {
+    private void generate(SummaryScope scope, ImmutableSet<TicketId> attempted) {
         AnalysisPrompt summaryPrompt = analysisService.inUsePrompt(AnalysisPromptType.SUMMARY);
         if (summaryPrompt == null) {
             throw new AnalysisPromptLoadException("No summary prompt version is marked as in use");
@@ -282,42 +319,46 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
         String classificationPromptId = analysisService.currentPromptId();
         ImmutableList<String> channelIds = channelRegistry.monitoredChannelIds();
 
-        SummaryBreakdowns breakdowns = summaryReadRepository.breakdowns(window, classificationPromptId, channelIds);
-        SummaryFingerprint current = summaryReadRepository.fingerprint(window, classificationPromptId, channelIds);
+        SummaryBreakdowns breakdowns = summaryReadRepository.breakdowns(scope, classificationPromptId, channelIds);
+        SummaryFingerprint current = summaryReadRepository.fingerprint(scope, classificationPromptId, channelIds);
         SummaryFingerprint fingerprint = current.withGapsAmong(attempted);
         if (fingerprint.gapCount() > 0) {
             // Not an error: the summary is generated from what could be classified, and stored under a
             // fingerprint that includes these gaps so the page does not retry them on every poll.
             log.warn(
-                    "{} closed ticket(s) in window {}..{} could not be classified; summarising without them",
+                    "{} closed ticket(s) in {} could not be classified; summarising without them",
                     fingerprint.gapCount(),
-                    window.from(),
-                    window.to());
+                    scope.describe());
         }
         if (current.gapCount() > fingerprint.gapCount()) {
             log.info(
-                    "{} ticket(s) closed in window {}..{} after the backfill computed its targets; left out of the"
+                    "{} ticket(s) closed in {} after the backfill computed its targets; left out of the"
                             + " snapshot's fingerprint so the next visit refreshes",
                     current.gapCount() - fingerprint.gapCount(),
-                    window.from(),
-                    window.to());
+                    scope.describe());
         }
         ImmutableList<SummaryReason> reasons = summaryReadRepository.reasons(
-                window,
+                scope,
                 classificationPromptId,
                 channelIds,
                 summaryAreaProps.page().maxReasons());
 
-        String content = llmSummaryService.generate(summaryPrompt.content(), breakdowns, reasons);
+        String content = llmSummaryService.generate(summaryPrompt.content(), scope, breakdowns, reasons);
         if (content.isBlank()) {
             throw new EmptySummaryException();
         }
 
         summarySnapshotRepository.upsert(new SummarySnapshot(
-                window, summaryPromptId, fingerprint.value(), content.strip(), llmSummaryService.modelName(), null));
+                scope.window(),
+                scope.teamGroupKey(),
+                summaryPromptId,
+                fingerprint.value(),
+                content.strip(),
+                llmSummaryService.modelName(),
+                null));
     }
 
-    private void recordFailure(SummaryWindow window, Exception cause) {
+    private void recordFailure(SummaryScope scope, Exception cause) {
         String summaryPromptId;
         String fingerprint;
         try {
@@ -329,29 +370,25 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
             }
             summaryPromptId = AnalysisService.computePromptId(summaryPrompt.content());
             fingerprint = summaryReadRepository
-                    .fingerprint(window, analysisService.currentPromptId(), channelRegistry.monitoredChannelIds())
+                    .fingerprint(scope, analysisService.currentPromptId(), channelRegistry.monitoredChannelIds())
                     .value();
         } catch (Exception e) {
             // Without the input's identity the failure cannot be tied to what it failed on, so let the
             // next visit retry rather than pinning an error we can no longer invalidate.
-            log.warn(
-                    "Could not identify the input of window {}..{} after a failed refresh",
-                    window.from(),
-                    window.to(),
-                    e);
+            log.warn("Could not identify the input of {} after a failed refresh", scope.describe(), e);
             return;
         }
         Failure failure = new Failure(summaryPromptId, fingerprint, describe(cause), clock.instant());
         synchronized (failures) {
             // Remove first so a repeat failure moves to the newest end instead of keeping its old slot.
-            failures.remove(window);
-            failures.put(window, failure);
+            failures.remove(scope);
+            failures.put(scope, failure);
         }
     }
 
-    private void clearFailure(SummaryWindow window) {
+    private void clearFailure(SummaryScope scope) {
         synchronized (failures) {
-            failures.remove(window);
+            failures.remove(scope);
         }
     }
 

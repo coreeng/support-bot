@@ -233,6 +233,13 @@ platform-integration:
         - name: pr-author-excluded
           groupRef: group-ref-pr-author-excluded
 
+# Team groups for the Support Summary functional tests. Static teams without a code use their name.
+team-groups:
+  groups:
+    - code: functional-area
+      label: Functional Area
+      team-codes: [wow, connected-app]
+
 # Proxy mode against the functional-test WireMock: the real proxy ChatModel is exercised
 # end-to-end (native Gemini REST + Basic auth). The generateContent stub is registered as a
 # permanent stub in the testkit's SlackWiremock. Selecting a provider also turns the Support

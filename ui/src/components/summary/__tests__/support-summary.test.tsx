@@ -12,7 +12,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ApiError, MAX_SUMMARY_POLL_FAILURES } from "../../../lib/hooks";
-import type { SummaryData, SummarySection, SummaryTicket } from "../../../lib/types/summary";
+import type { SummaryData, SummarySection, SummaryTeamGroups, SummaryTicket } from "../../../lib/types/summary";
 import { MAX_SUMMARY_WINDOW_DAYS, presetWindow } from "../../../lib/utils/summary-window";
 import SupportSummaryPage, { SUMMARY_NOT_ENABLED, summaryErrorMessage } from "../support-summary";
 
@@ -119,13 +119,37 @@ const enabled =
   () => ({ status: 200, body });
 const pending: RouteHandler = () => new Promise<never>(() => {});
 
+/** No team groups configured: the default for a deployment, and for these tests. */
+const noTeamGroups: SummaryTeamGroups = { displayName: "Area", groups: [] };
+
+const twoTeamGroups: SummaryTeamGroups = {
+  displayName: "Domain",
+  groups: [
+    {
+      code: "payments-area",
+      label: "Payments",
+      teams: [
+        { code: "payments", label: "Payments Team" },
+        { code: "ledger", label: "Ledger" },
+      ],
+    },
+    { code: "data-area", label: "Data", teams: [{ code: "warehouse", label: "Warehouse" }] },
+  ],
+};
+
 /** Routes every `/api/*` call the page makes; unrouted paths fail loudly. */
-function mockApi(summaryReply: RouteHandler, registry: unknown = emptyRegistry, enabledReply: RouteHandler = enabled({ enabled: true })) {
+function mockApi(
+  summaryReply: RouteHandler,
+  registry: unknown = emptyRegistry,
+  enabledReply: RouteHandler = enabled({ enabled: true }),
+  teamGroupsReply: RouteHandler = () => ({ status: 200, body: noTeamGroups })
+) {
   global.fetch = jest.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     let reply: MockReply;
     if (url === "/api/registry") reply = { status: 200, body: registry };
     else if (url === "/api/summary/enabled") reply = enabledReply(url);
+    else if (url === "/api/summary/team-groups") reply = teamGroupsReply(url);
     else if (url.startsWith("/api/summary")) reply = summaryReply(url);
     else throw new Error(`Unexpected fetch: ${url}`);
     const { status, body } = await reply;
@@ -217,6 +241,10 @@ describe("SupportSummaryPage", () => {
         title: "The selected range is invalid",
         detail: `The window must not exceed ${MAX_SUMMARY_WINDOW_DAYS} days, and the end date must not be before the start date.`,
       });
+    });
+
+    it("explains SUMMARY_TEAM_GROUP_UNKNOWN as a group that is no longer configured", () => {
+      expect(summaryErrorMessage(new ApiError(400, "SUMMARY_TEAM_GROUP_UNKNOWN")).title).toBe("The selected group is no longer configured");
     });
 
     it("explains ANALYSIS_PROMPT_LOAD_FAILED as a server prompt configuration problem", () => {
@@ -813,6 +841,73 @@ describe("SupportSummaryPage", () => {
 
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
       await waitFor(() => expect(summaryRequests()).toContain(summaryUrl("2026-07-31", "2026-08-15")));
+    });
+  });
+
+  describe("Team groups", () => {
+    /** A summary reply that, like the backend, echoes the window and the requested team group. */
+    const okWithGroup: RouteHandler = (url) => {
+      const requested = new URLSearchParams(url.split("?")[1] ?? "");
+      const code = requested.get("teamGroup");
+      const group = twoTeamGroups.groups.find((candidate) => candidate.code === code);
+      return {
+        status: 200,
+        body: {
+          ...readySummary,
+          from: requested.get("from") ?? readySummary.from,
+          to: requested.get("to") ?? readySummary.to,
+          ...(group ? { teamGroup: { code: group.code, label: group.label } } : {}),
+        },
+      };
+    };
+
+    it("hides the selector and shows every team when no groups are configured", async () => {
+      renderPage();
+
+      await findAtAGlance();
+      expect(screen.queryByTestId("summary-team-group-filter")).not.toBeInTheDocument();
+      expect(screen.getByTestId("summary-scope")).toHaveTextContent("All teams");
+      expect(summaryRequests()).toEqual([summaryUrl(defaultWindow().from, defaultWindow().to)]);
+    });
+
+    it("offers the configured groups under the deployment's name and narrows the summary to the one chosen", async () => {
+      mockApi(okWithGroup, emptyRegistry, enabled({ enabled: true }), () => ({ status: 200, body: twoTeamGroups }));
+      const user = userEvent.setup();
+      renderPage();
+
+      await findAtAGlance();
+      const filter = await screen.findByTestId("summary-team-group-filter");
+      await user.click(within(filter).getByRole("button", { name: /Domain/ }));
+      await user.click(await screen.findByRole("option", { name: "Payments" }));
+
+      const { from, to } = defaultWindow();
+      await waitFor(() => expect(summaryRequests()).toContain(`${summaryUrl(from, to)}&teamGroup=payments-area`));
+      await waitFor(() => expect(screen.getByTestId("summary-scope")).toHaveTextContent("Domain Payments"));
+      expect(within(screen.getByTestId("summary-scope")).getByTitle("Teams: Payments Team, Ledger")).toBeInTheDocument();
+      expect(screen.getByText("Top Teams in Payments")).toBeInTheDocument();
+      expect(screen.getByText("Top tenant in Payments")).toBeInTheDocument();
+    });
+
+    it("honours a shared link to a group, waiting for the groups so it never requests a stale one", async () => {
+      setMockUrlParamsInitial({ teamGroup: "data-area" });
+      mockApi(okWithGroup, emptyRegistry, enabled({ enabled: true }), () => ({ status: 200, body: twoTeamGroups }));
+
+      renderPage();
+
+      await waitFor(() => expect(screen.getByTestId("summary-scope")).toHaveTextContent("Domain Data"));
+      const { from, to } = defaultWindow();
+      expect(summaryRequests()).toEqual([`${summaryUrl(from, to)}&teamGroup=data-area`]);
+    });
+
+    it("falls back to every team when a shared link names a group that is no longer configured", async () => {
+      setMockUrlParamsInitial({ teamGroup: "retired-area" });
+      mockApi(okWithGroup, emptyRegistry, enabled({ enabled: true }), () => ({ status: 200, body: twoTeamGroups }));
+
+      renderPage();
+
+      await findAtAGlance();
+      expect(screen.getByTestId("summary-scope")).toHaveTextContent("All teams");
+      expect(summaryRequests().every((url) => !url.includes("teamGroup"))).toBe(true);
     });
   });
 

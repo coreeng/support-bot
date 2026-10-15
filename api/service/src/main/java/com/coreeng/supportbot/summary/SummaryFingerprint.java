@@ -42,21 +42,39 @@ import org.jspecify.annotations.Nullable;
  *       to see is left out, the next visit's fingerprint differs, and it gets its own refresh.
  * </ul>
  *
+ * <p>For a team group every one of those is limited to the group's tickets — a ticket closing in
+ * another team must not regenerate every group's prose — and the group's own definition is digested
+ * too ({@link SummaryScope#membershipDigest()}), so reconfiguring the group's members or label makes
+ * its cached prose stale even when no ticket moves. The whole window has no such digest, so its
+ * fingerprint reads exactly as it did before groups existed.
+ *
  * @param ticketCount tickets raised in the window, whatever their status
  * @param analysisCount number of analysis rows for the window under the current prompt
  * @param maxUpdatedAt the latest {@code analysis.updated_at} among them, null when there are none
  * @param maxTicketUpdatedAt the latest {@code ticket.updated_at} among the window's tickets, null
  *     when the window has none
  * @param gapIds ids of the closed tickets in the window still awaiting classification
+ * @param scopeDigest the team group's {@link SummaryScope#membershipDigest()}; null for the whole window
  */
 public record SummaryFingerprint(
         long ticketCount,
         long analysisCount,
         @Nullable LocalDateTime maxUpdatedAt,
         @Nullable Instant maxTicketUpdatedAt,
-        ImmutableSet<TicketId> gapIds) {
+        ImmutableSet<TicketId> gapIds,
+        @Nullable String scopeDigest) {
 
-    /** A fingerprint for a window with no classification gaps. */
+    /** A fingerprint for the whole window. */
+    public SummaryFingerprint(
+            long ticketCount,
+            long analysisCount,
+            @Nullable LocalDateTime maxUpdatedAt,
+            @Nullable Instant maxTicketUpdatedAt,
+            ImmutableSet<TicketId> gapIds) {
+        this(ticketCount, analysisCount, maxUpdatedAt, maxTicketUpdatedAt, gapIds, null);
+    }
+
+    /** A fingerprint for the whole window, with no classification gaps. */
     public SummaryFingerprint(
             long ticketCount,
             long analysisCount,
@@ -83,19 +101,21 @@ public record SummaryFingerprint(
     public SummaryFingerprint withGapsAmong(Set<TicketId> attempted) {
         ImmutableSet<TicketId> narrowed =
                 gapIds.stream().filter(attempted::contains).collect(ImmutableSet.toImmutableSet());
-        return new SummaryFingerprint(ticketCount, analysisCount, maxUpdatedAt, maxTicketUpdatedAt, narrowed);
+        return new SummaryFingerprint(
+                ticketCount, analysisCount, maxUpdatedAt, maxTicketUpdatedAt, narrowed, scopeDigest);
     }
 
     /**
      * Stable string form, stored in {@code summary_snapshot.fingerprint}: {@code
      * tickets/analysed@analysisUpdatedAt~ticketUpdatedAt}, with a {@code #gaps:idSum} suffix only when
      * there are gaps, so a fully classified window reads as {@code
-     * tickets/analysed@analysisUpdatedAt~ticketUpdatedAt}. Opaque to every consumer: nothing parses
-     * it, it is only compared for equality.
+     * tickets/analysed@analysisUpdatedAt~ticketUpdatedAt}, and a {@code |g:digest} suffix only for a
+     * team group. Opaque to every consumer: nothing parses it, it is only compared for equality.
      */
     public String value() {
         String base = ticketCount + "/" + analysisCount + "@" + (maxUpdatedAt == null ? "-" : maxUpdatedAt.toString())
                 + "~" + (maxTicketUpdatedAt == null ? "-" : maxTicketUpdatedAt.toString());
-        return gapIds.isEmpty() ? base : base + "#" + gapCount() + ":" + gapIdSum();
+        String withGaps = gapIds.isEmpty() ? base : base + "#" + gapCount() + ":" + gapIdSum();
+        return scopeDigest == null ? withGaps : withGaps + "|g:" + scopeDigest;
     }
 }

@@ -66,6 +66,41 @@ SELECT type, version FROM analysis_prompt WHERE is_in_use ORDER BY type;
 Cached summaries key on the prompt version, so re-enabling the same version serves the existing
 `summary_snapshot` rows without regenerating anything.
 
+## Rolling back to a release before V41 (team groups)
+
+`V41__summary_snapshot_team_group.sql` adds `summary_snapshot.team_group` (`''` for a summary of
+the whole window, the group's code otherwise) and replaces the unique key
+`summary_snapshot_window_prompt_unique (window_from, window_to, prompt_id)` with
+`summary_snapshot_window_group_prompt_unique (window_from, window_to, team_group, prompt_id)`.
+
+A pre-V41 service upserts with `ON CONFLICT (window_from, window_to, prompt_id)`, which has no
+matching constraint any more, so every summary refresh fails; and once any team group's snapshot
+exists for a window, its `find()` matches two rows and throws `TooManyRowsException`. **Before**
+starting the old release, drop the group snapshots and restore the old key:
+
+```sql
+DELETE FROM summary_snapshot WHERE team_group <> '';
+ALTER TABLE summary_snapshot DROP CONSTRAINT IF EXISTS summary_snapshot_window_group_prompt_unique;
+ALTER TABLE summary_snapshot
+    ADD CONSTRAINT summary_snapshot_window_prompt_unique UNIQUE (window_from, window_to, prompt_id);
+```
+
+The `team_group` column itself is harmless to the old service and can stay. Whole-window
+snapshots keep their fingerprints, so they are still served. An in-flight
+`{"type":"team-group-window",...}` row in `async_job` is unreadable to the old service, which
+deletes it at startup and releases the lock — the next visit starts a fresh refresh.
+
+### Rolling forward again
+
+Flyway will not re-run V41, so put its key back by hand before or right after the new release
+starts (otherwise the new service's group upserts fail):
+
+```sql
+ALTER TABLE summary_snapshot DROP CONSTRAINT IF EXISTS summary_snapshot_window_prompt_unique;
+ALTER TABLE summary_snapshot
+    ADD CONSTRAINT summary_snapshot_window_group_prompt_unique UNIQUE (window_from, window_to, team_group, prompt_id);
+```
+
 ## Re-running classification by hand
 
 The page classifies closed tickets in the window that have no analysis for the in-use
@@ -114,8 +149,8 @@ for that pass and retried after the next retry delay — check the API logs for
 
 ## Failed refreshes
 
-A refresh that fails (LLM error, prompt missing) is remembered **in process**: per window, at most
-64 entries, and only until `SUMMARY_FAILURE_RETRY_DELAY` passes or the window's data or prompt
+A refresh that fails (LLM error, prompt missing) is remembered **in process**: per window and
+[team group](#team-groups), at most 64 entries, and only until `SUMMARY_FAILURE_RETRY_DELAY` passes or the window's data or prompt
 changes. A restart forgets these failures, and each replica would keep its own set — the same
 trade-off the in-memory `GET /analysis/status` already makes. That is acceptable with the chart's
 single-replica API deployment (`helm-chart/templates/deployment.yaml` pins `replicas: 1`); if the
@@ -132,7 +167,29 @@ The manual run and the page's own refresh share one lock, the `async_job` row wi
   `generating` and polls; once the lock is free its next poll starts that window's refresh. A
   window whose cached summary is still current is served as `ready` and is not polled.
 
-A job that was interrupted by a restart is resumed at startup from the same row.
+A job that was interrupted by a restart is resumed at startup from the same row. A refresh for a
+team group that has since been removed from configuration is resumed for the whole window instead
+(logged as a warning) — the classification is still worth doing.
+
+## Team groups
+
+Team groups are configured in yaml (`team-groups.groups`, see
+[configuration](../../api/service/docs/configuration.md#team-groups)); there is nothing to run by
+hand. Things worth knowing when someone asks why a group's figures look off:
+
+- **Startup warnings.** `Team group '<code>' lists team codes that are not current tenant teams`
+  means a listed code is not a tenant team today. That is expected for a retired team kept for its
+  history; otherwise it is a typo. `... has no current tenant team among its members` means the
+  group will only ever show historical tickets.
+- **Renamed team codes.** Tickets keep the code they were raised under. If a team's code changes,
+  list both the old and the new code in the group, or the group loses the team's history.
+- **Totals.** A group's totals are below the whole window's: tickets with no team, or marked "Not a
+  Tenant", belong to no group, and a team in two groups is counted in both.
+- **Reconfiguring a group** (members or label) regenerates that group's narrative on its next
+  visit; other groups and the whole window keep theirs.
+- **Classification is shared.** Viewing a group classifies the whole window, so a group's first
+  visit can show "Analysing threads" for tickets outside the group; after that, switching group only
+  waits for the narrative.
 
 ### Getting a bearer token
 

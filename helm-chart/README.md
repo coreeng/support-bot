@@ -109,6 +109,24 @@ configMap:
       key: value
 ```
 
+#### Team groups
+
+To let the Support Summary be narrowed to a client's business areas (or domains, tribes…), list
+them under `configMap.config.team-groups`. Groups are keyed on tenant team codes, and the schema
+checks their shape at install time. See
+[configuration](../api/service/docs/configuration.md#team-groups) for the rules.
+
+```yaml
+configMap:
+  config:
+    team-groups:
+      display-name: Area   # what the UI calls a group
+      groups:
+        - code: payments-area
+          label: Payments
+          team-codes: [payments-api, ledger]
+```
+
 ## Auth Allow-List
 
 Restrict SSO login to specific email addresses and/or domains:

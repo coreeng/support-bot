@@ -52,9 +52,28 @@ export interface SummaryData {
   teams: SummaryCount[];
   /** Tickets per product tag (`enums.tags[].product: true`), once per ticket per product; untagged tickets have no row. */
   products: SummaryCount[];
+  /** The team group every figure is narrowed to; absent for the whole window. */
+  teamGroup?: { code: string; label: string };
   summary: SummarySection;
 }
 
 export interface SummaryStatus {
   enabled: boolean;
+}
+
+/** A configured team group (e.g. a client's business area): a named set of tenant teams. */
+export interface SummaryTeamGroup {
+  code: string;
+  label: string;
+  teams: { code: string; label: string }[];
+}
+
+/**
+ * The team groups the page can be narrowed to (`GET /summary/team-groups`). Mirrors
+ * `com.coreeng.supportbot.summary.rest.TeamGroupsUI`. An empty list means none are configured.
+ */
+export interface SummaryTeamGroups {
+  /** The noun the deployment calls a group by, e.g. "Area". */
+  displayName: string;
+  groups: SummaryTeamGroup[];
 }

@@ -7,14 +7,15 @@ import EditTicketModal from "@/components/tickets/EditTicketModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { isApiError, MAX_SUMMARY_POLL_FAILURES, useRegistry, useSummary, useSummaryEnabled } from "@/lib/hooks";
-import { enumValidator, isoDateValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
-import type { SummaryCount, SummaryData, SummarySection } from "@/lib/types/summary";
+import { SingleSelectFilter } from "@/components/ui/single-select-filter";
+import { isApiError, MAX_SUMMARY_POLL_FAILURES, useRegistry, useSummary, useSummaryEnabled, useSummaryTeamGroups } from "@/lib/hooks";
+import { enumValidator, isoDateValidator, useUrlParams, type ParamValidator } from "@/lib/hooks/useUrlParams";
+import type { SummaryCount, SummaryData, SummarySection, SummaryTeamGroup } from "@/lib/types/summary";
 import { cn, formatUtcDateTime } from "@/lib/utils";
 import { MAX_SUMMARY_WINDOW_DAYS, presetWindow, summaryWindowProblem, type SummaryWindowPreset } from "@/lib/utils/summary-window";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Eye } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 /**
  * The presets this page offers. Each named one is a whole business period before the current
@@ -31,6 +32,20 @@ const PRESET_LABELS: Record<SummaryPreset, string> = {
   lastMonth: "Last month",
   custom: "Custom range",
 };
+
+/** What a group is called when the deployment's groups have not loaded (yet). */
+const DEFAULT_TEAM_GROUP_NAME = "Area";
+
+/** Show a search box in the team group picker once there are more groups than fit at a glance. */
+const TEAM_GROUP_SEARCH_THRESHOLD = 8;
+
+/**
+ * Format check for the `teamGroup` URL parameter, mirroring the backend's code rule. Whether the
+ * code is actually configured can only be told once the groups have loaded (validators are fixed
+ * on mount), so that check is an effect in the page instead.
+ */
+const teamGroupCodeValidator: ParamValidator = (raw, defaultValue) =>
+  /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/.test(raw) ? raw : defaultValue;
 
 /**
  * Formats an inclusive date window compactly, sharing whatever the two ends have in common:
@@ -69,14 +84,47 @@ function presetForWindow(from: string, to: string): SummaryPreset {
   return "custom";
 }
 
-/** The line above the cards: which window is shown, how many tickets it holds, and a cue while another loads. */
-function WindowStrip({ from, to, totalTickets, refreshing }: { from: string; to: string; totalTickets: number; refreshing: boolean }) {
+/** The scope line's description of the team group on screen, with its member teams on hover. */
+interface ShownTeamGroup {
+  displayName: string;
+  label: string;
+  /** Member team labels, when the group's definition has loaded. */
+  teams?: string[];
+}
+
+/**
+ * The line above the cards: which window is shown, for which team group, how many tickets it holds,
+ * and a cue while another loads.
+ */
+function WindowStrip({
+  from,
+  to,
+  totalTickets,
+  refreshing,
+  teamGroup,
+}: {
+  from: string;
+  to: string;
+  totalTickets: number;
+  refreshing: boolean;
+  teamGroup: ShownTeamGroup | null;
+}) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="summary-window">
       <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
         {PRESET_LABELS[presetForWindow(from, to)]}
       </span>
       <span className="text-foreground font-semibold">{formatWindow(from, to)}</span>
+      <span className="text-muted-foreground" data-testid="summary-scope">
+        ·{" "}
+        {teamGroup ? (
+          <span title={teamGroup.teams?.length ? `Teams: ${teamGroup.teams.join(", ")}` : undefined}>
+            {teamGroup.displayName} <span className="text-foreground font-semibold">{teamGroup.label}</span>
+          </span>
+        ) : (
+          <span className="text-foreground font-semibold">All teams</span>
+        )}
+      </span>
       <span className="text-muted-foreground">
         · <span className="text-foreground font-mono font-semibold tabular-nums">{totalTickets.toLocaleString()}</span> tickets raised
       </span>
@@ -129,6 +177,7 @@ function RefreshFailingHint({ problem }: { problem: RefreshProblem }) {
 
 /** Headline numbers for the window: total raised plus the top item of each breakdown. */
 function AtAGlanceCard({ data }: { data: SummaryData }) {
+  const teamGroupLabel = data.teamGroup?.label;
   const top = (counts: SummaryCount[]): SummaryCount | undefined => counts[0];
   const topDriver = top(data.drivers);
   const topCategory = top(data.categories);
@@ -175,7 +224,7 @@ function AtAGlanceCard({ data }: { data: SummaryData }) {
             </GlanceChip>
           )}
           {topTeam && (
-            <GlanceChip label="Top tenant">
+            <GlanceChip label={teamGroupLabel ? `Top tenant in ${teamGroupLabel}` : "Top tenant"}>
               {topTeam.label} · <Metric>{topTeam.count.toLocaleString()}</Metric>
             </GlanceChip>
           )}
@@ -277,6 +326,12 @@ export function summaryErrorMessage(error: unknown): { title: string; detail: st
       detail: `The window must not exceed ${MAX_SUMMARY_WINDOW_DAYS} days, and the end date must not be before the start date.`,
     };
   }
+  if (isApiError(error) && error.reason === "SUMMARY_TEAM_GROUP_UNKNOWN") {
+    return {
+      title: "The selected group is no longer configured",
+      detail: "Choose another group, or clear the filter to see every team.",
+    };
+  }
   if (isApiError(error) && error.reason === "ANALYSIS_PROMPT_LOAD_FAILED") {
     return {
       title: "The classification prompt could not be loaded",
@@ -295,11 +350,12 @@ const RANGE_PROBLEM_LABELS = {
 export default function SupportSummaryPage() {
   const [params, setParams] = useUrlParams(
     // Widened to string so `setParams` accepts any preset, not just the default's literal type.
-    { dateFilter: DEFAULT_PRESET as string, dateFrom: "", dateTo: "" },
+    { dateFilter: DEFAULT_PRESET as string, dateFrom: "", dateTo: "", teamGroup: "" },
     {
       dateFilter: enumValidator(SUMMARY_PRESETS, DEFAULT_PRESET),
       dateFrom: isoDateValidator,
       dateTo: isoDateValidator,
+      teamGroup: teamGroupCodeValidator,
     }
   );
   // Safe to cast: the validator guarantees a valid preset.
@@ -320,12 +376,42 @@ export default function SupportSummaryPage() {
   // The sidebar hides the entry while the feature is off, but a direct visit must not fall through
   // to a request the backend will refuse.
   const { data: summaryEnabled, isLoading: isCheckingEnabled, isError: enabledCheckFailed } = useSummaryEnabled();
+
+  // Team groups: optional, per deployment. With none configured the selector is not shown and the
+  // page behaves exactly as it did without them.
+  // Asked for whenever the summary itself will be, so a failed flag check cannot leave a linked
+  // group waiting on a list that is never fetched.
+  const teamGroupsQuery = useSummaryTeamGroups(summaryEnabled === true || enabledCheckFailed);
+  const teamGroupName = teamGroupsQuery.data?.displayName ?? DEFAULT_TEAM_GROUP_NAME;
+  const teamGroups: SummaryTeamGroup[] = teamGroupsQuery.data?.groups ?? [];
+  const selectedTeamGroup = params.teamGroup ? teamGroups.find((group) => group.code === params.teamGroup) : undefined;
+  // A link to a group that has since been removed from configuration falls back to every team.
+  useEffect(() => {
+    if (teamGroupsQuery.isSuccess && params.teamGroup && !selectedTeamGroup) {
+      setParams({ teamGroup: "" });
+    }
+  }, [teamGroupsQuery.isSuccess, params.teamGroup, selectedTeamGroup, setParams]);
+  // A linked group is only requested once the list confirms it, so a stale link never flashes an
+  // error. If the list itself fails, the request goes ahead and the backend has the final say.
+  const teamGroupSettled = !params.teamGroup || teamGroupsQuery.isSuccess || teamGroupsQuery.isError;
+  const requestedTeamGroup = params.teamGroup && (selectedTeamGroup || teamGroupsQuery.isError) ? params.teamGroup : undefined;
+
   // When the flag check itself fails, the summary request is still made so its own error explains why.
   const { data, isLoading, error, isFetching, isPlaceholderData, pollFailures } = useSummary(
     summaryWindow.from,
     summaryWindow.to,
-    summaryEnabled === true || enabledCheckFailed
+    requestedTeamGroup,
+    (summaryEnabled === true || enabledCheckFailed) && teamGroupSettled
   );
+  // The group the figures on screen are for — the reply's, not the selector's, so the label stays
+  // honest while a newly chosen group is still loading.
+  const shownTeamGroup: ShownTeamGroup | null = data?.teamGroup
+    ? {
+        displayName: teamGroupName,
+        label: data.teamGroup.label,
+        teams: teamGroups.find((group) => group.code === data.teamGroup?.code)?.teams.map((team) => team.label),
+      }
+    : null;
   // Another window was chosen and the previous one's figures stand in until it loads.
   const refreshing = isFetching && isPlaceholderData;
   // A refresh (poll, ticket-save invalidation, focus) failed after a reply was already on screen:
@@ -369,6 +455,17 @@ export default function SupportSummaryPage() {
               <Eye className="h-4 w-4" />
               View Prompts
             </Button>
+            {teamGroups.length > 0 && (
+              <span data-testid="summary-team-group-filter">
+                <SingleSelectFilter
+                  title={teamGroupName}
+                  value={selectedTeamGroup?.code}
+                  onChange={(value) => setParams({ teamGroup: value ?? "" })}
+                  options={teamGroups.map((group) => ({ label: group.label, value: group.code }))}
+                  showSearch={teamGroups.length > TEAM_GROUP_SEARCH_THRESHOLD}
+                />
+              </span>
+            )}
             <Select
               value={dateFilter}
               onValueChange={(value) =>
@@ -446,7 +543,13 @@ export default function SupportSummaryPage() {
           data-testid="summary-body"
         >
           <div className="space-y-2">
-            <WindowStrip from={data.from} to={data.to} totalTickets={data.totalTickets} refreshing={refreshing} />
+            <WindowStrip
+              from={data.from}
+              to={data.to}
+              totalTickets={data.totalTickets}
+              refreshing={refreshing}
+              teamGroup={shownTeamGroup}
+            />
             {refreshProblem && <RefreshFailingHint problem={refreshProblem} />}
           </div>
 
@@ -474,7 +577,7 @@ export default function SupportSummaryPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <BreakdownCard title="Top Platform Features" counts={data.features} accent="success" onOpenTicket={openTicket} />
             <BreakdownCard
-              title="Top Teams"
+              title={data.teamGroup ? `Top Teams in ${data.teamGroup.label}` : "Top Teams"}
               counts={data.teams}
               accent="purple"
               subtitle={(team) => (team.topProduct ? `Top product: ${team.topProduct}` : undefined)}

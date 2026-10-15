@@ -70,8 +70,9 @@ public class SecurityConfig {
                         // one of those is ever widened to a wildcard.
                         .requestMatchers("/elevate/enabled", "/summary/enabled")
                         .authenticated()
-                        // Dashboards, the Support Summary page and the read-only prompt texts its
-                        // View Prompts dialog shows are open to leadership or support engineers.
+                        // Dashboards, the Support Summary page, the read-only prompt texts its
+                        // View Prompts dialog shows and the team groups its selector lists are open
+                        // to leadership or support engineers.
                         // /summary is deliberately not support-engineer-only: serving it triggers the
                         // backfill server-side, so leadership must reach it without the /analysis/run
                         // permission. It is also not method-scoped: Spring MVC serves HEAD through
@@ -82,6 +83,7 @@ public class SecurityConfig {
                                 "/elevate/**",
                                 "/summary",
                                 "/summary/prompt",
+                                "/summary/team-groups",
                                 "/analysis/prompt")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Summary data export/import is restricted to support engineers

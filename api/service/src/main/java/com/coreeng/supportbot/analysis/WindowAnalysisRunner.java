@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.analysis;
 
 import java.time.LocalDate;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Resumes a windowed refresh left behind by a restart.
@@ -22,5 +23,15 @@ public interface WindowAnalysisRunner {
      *
      * @return false when the executor rejected the run; the lock row has then been released
      */
-    boolean runWindowRefresh(LocalDate from, LocalDate to);
+    default boolean runWindowRefresh(LocalDate from, LocalDate to) {
+        return runWindowRefresh(from, to, null);
+    }
+
+    /**
+     * As {@link #runWindowRefresh(LocalDate, LocalDate)}, with the prose narrowed to one team group.
+     *
+     * @param teamGroup the team group's code; null for the whole window. A code that is no longer
+     *     configured is refreshed as the whole window — the classification is still worth doing.
+     */
+    boolean runWindowRefresh(LocalDate from, LocalDate to, @Nullable String teamGroup);
 }

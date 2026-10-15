@@ -362,6 +362,15 @@ summary-area:
     failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried
   offline-export: # The offline analysis kit served next to the export; independent of llm.*
     analysis-bundle-path: ${OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip (or directory to zip on the fly)
+
+# Team groups: named sets of tenant teams the Support Summary page can be narrowed to (ADR-009).
+# Full operator reference is in "Support Summary" → "Team groups" under Integrations below.
+team-groups:
+  display-name: ${TEAM_GROUPS_DISPLAY_NAME:Area} # The noun the UI calls a group by, e.g. Area, Domain, Tribe
+  groups: [] # None by default, which hides the selector
+  # - code: payments-area # Lowercase letters, digits and hyphens; appears in shareable links
+  #   label: Payments # Shown in the selector and to the summary model
+  #   team-codes: [payments-api, ledger] # Tenant team codes (ticket.team); a team may be in several groups
 ```
 
 For deployment versatility across different secret delivery mechanisms, you can base64-encode the PEM file into a single line before storing it:
@@ -593,6 +602,47 @@ the [Support Summary runbook](../../../docs/runbooks/support-summary.md).
   failed — is retried after `SUMMARY_FAILURE_RETRY_DELAY`. Failed refreshes are remembered in
   process only; see the runbook for the single-replica trade-off.
 
+### Team groups
+
+A **team group** is a named set of tenant teams — at most clients a business *area*, but a
+*domain*, *tribe* or *business unit* elsewhere — that the page can be narrowed to, so an
+engagement meeting with that group can open on what its teams asked about. The decision is
+recorded in [ADR-009](../../../docs/adr/adr-009-team-groups-for-support-summary.md).
+
+```yaml
+team-groups:
+  display-name: Area          # what the UI calls a group; defaults to "Area"
+  groups:
+    - code: addds             # lowercase letters, digits and hyphens; used in shareable links
+      label: ADDDS
+      team-codes: [payments-api, ledger, onboarding]
+    - code: data
+      label: Data Platform
+      team-codes: [warehouse, ledger]   # a team may belong to more than one group
+```
+
+- **Off by default.** With no groups the selector is hidden and the page is unchanged. There is no
+  separate switch.
+- **Keyed on team codes.** `team-codes` are the codes stored on tickets (`ticket.team`), so groups
+  work the same whichever tenant team provider is configured (static, Kubernetes, CEL).
+- **Validation.** Startup fails on a blank `display-name`, a code that is not lowercase
+  letters/digits/hyphens, a duplicate group code, a blank label, an empty `team-codes`, or a team
+  listed twice in one group. A team code that is not a current tenant team only logs a warning:
+  retired teams' codes stay on their historical tickets, and listing them keeps that history in the
+  group.
+- **What narrowing does.** Every figure, the per-ticket reasons and the narrative are limited to
+  tickets attributed to the group's teams. Tickets with no team or marked "Not a Tenant" belong to
+  no group, so a group's totals never add up to the whole window's, and overlapping groups do not
+  sum either.
+- **Classification is not narrowed.** The backfill always classifies every ticket in the window,
+  whichever group is being viewed, so switching group only costs the narrative.
+- **Cache.** Each (window, group) has its own `summary_snapshot` row (`team_group`, `''` for the
+  whole window), and its fingerprint covers only the group's tickets plus the group's definition —
+  changing a group's members or label regenerates its narrative on the next visit.
+- **Roles.** `GET /summary/team-groups` lists the groups for the page and is open to the same roles
+  as `GET /summary`. `GET /summary?teamGroup=<code>` rejects an unknown code with
+  `SUMMARY_TEAM_GROUP_UNKNOWN`.
+
 ### Environment variables
 
 Set these on the **API**:
@@ -602,6 +652,7 @@ Set these on the **API**:
 | `LLM_PROVIDER` | Turns the page on (any value other than `none`); see [Analysis](#analysis-knowledge-gap-llm) above. |
 | `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons (newest first) included in the report sent to the model, so a very wide window cannot overflow its context. Default `1000`, which covers the 92-day window cap at roughly 80 tickets a week. |
 | `SUMMARY_FAILURE_RETRY_DELAY` | How long a failed summary refresh is reported as an error before the next visit retries it. A change to the window's data or to the in-use summary prompt retries sooner. Default `15m`. |
+| `TEAM_GROUPS_DISPLAY_NAME` | What the UI calls a [team group](#team-groups), e.g. `Domain` or `Tribe`. Default `Area`. The groups themselves are configured in yaml. |
 
 ## Single Sign-On (SSO)
 

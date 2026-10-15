@@ -84,6 +84,8 @@ There is no **Run Analysis** button any more. Opening the page classifies any cl
 
 **View Prompts** (top right) opens a dialog with a dropdown showing the two prompts the page uses: **Ticket classification** (how each thread is sorted into driver, category and feature) and **Summary generation** (how the narrative is written). Both are read-only.
 
+**Team groups.** When the deployment configures team groups (usually called **Areas**; see [configuration](../../api/service/docs/configuration.md#team-groups)), a selector next to the window dropdown narrows the page — narrative, chips and every breakdown — to one group's tenant teams, and the strip above the cards names the group shown (hover for its teams). The choice is in the URL, so links can be shared. Classification is never narrowed: opening a group classifies the whole window, so switching to another group afterwards only waits for its narrative. A group's totals leave out tickets with no team or marked "Not a Tenant", which is why they are lower than **All teams**. Correcting a ticket's **Author's team** moves it between groups, and the affected narratives are regenerated on their next visit.
+
 ## Escalations
 
 You can view the full escalations list and its filters. To escalate a ticket, use the **Escalate** button on the bot's ticket message in the Slack thread — see [Escalating a ticket](#escalating-a-ticket) above.

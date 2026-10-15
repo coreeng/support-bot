@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.summary.rest;
 
 import com.coreeng.supportbot.analysis.AnalysisPromptLoadException;
+import com.coreeng.supportbot.summary.UnknownTeamGroupException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -17,6 +18,15 @@ public class SummaryExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, failure.getMessage());
         problem.setTitle("Invalid summary window");
         problem.setProperty("code", "SUMMARY_WINDOW_INVALID");
+        return problem;
+    }
+
+    /** A stale or mistyped team group — usually an old shared link. The page drops the parameter on this code. */
+    @ExceptionHandler(UnknownTeamGroupException.class)
+    public ProblemDetail handleUnknownTeamGroup(UnknownTeamGroupException failure) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, failure.getMessage());
+        problem.setTitle("Unknown team group");
+        problem.setProperty("code", "SUMMARY_TEAM_GROUP_UNKNOWN");
         return problem;
     }
 
