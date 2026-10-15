@@ -449,8 +449,8 @@ class PrDetectionServiceTest {
         @Test
         void postsConfiguredOverrideWhenMaintainingTeamPendingAndNoSla() {
             // given — same shape as above, but this repo has a `messages.detected` override configured
-            // . The override must win over the default
-            // no-SLA text, same as it would for a normal (non-codeowner) no-SLA repo.
+            // The override must win over the default no-SLA text, same as it would for a normal (non-codeowner) no-SLA
+            // repo.
             String customMessage = "Engineers monitor this repository regularly for pull requests.";
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
