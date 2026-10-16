@@ -1,10 +1,13 @@
 FROM docker.io/golang:1.25.1-alpine3.22 AS build
 WORKDIR $GOPATH/src/go.k6.io/k6
 
+# Pinned: newer k6 releases may require a newer Go than the base image provides
+ARG K6_VERSION=v1.8.1
+
 # hadolint ignore=DL3018
 RUN apk add --no-cache git && \
     go install go.k6.io/xk6/cmd/xk6@v0.20.1 && \
-    xk6 build --with github.com/coreeng/xk6-prometheus@v1.0.2 --output /tmp/k6
+    xk6 build ${K6_VERSION} --with github.com/coreeng/xk6-prometheus@v1.0.2 --output /tmp/k6
 
 FROM docker.io/prom/prometheus:v2.55.1 AS prometheus
 
