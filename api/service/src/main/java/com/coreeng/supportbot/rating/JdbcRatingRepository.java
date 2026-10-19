@@ -5,6 +5,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.coreeng.supportbot.dbschema.enums.TicketStatus;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,33 @@ public class JdbcRatingRepository implements RatingRepository {
     @Override
     public ImmutableList<Rating> getAllRatings() {
         return fetchRatings(dsl.select().from(RATINGS));
+    }
+
+    @Override
+    public boolean saveFeedback(RatingFeedback feedback) {
+        TicketId ticketId = feedback.ticketId();
+        return dsl.update(RATINGS)
+                        .set(RATINGS.FEEDBACK, feedback.feedback())
+                        .set(RATINGS.TICKET_ID, ticketId != null ? ticketId.id() : null)
+                        .where(RATINGS.ID.eq(feedback.ratingId()).and(RATINGS.FEEDBACK.isNull()))
+                        .execute()
+                > 0;
+    }
+
+    @Override
+    public ImmutableList<RatingFeedbackEntry> getAllFeedback() {
+        try (var stream = dsl.selectFrom(RATINGS).where(RATINGS.FEEDBACK.isNotNull()).stream()) {
+            return stream.map(r -> {
+                        Long ticketId = r.getTicketId();
+                        return new RatingFeedbackEntry(
+                                checkNotNull(r.getId()),
+                                checkNotNull(r.getRating()),
+                                checkNotNull(r.getSubmittedTs()),
+                                checkNotNull(r.getFeedback()),
+                                ticketId != null ? new TicketId(ticketId) : null);
+                    })
+                    .collect(toImmutableList());
+        }
     }
 
     private ImmutableList<Rating> fetchRatings(ResultQuery<?> query) {

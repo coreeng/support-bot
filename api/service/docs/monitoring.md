@@ -84,7 +84,7 @@ These metrics track how the bot processes incoming Slack notifications.
 | `event`           | Event type from payload   | `message`, `reaction_added`, `app_mention`                         |
 | `action`          | Action ID(s) from payload | `ticket-create`, `escalation-resolve`, `rating-submit-[1,2,3,4,5]` |
 | `suggestion`      | Action ID from payload    | `ticket-change-team`                                               |
-| `view_submission` | View callback ID          | `ticket-summary`, `ticket-confirm`, `homepage-filter`              |
+| `view_submission` | View callback ID          | `ticket-summary`, `ticket-confirm`, `homepage-filter`, `rating-feedback` |
 
 > **Note**: For block actions, if multiple actions are received in a single payload, their IDs are joined with `|`.
 > As far as we know Slack doesn't send multiple actions in a single payload, but we will find it out from the metric in case it does. 

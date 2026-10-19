@@ -155,6 +155,35 @@ public class Ticket {
         return new CloseFlowStubs(messageUpdatedStub, messageCheckedStub, ratingRequestStub, getQueryMessageStub);
     }
 
+    public RatingButtonClick ratingButtonClick(String triggerId, int rating) {
+        return RatingButtonClick.builder()
+                .triggerId(triggerId)
+                .ticket(this)
+                .rating(rating)
+                .build();
+    }
+
+    /** Stubs everything a star click triggers: the feedback modal, the thread lookup and the thank-you. */
+    public RatingFlowStubs stubRatingFlow(String reason, String triggerId, int rating) {
+        StubWithResult<RatingFeedbackForm> formOpened =
+                slackWiremock.stubViewsOpen(ViewsOpenExpectation.<RatingFeedbackForm>builder()
+                        .description(reason + ": feedback form opened")
+                        .viewCallbackId(RatingFeedbackFormSubmission.CALLBACK_ID)
+                        .triggerId(triggerId)
+                        .receiver(new RatingFeedbackForm.Receiver(id, rating))
+                        .build());
+        StubWithResult<RatingConfirmationMessage> confirmation = slackWiremock.stubEphemeralMessagePosted(
+                EphemeralMessageExpectation.<RatingConfirmationMessage>builder()
+                        .description(reason + ": rating confirmation posted")
+                        .channelId(channelId)
+                        .threadTs(queryTs)
+                        .userId(user.slackUserId())
+                        .receiver(new RatingConfirmationMessage.Receiver(rating))
+                        .build());
+        Stub getQueryMessage = stubQueryMessageFetch(reason + ": get query message");
+        return new RatingFlowStubs(formOpened, confirmation, getQueryMessage);
+    }
+
     public ReopenFlowStubs stubReopenFlow(String reason) {
         StubWithResult<TicketMessage> updated =
                 slackWiremock.stubMessageUpdated(MessageUpdatedExpectation.<TicketMessage>builder()
@@ -418,6 +447,19 @@ public class Ticket {
                 messageUpdated.assertIsCalled();
                 whiteCheckMarkAdded.assertIsCalled();
                 ratingRequestPosted.assertIsCalled();
+                getQueryMessage.assertIsCalled();
+            });
+        }
+    }
+
+    public record RatingFlowStubs(
+            StubWithResult<RatingFeedbackForm> formOpened,
+            StubWithResult<RatingConfirmationMessage> confirmationPosted,
+            Stub getQueryMessage) {
+        public void awaitAllCalled(Duration timeout) {
+            await().atMost(timeout).untilAsserted(() -> {
+                formOpened.assertIsCalled();
+                confirmationPosted.assertIsCalled();
                 getQueryMessage.assertIsCalled();
             });
         }
