@@ -256,6 +256,18 @@
         "port": { "type": "integer" }
       }
     },
+    "internalPort": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "allowedFrom": {
+          "type": "array",
+          "items": { "type": "object", "minProperties": 1 }
+        }
+      }
+    },
     "monitoring": {
       "type": "object",
       "additionalProperties": false,

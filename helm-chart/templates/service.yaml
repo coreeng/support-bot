@@ -17,5 +17,11 @@ spec:
       protocol: TCP
       name: metrics
     {{- end }}
+    {{- if .Values.internalPort.enabled }}
+    - port: {{ .Values.internalPort.port }}
+      targetPort: internal
+      protocol: TCP
+      name: internal
+    {{- end }}
   selector:
     {{- include "support-bot.selectorLabels" . | nindent 4 }}

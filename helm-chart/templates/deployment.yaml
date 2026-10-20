@@ -47,6 +47,11 @@ spec:
               containerPort: {{ .Values.metrics.port }}
               protocol: TCP
             {{- end }}
+            {{- if .Values.internalPort.enabled }}
+            - name: internal
+              containerPort: {{ .Values.internalPort.port }}
+              protocol: TCP
+            {{- end }}
           env:
             {{- $apiEnv := .Values.env | default list }}
             {{- if .Values.publicWebOrigin }}
@@ -66,6 +71,10 @@ spec:
             {{- end }}
             {{- $apiEnv = append $apiEnv (dict "name" "DEX_ISSUER_URI" "value" .Values.dex.config.issuer) }}
             {{- $apiEnv = append $apiEnv (dict "name" "DEX_INTERNAL_BASE_URL" "value" (include "support-bot.dex.internalBaseURL" .)) }}
+            {{- end }}
+            {{- if .Values.internalPort.enabled }}
+            {{- $apiEnv = append $apiEnv (dict "name" "INTERNAL_PORT_ENABLED" "value" "true") }}
+            {{- $apiEnv = append $apiEnv (dict "name" "INTERNAL_PORT" "value" (toString .Values.internalPort.port)) }}
             {{- end }}
             {{- $hasSupportBotVersion := false }}
             {{- range $apiEnv }}

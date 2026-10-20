@@ -79,6 +79,23 @@ metrics:
   enabled: true
   port: 8081
 
+# Internal port for Elevate's erasure orchestrator (docs/adr/adr-010-elevate-service-caller-on-an-internal-port.md).
+# Every request on this port is trusted as a service caller, so enabling it also renders a NetworkPolicy that
+# admits the port only from `allowedFrom` (NetworkPolicy peers) and leaves the http and metrics ports open.
+# The policy only protects the port where the cluster enforces NetworkPolicy.
+# Do not register Support Bot with Elevate's orchestrator until erasure processing ships (ADR-009).
+internalPort:
+  enabled: false
+  port: 8082
+  allowedFrom: []
+  # allowedFrom:
+  #   - namespaceSelector:
+  #       matchLabels:
+  #         kubernetes.io/metadata.name: teams-backend-prod
+  #     podSelector:
+  #       matchLabels:
+  #         app.kubernetes.io/name: teams-backend
+
 monitoring:
   enabled: false
   serviceMonitor:

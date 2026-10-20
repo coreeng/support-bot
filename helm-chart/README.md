@@ -135,6 +135,34 @@ These values are rendered into the ConfigMap `application.yaml` under `security.
 - Health endpoint: `/health` on port `8081` (used by liveness/readiness).
 - When `metrics.enabled=true`, metrics are exposed on port `8081` and a `metrics` Service port is added.
 
+## Elevate Erasure Requests (internal port)
+
+Support Bot can accept Erasure Requests from Elevate's erasure orchestrator ([ADR-009](../docs/adr/adr-009-personal-data-erasure-requests-from-elevate.md)). The orchestrator calls a dedicated internal port with no credential; the network decides who may reach it ([ADR-010](../docs/adr/adr-010-elevate-service-caller-on-an-internal-port.md)). It is **off by default**.
+
+- `internalPort.enabled` (bool): Serve the erasure endpoints on the internal port. Default `false`.
+- `internalPort.port` (int): Internal port on the container and the Service. Default `8082`.
+- `internalPort.allowedFrom` (list): NetworkPolicy `from` peers allowed to reach the internal port. Required when enabled.
+
+When enabled, the chart adds an `internal` container and Service port and a NetworkPolicy on the API pods that leaves the `http` and management (`8081`) ports open and admits the internal port only from `allowedFrom`. The internal port is protected only where the cluster enforces NetworkPolicy and the orchestrator runs in the same cluster. Never expose it through an ingress.
+
+- **Do not register Support Bot with Elevate's orchestrator yet.** Support Bot does not process requests, so every request stays `IN_PROGRESS` and the orchestrator would hold every Elevate Erasure Request open (ADR-009).
+- `internalPort.enabled` is the only supported switch. Setting `INTERNAL_PORT_ENABLED` through `env` or `internal-port.enabled` through `configMap.config` starts the listener without the NetworkPolicy.
+- The chart refuses `service.type` other than `ClusterIP` while the port is on.
+- Keep `allowedFrom` to the orchestrator's pods. A broad peer such as `namespaceSelector: {}` or an `ipBlock` admits every caller it matches as the service principal.
+- NetworkPolicies are additive: the rule that leaves the `http` and management ports open to every source also widens any stricter policy already selecting the API pods.
+
+```yaml
+internalPort:
+  enabled: true
+  allowedFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: teams-backend-prod
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: teams-backend
+```
+
 ## Bundled Dex
 
 The chart depends on the upstream [`dex/dex`](https://charts.dexidp.io) subchart. It's **disabled by default** — set `dex.enabled: true` to use it. When enabled, the API's `DEX_CLIENT_ID` / `DEX_CLIENT_SECRET` / `DEX_ISSUER_URI` / `DEX_INTERNAL_BASE_URL` env vars are wired automatically; the UI's `BACKEND_URL` is set to the in-cluster API svc.
