@@ -152,7 +152,7 @@ describe("HealthPage", () => {
       render(<HealthPage />, { wrapper: Wrapper });
 
       expect(screen.getByText("Activity Trends")).toBeInTheDocument();
-      expect(screen.getByText("Ratings")).toBeInTheDocument();
+      expect(screen.getByText("Ratings & Feedback")).toBeInTheDocument();
       expect(screen.getByText("Ticket Workbench")).toBeInTheDocument();
       expect(screen.getByText("Products View")).toBeInTheDocument();
     });
@@ -171,7 +171,7 @@ describe("HealthPage", () => {
 
       expect(screen.queryByText("Products View")).not.toBeInTheDocument();
       expect(screen.getByText("Activity Trends")).toBeInTheDocument();
-      expect(screen.getByText("Ratings")).toBeInTheDocument();
+      expect(screen.getByText("Ratings & Feedback")).toBeInTheDocument();
       expect(screen.getByText("Ticket Workbench")).toBeInTheDocument();
     });
 
