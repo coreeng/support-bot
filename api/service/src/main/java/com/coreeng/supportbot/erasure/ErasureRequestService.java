@@ -20,9 +20,14 @@ public class ErasureRequestService {
     private final Clock clock;
 
     @Transactional
-    public ErasureRequest submit(UUID requestId, String currentUserEmail, String newUserEmail) {
+    public ErasureRequestResponse submit(SubmitErasureRequest submission) {
+        UUID requestId = submission.requestId();
         boolean stored = repository.insertIfAbsent(new ErasureRequest(
-                requestId, currentUserEmail, newUserEmail, ErasureRequestStatus.IN_PROGRESS, clock.instant()));
+                requestId,
+                submission.currentUserEmail(),
+                submission.newUserEmail(),
+                ErasureRequestStatus.IN_PROGRESS,
+                clock.instant()));
         ErasureRequest request = repository
                 .findById(requestId)
                 .orElseThrow(() -> new IllegalStateException("Erasure request " + requestId + " was not stored"));
@@ -34,11 +39,14 @@ public class ErasureRequestService {
                     requestId,
                     request.status());
         }
-        return request;
+        return ErasureRequestResponse.from(request);
     }
 
     @Transactional(readOnly = true)
-    public ErasureRequest get(UUID requestId) {
-        return repository.findById(requestId).orElseThrow(() -> new ErasureRequestNotFoundException(requestId));
+    public ErasureRequestResponse get(UUID requestId) {
+        return repository
+                .findById(requestId)
+                .map(ErasureRequestResponse::from)
+                .orElseThrow(() -> new ErasureRequestNotFoundException(requestId));
     }
 }

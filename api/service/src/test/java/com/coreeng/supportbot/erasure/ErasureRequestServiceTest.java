@@ -40,14 +40,15 @@ class ErasureRequestServiceTest {
         when(repository.insertIfAbsent(any())).thenReturn(true);
         when(repository.findById(REQUEST_ID)).thenReturn(Optional.of(stored));
 
-        ErasureRequest result = service.submit(REQUEST_ID, "leaver@example.com", "erased@example.com");
+        ErasureRequestResponse result =
+                service.submit(new SubmitErasureRequest(REQUEST_ID, "leaver@example.com", "erased@example.com"));
 
         ArgumentCaptor<ErasureRequest> inserted = ArgumentCaptor.forClass(ErasureRequest.class);
         verify(repository).insertIfAbsent(inserted.capture());
         assertThat(inserted.getValue())
                 .isEqualTo(new ErasureRequest(
                         REQUEST_ID, "leaver@example.com", "erased@example.com", ErasureRequestStatus.IN_PROGRESS, NOW));
-        assertThat(result).isEqualTo(stored);
+        assertThat(result).isEqualTo(new ErasureRequestResponse(REQUEST_ID, ErasureRequestStatus.IN_PROGRESS, NOW));
     }
 
     @Test
@@ -57,9 +58,11 @@ class ErasureRequestServiceTest {
         when(repository.insertIfAbsent(any())).thenReturn(false);
         when(repository.findById(REQUEST_ID)).thenReturn(Optional.of(first));
 
-        ErasureRequest result = service.submit(REQUEST_ID, "different@example.com", "erased@example.com");
+        ErasureRequestResponse result =
+                service.submit(new SubmitErasureRequest(REQUEST_ID, "different@example.com", "erased@example.com"));
 
-        assertThat(result).isEqualTo(first);
+        assertThat(result)
+                .isEqualTo(new ErasureRequestResponse(REQUEST_ID, ErasureRequestStatus.IN_PROGRESS, firstAcceptedAt));
     }
 
     @Test
@@ -67,7 +70,8 @@ class ErasureRequestServiceTest {
         ErasureRequest stored = request(REQUEST_ID, "leaver@example.com", NOW);
         when(repository.findById(REQUEST_ID)).thenReturn(Optional.of(stored));
 
-        assertThat(service.get(REQUEST_ID)).isEqualTo(stored);
+        assertThat(service.get(REQUEST_ID))
+                .isEqualTo(new ErasureRequestResponse(REQUEST_ID, ErasureRequestStatus.IN_PROGRESS, NOW));
     }
 
     @Test

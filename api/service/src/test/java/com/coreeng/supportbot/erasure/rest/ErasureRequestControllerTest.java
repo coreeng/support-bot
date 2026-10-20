@@ -7,14 +7,14 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.coreeng.supportbot.erasure.ErasureRequest;
 import com.coreeng.supportbot.erasure.ErasureRequestNotFoundException;
+import com.coreeng.supportbot.erasure.ErasureRequestResponse;
 import com.coreeng.supportbot.erasure.ErasureRequestService;
 import com.coreeng.supportbot.erasure.ErasureRequestStatus;
+import com.coreeng.supportbot.erasure.SubmitErasureRequest;
 import com.coreeng.supportbot.util.JsonMapper;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
@@ -55,20 +55,17 @@ class ErasureRequestControllerTest {
     }
 
     @Test
-    void submitAcceptsTheRequestWithItsLocationAndStatus() throws Exception {
-        when(erasureRequestService.submit(REQUEST_ID, CURRENT_EMAIL, NEW_EMAIL)).thenReturn(stored());
+    void submitAcceptsTheRequestAndReportsItsStatus() throws Exception {
+        when(erasureRequestService.submit(new SubmitErasureRequest(REQUEST_ID, CURRENT_EMAIL, NEW_EMAIL)))
+                .thenReturn(stored());
 
-        MvcResult result = mockMvc.perform(post("/api/erasure-requests")
+        mockMvc.perform(post("/api/erasure-requests")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body(REQUEST_ID.toString(), CURRENT_EMAIL, NEW_EMAIL)))
                 .andExpect(status().isAccepted())
-                .andExpect(header().string("Location", "/api/erasure-requests/" + REQUEST_ID))
                 .andExpect(jsonPath("$.requestId").value(REQUEST_ID.toString()))
                 .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
-                .andExpect(jsonPath("$.requestedAt").value("2026-10-15T09:30:00Z"))
-                .andReturn();
-
-        assertThat(result.getResponse().getContentAsString()).doesNotContain(CURRENT_EMAIL, NEW_EMAIL);
+                .andExpect(jsonPath("$.requestedAt").value("2026-10-15T09:30:00Z"));
     }
 
     @ParameterizedTest
@@ -98,7 +95,8 @@ class ErasureRequestControllerTest {
 
     @Test
     void submitAcceptsABodyWithFieldsItDoesNotKnow() throws Exception {
-        when(erasureRequestService.submit(REQUEST_ID, CURRENT_EMAIL, NEW_EMAIL)).thenReturn(stored());
+        when(erasureRequestService.submit(new SubmitErasureRequest(REQUEST_ID, CURRENT_EMAIL, NEW_EMAIL)))
+                .thenReturn(stored());
 
         mockMvc.perform(post("/api/erasure-requests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -143,13 +141,11 @@ class ErasureRequestControllerTest {
     void getReportsTheRequest() throws Exception {
         when(erasureRequestService.get(REQUEST_ID)).thenReturn(stored());
 
-        MvcResult result = mockMvc.perform(get("/api/erasure-requests/" + REQUEST_ID))
+        mockMvc.perform(get("/api/erasure-requests/" + REQUEST_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.requestId").value(REQUEST_ID.toString()))
-                .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
-                .andReturn();
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
 
-        assertThat(result.getResponse().getContentAsString()).doesNotContain(CURRENT_EMAIL, NEW_EMAIL);
         verify(erasureRequestService).get(REQUEST_ID);
     }
 
@@ -171,13 +167,9 @@ class ErasureRequestControllerTest {
         verifyNoInteractions(erasureRequestService);
     }
 
-    private static ErasureRequest stored() {
-        return new ErasureRequest(
-                REQUEST_ID,
-                CURRENT_EMAIL,
-                NEW_EMAIL,
-                ErasureRequestStatus.IN_PROGRESS,
-                Instant.parse("2026-10-15T09:30:00Z"));
+    private static ErasureRequestResponse stored() {
+        return new ErasureRequestResponse(
+                REQUEST_ID, ErasureRequestStatus.IN_PROGRESS, Instant.parse("2026-10-15T09:30:00Z"));
     }
 
     private static String body(String requestId, String currentUserEmail, String newUserEmail) {

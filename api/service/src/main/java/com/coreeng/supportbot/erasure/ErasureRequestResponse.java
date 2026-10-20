@@ -1,7 +1,5 @@
-package com.coreeng.supportbot.erasure.rest;
+package com.coreeng.supportbot.erasure;
 
-import com.coreeng.supportbot.erasure.ErasureRequest;
-import com.coreeng.supportbot.erasure.ErasureRequestStatus;
 import java.time.Instant;
 import java.util.UUID;
 

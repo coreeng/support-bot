@@ -40,14 +40,14 @@ For Kubernetes deployments, see the Helm chart's `auth.allowedEmails` and `auth.
 
 ## Elevate Erasure Requests
 
-Elevate's erasure orchestrator submits and polls Erasure Requests on an internal port that is off by default ([ADR-009](../docs/adr/adr-009-personal-data-erasure-requests-from-elevate.md), [ADR-010](../docs/adr/adr-010-elevate-service-caller-on-an-internal-port.md)).
+Elevate's erasure orchestrator submits and polls Erasure Requests on an internal port that is off by default ([ADR-009](../docs/adr/adr-009-personal-data-erasure-requests.md), [ADR-010](../docs/adr/adr-010-service-caller-on-an-internal-port.md)).
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `INTERNAL_PORT_ENABLED` | Serve the erasure endpoints on the internal port | `false` |
 | `INTERNAL_PORT` | Internal port | `8082` |
 
-- `POST /api/erasure-requests` with `{requestId, currentUserEmail, newUserEmail}` stores the request and answers `202` with a `Location` header and `{requestId, status, requestedAt}`. Resubmitting an id returns the first request unchanged.
+- `POST /api/erasure-requests` with `{requestId, currentUserEmail, newUserEmail}` stores the request and answers `202` with `{requestId, status, requestedAt}`. Resubmitting an id returns the first request unchanged.
 - `GET /api/erasure-requests/{requestId}` reports the request, or `404` for an unknown id.
 
 Every request on the internal port is trusted as Elevate's service caller and may reach only these endpoints; the public port refuses them to everyone. The `X-Elevate-Tenant-Id` header the orchestrator sends is ignored. Nothing processes a request yet, so every request stays `IN_PROGRESS`. In Kubernetes, enable it through the chart's `internalPort` values, which also render the NetworkPolicy that protects the port.

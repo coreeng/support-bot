@@ -137,7 +137,7 @@ These values are rendered into the ConfigMap `application.yaml` under `security.
 
 ## Elevate Erasure Requests (internal port)
 
-Support Bot can accept Erasure Requests from Elevate's erasure orchestrator ([ADR-009](../docs/adr/adr-009-personal-data-erasure-requests-from-elevate.md)). The orchestrator calls a dedicated internal port with no credential; the network decides who may reach it ([ADR-010](../docs/adr/adr-010-elevate-service-caller-on-an-internal-port.md)). It is **off by default**.
+Support Bot can accept Erasure Requests from Elevate's erasure orchestrator ([ADR-009](../docs/adr/adr-009-personal-data-erasure-requests.md)). The orchestrator calls a dedicated internal port with no credential; the network decides who may reach it ([ADR-010](../docs/adr/adr-010-service-caller-on-an-internal-port.md)). It is **off by default**.
 
 - `internalPort.enabled` (bool): Serve the erasure endpoints on the internal port. Default `false`.
 - `internalPort.port` (int): Internal port on the container and the Service. Default `8082`.

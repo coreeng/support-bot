@@ -1,9 +1,9 @@
 package com.coreeng.supportbot.erasure.rest;
 
-import com.coreeng.supportbot.erasure.ErasureRequest;
+import com.coreeng.supportbot.erasure.ErasureRequestResponse;
 import com.coreeng.supportbot.erasure.ErasureRequestService;
+import com.coreeng.supportbot.erasure.SubmitErasureRequest;
 import jakarta.validation.Valid;
-import java.net.URI;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,15 +26,11 @@ public class ErasureRequestController {
 
     @PostMapping
     public ResponseEntity<ErasureRequestResponse> submit(@Valid @RequestBody SubmitErasureRequest request) {
-        ErasureRequest stored =
-                erasureRequestService.submit(request.requestId(), request.currentUserEmail(), request.newUserEmail());
-        return ResponseEntity.accepted()
-                .location(URI.create("/api/erasure-requests/" + stored.id()))
-                .body(ErasureRequestResponse.from(stored));
+        return ResponseEntity.accepted().body(erasureRequestService.submit(request));
     }
 
     @GetMapping("/{requestId}")
     public ResponseEntity<ErasureRequestResponse> get(@PathVariable UUID requestId) {
-        return ResponseEntity.ok(ErasureRequestResponse.from(erasureRequestService.get(requestId)));
+        return ResponseEntity.ok(erasureRequestService.get(requestId));
     }
 }

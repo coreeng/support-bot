@@ -36,7 +36,6 @@ public class ErasureRequestApiTests {
         Response submitted = erasureRequests.submit(body(requestId, CURRENT_EMAIL, NEW_EMAIL));
 
         assertThat(submitted.statusCode()).isEqualTo(202);
-        assertThat(submitted.header("Location")).isEqualTo("/api/erasure-requests/" + requestId);
         assertThat(submitted.jsonPath().getString("requestId")).isEqualTo(requestId);
         assertThat(submitted.jsonPath().getString("status")).isEqualTo("IN_PROGRESS");
         assertThat(submitted.jsonPath().getString("requestedAt")).isNotBlank();

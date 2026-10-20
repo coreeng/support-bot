@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.coreeng.supportbot.erasure.ErasureRequest;
+import com.coreeng.supportbot.erasure.ErasureRequestResponse;
 import com.coreeng.supportbot.erasure.ErasureRequestService;
 import com.coreeng.supportbot.erasure.ErasureRequestStatus;
 import com.coreeng.supportbot.security.AllowListService;
@@ -95,7 +95,7 @@ class ErasureRequestSecurityRouteTest {
 
     @Test
     void internalPortCallerCanSubmitAnErasureRequest() throws Exception {
-        when(erasureRequestService.submit(any(), any(), any())).thenReturn(stored());
+        when(erasureRequestService.submit(any())).thenReturn(stored());
 
         mockMvc.perform(post("/api/erasure-requests")
                         .with(onPort(INTERNAL_PORT))
@@ -163,12 +163,8 @@ class ErasureRequestSecurityRouteTest {
         };
     }
 
-    private static ErasureRequest stored() {
-        return new ErasureRequest(
-                REQUEST_ID,
-                "leaver@example.com",
-                "erased@example.com",
-                ErasureRequestStatus.IN_PROGRESS,
-                Instant.parse("2026-10-15T09:30:00Z"));
+    private static ErasureRequestResponse stored() {
+        return new ErasureRequestResponse(
+                REQUEST_ID, ErasureRequestStatus.IN_PROGRESS, Instant.parse("2026-10-15T09:30:00Z"));
     }
 }

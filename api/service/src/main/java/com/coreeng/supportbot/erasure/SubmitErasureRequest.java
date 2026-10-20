@@ -1,4 +1,4 @@
-package com.coreeng.supportbot.erasure.rest;
+package com.coreeng.supportbot.erasure;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.Email;

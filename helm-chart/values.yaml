@@ -79,7 +79,7 @@ metrics:
   enabled: true
   port: 8081
 
-# Internal port for Elevate's erasure orchestrator (docs/adr/adr-010-elevate-service-caller-on-an-internal-port.md).
+# Internal port for Elevate's erasure orchestrator (docs/adr/adr-010-service-caller-on-an-internal-port.md).
 # Every request on this port is trusted as a service caller, so enabling it also renders a NetworkPolicy that
 # admits the port only from `allowedFrom` (NetworkPolicy peers) and leaves the http and metrics ports open.
 # The policy only protects the port where the cluster enforces NetworkPolicy.
