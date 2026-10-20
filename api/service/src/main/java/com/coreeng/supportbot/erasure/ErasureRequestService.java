@@ -27,7 +27,8 @@ public class ErasureRequestService {
                 submission.currentUserEmail(),
                 submission.newUserEmail(),
                 ErasureRequestStatus.IN_PROGRESS,
-                clock.instant()));
+                clock.instant(),
+                0));
         ErasureRequest request = repository
                 .findById(requestId)
                 .orElseThrow(() -> new IllegalStateException("Erasure request " + requestId + " was not stored"));

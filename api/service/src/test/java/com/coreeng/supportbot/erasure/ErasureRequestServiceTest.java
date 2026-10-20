@@ -47,7 +47,12 @@ class ErasureRequestServiceTest {
         verify(repository).insertIfAbsent(inserted.capture());
         assertThat(inserted.getValue())
                 .isEqualTo(new ErasureRequest(
-                        REQUEST_ID, "leaver@example.com", "erased@example.com", ErasureRequestStatus.IN_PROGRESS, NOW));
+                        REQUEST_ID,
+                        "leaver@example.com",
+                        "erased@example.com",
+                        ErasureRequestStatus.IN_PROGRESS,
+                        NOW,
+                        0));
         assertThat(result).isEqualTo(new ErasureRequestResponse(REQUEST_ID, ErasureRequestStatus.IN_PROGRESS, NOW));
     }
 
@@ -83,6 +88,6 @@ class ErasureRequestServiceTest {
 
     private static ErasureRequest request(UUID id, String currentUserEmail, Instant requestedAt) {
         return new ErasureRequest(
-                id, currentUserEmail, "erased@example.com", ErasureRequestStatus.IN_PROGRESS, requestedAt);
+                id, currentUserEmail, "erased@example.com", ErasureRequestStatus.IN_PROGRESS, requestedAt, 0);
     }
 }

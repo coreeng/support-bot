@@ -13,4 +13,7 @@ public interface ErasureRequestRepository {
     boolean insertIfAbsent(ErasureRequest request);
 
     Optional<ErasureRequest> findById(UUID id);
+
+    /** Saves a request read at its stored version; a stale or missing one throws OptimisticLockingFailureException. */
+    ErasureRequest update(ErasureRequest request);
 }

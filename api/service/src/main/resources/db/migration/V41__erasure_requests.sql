@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS erasure_requests
     new_user_email     VARCHAR(255) NOT NULL,
     status             TEXT         NOT NULL,
     created_at         TIMESTAMPTZ  NOT NULL,
+    version            BIGINT       NOT NULL,
 
     CONSTRAINT erasure_requests_status_check CHECK (status IN ('IN_PROGRESS'))
 );

@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.erasure;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -73,9 +75,53 @@ class JdbcErasureRequestRepositoryPostgresTest {
         assertThat(repository.findById(requestId)).isEmpty();
     }
 
+    @Test
+    void updateSavesARequestReadAtItsStoredVersionAndIncrementsTheVersion() {
+        repository.insertIfAbsent(request("leaver@example.com", REQUESTED_AT));
+
+        ErasureRequest saved = repository.update(withCurrentEmail(read(), "anonymised@example.com"));
+
+        assertThat(saved.version()).isEqualTo(1);
+        assertThat(saved.currentUserEmail()).isEqualTo("anonymised@example.com");
+        assertThat(repository.findById(requestId)).contains(saved);
+    }
+
+    @Test
+    void updateRefusesAStaleVersionAndLeavesTheStoredRequestUnchanged() {
+        repository.insertIfAbsent(request("leaver@example.com", REQUESTED_AT));
+        ErasureRequest readByFirstWriter = read();
+        ErasureRequest readBySecondWriter = read();
+        ErasureRequest firstSave = repository.update(withCurrentEmail(readByFirstWriter, "first@example.com"));
+
+        assertThatThrownBy(() -> repository.update(withCurrentEmail(readBySecondWriter, "second@example.com")))
+                .isInstanceOf(OptimisticLockingFailureException.class);
+        assertThat(repository.findById(requestId)).contains(firstSave);
+    }
+
+    @Test
+    void updateRefusesARequestThatIsNotStored() {
+        assertThatThrownBy(() -> repository.update(request("leaver@example.com", REQUESTED_AT)))
+                .isInstanceOf(OptimisticLockingFailureException.class);
+        assertThat(repository.findById(requestId)).isEmpty();
+    }
+
+    private ErasureRequest read() {
+        return repository.findById(requestId).orElseThrow();
+    }
+
+    private static ErasureRequest withCurrentEmail(ErasureRequest request, String currentUserEmail) {
+        return new ErasureRequest(
+                request.id(),
+                currentUserEmail,
+                request.newUserEmail(),
+                request.status(),
+                request.requestedAt(),
+                request.version());
+    }
+
     private ErasureRequest request(String currentUserEmail, Instant requestedAt) {
         return new ErasureRequest(
-                requestId, currentUserEmail, "erased@example.com", ErasureRequestStatus.IN_PROGRESS, requestedAt);
+                requestId, currentUserEmail, "erased@example.com", ErasureRequestStatus.IN_PROGRESS, requestedAt, 0);
     }
 
     @Configuration(proxyBeanMethods = false)

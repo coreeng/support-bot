@@ -16,10 +16,11 @@ class ErasureRequestTest {
                 "leaver@example.com",
                 "erased@example.com",
                 ErasureRequestStatus.IN_PROGRESS,
-                Instant.parse("2026-10-15T09:30:00Z"));
+                Instant.parse("2026-10-15T09:30:00Z"),
+                3);
 
         assertThat(request.toString())
-                .contains(id.toString(), "IN_PROGRESS")
+                .contains(id.toString(), "IN_PROGRESS", "version=3")
                 .doesNotContain("leaver@example.com", "erased@example.com");
     }
 }
