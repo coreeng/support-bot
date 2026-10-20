@@ -53,6 +53,9 @@ public class SecurityConfig {
                         // caller as a 401 — and the UI signs the user out on 401.
                         .dispatcherTypeMatchers(DispatcherType.ERROR)
                         .permitAll()
+                        // Erasure endpoints are served only on the internal port (ADR-010)
+                        .requestMatchers(InternalPortSecurityConfig.SERVICE_PATHS)
+                        .denyAll()
                         // Public endpoints
                         .requestMatchers("/oauth2/**", "/login/**")
                         .permitAll()
@@ -121,6 +124,9 @@ public class SecurityConfig {
         };
         handlers.put(PathPatternRequestMatcher.withDefaults().matcher("/analysis/prompt"), jsonForbidden);
         handlers.put(PathPatternRequestMatcher.withDefaults().matcher("/summary/prompt"), jsonForbidden);
+        for (String path : InternalPortSecurityConfig.SERVICE_PATHS) {
+            handlers.put(PathPatternRequestMatcher.withDefaults().matcher(path), jsonForbidden);
+        }
         return new RequestMatcherDelegatingAccessDeniedHandler(handlers, new AccessDeniedHandlerImpl());
     }
 

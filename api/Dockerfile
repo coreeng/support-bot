@@ -46,5 +46,5 @@ COPY --from=build /build/service/build/libs/service.jar /app/service.jar
 
 CMD ["java", "-jar", "/app/service.jar"]
 
-EXPOSE 8080 8081
+EXPOSE 8080 8081 8082
 USER 185

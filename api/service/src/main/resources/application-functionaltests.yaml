@@ -12,6 +12,9 @@ security:
     emails: ${ALLOWED_EMAILS:}
     domains: ${ALLOWED_DOMAINS:}
 
+internal-port:
+  enabled: true
+
 slack:
   mode: http
   enable-request-verification: false

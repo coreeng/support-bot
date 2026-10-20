@@ -3,6 +3,11 @@ server:
   shutdown: graceful
   max-http-request-header-size: 65536  # 64KB
 
+# Listener for Elevate's erasure orchestrator (ADR-010). Off unless the deployment opts in.
+internal-port:
+  enabled: ${INTERNAL_PORT_ENABLED:false}
+  port: ${INTERNAL_PORT:8082}
+
 management:
   server:
     port: 8081
