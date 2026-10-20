@@ -126,7 +126,7 @@ public record Config(
         }
     }
 
-    public record SupportBot(String baseUrl, String token) {}
+    public record SupportBot(String baseUrl, String internalBaseUrl, String token) {}
 
     public record EscalationTeam(String label, String code, String slackGroupId) {}
 

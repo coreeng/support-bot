@@ -84,3 +84,4 @@ users:
 supportBot:
   token: dummy-token-dummy-token
   baseUrl: ${SERVICE_ENDPOINT:http://localhost:8080}
+  internalBaseUrl: ${INTERNAL_SERVICE_ENDPOINT:http://localhost:8082}

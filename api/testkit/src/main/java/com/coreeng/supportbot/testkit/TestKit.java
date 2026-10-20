@@ -8,6 +8,7 @@ public class TestKit {
     private final SlackWiremock slackWiremock;
     private final SupportBotSlackClient supportBotSlackClient;
     private final SupportBotClient supportBotClient;
+    private final ErasureRequestClient erasureRequestClient;
     private final Config config;
 
     /**
@@ -23,7 +24,9 @@ public class TestKit {
         SupportBotClient supportBotClient =
                 new SupportBotClient(config.supportBot().baseUrl(), slackWiremock);
         SupportBotSlackClient supportBotSlackClient = new SupportBotSlackClient(config, slackWiremock);
-        return new TestKit(slackWiremock, supportBotSlackClient, supportBotClient, config);
+        ErasureRequestClient erasureRequestClient = new ErasureRequestClient(
+                config.supportBot().internalBaseUrl(), config.supportBot().baseUrl());
+        return new TestKit(slackWiremock, supportBotSlackClient, supportBotClient, erasureRequestClient, config);
     }
 
     public RoledTestKit as(UserRole role) {
@@ -55,6 +58,13 @@ public class TestKit {
      */
     public SupportBotClient supportBotClient() {
         return supportBotClient;
+    }
+
+    /**
+     * Returns the client for the erasure endpoints Elevate's erasure orchestrator calls.
+     */
+    public ErasureRequestClient erasureRequests() {
+        return erasureRequestClient;
     }
 
     /**
