@@ -26,11 +26,9 @@ env:
   - name: JWT_SECRET
     value: "functional-test-jwt-secret-minimum-256-bits"
 
-# The functional-test Job calls the erasure endpoints from a pod in this namespace.
+# The functional-test Job calls the erasure endpoints on the internal port.
 internalPort:
   enabled: true
-  allowedFrom:
-    - podSelector: {}
 
 monitoring:
   enabled: true

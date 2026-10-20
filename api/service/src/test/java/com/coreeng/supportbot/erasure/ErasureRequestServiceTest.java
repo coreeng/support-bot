@@ -40,7 +40,7 @@ class ErasureRequestServiceTest {
         when(repository.insertIfAbsent(any())).thenReturn(true);
         when(repository.findById(REQUEST_ID)).thenReturn(Optional.of(stored));
 
-        ErasureRequestResponse result =
+        ErasureRequest result =
                 service.submit(new SubmitErasureRequest(REQUEST_ID, "leaver@example.com", "erased@example.com"));
 
         ArgumentCaptor<ErasureRequest> inserted = ArgumentCaptor.forClass(ErasureRequest.class);
@@ -53,7 +53,7 @@ class ErasureRequestServiceTest {
                         ErasureRequestStatus.IN_PROGRESS,
                         NOW,
                         0));
-        assertThat(result).isEqualTo(new ErasureRequestResponse(REQUEST_ID, ErasureRequestStatus.IN_PROGRESS, NOW));
+        assertThat(result).isEqualTo(stored);
     }
 
     @Test
@@ -63,11 +63,10 @@ class ErasureRequestServiceTest {
         when(repository.insertIfAbsent(any())).thenReturn(false);
         when(repository.findById(REQUEST_ID)).thenReturn(Optional.of(first));
 
-        ErasureRequestResponse result =
+        ErasureRequest result =
                 service.submit(new SubmitErasureRequest(REQUEST_ID, "different@example.com", "erased@example.com"));
 
-        assertThat(result)
-                .isEqualTo(new ErasureRequestResponse(REQUEST_ID, ErasureRequestStatus.IN_PROGRESS, firstAcceptedAt));
+        assertThat(result).isEqualTo(first);
     }
 
     @Test
@@ -75,8 +74,7 @@ class ErasureRequestServiceTest {
         ErasureRequest stored = request(REQUEST_ID, "leaver@example.com", NOW);
         when(repository.findById(REQUEST_ID)).thenReturn(Optional.of(stored));
 
-        assertThat(service.get(REQUEST_ID))
-                .isEqualTo(new ErasureRequestResponse(REQUEST_ID, ErasureRequestStatus.IN_PROGRESS, NOW));
+        assertThat(service.get(REQUEST_ID)).isEqualTo(stored);
     }
 
     @Test

@@ -137,31 +137,16 @@ These values are rendered into the ConfigMap `application.yaml` under `security.
 
 ## Elevate Erasure Requests (internal port)
 
-Support Bot can accept Erasure Requests from Elevate's erasure orchestrator ([ADR-009](../docs/adr/adr-009-personal-data-erasure-requests.md)). The orchestrator calls a dedicated internal port with no credential; the network decides who may reach it ([ADR-010](../docs/adr/adr-010-service-caller-on-an-internal-port.md)). It is **off by default**.
+Support Bot can accept Erasure Requests from Elevate's erasure orchestrator ([ADR-009](../docs/adr/adr-009-personal-data-erasure-requests.md)). The orchestrator calls a dedicated internal port with no credential ([ADR-010](../docs/adr/adr-010-service-caller-on-an-internal-port.md)). It is **off by default**.
 
 - `internalPort.enabled` (bool): Serve the erasure endpoints on the internal port. Default `false`.
 - `internalPort.port` (int): Internal port on the container and the Service. Default `8082`.
-- `internalPort.allowedFrom` (list): NetworkPolicy `from` peers allowed to reach the internal port. Required when enabled.
 
-When enabled, the chart adds an `internal` container and Service port and a NetworkPolicy on the API pods that leaves the `http` and management (`8081`) ports open and admits the internal port only from `allowedFrom`. The internal port is protected only where the cluster enforces NetworkPolicy and the orchestrator runs in the same cluster. Never expose it through an ingress.
+When enabled, the chart adds an `internal` container port and Service port. Every request on that port is trusted as the orchestrator.
 
+- **Restrict the internal port yourself.** The chart does not limit who can reach it. Add a NetworkPolicy that admits the port only from the orchestrator's pods; without one, any pod in the cluster can submit and poll Erasure Requests.
 - **Do not register Support Bot with Elevate's orchestrator yet.** Support Bot does not process requests, so every request stays `IN_PROGRESS` and the orchestrator would hold every Elevate Erasure Request open (ADR-009).
-- `internalPort.enabled` is the only supported switch. Setting `INTERNAL_PORT_ENABLED` through `env` or `internal-port.enabled` through `configMap.config` starts the listener without the NetworkPolicy.
-- The chart refuses `service.type` other than `ClusterIP` while the port is on.
-- Keep `allowedFrom` to the orchestrator's pods. A broad peer such as `namespaceSelector: {}` or an `ipBlock` admits every caller it matches as the service principal.
-- NetworkPolicies are additive: the rule that leaves the `http` and management ports open to every source also widens any stricter policy already selecting the API pods.
-
-```yaml
-internalPort:
-  enabled: true
-  allowedFrom:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: teams-backend-prod
-      podSelector:
-        matchLabels:
-          app.kubernetes.io/name: teams-backend
-```
+- The chart refuses `service.type` other than `ClusterIP` while the port is on. Never expose the port through an ingress.
 
 ## Bundled Dex
 

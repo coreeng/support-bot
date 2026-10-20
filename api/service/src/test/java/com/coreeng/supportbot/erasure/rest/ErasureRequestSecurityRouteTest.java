@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.coreeng.supportbot.erasure.ErasureRequestResponse;
+import com.coreeng.supportbot.erasure.ErasureRequest;
 import com.coreeng.supportbot.erasure.ErasureRequestService;
 import com.coreeng.supportbot.erasure.ErasureRequestStatus;
 import com.coreeng.supportbot.security.AllowListService;
@@ -42,7 +42,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * that the internal port reaches nothing else (ADR-010).
  */
 @WebMvcTest(controllers = ErasureRequestController.class)
-@Import({SecurityConfig.class, InternalPortSecurityConfig.class})
+@Import({SecurityConfig.class, InternalPortSecurityConfig.class, ErasureRequestMapper.class})
 @TestPropertySource(
         properties = {
             "security.jwt.secret=test-jwt-secret-for-unit-tests-minimum-256-bits",
@@ -163,8 +163,13 @@ class ErasureRequestSecurityRouteTest {
         };
     }
 
-    private static ErasureRequestResponse stored() {
-        return new ErasureRequestResponse(
-                REQUEST_ID, ErasureRequestStatus.IN_PROGRESS, Instant.parse("2026-10-15T09:30:00Z"));
+    private static ErasureRequest stored() {
+        return new ErasureRequest(
+                REQUEST_ID,
+                "leaver@example.com",
+                "erased@example.com",
+                ErasureRequestStatus.IN_PROGRESS,
+                Instant.parse("2026-10-15T09:30:00Z"),
+                0);
     }
 }

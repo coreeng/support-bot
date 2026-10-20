@@ -1,3 +1,6 @@
+{{- if and .Values.internalPort.enabled (ne .Values.service.type "ClusterIP") }}
+{{- fail "service.type must be ClusterIP when internalPort.enabled is true, or the internal port is published outside the cluster" }}
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:

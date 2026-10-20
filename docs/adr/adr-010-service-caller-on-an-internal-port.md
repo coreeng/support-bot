@@ -95,8 +95,9 @@ flowchart LR
 
 Option 4.
 
-- The internal port is **off by default**. A deployer turns it on through the Helm chart's `internalPort` values, which also carry the port (8082 by default) and the NetworkPolicy peers allowed to call it.
-- When it is on, the chart exposes the port on the Service, which must then be `ClusterIP`, and always renders a NetworkPolicy that leaves the `http` and `metrics` ports open and admits the internal port only from the listed peers. The chart refuses an empty peer list.
+- The internal port is **off by default**. A deployer turns it on through the Helm chart's `internalPort` values, which also carry the port (8082 by default). While it is off, Support Bot opens no listener and registers no erasure endpoints.
+- When it is on, the chart exposes the port on the Service, which must then be `ClusterIP`.
+- The chart does not render a NetworkPolicy. The deployer owns the policy that admits the internal port only from the orchestrator's pods, alongside the rest of their cluster's network rules.
 - A request on the internal port is a **service principal**: it holds a synthetic service authority, which no person's role can produce, and is confined to the erasure endpoints. Every other path on the internal port is refused. It carries no credential.
 - The public port refuses the erasure endpoints to everyone, people included, whether or not the internal port is on.
 - Support Bot **ignores** the tenant header the orchestrator sends. It serves one organisation per deployment, so there is no tenant to scope a request to. Nothing on either port reads the header, so Support Bot accepts requests raised in every tenant the orchestrator serves ([ADR-009](adr-009-personal-data-erasure-requests.md) records the consequence).
@@ -108,14 +109,14 @@ Option 4.
 ### Positive
 
 - No secret in any environment and no new trust root in Support Bot.
-- Deployments without an erasure orchestrator are unaffected: no listener, no Service port, no policy.
+- Deployments without an erasure orchestrator are unaffected: no listener, no erasure endpoints and no Service port.
 - The orchestrator needs only Support Bot's internal Service URL.
 
 ### Negative / Trade-offs
 
 - Identity is network-derived and coarse.
-- Turning off NetworkPolicy enforcement, or running Support Bot in a different cluster from the orchestrator, opens the internal port to whatever can reach it; Support Bot cannot detect either.
-- Adding another service caller means editing the peer list in Support Bot's values.
+- A deployment that enables the internal port without its own NetworkPolicy, turns off NetworkPolicy enforcement, or runs Support Bot in a different cluster from the orchestrator opens the internal port to whatever can reach it; Support Bot cannot detect any of these.
+- Adding another service caller means editing the deployer's NetworkPolicy.
 - On a laptop the internal port is open to anything that can reach it.
 
 ### Neutral

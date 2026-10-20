@@ -10,8 +10,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.coreeng.supportbot.erasure.ErasureRequest;
 import com.coreeng.supportbot.erasure.ErasureRequestNotFoundException;
-import com.coreeng.supportbot.erasure.ErasureRequestResponse;
 import com.coreeng.supportbot.erasure.ErasureRequestService;
 import com.coreeng.supportbot.erasure.ErasureRequestStatus;
 import com.coreeng.supportbot.erasure.SubmitErasureRequest;
@@ -28,6 +28,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
@@ -48,10 +49,25 @@ class ErasureRequestControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new ErasureRequestController(erasureRequestService))
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                        new ErasureRequestController(erasureRequestService, new ErasureRequestMapper()))
                 .setControllerAdvice(new ErasureRequestExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(new JsonMapper().getObjectMapper()))
                 .build();
+    }
+
+    @Test
+    void isRegisteredOnlyWhenTheInternalPortIsEnabled() {
+        ApplicationContextRunner runner = new ApplicationContextRunner()
+                .withBean(ErasureRequestService.class, () -> erasureRequestService)
+                .withBean(ErasureRequestMapper.class)
+                .withUserConfiguration(ErasureRequestController.class);
+
+        runner.run(context -> assertThat(context).doesNotHaveBean(ErasureRequestController.class));
+        runner.withPropertyValues("internal-port.enabled=false")
+                .run(context -> assertThat(context).doesNotHaveBean(ErasureRequestController.class));
+        runner.withPropertyValues("internal-port.enabled=true")
+                .run(context -> assertThat(context).hasSingleBean(ErasureRequestController.class));
     }
 
     @Test
@@ -59,13 +75,16 @@ class ErasureRequestControllerTest {
         when(erasureRequestService.submit(new SubmitErasureRequest(REQUEST_ID, CURRENT_EMAIL, NEW_EMAIL)))
                 .thenReturn(stored());
 
-        mockMvc.perform(post("/api/erasure-requests")
+        MvcResult result = mockMvc.perform(post("/api/erasure-requests")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body(REQUEST_ID.toString(), CURRENT_EMAIL, NEW_EMAIL)))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.requestId").value(REQUEST_ID.toString()))
                 .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
-                .andExpect(jsonPath("$.requestedAt").value("2026-10-15T09:30:00Z"));
+                .andExpect(jsonPath("$.requestedAt").value("2026-10-15T09:30:00Z"))
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString()).doesNotContain(CURRENT_EMAIL, NEW_EMAIL);
     }
 
     @ParameterizedTest
@@ -141,11 +160,13 @@ class ErasureRequestControllerTest {
     void getReportsTheRequest() throws Exception {
         when(erasureRequestService.get(REQUEST_ID)).thenReturn(stored());
 
-        mockMvc.perform(get("/api/erasure-requests/" + REQUEST_ID))
+        MvcResult result = mockMvc.perform(get("/api/erasure-requests/" + REQUEST_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.requestId").value(REQUEST_ID.toString()))
-                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+                .andReturn();
 
+        assertThat(result.getResponse().getContentAsString()).doesNotContain(CURRENT_EMAIL, NEW_EMAIL);
         verify(erasureRequestService).get(REQUEST_ID);
     }
 
@@ -167,9 +188,14 @@ class ErasureRequestControllerTest {
         verifyNoInteractions(erasureRequestService);
     }
 
-    private static ErasureRequestResponse stored() {
-        return new ErasureRequestResponse(
-                REQUEST_ID, ErasureRequestStatus.IN_PROGRESS, Instant.parse("2026-10-15T09:30:00Z"));
+    private static ErasureRequest stored() {
+        return new ErasureRequest(
+                REQUEST_ID,
+                CURRENT_EMAIL,
+                NEW_EMAIL,
+                ErasureRequestStatus.IN_PROGRESS,
+                Instant.parse("2026-10-15T09:30:00Z"),
+                0);
     }
 
     private static String body(String requestId, String currentUserEmail, String newUserEmail) {

@@ -1,15 +1,8 @@
 suite: internal port for Elevate's erasure orchestrator
 templates:
-  - templates/networkpolicy.yaml
   - templates/service.yaml
   - templates/deployment.yaml
 tests:
-  - it: renders no NetworkPolicy by default
-    template: templates/networkpolicy.yaml
-    asserts:
-      - hasDocuments:
-          count: 0
-
   - it: exposes no internal port by default
     template: templates/service.yaml
     asserts:
@@ -33,90 +26,20 @@ tests:
             name: internal
           any: true
 
-  - it: refuses to enable the internal port without allowed callers
-    template: templates/networkpolicy.yaml
-    set:
-      internalPort.enabled: true
-    asserts:
-      - failedTemplate:
-          errorPattern: "internalPort.allowedFrom must list at least one NetworkPolicy peer"
-
   - it: refuses to enable the internal port on a Service published outside the cluster
-    template: templates/networkpolicy.yaml
+    template: templates/service.yaml
     set:
       internalPort.enabled: true
-      internalPort.allowedFrom:
-        - podSelector: {}
       service.type: LoadBalancer
     asserts:
       - failedTemplate:
           errorPattern: "service.type must be ClusterIP when internalPort.enabled is true"
-
-  - it: admits the internal port only from the allowed callers and leaves the other ports open
-    template: templates/networkpolicy.yaml
-    set:
-      internalPort.enabled: true
-      internalPort.allowedFrom:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: teams-backend-prod
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: teams-backend
-    asserts:
-      - isKind:
-          of: NetworkPolicy
-      - equal:
-          path: spec.podSelector.matchLabels
-          value:
-            app.kubernetes.io/name: support-bot
-            app.kubernetes.io/instance: RELEASE-NAME
-      - equal:
-          path: spec.policyTypes
-          value: [Ingress]
-      - equal:
-          path: spec.ingress[0]
-          value:
-            ports:
-              - port: 8080
-                protocol: TCP
-              - port: 8081
-                protocol: TCP
-      - equal:
-          path: spec.ingress[1]
-          value:
-            from:
-              - namespaceSelector:
-                  matchLabels:
-                    kubernetes.io/metadata.name: teams-backend-prod
-                podSelector:
-                  matchLabels:
-                    app.kubernetes.io/name: teams-backend
-            ports:
-              - port: 8082
-                protocol: TCP
-
-  - it: keeps the management port open for probes when the metrics Service port is disabled
-    template: templates/networkpolicy.yaml
-    set:
-      metrics.enabled: false
-      internalPort.enabled: true
-      internalPort.allowedFrom:
-        - podSelector: {}
-    asserts:
-      - contains:
-          path: spec.ingress[0].ports
-          content:
-            port: 8081
-            protocol: TCP
 
   - it: exposes the internal port on the service when enabled
     template: templates/service.yaml
     set:
       internalPort.enabled: true
       internalPort.port: 9092
-      internalPort.allowedFrom:
-        - podSelector: {}
     asserts:
       - contains:
           path: spec.ports
@@ -131,8 +54,6 @@ tests:
     set:
       internalPort.enabled: true
       internalPort.port: 9092
-      internalPort.allowedFrom:
-        - podSelector: {}
     asserts:
       - contains:
           path: spec.template.spec.containers[0].ports

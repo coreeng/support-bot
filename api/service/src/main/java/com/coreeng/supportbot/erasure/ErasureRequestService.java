@@ -20,7 +20,7 @@ public class ErasureRequestService {
     private final Clock clock;
 
     @Transactional
-    public ErasureRequestResponse submit(SubmitErasureRequest submission) {
+    public ErasureRequest submit(SubmitErasureRequest submission) {
         UUID requestId = submission.requestId();
         boolean stored = repository.insertIfAbsent(new ErasureRequest(
                 requestId,
@@ -40,14 +40,11 @@ public class ErasureRequestService {
                     requestId,
                     request.status());
         }
-        return ErasureRequestResponse.from(request);
+        return request;
     }
 
     @Transactional(readOnly = true)
-    public ErasureRequestResponse get(UUID requestId) {
-        return repository
-                .findById(requestId)
-                .map(ErasureRequestResponse::from)
-                .orElseThrow(() -> new ErasureRequestNotFoundException(requestId));
+    public ErasureRequest get(UUID requestId) {
+        return repository.findById(requestId).orElseThrow(() -> new ErasureRequestNotFoundException(requestId));
     }
 }
