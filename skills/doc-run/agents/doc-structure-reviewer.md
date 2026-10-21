@@ -74,15 +74,20 @@ known template defects.
    with no on-disk change, which is a false finding by construction. If the spawn prompt carries a
    `=== BASELINE ===` block (the orchestrator's pre-run `git status`), subtract it first:
    pre-existing dirty files are not the builder's writes. Then: files changed but absent from
-   the manifest (pages, reports, or proposals), or manifest entries with no on-disk change, are
+   the manifest (pages, navigation files, reports, or proposals), or manifest entries with no on-disk change, are
    each a finding — the builder's self-report must match reality. Without a baseline, report
    changes you cannot attribute as `unattributed-change` rather than as builder defects.
 4. **Weight churn.** From `git diff`, flag any page whose only change is `Weight` (or whose
    `Weight` changed alongside no body change) when the builder did not list it as intentionally
    regenerated. Known latent instance: the alphabetical product-numbering rule renumbers existing
-   products when a new one lands ahead of them alphabetically.
+   products when a new one lands ahead of them alphabetically. Under `nav_ordering: nav-file`
+   the same check runs on the navigation files instead: flag any navigation file whose diff
+   removes or moves an entry that is not a skill entry, changes a key other than the ordered
+   list, or only reformats — the merge rule in doc-journeys' `references/output.md` (*Ordering
+   by navigation file*) forbids all three.
 5. **Frontmatter sanity** on every manifest page: parses as YAML delimited from line 1; carries
-   the site's title and weight fields; nothing precedes the opening `---` (the recorded failure mode
+   the site's title field, and its weight field under `nav_ordering: weight` (none under
+   `nav-file`); nothing precedes the opening `---` (the recorded failure mode
    silently discards frontmatter); the body carries no generation notice and no `## Sources` section; generated pages carry the `doc_journeys:` provenance block
    including `content_hash`.
 6. *(retired — reports are not reviewed)*

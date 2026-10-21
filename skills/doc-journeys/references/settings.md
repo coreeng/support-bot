@@ -81,9 +81,30 @@ paths are relative to the **repo root**.
 | `style_guide` | path | binding house style for authored pages |
 | `unverified_marker`, `low_confidence_banner`, `report_banner` | string | the site's marker syntax for an inferred claim, a low-confidence page, and a run report |
 | `contact_corroborators` | list of `{repo, path, field}` | tier-1 corroborators for contact points, repo-relative to the source root |
+| `section_index` | filename, optional | the file that makes a directory a section and carries its title — default `_index.md` |
+| `page_extension` | extension, optional | the extension of every page the skill writes, reports included — default `.md` |
+| `nav_ordering` | `weight` or `nav-file`, optional | how the site orders navigation: a weight field in each page's frontmatter, or a navigation file in each directory listing its children in order. Default `weight` |
+| `nav_file` | filename | the per-directory navigation file; **required when `nav_ordering` is `nav-file`**, ignored otherwise. Its format — the key holding the ordered list, the key holding a directory title, any "everything else" entry — is described in the site adapter |
+| `content_format` | `markdown` or `mdx`, optional | how the site parses page bodies. `mdx` turns on the MDX writing rules in `${CLAUDE_SKILL_DIR}/references/output.md`. Default `markdown` |
 
 A key that is present but empty is treated as absent. A missing required key stops the run with
 the key named.
+
+## Site conventions
+
+The five optional keys at the end of the table describe how the site is put together, and their
+defaults describe the convention the skill was first written against. **The reference files
+spell paths with the defaults** — `<product>/_index.md`, `<spine>.md`, `reports/batch.md` — and
+every such path is read through the settings: `_index.md` means the consumer's `section_index`,
+and a page's `.md` means its `page_extension`. A site whose index file is `index.md` gets
+`<product>/index.md` wherever a reference file says `<product>/_index.md`. The rule covers the
+agent prompt files too. It does not cover files outside the site — `product-definition/`, the
+plan file and `.doc-settings/` stay markdown whatever the site uses.
+
+Likewise, wherever a reference file says **Weight**, read it through `nav_ordering`: under
+`weight` it is the frontmatter field, under `nav-file` it is the entry's position in its
+directory's `nav_file`. The ordering principle is the same either way; *Navigation ordering* in
+`${CLAUDE_SKILL_DIR}/references/output.md` specifies both.
 
 ## How the values are used
 
@@ -92,7 +113,7 @@ the key named.
     keys; nothing is hard-coded.
   * **doc-run** reads `settings.md` at its step 0 and **pins every value it uses in every spawn
     prompt** — the four roots, `write_locations`, `build_command` with `<consumer root>`
-    substituted, `preview_path`, `base_branch`. Agents therefore never need to re-read
+    substituted, `preview_path`, `base_branch`, and the five site conventions. Agents therefore never need to re-read
     settings, and a reviewer's re-derive command lands on the same paths as the builder's.
   * **Agents** take the pinned values from their spawn prompt. The fallback, when a value is
     missing from the prompt, is to read `<consumer root>/.doc-settings/settings.md` — never to

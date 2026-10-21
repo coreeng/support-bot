@@ -298,6 +298,13 @@ touches a human-edited page. A `reviewed:` block a human adds to a page's frontm
 report lists the page under *needs re-review*, so sign-off never silently carries over to
 content nobody has read. Details in [`references/refresh.md`](references/refresh.md).
 
+Pages with no recorded `content_hash` — output carried over to another site without its
+frontmatter, say — are protected like human-edited pages. `adopt`
+(`Use doc-journeys to refresh Foglight, adopt.`) takes them over for one run: each is grounded
+against current evidence, regenerated minimally from the existing page, and given the full
+provenance block. Claims no source supports are removed and quoted in the report. A page whose
+recorded hash mismatches is never adopted.
+
 ---
 
 ## What it never does

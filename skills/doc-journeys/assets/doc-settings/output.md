@@ -97,6 +97,33 @@ from source syntax alone.
 selector that matches it. A bare `<table>` regex finds zero tables on a page whose theme adds
 classes to every one.
 
+## Navigation file
+
+`EDIT` — **only if `nav_ordering` is `nav-file`** in `settings.md`; delete this section
+otherwise. Describe the per-directory file the site orders its navigation from, so a run can
+merge into it:
+
+| Fact | Value |
+| --- | --- |
+| filename (`nav_file`) | `EDIT` |
+| format | `EDIT` — e.g. JSON, two-space indent |
+| key holding the ordered list of children | `EDIT` |
+| how a child is named in the list | `EDIT` — e.g. page slug without extension, directory name |
+| key holding a directory title, if the site reads titles from this file | `EDIT` or "none — titles come from the section index" |
+| the "everything else" entry, if the site has one | `EDIT` or "none" |
+| what the site does with a directory that has no file | `EDIT` — e.g. alphabetical order |
+
+The ordering rules in the Weight table below still apply; under `nav-file` they give each
+entry's position in its directory's list rather than a number on the page.
+
+## MDX
+
+`EDIT` — **only if `content_format` is `mdx`**; delete otherwise. Name the components pages may
+use (callouts, cards, tabs), the component for each of the three markers in the table above, and
+whether the site has a section-listing component — if it has none, bucket indexes carry an
+orienting sentence only. The skill's `references/output.md` (*MDX content*) carries the escaping
+rules; the build is the check.
+
 ## Weight table
 
 The theme orders navigation by weight within each section. The skill's rule is that Weight is

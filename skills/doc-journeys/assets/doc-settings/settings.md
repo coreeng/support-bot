@@ -73,6 +73,17 @@ unverified_marker: '> **Unverified:** …'
 low_confidence_banner: '> **Low confidence — review before relying on this page.** …'
 report_banner: '> **Run diagnostic, not documentation.** …'
 
+# Site conventions. All optional; the defaults below suit a site that indexes sections with
+# `_index.md`, orders navigation by a weight field, and parses plain markdown. A site that
+# indexes sections with another file, orders each directory from a navigation file listing its
+# children, or compiles pages as MDX sets these instead — output.md describes the navigation
+# file's format. EDIT if your site differs.
+# section_index: _index.md
+# page_extension: .md
+# nav_ordering: weight          # or nav-file
+# nav_file: ""                  # required with nav-file, e.g. the per-directory JSON file name
+# content_format: markdown      # or mdx
+
 # Strongest corroborators for contact points (chat channels, group handles, distribution lists):
 # schema-validated fields in source repos. Repo-relative to the source root. EDIT or set to []
 # if the estate has none — contact points then need corroboration from prose in two repos.
@@ -135,3 +146,4 @@ which is why `build_command` may need to name `<consumer root>`.
 | `style_guide` | doc-journeys | binding house style for authored pages |
 | `unverified_marker`, `low_confidence_banner`, `report_banner` | doc-journeys, structure reviewer | the site's marker syntax; quoted forms must be escaped per `output.md` |
 | `contact_corroborators` | doc-journeys, entity verifier | tier-1 corroborators for contact points |
+| `section_index`, `page_extension`, `nav_ordering`, `nav_file`, `content_format` | doc-journeys, builder, structure reviewer | the site conventions; optional, defaults as commented above |

@@ -33,9 +33,11 @@ names one of:
   * **a cross-product journey** — `/doc-run document the cross-product journey "Observe a service end to end"`
 
 The wording also carries the intent, using the keywords `doc-journeys` recognises: `refresh`,
-`force` / `regenerate anyway`, `extend` / `only what is missing`, `plan`. Where the target
+`force` / `regenerate anyway`, `extend` / `only what is missing`, `adopt`, `plan`. Where the target
 already has pages and the wording is ambiguous, the pipeline defaults to **refresh** — the safe
-reading — and says so in the close-out.
+reading — and says so in the close-out. `adopt` is never a default: it takes over pages that
+record no `content_hash` (output carried over from another site without its provenance), and
+only when the request says so.
 
 Two requests never reach the build:
 
@@ -65,6 +67,7 @@ the settings, the orchestrator itself uses:
 | `output_root`, `reports_dir`, `proposals_root`, `plan_file`, `prior_art_roots`, `prior_art_policy`, `source_exclude_paths` | pinned into every agent's spawn prompt so no agent rediscovers or guesses a path |
 | `build_command`, `build_toolchain`, `render_check` | the site build the structure reviewer runs, with `<consumer root>` substituted, wrapped in the toolchain shim where one is set |
 | `preview_path` | the direct link reviewers are given to the output |
+| `section_index`, `page_extension`, `nav_ordering`, `nav_file`, `content_format` | the site conventions — index filename, page extension, weight field or per-directory navigation file, markdown or MDX; optional, pinned with defaults filled in |
 | `authorisations` | the file recording what an unattended run may do here — declare, amend, and so on — and who granted it; the close-out cites it |
 
 Every agent is spawned with the **four path roles** pinned verbatim: the *tools root* (the

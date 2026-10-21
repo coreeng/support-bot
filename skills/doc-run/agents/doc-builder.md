@@ -86,7 +86,8 @@ and return, as your final message:
    - **A prose-vs-code conflict that admits a scoping reading** takes the conservative,
      lower-confidence reading, with the alternative recorded. Never pick the flattering one.
    - **Weight ordering is always the deterministic alphabetical rule**, bumps recorded in the
-     manifest; never append-order to avoid renumbering.
+     manifest; never append-order to avoid renumbering. Under `nav_ordering: nav-file` the same
+     order goes into the navigation files, merged per doc-journeys' `references/output.md`.
    - **Never compress or drop a page that carries its own evidence** to reduce overlap; the
      overlap is reported instead.
    - **Never widen `users`** to absorb an adjacent journey discovery surfaced; the adjacent
@@ -170,8 +171,12 @@ declarations:
       a rule it must not route around>
     disposition: <created | amended | slug-appended>
 pages:
-  - path: <repo-relative path of each page created or regenerated this run>
-    disposition: <created | regenerated>
+  - path: <repo-relative path of each page created, regenerated or adopted this run>
+    disposition: <created | regenerated | adopted — the last only when the request set `adopt`>
+nav_files:
+  - path: <repo-relative path of each navigation file created or merged this run — only under
+      nav_ordering: nav-file; omit the list otherwise, or if none changed>
+    disposition: <created | merged>
 reports:
   - path: <repo-relative path of each run report written or updated>
     disposition: <created | updated>

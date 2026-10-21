@@ -135,7 +135,10 @@ proposed declaration if the definition lacks one.
 
 **Something existing → resolve the intent yourself; do not ask.** Take the request's own
 wording where it names an intent (doc-journeys' *Mode resolution* keywords: `refresh`, `force`
-/ `regenerate anyway`, `extend` / `only what is missing`, `plan`). Where the wording is
+/ `regenerate anyway`, `extend` / `only what is missing`, `adopt`, `plan`). `adopt` is never
+your default: pages with no recorded `content_hash` stay protected unless the request itself
+says `adopt`, and where the target has such pages and the request does not, the close-out says
+how many and that re-running with `adopt` would take them over. Where the wording is
 ambiguous — "document Foglight Alerting" against a product that already has pages — **default to
 refresh**: pages whose evidence is unchanged are left alone, human-edited pages are protected
 and get sidecar proposals, and missing pages are still authored (the modes converge). It is
@@ -466,7 +469,8 @@ not as open questions back to the user. Then:
 - Every spawn prompt also pins the settings values every agent otherwise rediscovers or gets
   wrong: `output_root`, `reports_dir`, `proposals_root`, `plan_file`, `write_locations`,
   `prior_art_roots`, `prior_art_policy` (`coexist` when absent), `source_exclude_paths`,
-  `preview_path`, `render_check`, and the exact
+  `preview_path`, `render_check`, the five site conventions with their defaults filled in
+  (`section_index`, `page_extension`, `nav_ordering`, `nav_file`, `content_format`), and the exact
   **build command** — `build_command` with `<consumer root>` substituted for real (a
   dependency directory such as `node_modules` lives only in the main checkout, never in a
   worktree; a published re-derive command naming `<repo root>/node_modules` cannot reproduce)

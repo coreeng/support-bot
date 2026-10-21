@@ -9,6 +9,8 @@ Authored pages are written into the consumer's documentation site. This file is 
 
 It replaces three sections of `SKILL.md`: *Output root resolution*, *Naming and collisions*, and Step 5 *Frontmatter injection rules*.
 
+Paths below are spelled with the default site conventions — `_index.md` for a section's index page, `.md` for a page, a frontmatter Weight for ordering. Read them through the consumer's `section_index`, `page_extension` and `nav_ordering`, per *Site conventions* in `${CLAUDE_SKILL_DIR}/references/settings.md`.
+
 ## Output root
 
 `output_root` in the consumer's settings — the only location under the site's content directory that this skill writes to. It holds three peer sections — `products/`, `cross-product-journeys/` and `reports/` — and nothing else.
@@ -189,6 +191,21 @@ This is not hypothetical. The *Unverified claims* section exists precisely to re
 
 Check before writing, with the command the site adapter gives (typically a search for the tag's opening delimiter, filtered for the escaped form). The same applies to any section-listing, banner or cross-reference template tag a report quotes rather than uses.
 
+## MDX content (`content_format: mdx`)
+
+On a site that parses pages as MDX, markdown is compiled as code: a stray character in prose is a build failure, not a rendering glitch. Code spans and fenced code blocks stay literal, so commands, paths and config copied character-for-character are safe **inside** them. The rules below apply to every page and report the skill writes, in prose, headings, table cells, link text and list items:
+
+  * **`{` and `}`** open and close an expression. Escape them as `\{` and `\}`, or put the text in a code span.
+  * **`<`** opens a component or tag. A placeholder such as `<repo>` or `<scratch dir>` always goes in a code span; a literal less-than in prose is written `&lt;`.
+  * **No HTML comments.** `<!-- … -->` is a syntax error. Where a comment is genuinely needed, use the MDX form `{/* … */}`; a page body normally needs none.
+  * **No angle-bracket autolinks.** `<https://…>` does not link; write `[text](https://…)`.
+  * **Raw HTML must be valid JSX** — closed tags, `className` rather than `class` — so prefer plain markdown and the components the site adapter names.
+  * **Markers and banners are components.** `unverified_marker`, `low_confidence_banner` and `report_banner` take whatever form the adapter gives, typically a component. Quoting one in a report puts it in a code span, where it stays literal — the *Escaping template syntax* rule above reduces to that on these sites.
+
+The build is the authoritative check: an MDX compile error names the file and line. Run `build_command` before finishing, as the Guardrails already require.
+
+`content_hash` is unaffected — it is computed over the body exactly as written, escapes included.
+
 ### What stays outside
 
 **Sidecar proposals** (`${CLAUDE_SKILL_DIR}/references/refresh.md`) are written to `proposals_root`, outside the content tree, and are **not** published. A proposal is a draft of a real page, not a diagnostic about one. Publishing it would put a second copy of a page on the site with nothing marking which is current, which is the duplication failure the skill exists to avoid. The report links to a proposal by repository path, not by URL.
@@ -206,14 +223,30 @@ Collisions cannot occur, because `${CLAUDE_SKILL_DIR}/references/product-definit
 
 Note that this guarantees only that no two journeys share a *name*. It says nothing about two journeys covering the same *ground*, which is expected between the two sections and is handled after authoring by `${CLAUDE_SKILL_DIR}/references/duplication.md`.
 
-## Weight ordering
+## Navigation ordering
 
-The site orders its navigation by a weight field within each section. **Assign it deterministically so re-runs do not reshuffle the navigation** — the principle is the skill's; the numeric table is the site adapter's. The principle has four parts:
+The site orders its navigation within each section either by a weight field on each page or by a navigation file in each directory — `nav_ordering` in settings says which. **Assign the order deterministically so re-runs do not reshuffle the navigation** — the principle is the skill's; the concrete values are the site adapter's. The principle has four parts, and holds under both mechanisms:
 
   * Section furniture and bucket indexes take fixed values from the adapter's table, in Diátaxis order — tutorial, how-to, reference, explanation — which also happens to run from most to least hand-holding.
   * Journeys are weighted above every bucket, so a reader lands on the product, sees what it is, then how to learn it, use it, look things up in it and understand it, and only then the end-to-end paths through it.
   * **Journey order follows the product definition**, not alphabetical order — the author's ordering is meaningful and preserving it is worth more than sorted output. The same holds for variations within a journey and for the resolved cross-product journey list.
   * Products, pages inside a bucket, and reports other than the batch summary are numbered alphabetically by slug. Known latent churn: alphabetical numbering renumbers existing siblings when a new one lands ahead of them, and the structure reviewer reports the resulting Weight-only diffs.
+
+### Ordering by weight (`nav_ordering: weight`)
+
+Every page and section index carries the site's weight field, valued from the site adapter's Weight table. Lower sorts first.
+
+### Ordering by navigation file (`nav_ordering: nav-file`)
+
+Pages carry **no weight field**. Each directory under `output_root` that the skill creates or adds children to carries a `nav_file` listing its children — page slugs without extension, and subdirectory names — in the order the principle above gives: in a product directory, the four buckets in Diátaxis order and then the journeys in definition order; in a journey directory, the spine page or the variations in declared order; in `reports/`, the batch summary and then the rest alphabetically. The site adapter gives the file's format: the key holding the ordered list, the key holding a directory title where the site takes titles from there rather than from the section index, and the "everything else" entry if the site has one.
+
+A navigation file is **section furniture with a merge rule**, not a page. It carries no `doc_journeys:` block and no `content_hash`, and refresh never protects or proposes it. Instead a run touches it only like this:
+
+  1. **Absent** → create it with the computed list, the directory title where the adapter says the site reads one, and nothing else.
+  2. **Present** → leave every key other than the ordered list exactly as it is. Within the list, an entry naming something the skill wrote is a *skill entry*; every other entry — a page a human added, a separator, the "everything else" entry — keeps its position. The skill entries are rewritten into the computed order, occupying the positions skill entries already held; a new skill entry goes directly after the last existing one, or before the "everything else" entry where that comes first. An entry is never removed: an orphaned page keeps its entry until a human deletes both.
+  3. **Unchanged** → if the merged result equals the file on disk, do not write it. Rewriting an identical list, or reformatting it, is churn.
+
+Write the file in the format the adapter gives and keep the existing file's indentation where one exists. Ordering changes land in the navigation file and nowhere else, so under this mechanism a run **never needs to touch a human-edited page** to renumber it — the weight-only exception in the Guardrails does not arise.
 
 ## Frontmatter
 
@@ -270,7 +303,7 @@ doc_journeys:
 | title | Yes | Sentence case. Never repeat the product name in a page nested under that product, and **never repeat the journey name on a page nested under that journey** — see *Titles must be unique within a directory* below. |
 | summary | Yes | One sentence, no trailing full stop omitted — write it as a sentence. Appears in section listings and search results. |
 | tags | Yes | 3–8 lowercase terms drawn from the journey term set. These feed site search; generic terms (`platform`, `config`) dilute it and should be left out. |
-| weight | Yes | Per the site adapter's table and the principle above. |
+| weight | Under `nav_ordering: weight` | Per the site adapter's table and the principle above. Omitted under `nav-file`, where order lives in the directory's navigation file. |
 | aliases | No | Only when this page supersedes a known URL. Do not invent aliases. |
 | `doc_journeys.product` | Pages under `products/` | The resolved `product_name`, identical across every page of a product's run. **Omitted entirely on cross-product journey pages**, which carry `products` instead. |
 | `doc_journeys.products` | Cross-product journey pages | The products the journey crosses — in declared order where declared, in descending evidence weight where derived. Never emitted alongside `product` — a page has one or the other, so a consumer can tell the two kinds apart without parsing its path. |
@@ -422,7 +455,7 @@ Note that `routes_to` may point at another **cross-product** journey, as the arc
 
 **Cross-product journey index** (`cross-product-journeys/<journey>/_index.md`) — what the reader is trying to achieve, which products it crosses and why each is involved, prerequisites, and a link to the spine page. It must name the products in prose, not only in frontmatter: a reader arriving here is asking *which products do I need*, and that is the question this page exists to answer.
 
-**Bucket sections** (`tutorial/_index.md`, `how-to/_index.md`, `reference/_index.md`, `explanation/_index.md`) — a single orienting sentence, then the site's section-listing template tag, in the form the site adapter gives, **ordered by weight** — these sections have meaningful Weight ordering and the listing should honour it.
+**Bucket sections** (`tutorial/_index.md`, `how-to/_index.md`, `reference/_index.md`, `explanation/_index.md`) — a single orienting sentence, then the site's section-listing template tag, in the form the site adapter gives, **ordered by weight** — these sections have meaningful Weight ordering and the listing should honour it. Where the adapter records that the site has **no** section-listing tag, the bucket index carries the orienting sentence alone and the site's navigation is the listing. Never write the child list out by hand there: a bucket index is never refreshed (below), so a hand-written list goes stale on the next page added.
 
 Bucket sections are **section furniture**, like the top-level indexes above: created when a bucket first has pages, then left alone. They carry title, summary and weight and **no `doc_journeys:` block** — no `content_hash`, no `sources`, no `confidence`. That is deliberate, not an omission. A bucket index has no evidence behind it: its body is one orienting sentence and a template tag, its child list is computed by the site at render time, and there is nothing a refresh could recompute from changed sources. Emitting the block would mean inventing a `sources` list for a page whose own rule is that sources are never empty.
 
@@ -438,5 +471,7 @@ The short version:
   * A page a human has edited — detected by comparing the on-disk body against `content_hash`, *not* by the presence of `generated: true` — is **never overwritten**, by any mode or flag. If its evidence changed, the new version goes to a sidecar proposal under `proposals_root` for a human to merge.
   * A page whose evidence changed and which no human has touched is **regenerated minimally**: start from the existing page, change only what the evidence requires.
   * Journey directories no longer backed by the product definition are **orphaned**, reported, and never deleted.
+  * Under `nav_ordering: nav-file`, navigation files are **merged**, never overwritten, per *Ordering by navigation file* above.
+  * Pages with no recorded `content_hash` are human-owned unless the run carries the explicit **`adopt`** switch, per `${CLAUDE_SKILL_DIR}/references/refresh.md`.
 
 Getting this wrong destroys reviewed content, which is the most valuable material on the site. When uncertain whether a page is human-owned, treat it as human-owned.
