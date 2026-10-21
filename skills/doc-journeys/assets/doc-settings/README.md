@@ -35,6 +35,21 @@ main checkout — because that is where a run resolves them.
     unique across the whole definition. Recommended, not required: each product you intend
     to run has a brief or at least `features` — without them the skill still runs, but discovery
     vocabulary is thinner and the report says so.
+  * **The site conventions match the site.** If the site does not use `_index.md` section
+    indexes, `.md` pages, a weight field for ordering and plain markdown, then `section_index`,
+    `page_extension`, `nav_ordering`, `nav_file` and `content_format` are set in `settings.md`.
+    The site adapter's *Navigation file* and *MDX* sections are then filled in, or deleted
+    where they do not apply.
+  * **The site's frontmatter schema accepts a `doc_journeys:` key.** Every page a run writes
+    carries one. To check, add `doc_journeys: {}` to one existing page, run `build_command`, then
+    revert the page.
+  * **Every source is a git repository directly under the source root.** To list them, run
+    `find <source root> -mindepth 2 -maxdepth 2 -name .git`. A folder missing from that list is
+    not scanned. Loose files, such as exported wiki pages, go inside one of the listed
+    repositories: see *Sources that are not git repositories* in the skills README.
+  * **If the output root already has pages without a `doc_journeys:` block**, follow *Taking
+    over an existing site* in the skills README. Without the `adopt` switch those pages are
+    protected as human-edited.
   * **`base_branch` exists** (`git rev-parse --verify <base_branch>`). A run worktree branches
     from it and the finished branch merges back into it.
   * **The directory named by `worktree_dir` is gitignored** (`git check-ignore <worktree_dir>`

@@ -97,7 +97,9 @@ The whole workflow, in order. Each step links to the detail.
    consumer itself, whose existing documentation is consolidated. Clone the repositories the
    product is built from next to the consumer checkout (full clones, not shallow) and `git pull`
    them before a run: a run reads what is on disk. Every repository present is scanned, so
-   remove the ones no product you are running needs.
+   remove the ones no product you are running needs. Only git repositories count; for exported
+   wiki pages and other loose files see
+   [Sources that are not git repositories](#sources-that-are-not-git-repositories).
 3. **Set up `.doc-settings/`** from the starter and work through its checklist
    ([Setting up a consumer](#setting-up-a-consumer)). This is done once per consumer. One
    decision shapes every page: whether the output **replaces** your existing documentation or
@@ -130,6 +132,73 @@ The whole workflow, in order. Each step links to the detail.
    complete and can be closed out by hand rather than re-run.
 10. **Later**, `/doc-run refresh <product>` updates only what changed in the sources, and never
     overwrites a page a human has edited.
+
+If the output root already holds pages that carry no `doc_journeys:` block — a site migrated
+from elsewhere, or documentation written before the skill — follow steps 1–5, then
+[Taking over an existing site](#taking-over-an-existing-site) instead of steps 6–10.
+
+## Taking over an existing site
+
+Without the `adopt` switch, a page with no recorded `content_hash` is treated as human-edited:
+a refresh writes a sidecar proposal beside it and never changes it. To take such pages over:
+
+1. **Set the site conventions.** If the site does not use `_index.md` section indexes, `.md`
+   pages, a weight field for ordering and plain markdown, set `section_index`,
+   `page_extension`, `nav_ordering`, `nav_file` and `content_format` in `settings.md`, and fill
+   in the site adapter's *Navigation file* and *MDX* sections. See
+   [Site conventions](doc-journeys/references/settings.md#site-conventions).
+2. **Check the frontmatter schema.** Every page a run writes gains a `doc_journeys:` key. If
+   the site validates frontmatter and rejects unknown keys, allow that key first, or the build
+   fails on the first page written. To check, add `doc_journeys: {}` to one existing page's
+   frontmatter, run `build_command`, then revert the page.
+3. **Check the existing pages fit the layout.** Adoption finds a page by its position in the
+   [directory structure](doc-journeys/references/output.md#directory-structure):
+   `<output_root>/products/<product-slug>/<bucket>/<page>` (buckets `tutorial`, `how-to`,
+   `reference`, `explanation`), `<output_root>/products/<product-slug>/<journey-slug>/<page>`,
+   or `<output_root>/cross-product-journeys/<journey-slug>/<page>`. Slugs are derived from
+   names, so:
+   * give each `product.md` a `name` that slugs to the existing product directory
+     (`Foglight Agent` → `foglight-agent`);
+   * declare a journey for every existing journey directory, named so it slugs to that
+     directory.
+
+   A page anywhere else is out of scope: the report lists it, and it is never adopted or moved.
+   To list what must map to a product, bucket or declared journey:
+
+   ```bash
+   find <output_root>/products -mindepth 1 -maxdepth 2 -type d
+   ```
+4. **Make sure the sources carry the content.** Existing pages are not evidence: `output_root`
+   is excluded from sources. A claim no source supports is removed during adoption. Put
+   everything worth keeping under the source root, including exported wiki pages (see
+   [Sources that are not git repositories](#sources-that-are-not-git-repositories)).
+5. **Plan with `adopt`:** `/doc-run plan refresh <product>, adopt`. In the plan, check:
+   * the number of adoptable pages. Zero means step 3 failed;
+   * the claims that would be removed;
+   * that the files from step 4 appear as evidence.
+6. **Run with `adopt`:** `/doc-run refresh <product>, adopt`, then review and merge as in step
+   8 above. The report's *Adopted pages* section quotes every removed claim. To restore one, add
+   a source that supports it and re-run. Do not edit the page back by hand: a hand edit makes
+   the page human-owned again.
+
+`adopt` applies to one run and is never a default. An adopted page becomes an ordinary
+skill-owned page, so later runs are a plain `/doc-run refresh <product>`.
+
+## Sources that are not git repositories
+
+Discovery only scans git repositories directly under the source root. A plain folder there,
+such as exported wiki pages or a document dump, is skipped without a warning. To use such files:
+
+1. **Put them inside a repository under the source root.** The consumer repository works, for
+   example `<consumer root>/doc-sources/<name>/`.
+2. **Keep them out of the site:** outside `output_root`, outside every `source_exclude_paths`
+   entry and outside the site's content directory. A file in an excluded path is never read;
+   one in the content directory gets rendered as a page.
+3. **Do not gitignore them.** The search tools skip ignored files.
+   `git check-ignore -v <path>` prints nothing when the path is not ignored.
+4. **Commit them on `base_branch`.** Refresh detects source change through git history, so a
+   file that was never committed never counts as changed.
+5. **If they must not ship with the site,** keep them off the branch the site publishes from.
 
 To change the skills themselves, edit them here, release, and re-install in the consumer; never
 edit the vendored copies. A run in progress keeps the copy that was committed when its worktree

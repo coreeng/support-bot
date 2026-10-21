@@ -144,6 +144,8 @@ A site that already holds this skill's output can lose the provenance that makes
 
 **Not a route to restructuring.** A page carrying two Diátaxis intents, or sitting in the wrong bucket, is adopted where it is and the problem is reported under *Suggested actions*. Splitting or moving it is a human's decision.
 
+**Pages outside the layout.** Adoption maps a page by its position in the directory structure in `${CLAUDE_SKILL_DIR}/references/output.md`. A content page under `output_root` is out of scope when its position maps to no declared product, journey or bucket. Examples: a directory the layout does not have, a journey directory no declaration slugs to, a product directory no `product.md` `name` slugs to. Such a page is never adopted, moved, regenerated or proposed. The report lists it under *Adopted pages* as `outside the layout`, with its path and the declaration or move that would bring it into scope. Print the count of such pages in the step 1 confirmation, so a run with many of them is seen before it starts.
+
 `adopt` composes with `force` — which by then changes nothing for adopted pages, whose evidence counts as changed anyway — and is mutually exclusive with `only-missing`, which writes no existing page at all. It never touches a page whose recorded hash mismatches, in any combination.
 
 ## Step 5 — Structural changes
@@ -198,7 +200,7 @@ The report must also carry:
   * **Needs re-review** — pages regenerated since their `reviewed` block was recorded.
   * **Proposals** — every sidecar written, with what changed and where to find it.
   * **Orphans** — directories and pages no longer backed by the product definition.
-  * **Adopted pages** — under `adopt` only: each page adopted, and beneath it every claim removed because no source supported it, quoted; then each page `not adopted`, with why.
+  * **Adopted pages** — under `adopt` only: each page adopted, and beneath it every claim removed because no source supported it, quoted; then each page `not adopted`, with why; then each page `outside the layout`, with the declaration or move that would bring it into scope.
   * **Confidence changes** — any page whose confidence moved, in either direction, with why. A page that dropped from `high` to `low` because its best source was deleted is the single most important line in a refresh report.
 
 A refresh where nothing changed should say so in one line and write nothing. That is a successful run, not an empty one.

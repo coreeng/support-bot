@@ -303,7 +303,9 @@ frontmatter, say — are protected like human-edited pages. `adopt`
 (`Use doc-journeys to refresh Foglight, adopt.`) takes them over for one run: each is grounded
 against current evidence, regenerated minimally from the existing page, and given the full
 provenance block. Claims no source supports are removed and quoted in the report. A page whose
-recorded hash mismatches is never adopted.
+recorded hash mismatches is never adopted. Pages outside the skill's directory layout are
+listed in the report and left alone. The setup for taking over a whole site is in
+[Taking over an existing site](../README.md#taking-over-an-existing-site).
 
 ---
 
