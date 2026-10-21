@@ -1,0 +1,209 @@
+analysis:
+  reviewed:
+    - id
+    - ticket_id
+    - driver
+    - category
+    - feature
+    - summary
+    - created_at
+    - updated_at
+    - prompt_id
+
+analysis_prompt:
+  reviewed:
+    - id
+    - version
+    - content
+    - is_in_use
+    - created_at
+    - type
+
+async_job:
+  reviewed:
+    - id
+    - data
+    - started_at
+
+elevate_integrity_items:
+  reviewed:
+    - type
+    - journey_id
+    - journey_name
+    - journey_product_id
+    - user_id
+    - user_name
+    - user_product_id
+    - sort_name
+    - sort_id
+    - search_text
+
+elevate_journey_users:
+  reviewed:
+    - journey_id
+    - user_id
+
+elevate_journeys:
+  reviewed:
+    - resource_id
+    - payload
+    - slug
+    - name
+    - product_id
+    - product_slug
+    - user_description
+    - primary_problems
+    - created_at
+    - last_updated_at
+
+elevate_products:
+  reviewed:
+    - resource_id
+    - payload
+    - slug
+    - name
+    - customer
+    - created_at
+    - last_updated_at
+
+elevate_sync_state:
+  reviewed:
+    - singleton
+    - last_ping_attempt_at
+    - last_ping_success_at
+    - last_ping_succeeded
+    - last_ping_error
+    - last_sync_attempt_at
+    - last_sync_success_at
+    - last_sync_succeeded
+    - last_sync_error
+    - snapshot_version
+
+elevate_users:
+  reviewed:
+    - resource_id
+    - payload
+    - product_id
+    - name
+    - description
+    - created_at
+    - last_updated_at
+
+escalation:
+  reviewed:
+    - id
+    - ticket_id
+    - channel_id
+    - thread_ts
+    - created_message_ts
+    - status
+    - team
+    - source
+
+escalation_log:
+  reviewed:
+    - id
+    - escalation_id
+    - event
+    - date
+
+escalation_to_tag:
+  reviewed:
+    - escalation_id
+    - tag_code
+
+impact:
+  reviewed:
+    - code
+    - label
+    - deleted_at
+
+pr_tracking:
+  reviewed:
+    - id
+    - ticket_id
+    - repo
+    - pr_number
+    - pr_created_at
+    - sla_deadline
+    - owning_team
+    - can_auto_close_ticket
+    - status
+    - escalation_id
+    - closed_at
+    - created_at
+    - sla_remaining
+    - last_review_at
+    - last_author_activity_at
+    - has_sla
+    - provider
+    - codeowner_review_requested
+    - merge_phase_entered
+
+query:
+  reviewed:
+    - id
+    - ts
+    - channel_id
+    - date
+
+ratings:
+  reviewed:
+    - id
+    - rating
+    - submitted_ts
+    - status
+    - impact
+    - tags
+    - is_escalated
+
+summary_snapshot:
+  reviewed:
+    - id
+    - window_from
+    - window_to
+    - prompt_id
+    - fingerprint
+    - content
+    - model
+    - generated_at
+
+tag:
+  reviewed:
+    - code
+    - label
+    - deleted_at
+    - product
+
+team:
+  reviewed:
+    - code
+    - label
+    - deleted_at
+
+ticket:
+  reviewed:
+    - id
+    - query_id
+    - created_message_ts
+    - status
+    - team
+    - impact_code
+    - last_interacted_at
+    - rating_submitted
+    - assigned_to
+    - assigned_to_format
+    - assigned_to_hash
+    - updated_at
+
+ticket_log:
+  reviewed:
+    - id
+    - ticket_id
+    - event
+    - date
+
+ticket_to_tag:
+  reviewed:
+    - ticket_id
+    - tag_code

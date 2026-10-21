@@ -29,6 +29,10 @@ To automatically fix formatting:
 **Checkstyle** enforces naming conventions:
 - Enum constants must use `UPPER_SNAKE_CASE` (e.g., `MY_CONSTANT`, not `myConstant`)
 
+## Erasure Compliance
+
+`ErasureComplianceTest` fails unless every column of every table is listed in `service/src/test/resources/erasure-compliance.yaml` as `anonymised` or `reviewed`. Views are left out. When a migration adds or drops a table or column, update the list. Use `anonymised` when erasing a person must rewrite the column, and `reviewed` when it holds no personal data.
+
 ## Quick Reference
 
 | Task | Command |
