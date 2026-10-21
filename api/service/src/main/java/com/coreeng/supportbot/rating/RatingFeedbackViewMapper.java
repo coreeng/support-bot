@@ -61,12 +61,12 @@ public class RatingFeedbackViewMapper {
 
         blocks.add(input(i -> i.blockId(Fields.shareName.id())
                 .optional(true)
-                .label(plainText("Share your name?"))
+                .label(plainText("Link this feedback to your thread?"))
                 .element(checkboxes(c -> c.actionId(Fields.shareName.id())
                         .options(ImmutableList.of(option(
-                                "Share my name with this feedback",
+                                "Link my feedback to this support thread",
                                 SHARE_NAME_VALUE,
-                                "Links your feedback to this support thread so we can follow up.")))))));
+                                "Lets us see which support request your feedback is about.")))))));
         blocks.add(context(c -> c.elements(ImmutableList.of(markdownText(
                 "Leave this unticked to stay anonymous: your feedback won't be linked to you or this thread.")))));
         return blocks.build();

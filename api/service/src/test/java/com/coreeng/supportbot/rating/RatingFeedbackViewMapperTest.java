@@ -28,14 +28,16 @@ class RatingFeedbackViewMapperTest {
         View view = render(2);
 
         assertThat(view.getCallbackId()).isEqualTo(RatingFeedbackViewMapper.CALLBACK_ID);
-        assertThat(inputLabels(view)).containsExactly("What went wrong with your experience?", "Share your name?");
+        assertThat(inputLabels(view))
+                .containsExactly("What went wrong with your experience?", "Link this feedback to your thread?");
     }
 
     @Test
     void high_rating_asks_what_went_well() {
         View view = render(5);
 
-        assertThat(inputLabels(view)).containsExactly("What made your experience worthwhile?", "Share your name?");
+        assertThat(inputLabels(view))
+                .containsExactly("What made your experience worthwhile?", "Link this feedback to your thread?");
     }
 
     @Test

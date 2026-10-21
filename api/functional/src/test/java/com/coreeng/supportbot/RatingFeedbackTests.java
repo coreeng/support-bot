@@ -36,7 +36,8 @@ public class RatingFeedbackTests {
         ratingStubs.awaitAllCalled(Duration.ofSeconds(5));
 
         RatingFeedbackForm form = ratingStubs.formOpened().result();
-        assertThat(form.inputLabels()).containsExactly("What went wrong with your experience?", "Share your name?");
+        assertThat(form.inputLabels())
+                .containsExactly("What went wrong with your experience?", "Link this feedback to your thread?");
 
         String feedback = "Slow first response " + UUID.randomUUID();
         asTenant.slack()
@@ -67,7 +68,8 @@ public class RatingFeedbackTests {
         ratingStubs.awaitAllCalled(Duration.ofSeconds(5));
 
         RatingFeedbackForm form = ratingStubs.formOpened().result();
-        assertThat(form.inputLabels()).containsExactly("What made your experience worthwhile?", "Share your name?");
+        assertThat(form.inputLabels())
+                .containsExactly("What made your experience worthwhile?", "Link this feedback to your thread?");
 
         String feedback = "Fixed in minutes " + UUID.randomUUID();
         asTenant.slack()
