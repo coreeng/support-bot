@@ -55,6 +55,7 @@ public class PlatformTeamsService {
             PlatformTeam team = teamByCode.computeIfAbsent(
                     t.code(), k -> new PlatformTeam(t.name(), t.code(), new HashSet<>(), new HashSet<>()));
             team.groupRefs().add(t.groupRef());
+            mergeAttributes(team, t);
         }
 
         Set<GroupRef> uniqueGroupRefs = teams.stream()
@@ -99,6 +100,25 @@ public class PlatformTeamsService {
                 .addArgument(usersByEmail::size)
                 .addArgument(() -> Duration.between(start, Instant.now()))
                 .log("Finished fetching teams info. Teams({}), Groups({}), Users({}), Elapsed({})");
+    }
+
+    /**
+     * A team built from several resources gets the union of their attributes. On conflicting values the first
+     * one fetched is kept and the conflict is logged, since which value wins depends on the listing order.
+     */
+    private static void mergeAttributes(PlatformTeam team, PlatformTeamsFetcher.TeamAndGroupTuple tuple) {
+        tuple.attributes().forEach((name, value) -> {
+            String kept = team.attributes().putIfAbsent(name, value);
+            if (kept != null && !kept.equals(value)) {
+                log.atWarn()
+                        .addKeyValue("team", team.code())
+                        .addKeyValue("attribute", name)
+                        .log(
+                                "Resources for one team disagree on an attribute; keeping '{}', ignoring '{}'",
+                                kept,
+                                value);
+            }
+        });
     }
 
     private Map<GroupRef, List<PlatformUsersFetcher.Membership>> fetchMembershipsInParallel(

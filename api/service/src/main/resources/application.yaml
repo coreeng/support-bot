@@ -349,6 +349,10 @@ platform-integration:
           cel-expression: resource.metadata.name
         groupRef:
           cel-expression: resource.metadata.uid
+        # Optional extra values per team, read from the same resource. See docs/configuration.md
+        # attributes:
+        #   tier:
+        #     cel-expression: resource.metadata.?labels.?tier
 
 team:
   support:
