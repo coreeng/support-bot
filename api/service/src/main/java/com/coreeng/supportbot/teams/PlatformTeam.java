@@ -1,6 +1,8 @@
 package com.coreeng.supportbot.teams;
 
 import com.coreeng.supportbot.teams.groups.GroupRef;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -14,6 +16,7 @@ public class PlatformTeam {
     private final String code;
     private final Set<GroupRef> groupRefs;
     private final Set<PlatformUser> users;
+    private final Map<String, String> attributes = new HashMap<>();
 
     public PlatformTeam(String name, String code, Set<GroupRef> groupRefs, Set<PlatformUser> users) {
         this.name = name;

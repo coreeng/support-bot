@@ -255,6 +255,17 @@ platform-integration: # Whether to enable platform integration to automatically 
           cel-expression: resource.metadata.name
         groupRef: # Will use the `group-id` annotation as a group reference, e.g. Azure group id, GCP Group email. Supposed to be changed to a real configuration.
           cel-expression: resource.metadata.annotations.group-id
+        # Optional extra string values per team, read from the same resource. Returned as `attributes` on teams in
+        # API responses (/team, /user), omitted when empty. Startup logs how many resources got each attribute.
+        # - Attributes never change which teams are found. Like teamName and groupRef, a malformed `attributes` block or
+        #   expression fails startup. An expression that fails on a resource, or doesn't return a string, leaves the
+        #   attribute unset on that team; the first failure per attribute is logged as a warning, and the startup
+        #   summary gives the count. Blank values count as unset.
+        # - Use kebab-case or camelCase names. A name containing dots needs brackets, e.g. "[team.region]".
+        # - Start the optional `?` steps after a plain path, at most two in a row, as below.
+        attributes:
+          tier: # Attribute name, e.g. a team's support tier
+            cel-expression: resource.metadata.?labels.?tier # `?` makes each step optional: resources without the label silently get no attribute
 
 team:
   support:

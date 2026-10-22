@@ -7,6 +7,7 @@ import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.teams.fakes.FakeEscalationTeamsRegistry;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,63 @@ class TeamServiceTest {
         assertEquals(ImmutableList.of(TeamType.TENANT), result.get(0).types());
         assertEquals("team2", result.get(1).code());
         assertEquals(ImmutableList.of(TeamType.TENANT), result.get(1).types());
+    }
+
+    @Test
+    void listTeamsByType_tenant_carriesThePlatformTeamsAttributes() {
+        // given
+        PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
+        PlatformTeam platformTeam = new PlatformTeam("team1", Set.of(), Set.of());
+        platformTeam.attributes().put("tier", "gold");
+        when(platformTeamsService.listTeams()).thenReturn(ImmutableList.of(platformTeam));
+
+        TeamService teamService = new TeamService(
+                platformTeamsService,
+                new FakeEscalationTeamsRegistry(List.of()),
+                mockSupportTeamService(),
+                mock(TeamHistoryRepository.class));
+
+        // when
+        ImmutableList<Team> result = teamService.listTeamsByType(TeamType.TENANT);
+
+        // then
+        assertEquals(ImmutableMap.of("tier", "gold"), result.getFirst().attributes());
+    }
+
+    @Test
+    void escalationTeamThatIsAlsoATenant_carriesItsAttributesHoweverItsQueried() {
+        // given
+        PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
+        PlatformTeam platformTeam = new PlatformTeam("esc1", Set.of(), Set.of());
+        platformTeam.attributes().put("tier", "gold");
+        when(platformTeamsService.listTeams()).thenReturn(ImmutableList.of(platformTeam));
+        when(platformTeamsService.findTeamByCode("esc1")).thenReturn(platformTeam);
+
+        TeamService teamService = new TeamService(
+                platformTeamsService,
+                new FakeEscalationTeamsRegistry(
+                        List.of(new EscalationTeam("Escalation Team 1", "esc1", "slack:SLACK1"))),
+                mockSupportTeamService(),
+                mock(TeamHistoryRepository.class));
+        ImmutableMap<String, String> expected = ImmutableMap.of("tier", "gold");
+
+        // then
+        assertEquals(
+                expected,
+                teamService.listTeamsByType(TeamType.ESCALATION).getFirst().attributes());
+        assertEquals(
+                expected,
+                teamService.listTeamsByType(TeamType.TENANT).getFirst().attributes());
+        Team found = teamService.findTeamByCode("esc1");
+        assertNotNull(found);
+        assertEquals(expected, found.attributes());
+        assertEquals(
+                expected,
+                teamService.listTeams().stream()
+                        .filter(t -> t.code().equals("esc1"))
+                        .findFirst()
+                        .orElseThrow()
+                        .attributes());
     }
 
     @Test

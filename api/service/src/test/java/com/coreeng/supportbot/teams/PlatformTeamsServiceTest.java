@@ -10,9 +10,11 @@ import com.coreeng.supportbot.teams.fakes.FakeUsersFetcher;
 import com.coreeng.supportbot.teams.fakes.SlowUsersFetcher;
 import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.coreeng.supportbot.teams.groups.GroupResolver;
+import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class PlatformTeamsServiceTest {
@@ -57,6 +59,52 @@ class PlatformTeamsServiceTest {
         assertEquals(1, service.listTeamsByUserEmail("wow1@test.com").size());
         assertEquals(
                 "wow", service.listTeamsByUserEmail("wow1@test.com").getFirst().name());
+    }
+
+    @Test
+    void fetchedAttributes_areKeptOnTheTeam() {
+        PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(List.of(new PlatformTeamsFetcher.TeamAndGroupTuple(
+                "wow", "wow", ref("wow-group"), ImmutableMap.of("tier", "gold"))));
+        FakeUsersFetcher usersFetcher = FakeUsersFetcher.builder()
+                .memberships("wow-group", List.of(new PlatformUsersFetcher.Membership("wow1@test.com")))
+                .build();
+
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2), false);
+        PlatformTeamsService service = new PlatformTeamsService(
+                teamsFetcher, resolverOf(usersFetcher), new FakeEscalationTeamsRegistry(List.of()), props);
+
+        service.init();
+
+        var team = service.findTeamByCode("wow");
+        assertNotNull(team);
+        assertEquals(Map.of("tier", "gold"), team.attributes());
+    }
+
+    @Test
+    void teamFromSeveralResources_mergesAttributes_keepingTheFirstValueOnConflict() {
+        PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(List.of(
+                new PlatformTeamsFetcher.TeamAndGroupTuple(
+                        "team-a", "team-a", ref("group-1"), ImmutableMap.of("tier", "gold")),
+                new PlatformTeamsFetcher.TeamAndGroupTuple(
+                        "team-a",
+                        "team-a",
+                        ref("group-2"),
+                        ImmutableMap.of("tier", "silver", "owner", "platform-team")),
+                new PlatformTeamsFetcher.TeamAndGroupTuple("team-a", "team-a", ref("group-3"))));
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2), false);
+        PlatformTeamsService service = new PlatformTeamsService(
+                teamsFetcher,
+                resolverOf(FakeUsersFetcher.builder().build()),
+                new FakeEscalationTeamsRegistry(List.of()),
+                props);
+
+        service.init();
+
+        var team = service.findTeamByCode("team-a");
+        assertNotNull(team);
+        // Keys from both resources; the conflicting tier keeps the first value; a resource without attributes wipes
+        // nothing
+        assertEquals(Map.of("tier", "gold", "owner", "platform-team"), team.attributes());
     }
 
     @Test

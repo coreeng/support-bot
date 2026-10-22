@@ -5,6 +5,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -51,7 +52,10 @@ public class TeamService {
                             PlatformTeam platformTeam = platformTeamsService.findTeamByCode(t.code());
                             if (platformTeam != null) {
                                 return new Team(
-                                        t.label(), t.code(), ImmutableList.of(TeamType.TENANT, TeamType.ESCALATION));
+                                        t.label(),
+                                        t.code(),
+                                        ImmutableList.of(TeamType.TENANT, TeamType.ESCALATION),
+                                        ImmutableMap.copyOf(platformTeam.attributes()));
                             }
                             return new Team(t.label(), t.code(), ImmutableList.of(TeamType.ESCALATION));
                         })
@@ -107,8 +111,9 @@ public class TeamService {
             return new Team(
                     escalationTeam.label(),
                     escalationTeam.code(),
-                    ImmutableList.of(TeamType.TENANT, TeamType.ESCALATION));
+                    ImmutableList.of(TeamType.TENANT, TeamType.ESCALATION),
+                    ImmutableMap.copyOf(t.attributes()));
         }
-        return new Team(t.name(), t.code(), ImmutableList.of(TeamType.TENANT));
+        return new Team(t.name(), t.code(), ImmutableList.of(TeamType.TENANT), ImmutableMap.copyOf(t.attributes()));
     }
 }

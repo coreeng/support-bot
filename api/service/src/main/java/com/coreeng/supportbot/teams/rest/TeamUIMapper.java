@@ -18,7 +18,7 @@ public class TeamUIMapper {
     }
 
     public TeamUI mapToUI(Team team) {
-        return new TeamUI(team.label(), team.code(), team.types());
+        return new TeamUI(team.label(), team.code(), team.types(), true, team.attributes());
     }
 
     public TeamUI mapToUI(TeamDisplay team) {
