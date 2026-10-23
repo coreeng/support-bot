@@ -25,6 +25,25 @@ class AnalysisJobDataTest {
     }
 
     @Test
+    void encodesATeamGroupWindowRunAsItsOwnType() {
+        String data = AnalysisJobData.teamGroupWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23), "area-a");
+
+        assertThat(data)
+                .isEqualTo("{\"type\":\"team-group-window\",\"from\":\"2026-03-10\",\"to\":\"2026-03-23\","
+                        + "\"teamGroup\":\"area-a\"}");
+        assertThat(AnalysisJobData.parse(data))
+                .isEqualTo(new AnalysisJobData.TeamGroupWindowRun(
+                        LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23), "area-a"));
+    }
+
+    @Test
+    void aTeamGroupWindowRunWithoutItsGroupIsUnreadable() {
+        assertThat(AnalysisJobData.parse(
+                        "{\"type\":\"team-group-window\",\"from\":\"2026-03-10\",\"to\":\"2026-03-23\"}"))
+                .isNull();
+    }
+
+    @Test
     void stillReadsTheBareIntegerWrittenBeforeTheJsonForm() {
         // Rows written by an older version of the service must survive a rolling upgrade; the
         // alternative is the resume deleting them and silently dropping an in-flight run.

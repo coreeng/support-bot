@@ -3,8 +3,10 @@ package com.coreeng.supportbot.summary;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
+import com.coreeng.supportbot.teamgroups.TeamGroup;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSortedSet;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,6 +29,9 @@ class SummaryReadRepositoryPostgresTest {
     private static final String OTHER_CHANNEL = "C-SUMMARY-OTHER";
     private static final String PROMPT_ID = "prompt-summary-test";
     private static final SummaryWindow WINDOW = new SummaryWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 12));
+    private static final SummaryScope SCOPE = SummaryScope.all(WINDOW);
+    private static final TeamGroup GROUP = new TeamGroup("area-a", "Area A", ImmutableSortedSet.of("team-a", "team-b"));
+    private static final SummaryScope GROUP_SCOPE = new SummaryScope(WINDOW, GROUP);
 
     private final SummaryReadRepository repository;
     private final JdbcTemplate jdbcTemplate;
@@ -66,7 +71,7 @@ class SummaryReadRepositoryPostgresTest {
                 "team-z");
         classify(unmonitored, "Knowledge Gap", "Deployment & CD", "cd", "x");
 
-        SummaryBreakdowns breakdowns = repository.breakdowns(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryBreakdowns breakdowns = repository.breakdowns(SCOPE, PROMPT_ID, List.of(CHANNEL));
 
         assertThat(breakdowns.totalTickets()).isEqualTo(3);
         assertThat(breakdowns.classifiedTickets()).isEqualTo(2);
@@ -99,7 +104,7 @@ class SummaryReadRepositoryPostgresTest {
     void bucketsBlankValuesInsteadOfDroppingThem() {
         classify(ticket("2026-03-11T09:00:00", "ts-blank", null), "Knowledge Gap", "  ", "", "Reason.");
 
-        SummaryBreakdowns breakdowns = repository.breakdowns(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryBreakdowns breakdowns = repository.breakdowns(SCOPE, PROMPT_ID, List.of(CHANNEL));
 
         assertThat(breakdowns.categories())
                 .extracting(SummaryCount::label, SummaryCount::count)
@@ -117,12 +122,12 @@ class SummaryReadRepositoryPostgresTest {
         long stale = ticket("2026-03-11T09:00:00", "ts-stale", "team-a");
         classifyWithPrompt(stale, "Knowledge Gap", "Build & CI", "pipelines", "Old.", "an-older-prompt");
 
-        SummaryBreakdowns breakdowns = repository.breakdowns(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryBreakdowns breakdowns = repository.breakdowns(SCOPE, PROMPT_ID, List.of(CHANNEL));
 
         assertThat(breakdowns.totalTickets()).isEqualTo(1);
         assertThat(breakdowns.classifiedTickets()).isZero();
         assertThat(breakdowns.drivers()).isEmpty();
-        assertThat(repository.reasons(WINDOW, PROMPT_ID, List.of(CHANNEL), 100)).isEmpty();
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100)).isEmpty();
     }
 
     @Test
@@ -144,7 +149,7 @@ class SummaryReadRepositoryPostgresTest {
         // Raised but never classified: absent from the analysis breakdowns, still a team example.
         long open = ticket("2026-03-12T11:00:00", "ts-open", "team-c");
 
-        SummaryBreakdowns breakdowns = repository.breakdowns(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryBreakdowns breakdowns = repository.breakdowns(SCOPE, PROMPT_ID, List.of(CHANNEL));
 
         assertThat(recentFor(breakdowns.drivers(), "Knowledge Gap"))
                 .hasSize(JdbcSummaryReadRepository.RECENT_PER_ROW)
@@ -209,7 +214,7 @@ class SummaryReadRepositoryPostgresTest {
         SummaryTestFixtures.tagTicket(jdbcTemplate, vaultOnly, "unflagged", "Product - Vault");
         SummaryTestFixtures.tagTicket(jdbcTemplate, vaultOnly, "empty", "  ", true);
 
-        SummaryBreakdowns breakdowns = repository.breakdowns(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryBreakdowns breakdowns = repository.breakdowns(SCOPE, PROMPT_ID, List.of(CHANNEL));
 
         assertThat(breakdowns.products())
                 .extracting(SummaryCount::label, SummaryCount::count)
@@ -230,16 +235,16 @@ class SummaryReadRepositoryPostgresTest {
         long first = ticket("2026-03-11T09:00:00", "ts-1", "team-a");
         classify(first, "Knowledge Gap", "Build & CI", "pipelines", "One.", LocalDateTime.parse("2026-03-11T12:00:00"));
 
-        SummaryFingerprint initial = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint initial = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
         assertThat(initial.analysisCount()).isEqualTo(1);
         assertThat(initial.maxUpdatedAt()).isEqualTo(LocalDateTime.parse("2026-03-11T12:00:00"));
-        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL)).value())
+        assertThat(repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL)).value())
                 .isEqualTo(initial.value());
 
         long second = ticket("2026-03-12T09:00:00", "ts-2", "team-a");
         classify(second, "Task Request", "Build & CI", "pipelines", "Two.", LocalDateTime.parse("2026-03-12T12:00:00"));
 
-        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL)).value())
+        assertThat(repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL)).value())
                 .isNotEqualTo(initial.value());
     }
 
@@ -247,20 +252,20 @@ class SummaryReadRepositoryPostgresTest {
     void fingerprintTracksClosedTicketsAwaitingClassification() {
         long classified = ticket("2026-03-11T09:00:00", "ts-done", "team-a");
         classify(classified, "Knowledge Gap", "Build & CI", "ci", "Done.", LocalDateTime.parse("2026-03-11T12:00:00"));
-        SummaryFingerprint complete = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint complete = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
         assertThat(complete.gapCount()).isZero();
         assertThat(complete.value()).isEqualTo("1/1@2026-03-11T12:00~" + complete.maxTicketUpdatedAt());
 
         // An open ticket is not a gap — it will be classified once it closes.
         SummaryTestFixtures.insertTicket(
                 jdbcTemplate, CHANNEL, "ts-open", LocalDateTime.parse("2026-03-11T10:00:00"), "opened", "team-a");
-        SummaryFingerprint withOpen = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint withOpen = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
         assertThat(withOpen.gapCount()).isZero();
         assertThat(withOpen.value()).isEqualTo("2/1@2026-03-11T12:00~" + withOpen.maxTicketUpdatedAt());
 
         // A closed, unclassified ticket is: the fingerprint moves even though no analysis row changed.
         long gap = ticket("2026-03-12T09:00:00", "ts-gap", "team-a");
-        SummaryFingerprint withGap = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint withGap = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
         assertThat(withGap.ticketCount()).isEqualTo(3);
         assertThat(withGap.analysisCount()).isEqualTo(1);
         assertThat(withGap.gapCount()).isEqualTo(1);
@@ -270,7 +275,7 @@ class SummaryReadRepositoryPostgresTest {
 
         // Classifying it closes the gap and moves the analysis half instead.
         classify(gap, "Task Request", "Build & CI", "ci", "Later.", LocalDateTime.parse("2026-03-12T12:00:00"));
-        SummaryFingerprint after = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint after = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
         assertThat(after.gapCount()).isZero();
         assertThat(after.value()).isEqualTo("3/2@2026-03-12T12:00~" + after.maxTicketUpdatedAt());
     }
@@ -281,19 +286,19 @@ class SummaryReadRepositoryPostgresTest {
         classify(ticket, "Knowledge Gap", "Build & CI", "ci", "One.", LocalDateTime.parse("2026-03-11T12:00:00"));
         long other = ticket("2026-03-12T09:00:00", "ts-2", "team-b");
         classify(other, "Task Request", "Build & CI", "ci", "Two.", LocalDateTime.parse("2026-03-12T12:00:00"));
-        SummaryFingerprint initial = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint initial = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
         assertThat(initial.maxTicketUpdatedAt()).isNotNull().isEqualTo(updatedAt(other));
 
         // Re-saving a ticket with nothing changed must not invalidate the cached prose.
         jdbcTemplate.update("UPDATE ticket SET team = team, status = status WHERE id = ?", ticket);
-        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(initial);
+        assertThat(repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL))).isEqualTo(initial);
         // Nor must thread activity: last_interacted_at is not part of what the prose describes.
         jdbcTemplate.update("UPDATE ticket SET last_interacted_at = now() WHERE id = ?", ticket);
-        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(initial);
+        assertThat(repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL))).isEqualTo(initial);
 
         // Correcting the team changes the teams breakdown the prose quotes, with no analysis row touched.
         jdbcTemplate.update("UPDATE ticket SET team = ? WHERE id = ?", "team-c", ticket);
-        SummaryFingerprint reteamed = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint reteamed = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
         assertThat(reteamed.ticketCount()).isEqualTo(initial.ticketCount());
         assertThat(reteamed.analysisCount()).isEqualTo(initial.analysisCount());
         assertThat(reteamed.maxUpdatedAt()).isEqualTo(initial.maxUpdatedAt());
@@ -302,13 +307,13 @@ class SummaryReadRepositoryPostgresTest {
 
         // So does tagging it with a product: the tag row's trigger reaches the parent ticket.
         SummaryTestFixtures.tagTicket(jdbcTemplate, ticket, "alpha", "Alpha", true);
-        SummaryFingerprint tagged = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint tagged = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
         assertThat(tagged.maxTicketUpdatedAt()).isAfter(reteamed.maxTicketUpdatedAt());
-        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(tagged);
+        assertThat(repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL))).isEqualTo(tagged);
 
         // And removing a tag.
         jdbcTemplate.update("DELETE FROM ticket_to_tag WHERE ticket_id = ?", ticket);
-        SummaryFingerprint untagged = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint untagged = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
         assertThat(untagged.maxTicketUpdatedAt()).isAfter(tagged.maxTicketUpdatedAt());
 
         // A ticket outside the window or channel is not part of the fingerprint, however it is edited.
@@ -324,7 +329,7 @@ class SummaryReadRepositoryPostgresTest {
         long later = SummaryTestFixtures.insertTicket(
                 jdbcTemplate, CHANNEL, "ts-later", LocalDateTime.parse("2026-03-13T00:00:00"), "closed", "team-a");
         jdbcTemplate.update("UPDATE ticket SET team = ? WHERE id = ?", "team-z", later);
-        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL))).isEqualTo(untagged);
+        assertThat(repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL))).isEqualTo(untagged);
     }
 
     private Instant updatedAt(long ticketId) {
@@ -340,14 +345,14 @@ class SummaryReadRepositoryPostgresTest {
     void fingerprintChangesWhenAnOpenTicketIsRaisedInTheWindow() {
         long classified = ticket("2026-03-11T09:00:00", "ts-done", "team-a");
         classify(classified, "Knowledge Gap", "Build & CI", "ci", "Done.", LocalDateTime.parse("2026-03-11T12:00:00"));
-        SummaryFingerprint before = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint before = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
         assertThat(before.ticketCount()).isEqualTo(1);
 
         // A ticket raised after the snapshot but still open changes no analysis row and is not a gap,
         // yet it is in the totals the prose quotes — so a cached summary must read as stale.
         SummaryTestFixtures.insertTicket(
                 jdbcTemplate, CHANNEL, "ts-open", LocalDateTime.parse("2026-03-12T10:00:00"), "opened", "team-b");
-        SummaryFingerprint after = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint after = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
         assertThat(after.ticketCount()).isEqualTo(2);
         assertThat(after.analysisCount()).isEqualTo(before.analysisCount());
         assertThat(after.gapCount()).isZero();
@@ -363,13 +368,13 @@ class SummaryReadRepositoryPostgresTest {
                 LocalDateTime.parse("2026-03-12T11:00:00"),
                 "opened",
                 "team-b");
-        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL)).value())
+        assertThat(repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL)).value())
                 .isEqualTo(after.value());
     }
 
     @Test
     void fingerprintOfAnEmptyWindowIsStable() {
-        SummaryFingerprint fingerprint = repository.fingerprint(WINDOW, PROMPT_ID, List.of(CHANNEL));
+        SummaryFingerprint fingerprint = repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL));
 
         assertThat(fingerprint.ticketCount()).isZero();
         assertThat(fingerprint.analysisCount()).isZero();
@@ -388,9 +393,9 @@ class SummaryReadRepositoryPostgresTest {
 
         SummaryReason newest = new SummaryReason(LocalDate.of(2026, 3, 12), "Newest.");
         SummaryReason oldest = new SummaryReason(LocalDate.of(2026, 3, 10), "Oldest.");
-        assertThat(repository.reasons(WINDOW, PROMPT_ID, List.of(CHANNEL), 100)).containsExactly(newest, oldest);
-        assertThat(repository.reasons(WINDOW, PROMPT_ID, List.of(CHANNEL), 1)).containsExactly(newest);
-        assertThat(repository.reasons(WINDOW, PROMPT_ID, List.of(CHANNEL), 0)).isEmpty();
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100)).containsExactly(newest, oldest);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 1)).containsExactly(newest);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 0)).isEmpty();
         assertThat(newest.line()).isEqualTo("2026-03-12 — Newest.");
     }
 
@@ -398,13 +403,103 @@ class SummaryReadRepositoryPostgresTest {
     void unmonitoredChannelSetYieldsNothingRatherThanEverything() {
         classify(ticket("2026-03-11T09:00:00", "ts-any", "team-a"), "Knowledge Gap", "Build & CI", "ci", "Reason.");
 
-        SummaryBreakdowns breakdowns = repository.breakdowns(WINDOW, PROMPT_ID, List.of());
+        SummaryBreakdowns breakdowns = repository.breakdowns(SCOPE, PROMPT_ID, List.of());
 
         assertThat(breakdowns.totalTickets()).isZero();
         assertThat(breakdowns.teams()).isEmpty();
-        assertThat(repository.fingerprint(WINDOW, PROMPT_ID, List.of()).analysisCount())
+        assertThat(repository.fingerprint(SCOPE, PROMPT_ID, List.of()).analysisCount())
                 .isZero();
-        assertThat(repository.reasons(WINDOW, PROMPT_ID, List.of(), 10)).isEmpty();
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(), 10)).isEmpty();
+    }
+
+    @Test
+    void aTeamGroupNarrowsEveryFigureToItsTeams() {
+        long a = ticket("2026-03-10T09:00:00", "ts-a", "team-a");
+        long b = ticket("2026-03-11T09:00:00", "ts-b", "team-b");
+        long outside = ticket("2026-03-11T10:00:00", "ts-c", "team-c");
+        long noTeam = ticket("2026-03-11T11:00:00", "ts-none", null);
+        long notATenant = ticket("2026-03-11T12:00:00", "ts-nat", "Not a Tenant");
+        classify(a, "Knowledge Gap", "Build & CI", "pipelines", "A.");
+        classify(b, "Task Request", "Deployment & CD", "cd", "B.");
+        classify(outside, "Knowledge Gap", "Networking", "ingress", "C.");
+        classify(noTeam, "Knowledge Gap", "Networking", "ingress", "None.");
+        classify(notATenant, "Knowledge Gap", "Networking", "ingress", "Not a tenant.");
+
+        SummaryBreakdowns group = repository.breakdowns(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL));
+
+        assertThat(group.window()).isEqualTo(WINDOW);
+        assertThat(group.totalTickets()).isEqualTo(2);
+        assertThat(group.classifiedTickets()).isEqualTo(2);
+        assertThat(group.drivers())
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("Knowledge Gap", 1L), tuple("Task Request", 1L));
+        assertThat(group.categories())
+                .extracting(SummaryCount::label)
+                .containsExactlyInAnyOrder("Build & CI", "Deployment & CD");
+        assertThat(group.knowledgeGaps())
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("Build & CI", 1L));
+        // No "Unknown" or "Not a Tenant" bucket: a ticket with no tenant team belongs to no group.
+        assertThat(group.teams())
+                .extracting(SummaryCount::label, SummaryCount::count)
+                .containsExactly(tuple("team-a", 1L), tuple("team-b", 1L));
+        assertThat(repository.reasons(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL), 100))
+                .extracting(SummaryReason::text)
+                .containsExactly("B.", "A.");
+
+        // The whole window is untouched by the group's existence.
+        assertThat(repository.breakdowns(SCOPE, PROMPT_ID, List.of(CHANNEL)).totalTickets())
+                .isEqualTo(5);
+    }
+
+    @Test
+    void aTeamGroupsFingerprintIgnoresOtherTeamsAndCarriesItsDefinition() {
+        long inGroup = ticket("2026-03-11T09:00:00", "ts-in", "team-a");
+        classify(inGroup, "Knowledge Gap", "Build & CI", "ci", "In.", LocalDateTime.parse("2026-03-11T12:00:00"));
+        SummaryFingerprint before = repository.fingerprint(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL));
+
+        assertThat(before.ticketCount()).isEqualTo(1);
+        assertThat(before.scopeDigest())
+                .isEqualTo(GROUP_SCOPE.membershipDigest())
+                .isNotNull();
+        assertThat(before.value()).endsWith("|g:" + GROUP_SCOPE.membershipDigest());
+
+        // Another team's ticket closing unclassified is a gap for the whole window, not for the group.
+        ticket("2026-03-11T10:00:00", "ts-out", "team-c");
+        SummaryFingerprint after = repository.fingerprint(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL));
+        assertThat(after).isEqualTo(before);
+        assertThat(repository.fingerprint(SCOPE, PROMPT_ID, List.of(CHANNEL)).gapCount())
+                .isEqualTo(1);
+
+        // A group gap does count.
+        long groupGap = ticket("2026-03-11T11:00:00", "ts-gap", "team-b");
+        assertThat(repository
+                        .fingerprint(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL))
+                        .gapIds())
+                .containsExactly(new TicketId(groupGap));
+
+        // Relabelling the group (same tickets, another label) makes its fingerprint differ.
+        SummaryScope relabelled = new SummaryScope(
+                WINDOW, new TeamGroup("area-a", "Area A renamed", ImmutableSortedSet.of("team-a", "team-b")));
+        assertThat(repository
+                        .fingerprint(relabelled, PROMPT_ID, List.of(CHANNEL))
+                        .value())
+                .isNotEqualTo(repository
+                        .fingerprint(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL))
+                        .value());
+    }
+
+    @Test
+    void movingATicketOutOfTheGroupChangesTheGroupsFingerprint() {
+        long ticket = ticket("2026-03-11T09:00:00", "ts-1", "team-a");
+        classify(ticket, "Knowledge Gap", "Build & CI", "ci", "One.", LocalDateTime.parse("2026-03-11T12:00:00"));
+        SummaryFingerprint initial = repository.fingerprint(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL));
+
+        jdbcTemplate.update("UPDATE ticket SET team = ? WHERE id = ?", "team-c", ticket);
+
+        SummaryFingerprint moved = repository.fingerprint(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL));
+        assertThat(moved.ticketCount()).isZero();
+        assertThat(moved.value()).isNotEqualTo(initial.value());
     }
 
     private static long sum(ImmutableList<SummaryCount> counts) {

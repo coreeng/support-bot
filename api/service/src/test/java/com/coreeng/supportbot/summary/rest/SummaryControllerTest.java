@@ -2,6 +2,8 @@ package com.coreeng.supportbot.summary.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -23,14 +25,19 @@ import com.coreeng.supportbot.security.Role;
 import com.coreeng.supportbot.security.SecurityConfig;
 import com.coreeng.supportbot.security.UserPrincipal;
 import com.coreeng.supportbot.summary.SummaryBreakdowns;
+import com.coreeng.supportbot.summary.SummaryScope;
 import com.coreeng.supportbot.summary.SummaryService;
 import com.coreeng.supportbot.summary.SummaryState;
 import com.coreeng.supportbot.summary.SummaryWindow;
+import com.coreeng.supportbot.summary.UnknownTeamGroupException;
+import com.coreeng.supportbot.teamgroups.TeamGroup;
+import com.coreeng.supportbot.teamgroups.TeamGroupService;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSortedSet;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -67,6 +74,9 @@ class SummaryControllerTest {
 
     @MockitoBean
     private SummaryService summaryService;
+
+    @MockitoBean
+    private TeamGroupService teamGroupService;
 
     @MockitoBean
     private JwtService jwtService;
@@ -124,7 +134,7 @@ class SummaryControllerTest {
 
         ArgumentCaptor<LocalDate> from = ArgumentCaptor.forClass(LocalDate.class);
         ArgumentCaptor<LocalDate> to = ArgumentCaptor.forClass(LocalDate.class);
-        verify(summaryService).get(from.capture(), to.capture());
+        verify(summaryService).get(from.capture(), to.capture(), isNull());
         assertThat(to.getValue()).isEqualTo(LocalDate.of(2026, 3, 25));
         assertThat(from.getValue()).isEqualTo(LocalDate.of(2026, 3, 12));
     }
@@ -163,7 +173,7 @@ class SummaryControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("SUMMARY_WINDOW_INVALID"));
 
-        verify(summaryService, never()).get(any(), any());
+        verify(summaryService, never()).get(any(), any(), any());
     }
 
     @Test
@@ -183,7 +193,7 @@ class SummaryControllerTest {
                         .with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
                 .andExpect(status().isOk());
 
-        verify(summaryService).get(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 4, 2));
+        verify(summaryService).get(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 4, 2), null);
     }
 
     @Test
@@ -195,7 +205,7 @@ class SummaryControllerTest {
                 .andExpect(jsonPath("$.code").value("SUMMARY_WINDOW_INVALID"))
                 .andExpect(jsonPath("$.detail").value("The window must not exceed 92 days (about one quarter)"));
 
-        verify(summaryService, never()).get(any(), any());
+        verify(summaryService, never()).get(any(), any(), any());
     }
 
     @Test
@@ -205,7 +215,7 @@ class SummaryControllerTest {
         mockMvc.perform(get("/summary").with(authentication(authTokenWithRoles(Role.USER))))
                 .andExpect(status().isForbidden());
 
-        verify(summaryService, never()).get(any(), any());
+        verify(summaryService, never()).get(any(), any(), any());
     }
 
     @Test
@@ -215,7 +225,7 @@ class SummaryControllerTest {
         mockMvc.perform(head("/summary").with(authentication(authTokenWithRoles(Role.USER))))
                 .andExpect(status().isForbidden());
 
-        verify(summaryService, never()).get(any(), any());
+        verify(summaryService, never()).get(any(), any(), any());
     }
 
     @Test
@@ -225,7 +235,7 @@ class SummaryControllerTest {
         mockMvc.perform(head("/summary").with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
                 .andExpect(status().isOk());
 
-        verify(summaryService).get(any(), any());
+        verify(summaryService).get(any(), any(), any());
     }
 
     @Test
@@ -263,6 +273,90 @@ class SummaryControllerTest {
         verify(summaryService, never()).promptContent();
     }
 
+    @Test
+    void passesTheTeamGroupThroughAndEchoesItBack() throws Exception {
+        SummaryWindow window = new SummaryWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23));
+        TeamGroup group = new TeamGroup("area-a", "Area A", ImmutableSortedSet.of("team-a"));
+        when(summaryService.get(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23), "area-a"))
+                .thenReturn(new SummaryService.SummaryResult(
+                        new SummaryScope(window, group),
+                        new SummaryBreakdowns(
+                                window,
+                                0,
+                                0,
+                                ImmutableList.of(),
+                                ImmutableList.of(),
+                                ImmutableList.of(),
+                                ImmutableList.of(),
+                                ImmutableList.of(),
+                                ImmutableList.of()),
+                        new SummaryState.Generating(SummaryState.Phase.SUMMARISING, null, null)));
+
+        mockMvc.perform(get("/summary?from=2026-03-10&to=2026-03-23&teamGroup=area-a")
+                        .with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.teamGroup.code").value("area-a"))
+                .andExpect(jsonPath("$.teamGroup.label").value("Area A"));
+    }
+
+    @Test
+    void omitsTheTeamGroupForTheWholeWindow() throws Exception {
+        givenSummary();
+
+        mockMvc.perform(get("/summary").with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.teamGroup").doesNotExist());
+    }
+
+    @Test
+    void rejectsAnUnknownTeamGroupWithItsOwnCode() throws Exception {
+        when(summaryService.get(any(), any(), eq("gone"))).thenThrow(new UnknownTeamGroupException("gone"));
+
+        mockMvc.perform(get("/summary?teamGroup=gone")
+                        .with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SUMMARY_TEAM_GROUP_UNKNOWN"));
+    }
+
+    @Test
+    void listsTheTeamGroupsWithTheirMembersAndTheDisplayName() throws Exception {
+        TeamGroup group = new TeamGroup("area-a", "Area A", ImmutableSortedSet.of("team-a"));
+        when(teamGroupService.displayName()).thenReturn("Domain");
+        when(teamGroupService.describe())
+                .thenReturn(ImmutableList.of(new TeamGroupService.DescribedTeamGroup(
+                        group, ImmutableList.of(new TeamGroupService.Member("team-a", "Team A")))));
+
+        mockMvc.perform(get("/summary/team-groups")
+                        .with(authentication(authTokenWithRoles(Role.USER, Role.SUPPORT_ENGINEER))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Domain"))
+                .andExpect(jsonPath("$.groups[0].code").value("area-a"))
+                .andExpect(jsonPath("$.groups[0].label").value("Area A"))
+                .andExpect(jsonPath("$.groups[0].teams[0].code").value("team-a"))
+                .andExpect(jsonPath("$.groups[0].teams[0].label").value("Team A"));
+    }
+
+    @Test
+    void listsTheTeamGroupsToLeadership() throws Exception {
+        when(teamGroupService.displayName()).thenReturn("Area");
+        when(teamGroupService.describe()).thenReturn(ImmutableList.of());
+
+        mockMvc.perform(get("/summary/team-groups")
+                        .with(authentication(authTokenWithRoles(Role.USER, Role.LEADERSHIP))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groups").isEmpty());
+    }
+
+    @Test
+    void forbidsTheTeamGroupsWithoutLeadershipOrSupportEngineer() throws Exception {
+        mockMvc.perform(get("/summary/team-groups").with(authentication(authTokenWithRoles(Role.USER))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(head("/summary/team-groups").with(authentication(authTokenWithRoles(Role.USER))))
+                .andExpect(status().isForbidden());
+
+        verify(teamGroupService, never()).describe();
+    }
+
     private void givenSummary() {
         SummaryWindow window = new SummaryWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23));
         SummaryBreakdowns breakdowns = new SummaryBreakdowns(
@@ -280,8 +374,10 @@ class SummaryControllerTest {
                 ImmutableList.of(
                         new com.coreeng.supportbot.summary.SummaryCount("team-a", 3, ImmutableList.of(), "Alpha")),
                 ImmutableList.of(new com.coreeng.supportbot.summary.SummaryCount("Alpha", 1)));
-        when(summaryService.get(any(), any()))
+        when(summaryService.get(any(), any(), any()))
                 .thenReturn(new SummaryService.SummaryResult(
-                        breakdowns, new SummaryState.Ready("the prose", "model-a", Instant.EPOCH)));
+                        SummaryScope.all(window),
+                        breakdowns,
+                        new SummaryState.Ready("the prose", "model-a", Instant.EPOCH)));
     }
 }

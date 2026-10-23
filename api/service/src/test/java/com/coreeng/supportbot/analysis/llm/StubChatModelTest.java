@@ -12,8 +12,10 @@ import com.coreeng.supportbot.summary.LlmSummaryService;
 import com.coreeng.supportbot.summary.SummaryBreakdowns;
 import com.coreeng.supportbot.summary.SummaryCount;
 import com.coreeng.supportbot.summary.SummaryReason;
+import com.coreeng.supportbot.summary.SummaryScope;
 import com.coreeng.supportbot.summary.SummaryWindow;
 import com.coreeng.supportbot.summarydata.ThreadService;
+import com.coreeng.supportbot.teamgroups.TeamGroupService;
 import com.google.common.collect.ImmutableList;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -22,6 +24,7 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /**
  * Drives the stub through the <em>real</em> call sites rather than hand-built prompt strings.
@@ -81,10 +84,12 @@ class StubChatModelTest {
 
     @Test
     void summaryCallGetsProseRatherThanAClassificationBlock() {
-        LlmSummaryService summaryService = new LlmSummaryService(stub, llmProps());
+        LlmSummaryService summaryService =
+                new LlmSummaryService(stub, llmProps(), Mockito.mock(TeamGroupService.class));
 
         String summary = summaryService.generate(
                 "Summarise the window.",
+                SummaryScope.all(breakdowns().window()),
                 breakdowns(),
                 ImmutableList.of(new SummaryReason(LocalDate.of(2026, 3, 12), "Because.")));
 
@@ -107,7 +112,8 @@ class StubChatModelTest {
 
     @Test
     void summaryIsStampedWithTheStubModelNameNotTheConfiguredOne() {
-        LlmSummaryService summaryService = new LlmSummaryService(stub, llmProps());
+        LlmSummaryService summaryService =
+                new LlmSummaryService(stub, llmProps(), Mockito.mock(TeamGroupService.class));
 
         assertThat(summaryService.modelName()).isEqualTo("stub").isNotEqualTo("stub-local");
     }

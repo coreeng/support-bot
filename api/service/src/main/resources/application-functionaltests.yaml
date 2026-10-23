@@ -226,12 +226,21 @@ platform-integration:
       teams:
         - name: wow
           groupRef: group-ref-wow
+          attributes:
+            area: Functional Area
         - name: infra-integration
           groupRef: group-ref-infra-integration
         - name: connected-app
           groupRef: group-ref-connected-app
+          attributes:
+            area: Functional Area
         - name: pr-author-excluded
           groupRef: group-ref-pr-author-excluded
+
+# Team groups for the Support Summary functional tests, built from the static teams' `area`
+# attribute: wow and connected-app form the "Functional Area" group (code functional-area).
+team-groups:
+  attribute: area
 
 # Proxy mode against the functional-test WireMock: the real proxy ChatModel is exercised
 # end-to-end (native Gemini REST + Basic auth). The generateContent stub is registered as a
