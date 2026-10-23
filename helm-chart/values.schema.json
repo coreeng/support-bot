@@ -346,6 +346,14 @@
                 }
               }
             },
+            "team-groups": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "display-name": { "type": "string", "minLength": 1 },
+                "attribute": { "type": "string", "minLength": 1 }
+              }
+            },
             "security": {
               "type": "object",
               "additionalProperties": true,

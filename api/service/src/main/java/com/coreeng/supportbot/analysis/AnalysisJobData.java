@@ -18,7 +18,9 @@ import org.jspecify.annotations.Nullable;
  * <p>The payload is a small JSON document discriminated by {@code type}: {@code
  * {"type":"days","days":7}} is a days-based classification run, {@code
  * {"type":"window","from":"2026-01-01","to":"2026-01-14"}} a Support Summary refresh over an explicit
- * date range. Rows written before the JSON form existed hold a bare integer (the days), and are still
+ * date range, and {@code {"type":"team-group-window",...,"teamGroup":"x"}} the same refresh for one
+ * team group's summary — a separate type rather than an optional field on {@code window}, so a
+ * whole-window payload stays byte-identical to what earlier versions wrote. Rows written before the JSON form existed hold a bare integer (the days), and are still
  * read so an in-flight run survives the upgrade.
  *
  * <p>The mapper is private to this class rather than the application's: the stored form must not
@@ -53,6 +55,11 @@ public final class AnalysisJobData {
         return encode(new WindowRun(from, to));
     }
 
+    /** Payload for a Support Summary refresh whose prose is narrowed to one team group. */
+    public static String teamGroupWindow(LocalDate from, LocalDate to, String teamGroup) {
+        return encode(new TeamGroupWindowRun(from, to, teamGroup));
+    }
+
     private static String encode(Parsed payload) {
         try {
             return MAPPER.writeValueAsString(payload);
@@ -83,9 +90,10 @@ public final class AnalysisJobData {
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
     @JsonSubTypes({
         @JsonSubTypes.Type(value = DaysRun.class, name = "days"),
-        @JsonSubTypes.Type(value = WindowRun.class, name = "window")
+        @JsonSubTypes.Type(value = WindowRun.class, name = "window"),
+        @JsonSubTypes.Type(value = TeamGroupWindowRun.class, name = "team-group-window")
     })
-    public sealed interface Parsed permits DaysRun, WindowRun {}
+    public sealed interface Parsed permits DaysRun, WindowRun, TeamGroupWindowRun {}
 
     /** Classify closed tickets last interacted with in the last {@code days} days. */
     public record DaysRun(int days) implements Parsed {
@@ -101,6 +109,19 @@ public final class AnalysisJobData {
         public WindowRun {
             requireNonNull(from, "from");
             requireNonNull(to, "to");
+        }
+    }
+
+    /**
+     * Refresh the Support Summary for tickets raised between {@code from} and {@code to}, with the
+     * prose narrowed to the team group {@code teamGroup} (its code). Classification still covers the
+     * whole window.
+     */
+    public record TeamGroupWindowRun(LocalDate from, LocalDate to, String teamGroup) implements Parsed {
+        public TeamGroupWindowRun {
+            requireNonNull(from, "from");
+            requireNonNull(to, "to");
+            requireNonNull(teamGroup, "teamGroup");
         }
     }
 }

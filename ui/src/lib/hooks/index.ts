@@ -24,7 +24,7 @@ import type {
   RepoInsights,
   RequestBreakdown,
 } from "@/lib/types/dashboard";
-import type { SummaryData, SummaryStatus } from "@/lib/types/summary";
+import type { SummaryData, SummaryStatus, SummaryTeamGroups } from "@/lib/types/summary";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getCsrfToken, signOut } from "next-auth/react";
 import { useState } from "react";
@@ -582,6 +582,20 @@ export function useSummaryEnabled() {
   });
 }
 
+/**
+ * The team groups the Support Summary can be narrowed to, and the noun to call them by. They only
+ * change when the backend restarts, so the page refetches them when the backend reports a group it
+ * no longer has, rather than often.
+ */
+export function useSummaryTeamGroups(enabled = true) {
+  return useQuery<SummaryTeamGroups>({
+    queryKey: ["summary", "team-groups"],
+    queryFn: () => apiGet("/summary/team-groups"),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 /** The last successful summary reply for a window, as seen by the query's cumulative counters. */
 interface LastSummarySuccess {
   window: string;
@@ -611,15 +625,16 @@ function pollFailuresSince(
  * in a row have failed; after `MAX_SUMMARY_POLL_FAILURES` polling stops rather than spinning
  * through an outage.
  */
-export function useSummary(from?: string, to?: string, enabled = true) {
+export function useSummary(from?: string, to?: string, teamGroup?: string, enabled = true) {
   const params = new URLSearchParams();
   if (from) params.append("from", from);
   if (to) params.append("to", to);
+  if (teamGroup) params.append("teamGroup", teamGroup);
   const query = params.toString();
   const [lastSuccess, setLastSuccess] = useState<LastSummarySuccess>({ window: query, dataUpdatedAt: 0, errorUpdateCount: 0 });
 
   const result = useQuery<SummaryData>({
-    queryKey: ["summary", from ?? null, to ?? null],
+    queryKey: ["summary", from ?? null, to ?? null, teamGroup || null],
     // The request triggers backfill and prose generation on the backend, so it carries the CSRF token.
     queryFn: () => apiGet(`/summary${query ? `?${query}` : ""}`, { csrf: true }),
     enabled,

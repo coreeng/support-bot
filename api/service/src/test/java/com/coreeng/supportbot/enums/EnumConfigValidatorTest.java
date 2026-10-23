@@ -68,8 +68,8 @@ class EnumConfigValidatorTest {
         when(staticTeamsProps.enabled()).thenReturn(true);
         when(staticTeamsProps.teams())
                 .thenReturn(List.of(
-                        new StaticPlatformTeamsProps.TeamConfig("First", "dup", new GroupRef.Slack("S1")),
-                        new StaticPlatformTeamsProps.TeamConfig("Second", "dup", new GroupRef.Slack("S2"))));
+                        new StaticPlatformTeamsProps.TeamConfig("First", "dup", new GroupRef.Slack("S1"), null),
+                        new StaticPlatformTeamsProps.TeamConfig("Second", "dup", new GroupRef.Slack("S2"), null)));
 
         assertThatThrownBy(() -> validator.run(new DefaultApplicationArguments()))
                 .isInstanceOf(IllegalStateException.class)

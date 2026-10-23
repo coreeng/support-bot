@@ -56,6 +56,15 @@ describe("summary BFF route", () => {
     await expect(response.json()).resolves.toEqual({ summary: "text" });
   });
 
+  it("forwards the team group alongside the window", async () => {
+    mockBackendFetch.mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
+    const request = makeRequest({ query: "?from=2026-01-01&to=2026-01-31&teamGroup=area-a" });
+
+    await GET(request);
+
+    expect(mockBackendFetch).toHaveBeenCalledWith(request, "/summary?from=2026-01-01&to=2026-01-31&teamGroup=area-a", {}, "/summary");
+  });
+
   // An uncached window triggers classification and paid summary generation on the backend, and the
   // session cookie is SameSite=None, so a cross-site GET must be rejected before reaching the backend.
   it("returns 403 without contacting the backend when the CSRF header is missing", async () => {

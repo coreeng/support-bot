@@ -12,10 +12,12 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const from = searchParams.get("from");
   const to = searchParams.get("to");
+  const teamGroup = searchParams.get("teamGroup");
 
   const params = new URLSearchParams();
   if (from) params.append("from", from);
   if (to) params.append("to", to);
+  if (teamGroup) params.append("teamGroup", teamGroup);
   const query = params.toString();
 
   const response = await backendFetch(request, `/summary${query ? `?${query}` : ""}`, {}, "/summary");
