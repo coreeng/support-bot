@@ -1,4 +1,4 @@
-FROM docker.io/node:24.10.0-alpine3.22 AS base
+FROM docker.io/node:24.22.1-alpine3.23 AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -32,6 +32,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN apk add --no-cache libcrypto3=3.5.9-r0 \
     libssl3=3.5.9-r0 \
     libstdc++=15.2.0-r2 \
+    musl=1.2.5-r24 \
+    musl-utils=1.2.5-r24 \
     zlib=1.3.2-r1 \
  && addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nextjs

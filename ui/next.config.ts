@@ -9,15 +9,6 @@ const nextConfig: NextConfig = {
     tsconfigPath: "tsconfig.build.json",
   },
 
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
-    ],
-  },
-
   experimental: {
     serverActions: {
       // Empty array = same-origin only (Origin must match Host/X-Forwarded-Host)
