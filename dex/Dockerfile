@@ -2,22 +2,25 @@
 # Published as support-bot-dex:<version> alongside support-bot and support-bot-ui from the main
 # support-bot-fast-feedback / support-bot-prod workflows (build context is the dex/ directory).
 # Bump DEX_BASE_TAG together with values-dexidp.yaml when upgrading Dex.
-ARG DEX_BASE_TAG=v2.45.1
+ARG DEX_BASE_TAG=v2.46.1
+# Upstream Dex bundles an older gomplate (used by its entrypoint for templated configs); replace it with a
+# patched release. Drop this stage once the upstream image ships the same or a newer gomplate.
+ARG GOMPLATE_TAG=v5.3.1
+FROM ghcr.io/hairyhenderson/gomplate:${GOMPLATE_TAG} AS gomplate
+
 FROM ghcr.io/dexidp/dex:${DEX_BASE_TAG}
 
 USER root
 RUN apk add --no-cache \
-    alpine-baselayout=3.7.2-r0 \
-    alpine-baselayout-data=3.7.2-r0 \
-    alpine-release=3.23.6-r0 \
-    apk-tools=3.0.8-r0 \
-    ca-certificates-bundle=20260909-r0 \
-    libapk=3.0.8-r0 \
+    alpine-release=3.24.3-r0 \
+    ca-certificates-bundle=20261020-r0 \
     libcrypto3=3.5.9-r0 \
     libssl3=3.5.9-r0 \
-    musl=1.2.5-r23 \
-    musl-utils=1.2.5-r23 \
+    musl=1.2.6-r3 \
+    musl-utils=1.2.6-r3 \
     zlib=1.3.2-r1
+
+COPY --from=gomplate /gomplate /usr/local/bin/gomplate
 
 # Theme assets (whole directory) — referenced by frontend.theme=supportbot in the Dex config.
 COPY --chown=1001:1001 web/themes/supportbot/ /srv/dex/web/themes/supportbot/

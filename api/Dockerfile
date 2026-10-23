@@ -36,6 +36,8 @@ FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
 USER 0
 RUN microdnf update -y \
         libattr-2.6.0-1.el9_8 \
+        pcre2-10.40-7.el9_8 \
+        pcre2-syntax-10.40-7.el9_8 \
         sqlite-libs-3.34.1-11.el9_8 \
     && microdnf clean all
 USER 185
