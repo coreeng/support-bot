@@ -30,7 +30,7 @@ images:
           package-manager metadata, not a GitLab credential, and the finding status was
           "unverified" (live verification did not confirm an active credential).
 
-  # ui image — node:24.10.0-alpine3.22 base (ui/Dockerfile).
+  # ui image — node:24.22.1-alpine3.23 base (ui/Dockerfile).
   - name: support-bot-ui
     secrets:
       - id: p2psec_fa1393fff9412357
