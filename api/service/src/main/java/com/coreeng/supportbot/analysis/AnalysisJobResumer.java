@@ -2,8 +2,10 @@ package com.coreeng.supportbot.analysis;
 
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -50,7 +52,8 @@ public class AnalysisJobResumer {
             log.info("Found pending async job on startup: {}, resuming...", AnalysisJobData.JOB_ID);
             switch (job) {
                 case AnalysisJobData.DaysRun daysRun -> analysisService.resume(daysRun.days());
-                case AnalysisJobData.WindowRun windowRun -> resumeWindowRun(windowRun);
+                case AnalysisJobData.WindowRun windowRun -> resumeWindowRun(windowRun.from(), windowRun.to(), null);
+                case AnalysisJobData.TeamGroupWindowRun run -> resumeWindowRun(run.from(), run.to(), run.teamGroup());
             }
         } catch (Exception e) {
             log.error("Failed to resume analysis job on startup", e);
@@ -62,16 +65,16 @@ public class AnalysisJobResumer {
      * owner, and the row has to go: it holds the shared lock, so leaving it would block every future
      * analysis run.
      */
-    private void resumeWindowRun(AnalysisJobData.WindowRun windowRun) {
+    private void resumeWindowRun(LocalDate from, LocalDate to, @Nullable String teamGroup) {
         WindowAnalysisRunner runner = windowAnalysisRunner.getIfAvailable();
         if (runner == null) {
             log.warn(
                     "Pending windowed analysis job {}..{} has no runner (summary feature disabled), deleting job",
-                    windowRun.from(),
-                    windowRun.to());
+                    from,
+                    to);
             asyncJobRepository.deleteJob(AnalysisJobData.JOB_ID);
             return;
         }
-        runner.runWindowRefresh(windowRun.from(), windowRun.to());
+        runner.runWindowRefresh(from, to, teamGroup);
     }
 }

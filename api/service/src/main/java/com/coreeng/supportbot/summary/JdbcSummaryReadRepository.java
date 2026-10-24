@@ -5,6 +5,7 @@ import static com.coreeng.supportbot.dbschema.Tables.QUERY;
 import static com.coreeng.supportbot.dbschema.Tables.TAG;
 import static com.coreeng.supportbot.dbschema.Tables.TICKET;
 import static com.coreeng.supportbot.dbschema.Tables.TICKET_TO_TAG;
+import static org.jooq.impl.DSL.any;
 import static org.jooq.impl.DSL.arrayAgg;
 import static org.jooq.impl.DSL.coalesce;
 import static org.jooq.impl.DSL.count;
@@ -91,10 +92,10 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
     private final DSLContext dsl;
 
     @Override
-    public SummaryBreakdowns breakdowns(SummaryWindow window, String promptId, Collection<String> channelIds) {
+    public SummaryBreakdowns breakdowns(SummaryScope scope, String promptId, Collection<String> channelIds) {
         if (channelIds.isEmpty()) {
             return new SummaryBreakdowns(
-                    window,
+                    scope.window(),
                     0L,
                     0L,
                     ImmutableList.of(),
@@ -112,32 +113,31 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
                 .leftJoin(ANALYSIS)
                 .on(analysisJoin(promptId))
-                .where(inWindow(window, channelIds))
+                .where(inScope(scope, channelIds))
                 .fetchSingle();
 
         return new SummaryBreakdowns(
-                window,
+                scope.window(),
                 orZero(totals.value1()),
                 orZero(totals.value2()),
-                countByAnalysisField(ANALYSIS.DRIVER, UNCLASSIFIED_LABEL, noCondition(), window, promptId, channelIds),
-                countByAnalysisField(
-                        ANALYSIS.CATEGORY, UNCLASSIFIED_LABEL, noCondition(), window, promptId, channelIds),
+                countByAnalysisField(ANALYSIS.DRIVER, UNCLASSIFIED_LABEL, noCondition(), scope, promptId, channelIds),
+                countByAnalysisField(ANALYSIS.CATEGORY, UNCLASSIFIED_LABEL, noCondition(), scope, promptId, channelIds),
                 countByAnalysisField(
                         ANALYSIS.CATEGORY,
                         UNCLASSIFIED_LABEL,
                         trim(ANALYSIS.DRIVER).eq(KNOWLEDGE_GAP_DRIVER),
-                        window,
+                        scope,
                         promptId,
                         channelIds),
-                countByAnalysisField(ANALYSIS.FEATURE, NO_FEATURE_LABEL, noCondition(), window, promptId, channelIds),
-                countByTeam(window, promptId, channelIds),
-                countByProduct(window, promptId, channelIds));
+                countByAnalysisField(ANALYSIS.FEATURE, NO_FEATURE_LABEL, noCondition(), scope, promptId, channelIds),
+                countByTeam(scope, promptId, channelIds),
+                countByProduct(scope, promptId, channelIds));
     }
 
     @Override
-    public SummaryFingerprint fingerprint(SummaryWindow window, String promptId, Collection<String> channelIds) {
+    public SummaryFingerprint fingerprint(SummaryScope scope, String promptId, Collection<String> channelIds) {
         if (channelIds.isEmpty()) {
-            return new SummaryFingerprint(0L, 0L, null, null);
+            return new SummaryFingerprint(0L, 0L, null, null, ImmutableSet.of(), scope.membershipDigest());
         }
 
         Record2<Integer, LocalDateTime> row = dsl.select(count(), max(ANALYSIS.UPDATED_AT))
@@ -146,7 +146,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
                 .join(ANALYSIS)
                 .on(analysisJoin(promptId))
-                .where(inWindow(window, channelIds))
+                .where(inScope(scope, channelIds))
                 .fetchSingle();
 
         // One pass over the window's tickets: how many were raised at all (open ones included — they
@@ -163,7 +163,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .from(QUERY)
                 .join(TICKET)
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
-                .where(inWindow(window, channelIds))
+                .where(inScope(scope, channelIds))
                 .fetchSingle();
 
         Long[] gapIds = tickets.value2();
@@ -174,12 +174,13 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 tickets.value3(),
                 gapIds == null
                         ? ImmutableSet.of()
-                        : Arrays.stream(gapIds).map(TicketId::new).collect(ImmutableSet.toImmutableSet()));
+                        : Arrays.stream(gapIds).map(TicketId::new).collect(ImmutableSet.toImmutableSet()),
+                scope.membershipDigest());
     }
 
     @Override
     public ImmutableList<SummaryReason> reasons(
-            SummaryWindow window, String promptId, Collection<String> channelIds, int limit) {
+            SummaryScope scope, String promptId, Collection<String> channelIds, int limit) {
         if (channelIds.isEmpty() || limit <= 0) {
             return ImmutableList.of();
         }
@@ -190,7 +191,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
                 .join(ANALYSIS)
                 .on(analysisJoin(promptId))
-                .where(inWindow(window, channelIds))
+                .where(inScope(scope, channelIds))
                 .and(trim(ANALYSIS.SUMMARY).ne(""))
                 .orderBy(QUERY.DATE.desc(), TICKET.ID.desc())
                 .limit(limit)
@@ -218,7 +219,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
             TableField<?, String> field,
             String blankLabel,
             Condition filter,
-            SummaryWindow window,
+            SummaryScope scope,
             String promptId,
             Collection<String> channelIds) {
         return breakdown(
@@ -226,19 +227,19 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 j -> j.join(ANALYSIS).on(analysisJoin(promptId)),
                 filter,
                 ImmutableMap.of(),
-                window,
+                scope,
                 channelIds);
     }
 
     private ImmutableList<SummaryCount> countByTeam(
-            SummaryWindow window, String promptId, Collection<String> channelIds) {
+            SummaryScope scope, String promptId, Collection<String> channelIds) {
         Field<String> label = bucketed(TICKET.TEAM, UNKNOWN_TEAM_LABEL);
         return breakdown(
                 label,
                 j -> j.leftJoin(ANALYSIS).on(analysisJoin(promptId)),
                 noCondition(),
-                topProductByTeam(label, window, channelIds),
-                window,
+                topProductByTeam(label, scope, channelIds),
+                scope,
                 channelIds);
     }
 
@@ -250,7 +251,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
      * retired, so history stays attributed — the same rules as the UI's Products View.
      */
     private ImmutableList<SummaryCount> countByProduct(
-            SummaryWindow window, String promptId, Collection<String> channelIds) {
+            SummaryScope scope, String promptId, Collection<String> channelIds) {
         Field<String> label = productName();
         Joins viaProductTag = j -> j.join(TICKET_TO_TAG)
                 .on(TICKET_TO_TAG.TICKET_ID.eq(TICKET.ID))
@@ -258,7 +259,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .on(TAG.CODE.eq(TICKET_TO_TAG.TAG_CODE))
                 .leftJoin(ANALYSIS)
                 .on(analysisJoin(promptId));
-        return breakdown(label, viaProductTag, isProductTag(label), ImmutableMap.of(), window, channelIds);
+        return breakdown(label, viaProductTag, isProductTag(label), ImmutableMap.of(), scope, channelIds);
     }
 
     /**
@@ -266,7 +267,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
      * break alphabetically; a team none of whose tickets carries a product tag is absent.
      */
     private ImmutableMap<String, String> topProductByTeam(
-            Field<String> team, SummaryWindow window, Collection<String> channelIds) {
+            Field<String> team, SummaryScope scope, Collection<String> channelIds) {
         Field<String> product = productName();
         Field<Integer> tickets = countDistinct(TICKET.ID);
 
@@ -279,7 +280,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .on(TICKET_TO_TAG.TICKET_ID.eq(TICKET.ID))
                 .join(TAG)
                 .on(TAG.CODE.eq(TICKET_TO_TAG.TAG_CODE))
-                .where(inWindow(window, channelIds))
+                .where(inScope(scope, channelIds))
                 .and(isProductTag(product))
                 .groupBy(team, product)
                 .orderBy(team.asc(), tickets.desc(), product.asc())
@@ -335,7 +336,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
             Joins joins,
             Condition filter,
             ImmutableMap<String, String> topProduct,
-            SummaryWindow window,
+            SummaryScope scope,
             Collection<String> channelIds) {
         // Unqualified names resolve against the enclosing derived table; jOOQ's typed field(...) lookup
         // on a Table is nullable, which NullAway would reject.
@@ -352,7 +353,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .join(TICKET)
                 .on(TICKET.QUERY_ID.eq(QUERY.ID));
         Table<?> tickets = joins.apply(joined)
-                .where(inWindow(window, channelIds))
+                .where(inScope(scope, channelIds))
                 .and(filter)
                 .asTable("tickets");
 
@@ -416,9 +417,21 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
         return ANALYSIS.TICKET_ID.eq(TICKET.ID.coerce(ANALYSIS.TICKET_ID)).and(ANALYSIS.PROMPT_ID.eq(promptId));
     }
 
-    private static Condition inWindow(SummaryWindow window, Collection<String> channelIds) {
+    /**
+     * The tickets a summary covers: raised in the window in a monitored channel and, for a team
+     * group, attributed to one of its teams. Every query here joins {@code ticket}, so the group
+     * narrows totals, breakdowns, reasons and fingerprint alike; a ticket with no team, or marked
+     * "Not a Tenant", belongs to no group.
+     */
+    private static Condition inScope(SummaryScope scope, Collection<String> channelIds) {
+        SummaryWindow window = scope.window();
         Instant from = window.from().atStartOfDay().toInstant(ZoneOffset.UTC);
         Instant to = window.to().plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        return QUERY.CHANNEL_ID.in(channelIds).and(QUERY.DATE.ge(from)).and(QUERY.DATE.lt(to));
+        Condition inWindow =
+                QUERY.CHANNEL_ID.in(channelIds).and(QUERY.DATE.ge(from)).and(QUERY.DATE.lt(to));
+        if (scope.isAll()) {
+            return inWindow;
+        }
+        return inWindow.and(TICKET.TEAM.eq(any(scope.teamCodes().toArray(String[]::new))));
     }
 }

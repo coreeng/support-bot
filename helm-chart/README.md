@@ -109,6 +109,21 @@ configMap:
       key: value
 ```
 
+#### Team groups
+
+To let the Support Summary be narrowed to business areas (or domains, tribes…), name the team
+attribute the groups are built from under `configMap.config.team-groups`. Tenant teams with the same
+value for it form one group. The attribute comes from the team provider (k8s-generic `attributes`, or
+`attributes` on static teams). See [configuration](../api/service/docs/configuration.md#team-groups).
+
+```yaml
+configMap:
+  config:
+    team-groups:
+      display-name: Area   # what the UI calls a group
+      attribute: area      # the team attribute whose value names a team's group
+```
+
 ## Auth Allow-List
 
 Restrict SSO login to specific email addresses and/or domains:

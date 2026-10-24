@@ -162,6 +162,7 @@ summary_snapshot:
     - id
     - window_from
     - window_to
+    - team_group
     - prompt_id
     - fingerprint
     - content

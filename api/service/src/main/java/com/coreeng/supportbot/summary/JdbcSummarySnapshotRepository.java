@@ -17,13 +17,15 @@ public class JdbcSummarySnapshotRepository implements SummarySnapshotRepository 
 
     @Override
     @Transactional(readOnly = true)
-    public @Nullable SummarySnapshot find(SummaryWindow window, String promptId) {
+    public @Nullable SummarySnapshot find(SummaryScope scope, String promptId) {
         return dsl.selectFrom(SUMMARY_SNAPSHOT)
-                .where(SUMMARY_SNAPSHOT.WINDOW_FROM.eq(window.from()))
-                .and(SUMMARY_SNAPSHOT.WINDOW_TO.eq(window.to()))
+                .where(SUMMARY_SNAPSHOT.WINDOW_FROM.eq(scope.window().from()))
+                .and(SUMMARY_SNAPSHOT.WINDOW_TO.eq(scope.window().to()))
+                .and(SUMMARY_SNAPSHOT.TEAM_GROUP.eq(scope.teamGroupKey()))
                 .and(SUMMARY_SNAPSHOT.PROMPT_ID.eq(promptId))
                 .fetchOne(r -> new SummarySnapshot(
                         new SummaryWindow(r.get(SUMMARY_SNAPSHOT.WINDOW_FROM), r.get(SUMMARY_SNAPSHOT.WINDOW_TO)),
+                        r.get(SUMMARY_SNAPSHOT.TEAM_GROUP),
                         r.get(SUMMARY_SNAPSHOT.PROMPT_ID),
                         r.get(SUMMARY_SNAPSHOT.FINGERPRINT),
                         r.get(SUMMARY_SNAPSHOT.CONTENT),
@@ -34,7 +36,7 @@ public class JdbcSummarySnapshotRepository implements SummarySnapshotRepository 
     /**
      * {@inheritDoc}
      *
-     * <p>Upserts on the (window_from, window_to, prompt_id) unique key: a regenerated summary
+     * <p>Upserts on the (window_from, window_to, team_group, prompt_id) unique key: a regenerated summary
      * replaces the stale one in place rather than accumulating history, and two visitors racing to
      * write the same window cannot deadlock on a duplicate key.
      */
@@ -45,6 +47,7 @@ public class JdbcSummarySnapshotRepository implements SummarySnapshotRepository 
                         SUMMARY_SNAPSHOT,
                         SUMMARY_SNAPSHOT.WINDOW_FROM,
                         SUMMARY_SNAPSHOT.WINDOW_TO,
+                        SUMMARY_SNAPSHOT.TEAM_GROUP,
                         SUMMARY_SNAPSHOT.PROMPT_ID,
                         SUMMARY_SNAPSHOT.FINGERPRINT,
                         SUMMARY_SNAPSHOT.CONTENT,
@@ -52,11 +55,16 @@ public class JdbcSummarySnapshotRepository implements SummarySnapshotRepository 
                 .values(
                         snapshot.window().from(),
                         snapshot.window().to(),
+                        snapshot.teamGroup(),
                         snapshot.promptId(),
                         snapshot.fingerprint(),
                         snapshot.content(),
                         snapshot.model())
-                .onConflict(SUMMARY_SNAPSHOT.WINDOW_FROM, SUMMARY_SNAPSHOT.WINDOW_TO, SUMMARY_SNAPSHOT.PROMPT_ID)
+                .onConflict(
+                        SUMMARY_SNAPSHOT.WINDOW_FROM,
+                        SUMMARY_SNAPSHOT.WINDOW_TO,
+                        SUMMARY_SNAPSHOT.TEAM_GROUP,
+                        SUMMARY_SNAPSHOT.PROMPT_ID)
                 .doUpdate()
                 .set(SUMMARY_SNAPSHOT.FINGERPRINT, excluded(SUMMARY_SNAPSHOT.FINGERPRINT))
                 .set(SUMMARY_SNAPSHOT.CONTENT, excluded(SUMMARY_SNAPSHOT.CONTENT))

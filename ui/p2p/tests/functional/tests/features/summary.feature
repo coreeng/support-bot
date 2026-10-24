@@ -38,3 +38,29 @@ Feature: Support Summary window presets
     And user selects the "Last Month" summary window
     Then the summary should be requested from "2026-08-01" to "2026-08-31"
     And the summary window should show "1 – 31 Aug 2026"
+
+  Scenario: Without team groups the summary reads as it did before them
+    Given the current date is "2026-09-09T12:00:00Z"
+    When user "engineer@example.com" logs in
+    And user navigates directly to "/summary"
+    Then no team group selector should be shown
+    And no summary scope should be shown
+
+  Scenario: The summary can be narrowed to a team group
+    Given the current date is "2026-09-09T12:00:00Z"
+    And the summary has the team group "payments-area" labelled "Payments"
+    When user "engineer@example.com" logs in
+    And user navigates directly to "/summary"
+    And user narrows the summary to the "Payments" team group
+    Then the summary should be requested for the team group "payments-area"
+    And the summary scope should show "Area Payments"
+
+  Scenario: A shared link opens the summary narrowed to its team group
+    Given the current date is "2026-09-09T12:00:00Z"
+    And the summary has the team group "payments-area" labelled "Payments"
+    When user "engineer@example.com" logs in
+    And user navigates directly to "/summary?teamGroup=payments-area"
+    Then the summary should be requested for the team group "payments-area"
+    And the summary should be requested from "2026-08-24" to "2026-09-04"
+    And the summary scope should show "Area Payments"
+

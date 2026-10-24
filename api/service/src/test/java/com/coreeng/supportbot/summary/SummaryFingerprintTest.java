@@ -59,6 +59,17 @@ class SummaryFingerprintTest {
         assertThat(current.withGapsAmong(ids(42, 99, 100, 7))).isEqualTo(current);
     }
 
+    @Test
+    void aTeamGroupsDigestIsAppendedAndSurvivesNarrowing() {
+        SummaryFingerprint group = new SummaryFingerprint(3, 2, UPDATED_AT, TICKET_UPDATED_AT, ids(42), "abc");
+
+        assertThat(group.value()).isEqualTo(BASE + "#1:42|g:abc");
+        assertThat(group.withGapsAmong(Set.of()).value()).isEqualTo(BASE + "|g:abc");
+        // The whole window has no digest, so its value is exactly what it was before team groups.
+        assertThat(new SummaryFingerprint(3, 2, UPDATED_AT, TICKET_UPDATED_AT).value())
+                .isEqualTo(BASE);
+    }
+
     private static ImmutableSet<TicketId> ids(long... ids) {
         ImmutableSet.Builder<TicketId> set = ImmutableSet.builder();
         for (long id : ids) {
