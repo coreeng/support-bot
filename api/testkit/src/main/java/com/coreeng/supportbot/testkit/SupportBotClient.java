@@ -130,6 +130,26 @@ public class SupportBotClient {
         }
     }
 
+    public ImmutableList<RatingFeedbackItem> ratingFeedback(LocalDate dateFrom, LocalDate dateTo) {
+        return ImmutableList.copyOf(request()
+                .queryParam("dateFrom", dateFrom.toString())
+                .queryParam("dateTo", dateTo.toString())
+                .when()
+                .get(baseUrl + "/rating/feedback")
+                .then()
+                .log()
+                .ifValidationFails(LogDetail.ALL, true)
+                .statusCode(200)
+                .extract()
+                .as(RatingFeedbackItem[].class));
+    }
+
+    public record RatingFeedbackItem(
+            int rating,
+            LocalDate weekStart,
+            String feedback,
+            @Nullable Long ticketId) {}
+
     public TicketResponse updateTicket(long ticketId, UpdateTicketRequest request) {
         return request()
                 .when()

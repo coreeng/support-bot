@@ -89,6 +89,19 @@ public class SlackTestKit {
                 .build());
     }
 
+    public void clickRatingButton(RatingButtonClick click) {
+        supportBotSlackClient.notifyButtonClicked(RawButtonClick.builder()
+                .teamId(testKit.teamId())
+                .userId(testKit.userId())
+                .triggerId(click.triggerId())
+                .actionId(click.actionId())
+                .privateMetadata(click.privateMetadata())
+                .channelId(click.ticket().channelId())
+                .messageTs(MessageTs.now())
+                .threadTs(click.ticket().queryTs())
+                .build());
+    }
+
     public void submitView(ViewSubmission viewSubmission) {
         supportBotSlackClient.notifyViewSubmitted(RawViewSubmission.builder()
                 .teamId(testKit.teamId())

@@ -148,6 +148,8 @@ query:
     - date
 
 ratings:
+  anonymised:
+    - feedback
   reviewed:
     - id
     - rating
@@ -156,6 +158,7 @@ ratings:
     - impact
     - tags
     - is_escalated
+    - ticket_id
 
 summary_snapshot:
   reviewed:

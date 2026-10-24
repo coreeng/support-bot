@@ -84,6 +84,10 @@ public class SecurityConfig {
                                 "/summary/prompt",
                                 "/analysis/prompt")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
+                        // Free-text rating feedback can name people and, when the submitter opted in, link to
+                        // their thread, so it is not exposed to every authenticated user like /stats is.
+                        .requestMatchers("/rating/**")
+                        .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Summary data export/import is restricted to support engineers
                         .requestMatchers("/summary-data/**")
                         .hasAnyRole("SUPPORT_ENGINEER")
