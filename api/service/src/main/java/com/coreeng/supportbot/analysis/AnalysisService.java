@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.HexFormat;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
@@ -176,7 +177,8 @@ public class AnalysisService {
     }
 
     /**
-     * Classifies the tickets raised in the given window that have no analysis for the current prompt.
+     * Classifies the tickets raised in the given window, optionally limited to the given teams, that
+     * have no analysis for the current prompt.
      *
      * <p>Runs on the caller's thread and deliberately neither takes nor releases the {@code async_job}
      * lock: the Support Summary refresh that calls this already holds it and goes on to generate the
@@ -185,12 +187,13 @@ public class AnalysisService {
      *
      * @param from First day of the window (inclusive), on ticket-creation time
      * @param to Last day of the window (inclusive)
+     * @param teamCodes tenant team codes to limit the backfill to; empty for every ticket in the window
      */
-    public void backfillWindow(LocalDate from, LocalDate to) {
+    public void backfillWindow(LocalDate from, LocalDate to, Collection<String> teamCodes) {
         String prompt = loadPrompt();
         String promptId = computePromptId(prompt);
-        log.info("Backfilling analysis for window {}..{} with prompt ID {}", from, to, promptId);
-        classify(threadsAwaitingAnalysisService.find(from, to, promptId), prompt, promptId);
+        log.info("Backfilling analysis for window {}..{}, teams {}, with prompt ID {}", from, to, teamCodes, promptId);
+        classify(threadsAwaitingAnalysisService.find(from, to, teamCodes, promptId), prompt, promptId);
     }
 
     /**

@@ -56,9 +56,12 @@ team-groups:
 - `GET /summary/team-groups` lists the groups and the display name, under the same roles as
   `/summary`. With no groups the UI hides its selector and shows no scope, so the page reads as
   before.
-- **Classification is never narrowed.** The backfill and the shared `analysis` lock work on the whole
-  window whatever group asked, so every ticket is classified once and switching group only costs the
-  narrative.
+- **Classification follows the scope.** A group's refresh classifies only the group's own tickets;
+  "All" classifies whatever in the window is still unclassified, including the tickets no group
+  shows (no team, "Not a Tenant", or a team in no group). Results are stored per ticket and prompt,
+  so each ticket is classified once per classification prompt, and a ticket that keeps failing is
+  only retried by the scopes that report on it rather than by every group's. The shared `analysis`
+  lock stays global.
 - **Cache per (window, team group, prompt).** `summary_snapshot` gains `team_group` (`''` for the whole
   window — a NOT NULL sentinel, because NULLs are distinct in a unique constraint and would defeat
   `ON CONFLICT`). Existing rows become "All" unchanged.
@@ -86,11 +89,13 @@ team-groups:
 
 - A shareable link opens straight on one area's summary.
 - No installation-specific behaviour in code: installations without groups see no change.
-- Switching group is quick once a window is classified; only the narrative is generated.
+- Switching group is quick once the group's tickets are classified; only the narrative is generated.
 
 ### Negative
 
 - One LLM call per (window, group) actually viewed, and one snapshot row each.
+- The first visit to each group in a window waits for that group's tickets to be classified. Tickets
+  in no group are only classified when "All" is viewed, or by a manual run.
 - A group refresh waits behind any in-flight refresh, because the lock is global. While one runs,
   every viewer sees the summary as generating, including those whose cached summary is current;
   that was already true across windows, and groups make it more frequent.
@@ -108,8 +113,9 @@ team-groups:
 
 ## Alternatives considered
 
-- **Extending `SummaryWindow` with the group.** Rejected: the window type is what the backfill and lock
-  use, and keeping it group-free shows in the types which paths are narrowed.
+- **Extending `SummaryWindow` with the group.** Rejected: the window (the period a summary covers)
+  and the optional group narrowing it are separate concerns. `SummaryScope` pairs them, so "All" is a
+  scope with no group rather than a window carrying a nullable group.
 - **A nullable `team_group` column.** Rejected: NULLs are distinct in a unique constraint, so
   `ON CONFLICT` would never match the "All" row (`NULLS NOT DISTINCT` needs Postgres 15+).
 - **A separate snapshot table for groups.** Simpler rollback, but a second table and a branch in every

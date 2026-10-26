@@ -9,10 +9,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * What a Support Summary covers: a window, optionally narrowed to one team group's tickets.
  *
- * <p>Kept apart from {@link SummaryWindow} on purpose. Classification is never scoped — the backfill
- * and the {@code async_job} lock work on the whole window, so every ticket is classified whichever
- * group is being looked at, and switching group only costs the prose. Those paths take the window;
- * the breakdowns, the fingerprint, the cached prose and the failure memory take the scope.
+ * <p>Kept apart from {@link SummaryWindow} on purpose: the window is what a summary is about, the
+ * scope is which of its tickets. The backfill, the breakdowns, the fingerprint, the cached prose and
+ * the failure memory all take the scope, so a group's refresh only classifies the group's own
+ * tickets.
  *
  * @param teamGroup the group the summary is narrowed to; null for every ticket in the window ("All")
  */

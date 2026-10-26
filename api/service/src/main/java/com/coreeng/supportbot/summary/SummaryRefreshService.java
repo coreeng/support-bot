@@ -31,11 +31,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 /**
- * Runs one summary's refresh: backfill the window's classification gaps, then regenerate the prose
+ * Runs one summary's refresh: backfill the scope's classification gaps, then regenerate the prose
  * summary for the scope — the whole window, or one team group within it.
  *
- * <p>The backfill always covers the whole window, whichever scope asked for it: every ticket is
- * classified once, so another group's summary of the same window only has the prose left to write.
+ * <p>The backfill covers the scope: every gap in the window for the whole window, only the group's
+ * own tickets for a team group. Results are stored per ticket and prompt, so a ticket another scope
+ * already classified is not classified again.
  *
  * <p>Both halves happen inside a single {@code async_job} claim on the shared {@code "analysis"}
  * lock. Splitting them would let a days-based run slip in between and change the very data the
@@ -188,7 +189,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
         String described = scope.describe();
         try {
             status.set(new SummaryRefreshStatus(scope, SummaryState.Phase.CLASSIFYING, true));
-            ImmutableSet<TicketId> attempted = backfill(scope.window());
+            ImmutableSet<TicketId> attempted = backfill(scope);
             if (attempted == null) {
                 // The backfill stops early on interrupt (shutdown) and returns normally. Summarising now
                 // would store a snapshot whose fingerprint marks the unclassified tickets as gaps, and
@@ -241,7 +242,12 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
     }
 
     /**
-     * Classifies the window's gaps, in at most two passes.
+     * Classifies the scope's gaps, in at most two passes.
+     *
+     * <p>A team group's refresh only classifies the group's own tickets. Other tickets in the window
+     * are left to the refreshes that report on them, so a group page does not sit classifying tickets
+     * it does not show, and a ticket that keeps failing is only retried by the scopes it belongs to
+     * rather than by every group's.
      *
      * <p>A pass classifies serially with a per-thread delay, so a wide window can take a long time,
      * and a ticket closed meanwhile is not in the list the pass computed up front. Left alone it
@@ -257,27 +263,27 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
      * @return the ids of the tickets the passes set out to classify (whether or not they succeeded),
      *     or null when a pass was interrupted (shutdown); the interrupt flag is then left set
      */
-    private @Nullable ImmutableSet<TicketId> backfill(SummaryWindow window) {
+    private @Nullable ImmutableSet<TicketId> backfill(SummaryScope scope) {
+        SummaryWindow window = scope.window();
         String classificationPromptId = analysisService.currentPromptId();
-        ImmutableSet<TicketId> firstPassTargets = awaitingClassification(window, classificationPromptId);
+        ImmutableSet<TicketId> firstPassTargets = awaitingClassification(scope, classificationPromptId);
 
-        analysisService.backfillWindow(window.from(), window.to());
+        analysisService.backfillWindow(window.from(), window.to(), scope.teamCodes());
         if (Thread.currentThread().isInterrupted()) {
             return null;
         }
 
-        ImmutableSet<TicketId> stillAwaiting = awaitingClassification(window, classificationPromptId);
+        ImmutableSet<TicketId> stillAwaiting = awaitingClassification(scope, classificationPromptId);
         if (firstPassTargets.containsAll(stillAwaiting)) {
             return firstPassTargets;
         }
         log.info(
-                "{} ticket(s) closed in window {}..{} during the backfill; classifying them in a second pass",
+                "{} ticket(s) closed in {} during the backfill; classifying them in a second pass",
                 stillAwaiting.stream()
                         .filter(id -> !firstPassTargets.contains(id))
                         .count(),
-                window.from(),
-                window.to());
-        analysisService.backfillWindow(window.from(), window.to());
+                scope.describe());
+        analysisService.backfillWindow(window.from(), window.to(), scope.teamCodes());
         if (Thread.currentThread().isInterrupted()) {
             return null;
         }
@@ -287,9 +293,12 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
                 .build();
     }
 
-    /** The same lookup the backfill itself starts from: closed tickets in the window with no analysis for the prompt. */
-    private ImmutableSet<TicketId> awaitingClassification(SummaryWindow window, String classificationPromptId) {
-        return threadsAwaitingAnalysisService.find(window.from(), window.to(), classificationPromptId).stream()
+    /** The same lookup the backfill itself starts from: closed tickets in the scope with no analysis for the prompt. */
+    private ImmutableSet<TicketId> awaitingClassification(SummaryScope scope, String classificationPromptId) {
+        SummaryWindow window = scope.window();
+        return threadsAwaitingAnalysisService
+                .find(window.from(), window.to(), scope.teamCodes(), classificationPromptId)
+                .stream()
                 .map(thread -> new TicketId(thread.ticketId()))
                 .collect(ImmutableSet.toImmutableSet());
     }
@@ -297,10 +306,6 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
     /**
      * Reads the scope afresh — after the backfill, so the counts, the reasons and the fingerprint
      * stored with the summary all describe the same post-backfill state.
-     *
-     * <p>{@code attempted} comes from the whole window, so for a team group it is a superset of the
-     * group's gaps; narrowing the group's fingerprint to it keeps exactly the group gaps the backfill
-     * tried.
      *
      * <p>The stored fingerprint's gap component is narrowed to the gaps the backfill attempted. A gap
      * it attempted and could not fill is pinned into the fingerprint, so the page serves the snapshot

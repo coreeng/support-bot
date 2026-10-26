@@ -195,9 +195,12 @@ unexpected:
   a Tenant", belong to no group.
 - **Membership changes** regenerate that group's narrative on its next visit; other groups and the
   whole window keep theirs. Membership only changes at a restart, when the teams are fetched again.
-- **Classification is shared.** Viewing a group classifies the whole window, so a group's first
-  visit can show "Analysing threads" for tickets outside the group; after that, switching group only
-  waits for the narrative.
+- **Classification follows the group.** Viewing a group classifies only the group's tickets.
+  "All teams" classifies whatever in the window is still unclassified, including tickets no group
+  shows (no team, "Not a Tenant", or a team in no group). Each ticket is classified once per
+  classification prompt, so a ticket another view already classified is not redone. A ticket that
+  cannot be classified (for example, its thread is gone) is retried only by the views that include
+  it.
 
 ### Getting a bearer token
 

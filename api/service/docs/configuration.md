@@ -652,8 +652,10 @@ The core-platform provider has no attributes, so it has no groups.
 - **What narrowing does.** Every figure, the per-ticket reasons and the narrative are limited to
   tickets attributed to the group's teams. Tickets with no team or marked "Not a Tenant" belong to
   no group, so the groups' totals don't add up to the whole window's.
-- **Classification is not narrowed.** The backfill always classifies every ticket in the window,
-  whichever group is being viewed, so switching group only costs the narrative.
+- **Classification follows the group.** Viewing a group classifies only the group's own tickets.
+  Viewing every team classifies whatever in the window is still unclassified, including tickets no
+  group shows (no team, "Not a Tenant", or a team in no group). A ticket already classified for the
+  current prompt is not classified again.
 - **Cache.** Each (window, group) has its own `summary_snapshot` row (`team_group`, `''` for the
   whole window), and its fingerprint covers only the group's tickets plus the group's definition —
   changing a group's members or label regenerates its narrative on the next visit.

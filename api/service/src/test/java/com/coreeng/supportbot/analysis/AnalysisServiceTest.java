@@ -13,6 +13,8 @@ import com.coreeng.supportbot.config.LlmProps;
 import com.coreeng.supportbot.config.LlmProvider;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.concurrent.Executor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -294,6 +296,29 @@ class AnalysisServiceTest {
         assertThat(status.analyzedCount()).isEqualTo(2);
         assertThat(status.exportedCount()).isEqualTo(2);
         assertThat(status.error()).isNull();
+    }
+
+    @Test
+    void backfillWindow_classifiesOnlyTheGivenTeamsGaps() {
+        // A team group's refresh passes its teams; dropping them here would quietly classify the whole
+        // window again on every group's refresh.
+        LocalDate from = LocalDate.of(2026, 3, 10);
+        LocalDate to = LocalDate.of(2026, 3, 23);
+        List<String> teamCodes = List.of("team-a");
+        givenPromptInUse();
+        String promptId = AnalysisService.computePromptId(PROMPT_TEXT);
+        when(threadsAwaitingAnalysisService.find(from, to, teamCodes, promptId))
+                .thenReturn(ImmutableList.of(new ThreadToAnalyze(1L, "ts1", "C123456")));
+        when(llmAnalysisService.analyzeThread("C123456", "ts1", 1L, PROMPT_TEXT))
+                .thenReturn(new AnalysisRecord(1, "Bug", "Config", "networking", "Issue 1", null));
+
+        service.backfillWindow(from, to, teamCodes);
+
+        verify(threadsAwaitingAnalysisService).find(from, to, teamCodes, promptId);
+        ArgumentCaptor<AnalysisRecord> captor = ArgumentCaptor.forClass(AnalysisRecord.class);
+        verify(analysisRepository).upsert(captor.capture());
+        assertThat(captor.getValue().ticketId()).isEqualTo(1);
+        assertThat(captor.getValue().promptId()).isEqualTo(promptId);
     }
 
     @Test

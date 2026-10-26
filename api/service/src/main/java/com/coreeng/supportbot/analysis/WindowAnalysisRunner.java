@@ -28,7 +28,8 @@ public interface WindowAnalysisRunner {
     }
 
     /**
-     * As {@link #runWindowRefresh(LocalDate, LocalDate)}, with the prose narrowed to one team group.
+     * As {@link #runWindowRefresh(LocalDate, LocalDate)}, with the backfill and the summary narrowed to
+     * one team group.
      *
      * @param teamGroup the team group's code; null for the whole window. A code whose group no
      *     longer exists is refreshed as the whole window — the classification is still worth doing.

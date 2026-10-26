@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.summary;
 
+import com.coreeng.supportbot.analysis.JdbcThreadsAwaitingAnalysisRepository;
+import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository;
 import javax.sql.DataSource;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
@@ -39,6 +41,11 @@ public class SummaryPostgresTestConfig {
     @Bean
     SummaryReadRepository summaryReadRepository(DSLContext dslContext) {
         return new JdbcSummaryReadRepository(dslContext);
+    }
+
+    @Bean
+    ThreadsAwaitingAnalysisRepository threadsAwaitingAnalysisRepository(DSLContext dslContext) {
+        return new JdbcThreadsAwaitingAnalysisRepository(dslContext);
     }
 
     @Bean

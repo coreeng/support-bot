@@ -3,6 +3,7 @@ package com.coreeng.supportbot.summary;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
+import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository;
 import com.coreeng.supportbot.teamgroups.TeamGroup;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
@@ -34,10 +35,15 @@ class SummaryReadRepositoryPostgresTest {
     private static final SummaryScope GROUP_SCOPE = new SummaryScope(WINDOW, GROUP);
 
     private final SummaryReadRepository repository;
+    private final ThreadsAwaitingAnalysisRepository threadsAwaitingAnalysisRepository;
     private final JdbcTemplate jdbcTemplate;
 
-    SummaryReadRepositoryPostgresTest(SummaryReadRepository repository, JdbcTemplate jdbcTemplate) {
+    SummaryReadRepositoryPostgresTest(
+            SummaryReadRepository repository,
+            ThreadsAwaitingAnalysisRepository threadsAwaitingAnalysisRepository,
+            JdbcTemplate jdbcTemplate) {
         this.repository = repository;
+        this.threadsAwaitingAnalysisRepository = threadsAwaitingAnalysisRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -504,6 +510,32 @@ class SummaryReadRepositoryPostgresTest {
 
     private static long sum(ImmutableList<SummaryCount> counts) {
         return counts.stream().mapToLong(SummaryCount::count).sum();
+    }
+
+    @Test
+    void aTeamGroupsBackfillTargetsAreExactlyTheGapsItsFingerprintCounts() {
+        // The refresh pins a group's gaps into its fingerprint only if the backfill attempted them. Two
+        // independently written queries pick those tickets, so they must agree: a group gap the backfill
+        // never sees would make every poll start a new refresh.
+        long inGroupA = ticket("2026-03-11T09:00:00", "ts-a", "team-a");
+        long inGroupB = ticket("2026-03-11T10:00:00", "ts-b", "team-b");
+        ticket("2026-03-11T11:00:00", "ts-c", "team-c");
+        ticket("2026-03-11T12:00:00", "ts-none", null);
+        long classified = ticket("2026-03-11T13:00:00", "ts-done", "team-a");
+        classify(classified, "Knowledge Gap", "Build & CI", "ci", "Done.");
+
+        ImmutableList<TicketId> backfillTargets = threadsAwaitingAnalysisRepository
+                .findThreadsAwaitingAnalysis(
+                        WINDOW.from(), WINDOW.to(), GROUP_SCOPE.teamCodes(), PROMPT_ID, List.of(CHANNEL))
+                .stream()
+                .map(thread -> new TicketId(thread.ticketId()))
+                .collect(ImmutableList.toImmutableList());
+
+        assertThat(repository
+                        .fingerprint(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL))
+                        .gapIds())
+                .containsExactlyInAnyOrderElementsOf(backfillTargets)
+                .containsExactlyInAnyOrder(new TicketId(inGroupA), new TicketId(inGroupB));
     }
 
     private long ticket(String raisedAt, String ts, @Nullable String team) {

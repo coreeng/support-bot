@@ -113,9 +113,9 @@ public final class AnalysisJobData {
     }
 
     /**
-     * Refresh the Support Summary for tickets raised between {@code from} and {@code to}, with the
-     * prose narrowed to the team group {@code teamGroup} (its code). Classification still covers the
-     * whole window.
+     * Refresh the Support Summary for tickets raised between {@code from} and {@code to}, narrowed to
+     * the team group {@code teamGroup} (its code): the classification backfill and the summary only
+     * cover the group's tickets.
      */
     public record TeamGroupWindowRun(LocalDate from, LocalDate to, String teamGroup) implements Parsed {
         public TeamGroupWindowRun {
