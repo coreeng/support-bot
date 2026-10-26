@@ -1,10 +1,13 @@
 package com.coreeng.supportbot;
 
 import static com.coreeng.supportbot.testkit.UserRole.tenant;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.testkit.Config;
+import com.coreeng.supportbot.testkit.SlackWiremock;
 import com.coreeng.supportbot.testkit.SupportBotClient;
 import com.coreeng.supportbot.testkit.TestKit;
 import com.coreeng.supportbot.testkit.TestKitExtension;
@@ -54,6 +57,7 @@ public class SummaryApiTests {
     private Config config;
     private SupportBotClient supportBotClient;
     private TestKit testKit;
+    private SlackWiremock slackWiremock;
 
     @Test
     void summaryEnabled_returnsTrue_forAnyAuthenticatedRole() {
@@ -211,20 +215,62 @@ public class SummaryApiTests {
         closeTicketFor("wow");
         closeTicketFor("infra-integration");
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        String window = "?from=" + today.minusDays(30) + "&to=" + today;
+        String allPath = "/summary?from=" + today.minusDays(30) + "&to=" + today;
+        String groupPath = allPath + "&teamGroup=" + TEAM_GROUP;
 
-        var all = get(SUPPORT_ENGINEER_ROLE, "/summary" + window);
-        var group = get(SUPPORT_ENGINEER_ROLE, "/summary" + window + "&teamGroup=" + TEAM_GROUP);
+        // Opening a window that ends today starts a refresh, which classifies the window's closed
+        // tickets and so fetches their Slack threads. Stub that, and let the refreshes finish inside
+        // the test, so no fetch lands after the stub is gone.
+        slackWiremock.stubFor(post("/api/conversations.replies")
+                .withName("summary team group: thread replies for the window's closed tickets")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {
+                                    "ok": true,
+                                    "messages": [
+                                        {"type": "message", "text": "Summary team group query", "ts": "1700000000.000100"}
+                                    ],
+                                    "has_more": false
+                                }
+                                """)));
+        try {
+            var all = get(SUPPORT_ENGINEER_ROLE, allPath);
+            var group = get(SUPPORT_ENGINEER_ROLE, groupPath);
 
-        assertThat(all.statusCode()).isEqualTo(200);
-        assertThat(group.statusCode()).isEqualTo(200);
-        assertThat(all.jsonPath().getList("teams.label", String.class)).contains("wow", "infra-integration");
-        assertThat(group.jsonPath().getList("teams.label", String.class))
-                .contains("wow")
-                .isSubsetOf("wow", "connected-app");
-        assertThat(group.jsonPath().getLong("totalTickets"))
-                .isPositive()
-                .isLessThan(all.jsonPath().getLong("totalTickets"));
+            assertThat(all.statusCode()).isEqualTo(200);
+            assertThat(group.statusCode()).isEqualTo(200);
+            assertThat(all.jsonPath().getList("teams.label", String.class)).contains("wow", "infra-integration");
+            assertThat(group.jsonPath().getList("teams.label", String.class))
+                    .contains("wow")
+                    .isSubsetOf("wow", "connected-app");
+            assertThat(group.jsonPath().getLong("totalTickets"))
+                    .isPositive()
+                    .isLessThan(all.jsonPath().getLong("totalTickets"));
+
+            // The lock is global: the group's own refresh only starts once the whole window's ends.
+            awaitSummarySettled(allPath);
+            awaitSummarySettled(groupPath);
+        } finally {
+            slackWiremock.cleanupTestStubs();
+        }
+    }
+
+    /** Polls until the summary for {@code path} is no longer generating, starting its refresh if it needs one. */
+    private void awaitSummarySettled(String path) {
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(60))
+                .pollInterval(Duration.ofSeconds(1))
+                .untilAsserted(() -> {
+                    var polled = get(SUPPORT_ENGINEER_ROLE, path);
+                    assertThat(polled.statusCode()).isEqualTo(200);
+                    assertThat(polled.jsonPath().getString("summary.state"))
+                            .as(
+                                    "summary section for %s: %s",
+                                    path, polled.jsonPath().getMap("summary"))
+                            .isIn("ready", "unavailable");
+                });
     }
 
     @Test
