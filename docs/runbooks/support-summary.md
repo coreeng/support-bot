@@ -66,6 +66,36 @@ SELECT type, version FROM analysis_prompt WHERE is_in_use ORDER BY type;
 Cached summaries key on the prompt version, so re-enabling the same version serves the existing
 `summary_snapshot` rows without regenerating anything.
 
+## Classification prompt version 2 (V43)
+
+`V43__classification_prompt_product_bug.sql` seeds classification prompt version 2 and puts it in
+use in place of version 1. It adds a **Product Bug** driver for a platform that does not behave as
+designed or documented, and narrows **Product Temporary Issue** to outages, incidents and external
+dependencies.
+
+Nothing is re-classified when it deploys. A new prompt is a new `prompt_id`, so analysis rows from
+version 1 stop counting as current, and each window catches up when it is next used:
+
+- Opening the Support Summary for a window re-classifies that window's closed tickets (one LLM call
+  each) and regenerates its summary, which replaces the cached one. Until it finishes, the page
+  shows the summary as generating rather than the old text, and the breakdowns count each ticket as
+  unclassified until its re-classification lands.
+- `POST /analysis/run?days=N` re-classifies closed tickets last active in the past `N` days. It does
+  not regenerate any summary; the next visit to an affected window does that (see
+  [Re-running classification by hand](#re-running-classification-by-hand)).
+- Windows nobody opens keep their version 1 classifications and summary.
+
+Rolling back to a release from before V43 does not bring version 1 back: the prompt in use is read
+from the table, so the older release keeps classifying with version 2. To go back to version 1,
+flip the flags. Version 1's row is unchanged, so the analysis rows still stamped with it become
+current again; a ticket already re-classified under version 2 has lost its version 1 row (there is
+one row per ticket) and is re-classified once more when its window is next used.
+
+```sql
+UPDATE analysis_prompt SET is_in_use = FALSE WHERE type = 'classification';
+UPDATE analysis_prompt SET is_in_use = TRUE WHERE type = 'classification' AND version = 1;
+```
+
 ## Rolling back to a release before V42 (team groups)
 
 `V42__summary_snapshot_team_group.sql` adds `summary_snapshot.team_group` (`''` for a summary of
