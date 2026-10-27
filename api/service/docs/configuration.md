@@ -376,7 +376,7 @@ summary-area:
   offline-export: # The offline analysis kit served next to the export; independent of llm.*
     analysis-bundle-path: ${OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip (or directory to zip on the fly)
 
-# Team groups: named sets of tenant teams the Support Summary page can be narrowed to (ADR-009).
+# Team groups: named sets of tenant teams the Support Summary page can be narrowed to (ADR-010).
 # Full operator reference is in "Support Summary" → "Team groups" under Integrations below.
 team-groups:
   display-name: ${TEAM_GROUPS_DISPLAY_NAME:Area} # The noun the UI calls a group by, e.g. Area, Domain, Tribe
@@ -616,7 +616,7 @@ the [Support Summary runbook](../../../docs/runbooks/support-summary.md).
 
 A **team group** is a named set of tenant teams — a business *area*, *domain*, *tribe* or
 *business unit* — that the page can be narrowed to, so its figures and narrative cover only that
-group's tickets. The decision is recorded in [ADR-009](../../../docs/adr/adr-009-team-groups-for-support-summary.md).
+group's tickets. The decision is recorded in [ADR-010](../../../docs/adr/adr-010-team-groups-for-support-summary.md).
 
 Groups are built from a **team attribute**: every tenant team with the same value for it forms one
 group, labelled with that value.

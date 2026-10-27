@@ -66,14 +66,14 @@ SELECT type, version FROM analysis_prompt WHERE is_in_use ORDER BY type;
 Cached summaries key on the prompt version, so re-enabling the same version serves the existing
 `summary_snapshot` rows without regenerating anything.
 
-## Rolling back to a release before V41 (team groups)
+## Rolling back to a release before V42 (team groups)
 
-`V41__summary_snapshot_team_group.sql` adds `summary_snapshot.team_group` (`''` for a summary of
+`V42__summary_snapshot_team_group.sql` adds `summary_snapshot.team_group` (`''` for a summary of
 the whole window, the group's code otherwise) and replaces the unique key
 `summary_snapshot_window_prompt_unique (window_from, window_to, prompt_id)` with
 `summary_snapshot_window_group_prompt_unique (window_from, window_to, team_group, prompt_id)`.
 
-A pre-V41 service upserts with `ON CONFLICT (window_from, window_to, prompt_id)`, which has no
+A pre-V42 service upserts with `ON CONFLICT (window_from, window_to, prompt_id)`, which has no
 matching constraint any more, so every summary refresh fails; and once any team group's snapshot
 exists for a window, its `find()` matches two rows and throws `TooManyRowsException`. **Before**
 starting the old release, drop the group snapshots and restore the old key:
@@ -92,7 +92,7 @@ deletes it at startup and releases the lock — the next visit starts a fresh re
 
 ### Rolling forward again
 
-Flyway will not re-run V41, so put its key back by hand before or right after the new release
+Flyway will not re-run V42, so put its key back by hand before or right after the new release
 starts (otherwise the new service's group upserts fail):
 
 ```sql

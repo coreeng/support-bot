@@ -1,4 +1,4 @@
--- Support Summary team groups (ADR-009): the prose is cached per (window, team group, prompt version).
+-- Support Summary team groups (ADR-010): the prose is cached per (window, team group, prompt version).
 --
 -- `team_group` is the group's code, or '' for a summary of the whole window ("All"). It is NOT NULL
 -- with a '' sentinel rather than nullable because NULLs are distinct in a unique constraint, so

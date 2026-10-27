@@ -101,7 +101,7 @@ team-groups:
   that was already true across windows, and groups make it more frequent.
 - A group's totals do not sum to the whole window's (unattributed and "Not a Tenant" tickets belong to
   no group), which the user guides explain.
-- Rolling back past `V41` needs the unique key restored by hand (see the Support Summary runbook).
+- Rolling back past `V42` needs the unique key restored by hand (see the Support Summary runbook).
 - Groups follow the teams fetched at startup. A team that is no longer fetched leaves its group,
   taking its past tickets out of the group's summary, and a team that moves group takes its history
   with it. Keeping retired teams would need their last attributes stored, e.g. in the `team` table.

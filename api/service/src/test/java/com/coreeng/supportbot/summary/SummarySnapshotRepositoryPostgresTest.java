@@ -112,7 +112,7 @@ class SummarySnapshotRepositoryPostgresTest {
 
     @Test
     void aRowWrittenWithoutATeamGroupReadsAsTheWholeWindow() {
-        // What every snapshot stored before team groups existed looks like after V41.
+        // What every snapshot stored before team groups existed looks like after V42.
         jdbcTemplate.update(
                 "INSERT INTO summary_snapshot (window_from, window_to, prompt_id, fingerprint, content, model)"
                         + " VALUES (?, ?, ?, 'f', 'legacy', 'm')",

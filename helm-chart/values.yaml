@@ -157,7 +157,7 @@ configMap:
     #       product: true
     # Team groups: sets of tenant teams (e.g. business areas) the Support Summary page can be
     # narrowed to, built from a team attribute; none by default, which hides the selector.
-    # See docs/adr/adr-009-team-groups-for-support-summary.md.
+    # See docs/adr/adr-010-team-groups-for-support-summary.md.
     # team-groups:
     #   display-name: Area
     #   attribute: area

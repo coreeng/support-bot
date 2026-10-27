@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
  * Team groups: named sets of tenant teams — a business area, domain or tribe — that the Support
- * Summary page can be focused on (ADR-009).
+ * Summary page can be focused on (ADR-010).
  *
  * <p>Groups are built from a team attribute: every tenant team carrying the attribute joins the
  * group named by its value. Attributes come from the team provider, either the k8s-generic
