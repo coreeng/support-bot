@@ -16,11 +16,11 @@ class TeamGroupsPropsTest {
     }
 
     @Test
-    void isOffByDefault_withAreaAsTheDisplayName() {
+    void isOffByDefault_withTeamGroupAsTheDisplayName() {
         TeamGroupsProps props = bind(Map.of());
 
         assertThat(props.attribute()).isNull();
-        assertThat(props.displayName()).isEqualTo("Area");
+        assertThat(props.displayName()).isEqualTo("Team group");
     }
 
     @Test

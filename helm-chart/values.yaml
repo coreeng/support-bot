@@ -159,8 +159,8 @@ configMap:
     # narrowed to, built from a team attribute; none by default, which hides the selector.
     # See docs/adr/adr-010-team-groups-for-support-summary.md.
     # team-groups:
-    #   display-name: Area
-    #   attribute: area
+    #   display-name: Domain
+    #   attribute: department
 
 # UI deployment (disabled by default for backward compatibility)
 ui:

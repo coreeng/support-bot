@@ -176,7 +176,7 @@ public class SummaryApiTests {
 
             assertThat(response.statusCode()).isEqualTo(200);
             var body = response.jsonPath();
-            assertThat(body.getString("displayName")).isEqualTo("Area");
+            assertThat(body.getString("displayName")).isEqualTo("Team group");
             assertThat(body.getList("groups.code", String.class)).containsExactly(TEAM_GROUP);
             assertThat(body.getString("groups[0].label")).isEqualTo("Functional Area");
             assertThat(body.getList("groups[0].teams.code", String.class))

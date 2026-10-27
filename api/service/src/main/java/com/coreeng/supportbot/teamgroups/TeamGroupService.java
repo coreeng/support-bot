@@ -23,7 +23,7 @@ public class TeamGroupService {
     /** A group with its members' display labels resolved, in the group's member order. */
     public record DescribedTeamGroup(TeamGroup group, ImmutableList<Member> members) {}
 
-    /** The noun the UI shows for a group, e.g. "Area". */
+    /** The noun the UI shows for a group, e.g. "Domain". */
     public String displayName() {
         return props.displayName();
     }

@@ -40,11 +40,11 @@ Opening the page classifies any closed-but-unclassified tickets in the window au
 
 **View Prompts** shows the two prompts behind the page (ticket classification and summary generation), read-only.
 
-### Focusing on one area
+### Focusing on one team group
 
-If your deployment has team groups set up, a selector next to the window dropdown narrows the whole page — narrative, chips and every breakdown — to one group of tenant teams. A group is called an **Area** by default, but the name can be changed. The strip above the cards shows which group is on screen (hover it to see its teams), and **Top Teams** ranks the teams within it. Clear the selector to go back to **All teams**.
+If your deployment has team groups set up, a selector next to the window dropdown narrows the whole page — narrative, chips and every breakdown — to one group of tenant teams. A group is called a **Team group** by default, but your deployment may use another name, such as Domain. The strip above the cards shows which group is on screen (hover it to see its teams), and **Top Teams** ranks the teams within it. Clear the selector to go back to **All teams**.
 
-The group is part of the page's address, so you can share or bookmark a link that opens straight on, say, last month for one area. Its first visit may take a moment while the narrative is written for that group; after that it loads instantly like any other window.
+The group is part of the page's address, so you can share or bookmark a link that opens straight on, say, last month for one group. Its first visit may take a moment while the narrative is written for that group; after that it loads instantly like any other window.
 
 A group's totals are at most the whole window's: tickets with no team, or not raised by a tenant, belong to no group.
 

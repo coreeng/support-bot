@@ -34,7 +34,7 @@ const PRESET_LABELS: Record<SummaryPreset, string> = {
 };
 
 /** What a group is called when the deployment's groups have not loaded (yet). */
-const DEFAULT_TEAM_GROUP_NAME = "Area";
+const DEFAULT_TEAM_GROUP_NAME = "Team group";
 
 /** Show a search box in the team group picker once there are more groups than fit at a glance. */
 const TEAM_GROUP_SEARCH_THRESHOLD = 8;

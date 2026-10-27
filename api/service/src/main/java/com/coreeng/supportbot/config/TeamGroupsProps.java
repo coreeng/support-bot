@@ -13,13 +13,14 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * fetcher's expressions or a static team's config. No attribute (the default) means no groups,
  * which hides the selector.
  *
- * @param displayName the noun the UI shows for a group, e.g. "Area", "Domain", "Tribe"
+ * @param displayName the noun the UI shows for a group, e.g. "Domain" or "Tribe"; "Team group" by default
  * @param attribute the name of the team attribute whose value names a team's group, with
  *     surrounding whitespace removed; null for none
  */
 @ConfigurationProperties("team-groups")
 public record TeamGroupsProps(
-        @DefaultValue("Area") String displayName, @Nullable String attribute) {
+        @DefaultValue("Team group") String displayName,
+        @Nullable String attribute) {
 
     public TeamGroupsProps {
         if (displayName.isBlank()) {

@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * The team groups the Support Summary page can be narrowed to.
  *
- * @param displayName the noun the deployment calls a group by, e.g. "Area"
+ * @param displayName the noun the deployment calls a group by, e.g. "Domain"
  * @param groups the groups, in display order; empty when there are none
  */
 public record TeamGroupsUI(String displayName, List<TeamGroupUI> groups) {

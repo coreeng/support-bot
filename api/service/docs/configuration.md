@@ -240,7 +240,7 @@ platform-integration: # Whether to enable platform integration to automatically 
           code: my-team # optional immutable identity used for mapping (ticket/escalation refs + escalation<->platform join); defaults to name
           group-ref: static:my-group # group whose members belong to the team: static:<group>, slack:<usergroup id>, google:<group email>, azure:<group id>
           # attributes: # optional extra values about the team, returned on teams in the API; e.g. the attribute team groups are built from
-          #   area: Payments
+          #   department: Department A
     core-platform: # Scraper specific to CECG's Core Platform
       enabled: false
     k8s-generic: # A generic scraper that might be used in any K8S environment
@@ -379,8 +379,8 @@ summary-area:
 # Team groups: named sets of tenant teams the Support Summary page can be narrowed to (ADR-010).
 # Full operator reference is in "Support Summary" → "Team groups" under Integrations below.
 team-groups:
-  display-name: ${TEAM_GROUPS_DISPLAY_NAME:Area} # The noun the UI calls a group by, e.g. Area, Domain, Tribe
-  # attribute: area # Team attribute whose value names a team's group; unset (the default) means no groups and no selector
+  display-name: ${TEAM_GROUPS_DISPLAY_NAME:Team group} # The noun the UI calls a group by, e.g. Domain, Tribe
+  # attribute: department # Team attribute whose value names a team's group; unset (the default) means no groups and no selector
 ```
 
 For deployment versatility across different secret delivery mechanisms, you can base64-encode the PEM file into a single line before storing it:
@@ -623,15 +623,15 @@ group, labelled with that value.
 
 ```yaml
 team-groups:
-  display-name: Area   # what the UI calls a group; defaults to "Area"
-  attribute: area      # the team attribute whose value names a team's group
+  display-name: Domain # what the UI calls a group; defaults to "Team group"
+  attribute: department # the team attribute whose value names a team's group
 ```
 
 The attribute comes from the tenant team provider:
 
 - **k8s-generic:** an entry under `config.attributes`, read from each team's resource with CEL (see
   the `teams-scraping` reference above).
-- **static:** `attributes` on each listed team, e.g. `attributes: {area: Payments}`.
+- **static:** `attributes` on each listed team, e.g. `attributes: {department: Department A}`.
 
 The core-platform provider has no attributes, so it has no groups.
 
@@ -672,7 +672,7 @@ Set these on the **API**:
 | `LLM_PROVIDER` | Turns the page on (any value other than `none`); see [Analysis](#analysis-knowledge-gap-llm) above. |
 | `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons (newest first) included in the report sent to the model, so a very wide window cannot overflow its context. Default `1000`, which covers the 92-day window cap at roughly 80 tickets a week. |
 | `SUMMARY_FAILURE_RETRY_DELAY` | How long a failed summary refresh is reported as an error before the next visit retries it. A change to the window's data or to the in-use summary prompt retries sooner. Default `15m`. |
-| `TEAM_GROUPS_DISPLAY_NAME` | What the UI calls a [team group](#team-groups), e.g. `Domain` or `Tribe`. Default `Area`. The attribute groups are built from is set in yaml (`team-groups.attribute`). |
+| `TEAM_GROUPS_DISPLAY_NAME` | What the UI calls a [team group](#team-groups), e.g. `Domain` or `Tribe`. Default `Team group`. The attribute groups are built from is set in yaml (`team-groups.attribute`). |
 
 ## Single Sign-On (SSO)
 

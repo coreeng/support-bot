@@ -434,5 +434,5 @@ summary-area:
 # (the default) means no groups, which hides the selector. Not to be confused with the "Support
 # Areas" breakdown, which is the classifier's drivers. See docs/adr/adr-010-team-groups-for-support-summary.md.
 team-groups:
-  display-name: ${TEAM_GROUPS_DISPLAY_NAME:Area} # The noun the UI calls a group by, e.g. Area, Domain, Tribe
-  # attribute: area # A team attribute name, from k8s-generic `attributes` or a static team's `attributes`
+  display-name: ${TEAM_GROUPS_DISPLAY_NAME:Team group} # The noun the UI calls a group by, e.g. Domain, Tribe
+  # attribute: department # A team attribute name, from k8s-generic `attributes` or a static team's `attributes`

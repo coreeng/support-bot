@@ -74,7 +74,7 @@ export interface SummaryTeamGroup {
  * attribute set, or no tenant team has a usable value).
  */
 export interface SummaryTeamGroups {
-  /** The noun the deployment calls a group by, e.g. "Area". */
+  /** The noun the deployment calls a group by, e.g. "Domain". */
   displayName: string;
   groups: SummaryTeamGroup[];
 }

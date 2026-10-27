@@ -5,18 +5,15 @@
 ## Context
 
 The Support Summary page (`/summary`) describes what support saw across a date window for **every**
-tenant. Tenant teams can be organised into *areas* — groupings of several tenant teams (e.g.
-Payments) — and it is useful to see the same summary focused on one area. Today the page
+tenant. Tenant teams can be organised into groups of several teams, and it is useful to see the
+same summary focused on one of them. Today the page
 can only show one team's tickets indirectly (the Top Teams card), never a group's narrative.
 
-The bot can run in many installations, each of which may group its teams differently (area, domain,
-tribe, business unit) and discover them differently (static config, the core-platform Kubernetes
-fetcher, generic CEL over Kubernetes resources). Nothing in the codebase models a level
-above tenant teams.
+Teams come from static config, the core-platform Kubernetes fetcher or CEL over Kubernetes
+resources, and nothing in the codebase models a level above tenant teams.
 
-The word "area" is already taken twice: the summary's **Top Support Areas** card is the classifier's
-drivers dimension, and `summary-area:` is the configuration prefix of the summary feature. Separately,
-`teams.groups` (`GroupRef`) means identity-provider groups that team members are resolved from.
+`teams.groups` (`GroupRef`) already means identity-provider groups that team members are resolved
+from, so the new concept needs a name that is clearly about grouping teams.
 
 ## Decision
 
@@ -27,12 +24,12 @@ from a **team attribute**. Tenant teams with the same value for the attribute fo
 
 ```yaml
 team-groups:
-  display-name: Area   # the noun the UI shows; per installation, default "Area"
-  attribute: area      # the team attribute whose value names a team's group
+  display-name: Domain    # the noun the UI shows; default "Team group"
+  attribute: department  # the team attribute whose value names a team's group
 ```
 
-- **Generic name in code and config, installation-chosen name in the UI.** "Team group" avoids both
-  "area" clashes; each installation calls them whatever its organisation does.
+- **Name.** Code and config call them team groups; the UI calls them by `display-name`, "Team
+  group" by default.
 - **Built from team attributes.** Team providers already expose attributes on teams: the k8s-generic
   fetcher reads them from each team's resource with CEL, and static teams list them in config. The
   grouping is then kept where the teams are defined rather than in a second list that would need to
@@ -75,8 +72,8 @@ team-groups:
   rather than an extra field on `window`, so a whole-window payload stays readable by earlier
   versions. A resumed group that no longer exists is refreshed for the whole window.
 - **Prompt unchanged.** The report sent to the model gains one `Scope:` line naming the group and its
-  teams; the summary prompt is not versioned, because a new version would orphan every cached snapshot
-  at every installation.
+  teams; the summary prompt is not versioned, because a new version would orphan every cached
+  snapshot.
 
 ### Not decided here
 
@@ -87,8 +84,8 @@ team-groups:
 
 ### Positive
 
-- A shareable link opens straight on one area's summary.
-- No installation-specific behaviour in code: installations without groups see no change.
+- A shareable link opens straight on one group's summary.
+- With no attribute configured, the page is unchanged.
 - Switching group is quick once the group's tickets are classified; only the narrative is generated.
 
 ### Negative

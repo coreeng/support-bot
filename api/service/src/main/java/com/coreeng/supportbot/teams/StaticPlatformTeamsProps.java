@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("platform-integration.teams-scraping.static")
 public record StaticPlatformTeamsProps(boolean enabled, List<TeamConfig> teams) {
-    /** @param attributes extra values about the team, keyed by attribute name, e.g. the area it belongs to */
+    /** @param attributes extra values about the team, keyed by attribute name, e.g. the one team groups are built from */
     public record TeamConfig(
             String name,
             @Nullable String code,
