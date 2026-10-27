@@ -219,6 +219,7 @@ public class SupportBotSlackClient {
                   },
                   "token": "${token}",
                   "trigger_id": "${triggerId}",
+                  ${messageContext}
                   "actions": [
                     {
                       "action_id": "${actionId}",
@@ -234,6 +235,7 @@ public class SupportBotSlackClient {
                         "userId", click.userId(),
                         "actionId", click.actionId(),
                         "triggerId", click.triggerId(),
+                        "messageContext", renderMessageContext(click),
                         "privateMetadata",
                                 StringEscapeUtils.escapeJson(
                                         click.privateMetadata().trim())));
@@ -244,6 +246,24 @@ public class SupportBotSlackClient {
                 .log()
                 .ifValidationFails(LogDetail.ALL, true)
                 .statusCode(200);
+    }
+
+    private static String renderMessageContext(RawButtonClick click) {
+        if (click.channelId() == null || click.messageTs() == null) {
+            return "";
+        }
+        String threadTsField =
+                click.threadTs() != null ? String.format("\"thread_ts\": \"%s\",", click.threadTs()) : "";
+        return String.format("""
+                "channel": {"id": "%1$s"},
+                "container": {
+                  "type": "message",
+                  %3$s
+                  "message_ts": "%2$s",
+                  "channel_id": "%1$s",
+                  "is_ephemeral": true
+                },
+                """, click.channelId(), click.messageTs(), threadTsField);
     }
 
     public void notifyViewSubmitted(RawViewSubmission rawViewSubmission) {

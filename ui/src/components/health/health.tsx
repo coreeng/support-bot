@@ -1,6 +1,8 @@
 "use client";
 
 import LoadingSkeleton from "@/components/LoadingSkeleton";
+import RatingFeedback from "@/components/health/rating-feedback";
+import { StarRating } from "@/components/health/star-rating";
 import ProductsPage, { hasActiveProductTags } from "@/components/products/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +42,7 @@ export default function HealthPage() {
 
   const tabs = [
     { key: "tickets" as const, label: "Activity Trends", icon: ClipboardList, color: "blue" },
-    { key: "ratings" as const, label: "Ratings", icon: Star, color: "yellow" },
+    { key: "ratings" as const, label: "Ratings & Feedback", icon: Star, color: "yellow" },
     { key: "workbench" as const, label: "Ticket Workbench", icon: Headphones, color: "purple" },
     ...(productTagsConfigured ? [{ key: "products" as const, label: "Products View", icon: Package, color: "green" }] : []),
   ];
@@ -1151,6 +1153,7 @@ export default function HealthPage() {
                 <MetricCard title="Percentage Rated" value={`${percentageRated}%`} color="green" />
                 <MetricCard title="Ratings Count" value={totalRatings} color="green" />
               </div>
+              <RatingFeedback from={dateRange.from} to={dateRange.to} />
               <div className="space-y-6">
                 <div className="bg-card rounded-lg border p-4">
                   <h2 className="text-foreground mb-2 text-center text-xl font-semibold">Ratings Received per Week</h2>
@@ -1687,26 +1690,6 @@ export function MetricCard({ title, value, extra, color }: { title: string; valu
         {value}
       </div>
       {extra && <p className="text-muted-foreground mt-1 text-xs">{extra}</p>}
-    </div>
-  );
-}
-
-function StarRating({ rating, hideValue = false }: { rating: number; hideValue?: boolean }) {
-  const max = 5;
-  const fullStars = Math.floor(rating);
-  const halfStar = rating % 1 >= 0.5;
-  return (
-    <div className="inline-flex items-center gap-0.5">
-      {Array.from({ length: max }, (_, i) => {
-        if (i < fullStars) {
-          return <Star key={i} className="fill-warning text-warning h-4 w-4" />;
-        }
-        if (i === fullStars && halfStar) {
-          return <Star key={i} className="text-warning h-4 w-4" />;
-        }
-        return <Star key={i} className="text-muted-foreground/40 h-4 w-4" />;
-      })}
-      {!hideValue && <span className="text-muted-foreground ml-1 text-sm">{rating.toFixed(1)}</span>}
     </div>
   );
 }

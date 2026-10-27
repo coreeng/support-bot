@@ -337,6 +337,34 @@ export const useRatings = (from?: string, to?: string) => {
   });
 };
 
+export type RatingFeedbackItem = {
+  rating: number;
+  /** Monday of the UTC week the rating was submitted in, as YYYY-MM-DD; exact times are never exposed. */
+  weekStart: string;
+  feedback: string;
+  /** The rated ticket, or null when the submitter didn't share their name. Non-null is what makes feedback "named". */
+  ticketId: number | null;
+};
+
+/**
+ * Follow-up feedback for the date range. The backend widens `from`/`to` to whole UTC weeks (ADR-009),
+ * so results can include days just outside the range.
+ */
+export const useRatingFeedback = (from?: string, to?: string) => {
+  return useQuery({
+    queryKey: ["rating-feedback", from, to],
+    queryFn: async (): Promise<RatingFeedbackItem[]> => {
+      const params = new URLSearchParams();
+      if (from) params.append("from", from);
+      if (to) params.append("to", to);
+      const query = params.toString();
+      return apiGet(`/rating/feedback${query ? `?${query}` : ""}`);
+    },
+    // A 403 is final; retrying would only delay the access message
+    retry: shouldRetryTransientFailure,
+  });
+};
+
 export interface Registry {
   impacts: { label: string; code: string; active?: boolean }[];
   tags: { label: string; code: string; active?: boolean }[];

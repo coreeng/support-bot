@@ -45,6 +45,28 @@ public interface ViewSubmission {
         }
     }
 
+    record PlainTextValue(String name, String value) implements Value {
+        @Override
+        public String renderJson() {
+            return String.format("{\"type\":\"plain_text_input\",\"value\":%s}\n", quote(value));
+        }
+    }
+
+    record CheckboxesValue(String name, ImmutableList<String> values) implements Value {
+        @Override
+        public String renderJson() {
+            return renderMultiSelectJson("checkboxes", values);
+        }
+    }
+
+    private static String quote(String value) {
+        try {
+            return new ObjectMapper().writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private static String renderMultiSelectJson(String type, ImmutableList<String> values) {
         ObjectMapper mapper = new ObjectMapper();
         String selectedOptions = values.stream()
