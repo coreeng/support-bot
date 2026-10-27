@@ -34,13 +34,13 @@ class AnalysisPromptRepositoryPostgresTest {
 
     /**
      * SHA-256 of the prompt as it was when it still lived in api/service/analysis/prompt.md. It is the
-     * prompt_id the analysis rows classified before V42 are stamped with, so the V37 seed must keep
+     * prompt_id the analysis rows classified before V43 are stamped with, so the V37 seed must keep
      * matching it: it names the text those rows came from.
      */
     private static final String FIRST_PROMPT_ID = "a306429c1eea579c033108c4c70ff859e9fc02e91fb1dffd643d1f209b16dde5";
 
     /**
-     * SHA-256 of the V42 seed, the prompt in use. Any drift in that seed re-classifies every thread
+     * SHA-256 of the V43 seed, the prompt in use. Any drift in that seed re-classifies every thread
      * whose analysis it stamped.
      */
     private static final String SEEDED_PROMPT_ID = "74afee4056e8b4505be52743eba2ab40e15715e19c619b569746d85429149f76";
@@ -49,7 +49,7 @@ class AnalysisPromptRepositoryPostgresTest {
     private static final int SEEDED_VERSION = 2;
 
     /** How to recover a local database whose seeded classification prompt was deleted. */
-    private static final String RESEED_HINT = "Flyway will not re-seed an applied migration: delete version 42 from"
+    private static final String RESEED_HINT = "Flyway will not re-seed an applied migration: delete version 43 from"
             + " flyway_schema_history and run the migrations again. An older branch's copy of this test deletes"
             + " every classification version above 1.";
 
@@ -67,16 +67,16 @@ class AnalysisPromptRepositoryPostgresTest {
 
     /**
      * What the migrations leave in use, checked once before any reset can mask it: classification
-     * version 2 (V42) and summary version 1 (V38). Every reset below re-flags version 2 itself, so
-     * without this a V42 that inserted the row but never switched to it would go unnoticed.
+     * version 2 (V43) and summary version 1 (V38). Every reset below re-flags version 2 itself, so
+     * without this a V43 that inserted the row but never switched to it would go unnoticed.
      */
     @BeforeAll
     void migrationsLeaveTheSeededVersionsInUse() {
         List<String> inUse = jdbcTemplate.queryForList(
                 "SELECT type || ' v' || version FROM analysis_prompt WHERE is_in_use ORDER BY type", String.class);
         String why = seededVersionExists()
-                ? "Classification version " + SEEDED_VERSION + " exists but is not the one in use: V42 did not"
-                        + " switch to it, or the flags were changed since. Fix V42, or on a local database set"
+                ? "Classification version " + SEEDED_VERSION + " exists but is not the one in use: V43 did not"
+                        + " switch to it, or the flags were changed since. Fix V43, or on a local database set"
                         + " is_in_use on classification version " + SEEDED_VERSION + " only."
                 : "Classification version " + SEEDED_VERSION + " is missing. " + RESEED_HINT;
 

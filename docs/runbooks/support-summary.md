@@ -66,9 +66,9 @@ SELECT type, version FROM analysis_prompt WHERE is_in_use ORDER BY type;
 Cached summaries key on the prompt version, so re-enabling the same version serves the existing
 `summary_snapshot` rows without regenerating anything.
 
-## Classification prompt version 2 (V42)
+## Classification prompt version 2 (V43)
 
-`V42__classification_prompt_product_bug.sql` seeds classification prompt version 2 and puts it in
+`V43__classification_prompt_product_bug.sql` seeds classification prompt version 2 and puts it in
 use in place of version 1. It adds a **Product Bug** driver for a platform that does not behave as
 designed or documented, and narrows **Product Temporary Issue** to outages, incidents and external
 dependencies.
@@ -85,7 +85,7 @@ version 1 stop counting as current, and each window catches up when it is next u
   [Re-running classification by hand](#re-running-classification-by-hand)).
 - Windows nobody opens keep their version 1 classifications and summary.
 
-Rolling back to a release from before V42 does not bring version 1 back: the prompt in use is read
+Rolling back to a release from before V43 does not bring version 1 back: the prompt in use is read
 from the table, so the older release keeps classifying with version 2. To go back to version 1,
 flip the flags. Version 1's row is unchanged, so the analysis rows still stamped with it become
 current again; a ticket already re-classified under version 2 has lost its version 1 row (there is
