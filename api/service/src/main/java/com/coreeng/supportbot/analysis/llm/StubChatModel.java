@@ -43,10 +43,15 @@ public class StubChatModel implements ChatModel {
     /** Set by {@code LlmSummaryService} around the aggregated window report. */
     private static final String SUMMARY_MARKER = "--- BEGIN WINDOW REPORT ---";
 
-    // Values drawn from the controlled taxonomy in the seeded classification prompt (V37), so the
+    // Values drawn from the controlled taxonomy in the seeded classification prompt (V42), so the
     // stubbed breakdowns look like real ones rather than free text the UI has never seen.
     private static final List<String> DRIVERS = List.of(
-            "Knowledge Gap", "Product Usability Problem", "Product Temporary Issue", "Feature Request", "Task Request");
+            "Knowledge Gap",
+            "Product Usability Problem",
+            "Product Temporary Issue",
+            "Product Bug",
+            "Feature Request",
+            "Task Request");
 
     private static final List<String> CATEGORIES = List.of(
             "Tenancy & Onboarding",
