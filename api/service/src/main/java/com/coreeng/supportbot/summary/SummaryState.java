@@ -32,7 +32,7 @@ public sealed interface SummaryState {
 
     /** Stage of a refresh, for a meaningful progress message. */
     enum Phase {
-        /** Backfilling classifications for tickets in the window. */
+        /** Backfilling classifications for tickets in the scope. */
         CLASSIFYING,
         /** Asking the LLM for the prose summary. */
         SUMMARISING

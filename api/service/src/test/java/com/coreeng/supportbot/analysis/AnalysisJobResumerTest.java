@@ -77,8 +77,22 @@ class AnalysisJobResumerTest {
 
         resumer.resumeOnStartup();
 
-        verify(runner).runWindowRefresh(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23));
+        verify(runner).runWindowRefresh(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23), null);
         verify(analysisService, never()).resume(anyInt());
+        verify(asyncJobRepository, never()).deleteJob(any());
+    }
+
+    @Test
+    void handsATeamGroupWindowJobToItsRunnerWithItsGroup() {
+        String payload =
+                AnalysisJobData.teamGroupWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23), "area-a");
+        when(asyncJobRepository.findJob("analysis")).thenReturn(new AsyncJob("analysis", payload, Instant.now()));
+        WindowAnalysisRunner runner = mock(WindowAnalysisRunner.class);
+        when(windowAnalysisRunner.getIfAvailable()).thenReturn(runner);
+
+        resumer.resumeOnStartup();
+
+        verify(runner).runWindowRefresh(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23), "area-a");
         verify(asyncJobRepository, never()).deleteJob(any());
     }
 

@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
  * @param teams breakdown over every ticket raised, so it sums to {@code totalTickets}
  * @param products tickets per product tag ("Product - &lt;name&gt;"), one count per ticket per
  *     product; empty when no ticket in the window carries one
+ * @param teamGroup the team group every figure is narrowed to; absent for the whole window
  * @param summary the prose section, which carries its own state and never blocks the rest
  */
 public record SummaryUI(
@@ -35,7 +36,11 @@ public record SummaryUI(
         List<SummaryCountUI> features,
         List<SummaryCountUI> teams,
         List<SummaryCountUI> products,
+        @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable SummaryTeamGroupUI teamGroup,
         SummarySectionUI summary) {
+
+    /** The team group a summary is narrowed to. */
+    public record SummaryTeamGroupUI(String code, String label) {}
 
     /**
      * One bar of a ranked breakdown.

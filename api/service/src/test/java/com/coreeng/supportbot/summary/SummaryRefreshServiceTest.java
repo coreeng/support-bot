@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.analysis.AnalysisJobData;
@@ -24,9 +25,12 @@ import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.teamgroups.TeamGroup;
+import com.coreeng.supportbot.teamgroups.TeamGroupService;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedSet;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -52,6 +56,12 @@ class SummaryRefreshServiceTest {
     private static final LocalDate FROM = LocalDate.of(2026, 3, 10);
     private static final LocalDate TO = LocalDate.of(2026, 3, 23);
     private static final SummaryWindow WINDOW = new SummaryWindow(FROM, TO);
+    private static final SummaryScope SCOPE = SummaryScope.all(WINDOW);
+    private static final TeamGroup GROUP = new TeamGroup("area-a", "Area A", ImmutableSortedSet.of("team-a", "team-b"));
+    private static final SummaryScope GROUP_SCOPE = new SummaryScope(WINDOW, GROUP);
+    /** The team filter of a whole-window scope: none. */
+    private static final ImmutableSortedSet<String> ALL_TEAMS = ImmutableSortedSet.of();
+
     private static final String CHANNEL = "C123456";
     private static final String CLASSIFICATION_PROMPT = "classify this";
     private static final String SUMMARY_PROMPT = "summarise this";
@@ -81,6 +91,9 @@ class SummaryRefreshServiceTest {
     @Mock
     private LlmSummaryService llmSummaryService;
 
+    @Mock
+    private TeamGroupService teamGroupService;
+
     /** Stands in for the {@code analysisTaskExecutor} in the dispatch tests; nothing runs unless a test runs it. */
     @Mock
     private Executor analysisExecutor;
@@ -96,20 +109,23 @@ class SummaryRefreshServiceTest {
 
         lenient().when(analysisService.currentPromptId()).thenReturn(CLASSIFICATION_PROMPT_ID);
         lenient()
-                .when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
+                .when(threadsAwaitingAnalysisService.find(FROM, TO, ALL_TEAMS, CLASSIFICATION_PROMPT_ID))
+                .thenReturn(ImmutableList.of());
+        lenient()
+                .when(threadsAwaitingAnalysisService.find(FROM, TO, GROUP.teamCodes(), CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of());
         lenient()
                 .when(analysisService.inUsePrompt(AnalysisPromptType.SUMMARY))
                 .thenReturn(new AnalysisPrompt(1, SUMMARY_PROMPT));
         lenient()
-                .when(summaryReadRepository.breakdowns(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .when(summaryReadRepository.breakdowns(SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(breakdowns());
         lenient()
-                .when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .when(summaryReadRepository.fingerprint(SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(
                         new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT));
         lenient()
-                .when(summaryReadRepository.reasons(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
+                .when(summaryReadRepository.reasons(SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
                 .thenReturn(ImmutableList.of(REASON));
         lenient().when(llmSummaryService.modelName()).thenReturn("model-a");
     }
@@ -125,6 +141,7 @@ class SummaryRefreshServiceTest {
                 summarySnapshotRepository,
                 llmSummaryService,
                 channelRegistry,
+                teamGroupService,
                 new SummaryAreaProps(
                         new SummaryAreaProps.Sanitisation(List.of(), List.of()),
                         new SummaryAreaProps.Page(400, RETRY_DELAY),
@@ -138,9 +155,9 @@ class SummaryRefreshServiceTest {
         SummaryRefreshService dispatching = newService(analysisExecutor);
         when(asyncJobRepository.tryStartJob("analysis", AnalysisJobData.window(FROM, TO)))
                 .thenReturn(true);
-        when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenReturn("the prose");
 
-        assertThat(dispatching.start(WINDOW)).isTrue();
+        assertThat(dispatching.start(SCOPE)).isTrue();
 
         // The request thread only hands the run over; nothing has been classified or summarised yet.
         ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
@@ -150,7 +167,7 @@ class SummaryRefreshServiceTest {
 
         task.getValue().run();
 
-        verify(analysisService).backfillWindow(FROM, TO);
+        verify(analysisService).backfillWindow(FROM, TO, ALL_TEAMS);
         verify(summarySnapshotRepository).upsert(any());
         verify(asyncJobRepository).deleteJob("analysis");
     }
@@ -161,7 +178,7 @@ class SummaryRefreshServiceTest {
         when(asyncJobRepository.tryStartJob("analysis", AnalysisJobData.window(FROM, TO)))
                 .thenReturn(false);
 
-        assertThat(dispatching.start(WINDOW)).isFalse();
+        assertThat(dispatching.start(SCOPE)).isFalse();
         verifyNoInteractions(analysisExecutor, analysisService);
     }
 
@@ -174,7 +191,7 @@ class SummaryRefreshServiceTest {
                 .thenReturn(true);
         doThrow(new TaskRejectedException("saturated")).when(analysisExecutor).execute(any());
 
-        assertThat(dispatching.start(WINDOW)).isFalse();
+        assertThat(dispatching.start(SCOPE)).isFalse();
 
         verify(asyncJobRepository).deleteJob("analysis");
         verifyNoInteractions(analysisService);
@@ -193,25 +210,203 @@ class SummaryRefreshServiceTest {
     }
 
     @Test
+    void start_claimsTheLockWithATeamGroupPayloadForAGroupScope() {
+        SummaryRefreshService dispatching = newService(analysisExecutor);
+        when(asyncJobRepository.tryStartJob("analysis", AnalysisJobData.teamGroupWindow(FROM, TO, "area-a")))
+                .thenReturn(true);
+
+        assertThat(dispatching.start(GROUP_SCOPE)).isTrue();
+
+        verify(analysisExecutor).execute(any());
+    }
+
+    @Test
+    void aTeamGroupRefreshOnlyBackfillsTheGroupsTicketsAndStoresTheGroupsSnapshot() {
+        // Tickets outside the group are left to the refreshes that report on them: a ticket that keeps
+        // failing to classify would otherwise be retried by every group's refresh, and the group's page
+        // would sit classifying tickets it does not show.
+        when(teamGroupService.find("area-a")).thenReturn(GROUP);
+        when(summaryReadRepository.breakdowns(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(breakdowns());
+        when(summaryReadRepository.fingerprint(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(new SummaryFingerprint(
+                        1, 1, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT, ImmutableSet.of(), "d1"));
+        when(summaryReadRepository.reasons(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
+                .thenReturn(ImmutableList.of(REASON));
+        when(llmSummaryService.generate(SUMMARY_PROMPT, GROUP_SCOPE, breakdowns(), ImmutableList.of(REASON)))
+                .thenReturn("the group's prose");
+
+        service.runWindowRefresh(FROM, TO, "area-a");
+
+        verify(analysisService).backfillWindow(FROM, TO, GROUP.teamCodes());
+        verify(analysisService, times(1)).backfillWindow(any(), any(), any());
+        verify(threadsAwaitingAnalysisService, times(2)).find(FROM, TO, GROUP.teamCodes(), CLASSIFICATION_PROMPT_ID);
+        verifyNoMoreInteractions(threadsAwaitingAnalysisService);
+        ArgumentCaptor<SummarySnapshot> stored = ArgumentCaptor.forClass(SummarySnapshot.class);
+        verify(summarySnapshotRepository).upsert(stored.capture());
+        assertThat(stored.getValue())
+                .isEqualTo(new SummarySnapshot(
+                        WINDOW,
+                        "area-a",
+                        SUMMARY_PROMPT_ID,
+                        "1/1@2026-03-23T10:00~" + TICKET_UPDATED_AT + "|g:d1",
+                        "the group's prose",
+                        "model-a",
+                        null));
+        verify(asyncJobRepository).deleteJob("analysis");
+    }
+
+    @Test
+    void aTeamGroupsSecondPassStaysWithinTheGroup() {
+        // A group ticket closed during the first pass gets the second pass, which is scoped like the first.
+        when(teamGroupService.find("area-a")).thenReturn(GROUP);
+        when(threadsAwaitingAnalysisService.find(FROM, TO, GROUP.teamCodes(), CLASSIFICATION_PROMPT_ID))
+                .thenReturn(ImmutableList.of())
+                .thenReturn(ImmutableList.of(new ThreadToAnalyze(7L, "1.7", CHANNEL)));
+        when(summaryReadRepository.fingerprint(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(new SummaryFingerprint(
+                        1, 1, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT, ImmutableSet.of(), "d1"));
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenReturn("the group's prose");
+
+        service.runWindowRefresh(FROM, TO, "area-a");
+
+        verify(analysisService, times(2)).backfillWindow(FROM, TO, GROUP.teamCodes());
+        verify(analysisService, times(2)).backfillWindow(any(), any(), any());
+    }
+
+    @Test
+    void aGroupGapTheBackfillAttemptedAndCouldNotFillStaysInTheGroupsStoredFingerprint() {
+        // As for the whole window: the group's backfill attempted ticket 42 and could not fill it, so it
+        // is baked into the group's fingerprint and the group's page serves the snapshot rather than
+        // retrying it on every poll.
+        when(teamGroupService.find("area-a")).thenReturn(GROUP);
+        when(threadsAwaitingAnalysisService.find(FROM, TO, GROUP.teamCodes(), CLASSIFICATION_PROMPT_ID))
+                .thenReturn(ImmutableList.of(new ThreadToAnalyze(42L, "ts-42", CHANNEL)));
+        SummaryFingerprint current = new SummaryFingerprint(
+                1,
+                0,
+                LocalDate.of(2026, 3, 23).atTime(10, 0),
+                TICKET_UPDATED_AT,
+                ImmutableSet.of(new TicketId(42)),
+                "d1");
+        when(summaryReadRepository.fingerprint(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(current);
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenReturn("the group's prose");
+
+        service.runWindowRefresh(FROM, TO, "area-a");
+
+        ArgumentCaptor<SummarySnapshot> stored = ArgumentCaptor.forClass(SummarySnapshot.class);
+        verify(summarySnapshotRepository).upsert(stored.capture());
+        assertThat(stored.getValue().fingerprint())
+                .isEqualTo(current.value())
+                .isEqualTo("1/0@2026-03-23T10:00~" + TICKET_UPDATED_AT + "#1:42|g:d1");
+    }
+
+    @Test
+    void aGroupGapTheBackfillNeverAttemptedIsLeftOutOfTheGroupsStoredFingerprint() {
+        // Ticket 99 closes during the group's first pass and is picked up by the second; ticket 100
+        // closes during the second pass, too late for either. Only 99 is pinned, so the group's next
+        // visit computes a different fingerprint and starts the refresh that attempts 100.
+        when(teamGroupService.find("area-a")).thenReturn(GROUP);
+        when(threadsAwaitingAnalysisService.find(FROM, TO, GROUP.teamCodes(), CLASSIFICATION_PROMPT_ID))
+                .thenReturn(ImmutableList.of())
+                .thenReturn(ImmutableList.of(new ThreadToAnalyze(99L, "ts-99", CHANNEL)));
+        SummaryFingerprint current = new SummaryFingerprint(
+                2,
+                0,
+                LocalDate.of(2026, 3, 23).atTime(10, 0),
+                TICKET_UPDATED_AT,
+                ImmutableSet.of(new TicketId(99), new TicketId(100)),
+                "d1");
+        when(summaryReadRepository.fingerprint(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(current);
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenReturn("the group's prose");
+
+        service.runWindowRefresh(FROM, TO, "area-a");
+
+        ArgumentCaptor<SummarySnapshot> stored = ArgumentCaptor.forClass(SummarySnapshot.class);
+        verify(summarySnapshotRepository).upsert(stored.capture());
+        assertThat(stored.getValue().fingerprint())
+                .isEqualTo("2/0@2026-03-23T10:00~" + TICKET_UPDATED_AT + "#1:99|g:d1")
+                .isNotEqualTo(current.value());
+    }
+
+    @Test
+    void aResumedRunForATeamGroupThatNoLongerExistsRefreshesTheWholeWindow() {
+        when(teamGroupService.find("gone")).thenReturn(null);
+        when(llmSummaryService.generate(SUMMARY_PROMPT, SCOPE, breakdowns(), ImmutableList.of(REASON)))
+                .thenReturn("the prose");
+
+        service.runWindowRefresh(FROM, TO, "gone");
+
+        verify(analysisService).backfillWindow(FROM, TO, ALL_TEAMS);
+        ArgumentCaptor<SummarySnapshot> stored = ArgumentCaptor.forClass(SummarySnapshot.class);
+        verify(summarySnapshotRepository).upsert(stored.capture());
+        assertThat(stored.getValue().teamGroup()).isEqualTo(SummaryScope.ALL_KEY);
+    }
+
+    @Test
+    void aTeamGroupsFailureIsRecordedUnderTheGroupsFingerprint_andDoesNotBlockTheWholeWindow() {
+        // The group's fingerprint carries its membership digest, so it differs from the whole
+        // window's: a failure stored under the wrong one would never match, and be retried on every poll.
+        SummaryFingerprint groupFingerprint = new SummaryFingerprint(
+                3,
+                2,
+                LocalDate.of(2026, 3, 23).atTime(10, 0),
+                TICKET_UPDATED_AT,
+                ImmutableSet.of(),
+                GROUP_SCOPE.membershipDigest());
+        assertThat(groupFingerprint.value()).isNotEqualTo(FINGERPRINT);
+        when(teamGroupService.find("area-a")).thenReturn(GROUP);
+        when(summaryReadRepository.fingerprint(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(groupFingerprint);
+        when(summaryReadRepository.breakdowns(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+                .thenReturn(breakdowns());
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenThrow(new IllegalStateException("boom"));
+
+        service.runWindowRefresh(FROM, TO, "area-a");
+
+        assertThat(service.failureFor(GROUP_SCOPE, SUMMARY_PROMPT_ID, groupFingerprint.value()))
+                .isEqualTo(SummaryRefreshService.ERROR_GENERIC);
+        assertThat(service.failureFor(GROUP_SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT))
+                .isNull();
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
+    }
+
+    @Test
+    void theWholeWindowsFailureDoesNotBlockATeamGroup() {
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenThrow(new IllegalStateException("boom"));
+
+        service.runWindowRefresh(FROM, TO);
+
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT))
+                .isEqualTo(SummaryRefreshService.ERROR_GENERIC);
+        assertThat(service.failureFor(GROUP_SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT))
+                .isNull();
+    }
+
+    @Test
     void backfillsBeforeGeneratingAndStoresTheResultingSnapshot() {
-        when(llmSummaryService.generate(SUMMARY_PROMPT, breakdowns(), ImmutableList.of(REASON)))
+        when(llmSummaryService.generate(SUMMARY_PROMPT, SCOPE, breakdowns(), ImmutableList.of(REASON)))
                 .thenReturn("  the prose  ");
 
         service.runWindowRefresh(FROM, TO);
 
-        verify(analysisService).backfillWindow(FROM, TO);
+        verify(analysisService).backfillWindow(FROM, TO, ALL_TEAMS);
         ArgumentCaptor<SummarySnapshot> stored = ArgumentCaptor.forClass(SummarySnapshot.class);
         verify(summarySnapshotRepository).upsert(stored.capture());
         assertThat(stored.getValue())
-                .isEqualTo(new SummarySnapshot(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT, "the prose", "model-a", null));
+                .isEqualTo(
+                        new SummarySnapshot(WINDOW, "", SUMMARY_PROMPT_ID, FINGERPRINT, "the prose", "model-a", null));
         assertThat(service.status().running()).isFalse();
         verify(asyncJobRepository).deleteJob("analysis");
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
     }
 
     @Test
     void releasesTheLockAndRecordsTheErrorWhenGenerationFails() {
-        when(llmSummaryService.generate(any(), any(), any())).thenThrow(new IllegalStateException("model exploded"));
+        when(llmSummaryService.generate(any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("model exploded"));
 
         service.runWindowRefresh(FROM, TO);
 
@@ -219,71 +414,79 @@ class SummaryRefreshServiceTest {
         verify(asyncJobRepository).deleteJob("analysis");
         verify(summarySnapshotRepository, never()).upsert(any());
         assertThat(service.status().running()).isFalse();
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT))
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT))
                 .isEqualTo(SummaryRefreshService.ERROR_GENERIC);
     }
 
     @Test
     void aRecordedFailureOnlyAppliesToTheDataThatProducedIt() {
-        when(llmSummaryService.generate(any(), any(), any())).thenThrow(new IllegalStateException("model exploded"));
+        when(llmSummaryService.generate(any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("model exploded"));
 
         service.runWindowRefresh(FROM, TO);
 
         // A different fingerprint means the window's data moved on: the failure is stale, so a retry
         // is warranted rather than a sticky error.
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, "9/9@2026-04-01T10:00"))
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, "9/9@2026-04-01T10:00"))
                 .isNull();
-        assertThat(service.failureFor(new SummaryWindow(FROM, TO.plusDays(1)), SUMMARY_PROMPT_ID, FINGERPRINT))
+        assertThat(service.failureFor(
+                        SummaryScope.all(new SummaryWindow(FROM, TO.plusDays(1))), SUMMARY_PROMPT_ID, FINGERPRINT))
                 .isNull();
     }
 
     @Test
     void aRecordedFailureIsRetriedOnceTheDelayHasPassedEvenIfTheDataIsUnchanged() {
-        when(llmSummaryService.generate(any(), any(), any())).thenThrow(new IllegalStateException("model exploded"));
+        when(llmSummaryService.generate(any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("model exploded"));
 
         service.runWindowRefresh(FROM, TO);
 
         // Polls inside the delay keep reporting the error rather than hammering the model.
         clock.advance(RETRY_DELAY.minusSeconds(1));
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT))
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT))
                 .isEqualTo(SummaryRefreshService.ERROR_GENERIC);
         // A window whose data never changes again (last month's) must not stay pinned to a transient
         // error until a restart: once the delay has passed the next visit gets to retry.
         clock.advance(Duration.ofSeconds(1));
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
         // And the expiry is not a one-off: the entry is gone, not merely hidden.
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
     }
 
     @Test
     void aNewSummaryPromptVersionReleasesARecordedFailure() {
-        when(llmSummaryService.generate(any(), any(), any())).thenThrow(new IllegalStateException("model exploded"));
+        when(llmSummaryService.generate(any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("model exploded"));
 
         service.runWindowRefresh(FROM, TO);
 
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT))
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT))
                 .isEqualTo(SummaryRefreshService.ERROR_GENERIC);
         // The failure was about a particular prompt; a newly published version is a different input
         // and deserves a fresh attempt even though the window's data is identical.
         String newPromptId = AnalysisService.computePromptId("summarise this, but better");
-        assertThat(service.failureFor(WINDOW, newPromptId, FINGERPRINT)).isNull();
+        assertThat(service.failureFor(SCOPE, newPromptId, FINGERPRINT)).isNull();
     }
 
     @Test
     void failuresForDifferentWindowsAreRememberedIndependently() {
         SummaryWindow otherWindow = new SummaryWindow(FROM.minusMonths(1), TO.minusMonths(1));
         String otherFingerprint = "9/7@2026-02-20T09:00~" + TICKET_UPDATED_AT;
-        when(summaryReadRepository.fingerprint(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+        when(summaryReadRepository.fingerprint(
+                        SummaryScope.all(otherWindow), CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(
                         new SummaryFingerprint(9, 7, LocalDate.of(2026, 2, 20).atTime(9, 0), TICKET_UPDATED_AT));
-        when(summaryReadRepository.breakdowns(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+        when(summaryReadRepository.breakdowns(
+                        SummaryScope.all(otherWindow), CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(breakdowns());
-        when(summaryReadRepository.reasons(otherWindow, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
+        when(summaryReadRepository.reasons(
+                        SummaryScope.all(otherWindow), CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
                 .thenReturn(ImmutableList.of(REASON));
-        when(threadsAwaitingAnalysisService.find(otherWindow.from(), otherWindow.to(), CLASSIFICATION_PROMPT_ID))
+        when(threadsAwaitingAnalysisService.find(
+                        otherWindow.from(), otherWindow.to(), ALL_TEAMS, CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of());
         // Distinguishable failures, so the test can tell whose memo is whose.
-        when(llmSummaryService.generate(any(), any(), any()))
+        when(llmSummaryService.generate(any(), any(), any(), any()))
                 .thenThrow(new IllegalStateException("first exploded"))
                 .thenThrow(new SlackException("second exploded"));
 
@@ -292,21 +495,22 @@ class SummaryRefreshServiceTest {
 
         // The second window's failure must not evict the first's, or the first would be retried on
         // the very next poll of a tab that is still looking at it.
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT))
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT))
                 .isEqualTo(SummaryRefreshService.ERROR_GENERIC);
-        assertThat(service.failureFor(otherWindow, SUMMARY_PROMPT_ID, otherFingerprint))
+        assertThat(service.failureFor(SummaryScope.all(otherWindow), SUMMARY_PROMPT_ID, otherFingerprint))
                 .isEqualTo(SummaryRefreshService.ERROR_SLACK);
     }
 
     @Test
     void theFailureMemoIsBoundedAndDropsTheOldestWindowFirst() {
-        when(llmSummaryService.generate(any(), any(), any())).thenThrow(new IllegalStateException("model exploded"));
+        when(llmSummaryService.generate(any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("model exploded"));
         when(summaryReadRepository.fingerprint(any(), any(), any()))
                 .thenReturn(
                         new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT));
         when(summaryReadRepository.breakdowns(any(), any(), any())).thenReturn(breakdowns());
         when(summaryReadRepository.reasons(any(), any(), any(), anyInt())).thenReturn(ImmutableList.of(REASON));
-        when(threadsAwaitingAnalysisService.find(any(), any(), any())).thenReturn(ImmutableList.of());
+        when(threadsAwaitingAnalysisService.find(any(), any(), any(), any())).thenReturn(ImmutableList.of());
 
         service.runWindowRefresh(FROM, TO);
         for (int i = 1; i <= SummaryRefreshService.MAX_REMEMBERED_FAILURES; i++) {
@@ -314,26 +518,28 @@ class SummaryRefreshServiceTest {
         }
 
         // The first window was pushed out; the most recent ones are still remembered.
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
         assertThat(service.failureFor(
-                        new SummaryWindow(FROM.plusDays(1), TO.plusDays(1)), SUMMARY_PROMPT_ID, FINGERPRINT))
+                        SummaryScope.all(new SummaryWindow(FROM.plusDays(1), TO.plusDays(1))),
+                        SUMMARY_PROMPT_ID,
+                        FINGERPRINT))
                 .isEqualTo(SummaryRefreshService.ERROR_GENERIC);
         SummaryWindow newest = new SummaryWindow(
                 FROM.plusDays(SummaryRefreshService.MAX_REMEMBERED_FAILURES),
                 TO.plusDays(SummaryRefreshService.MAX_REMEMBERED_FAILURES));
-        assertThat(service.failureFor(newest, SUMMARY_PROMPT_ID, FINGERPRINT))
+        assertThat(service.failureFor(SummaryScope.all(newest), SUMMARY_PROMPT_ID, FINGERPRINT))
                 .isEqualTo(SummaryRefreshService.ERROR_GENERIC);
     }
 
     @Test
     void aFailedBackfillStopsTheRefreshBeforeItAsksTheModel() {
-        doThrow(new SlackException("slack is down")).when(analysisService).backfillWindow(FROM, TO);
+        doThrow(new SlackException("slack is down")).when(analysisService).backfillWindow(FROM, TO, ALL_TEAMS);
 
         service.runWindowRefresh(FROM, TO);
 
         verifyNoInteractions(llmSummaryService);
         verify(asyncJobRepository).deleteJob("analysis");
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT))
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT))
                 .isEqualTo(SummaryRefreshService.ERROR_SLACK);
     }
 
@@ -342,11 +548,11 @@ class SummaryRefreshServiceTest {
         // The memo is rendered verbatim to every viewer of the page, so a jOOQ failure (full SQL) or a
         // model-client failure (endpoint, project) must be reduced to a fixed phrase.
         String sql = "select secret_column from secret_table where project = 'acme-prod'";
-        when(llmSummaryService.generate(any(), any(), any())).thenThrow(new DataAccessException(sql));
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenThrow(new DataAccessException(sql));
 
         service.runWindowRefresh(FROM, TO);
 
-        String error = service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT);
+        String error = service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT);
         assertThat(error).isEqualTo(SummaryRefreshService.ERROR_GENERIC).doesNotContain("secret", "acme");
     }
 
@@ -377,42 +583,42 @@ class SummaryRefreshServiceTest {
         service.runWindowRefresh(FROM, TO);
 
         verify(summarySnapshotRepository, never()).upsert(any());
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT)).isNull();
     }
 
     @Test
     void aTicketClosedDuringTheFirstPassIsClassifiedByASecondPass() {
         ThreadToAnalyze lateCloser = new ThreadToAnalyze(99L, "ts-99", CHANNEL);
         // Nothing awaits before the first pass; by the time it finishes, ticket 99 has closed.
-        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
+        when(threadsAwaitingAnalysisService.find(FROM, TO, ALL_TEAMS, CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of())
                 .thenReturn(ImmutableList.of(lateCloser));
-        when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenReturn("the prose");
 
         service.runWindowRefresh(FROM, TO);
 
         // Two passes, both before the summary is generated from the post-backfill state.
         InOrder inOrder = Mockito.inOrder(analysisService, llmSummaryService);
-        inOrder.verify(analysisService, times(2)).backfillWindow(FROM, TO);
-        inOrder.verify(llmSummaryService).generate(any(), any(), any());
+        inOrder.verify(analysisService, times(2)).backfillWindow(FROM, TO, ALL_TEAMS);
+        inOrder.verify(llmSummaryService).generate(any(), any(), any(), any());
         verify(summarySnapshotRepository).upsert(any());
     }
 
     @Test
     void noThirdPassRunsEvenIfTheSecondLeavesGapsBehind() {
         ThreadToAnalyze lateCloser = new ThreadToAnalyze(99L, "ts-99", CHANNEL);
-        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
+        when(threadsAwaitingAnalysisService.find(FROM, TO, ALL_TEAMS, CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of())
                 .thenReturn(ImmutableList.of(lateCloser))
                 // Were a third pass to be considered, this is what it would see: another new arrival.
                 .thenReturn(ImmutableList.of(lateCloser, new ThreadToAnalyze(100L, "ts-100", CHANNEL)));
-        when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenReturn("the prose");
 
         service.runWindowRefresh(FROM, TO);
 
-        verify(analysisService, times(2)).backfillWindow(FROM, TO);
+        verify(analysisService, times(2)).backfillWindow(FROM, TO, ALL_TEAMS);
         // The gaps are only re-read once, between the two passes.
-        verify(threadsAwaitingAnalysisService, times(2)).find(FROM, TO, CLASSIFICATION_PROMPT_ID);
+        verify(threadsAwaitingAnalysisService, times(2)).find(FROM, TO, ALL_TEAMS, CLASSIFICATION_PROMPT_ID);
         verify(summarySnapshotRepository).upsert(any());
     }
 
@@ -421,19 +627,19 @@ class SummaryRefreshServiceTest {
         // Ticket 42's thread is gone: it awaits classification before and after the pass. Retrying it
         // would fail the same way, so a second pass is only for tickets the first could not have seen.
         ThreadToAnalyze unclassifiable = new ThreadToAnalyze(42L, "ts-42", CHANNEL);
-        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
+        when(threadsAwaitingAnalysisService.find(FROM, TO, ALL_TEAMS, CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of(unclassifiable));
-        when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenReturn("the prose");
 
         service.runWindowRefresh(FROM, TO);
 
-        verify(analysisService, times(1)).backfillWindow(FROM, TO);
+        verify(analysisService, times(1)).backfillWindow(FROM, TO, ALL_TEAMS);
         verify(summarySnapshotRepository).upsert(any());
     }
 
     @Test
     void anInterruptedSecondPassAbortsTheRefreshWithoutSummarising() {
-        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
+        when(threadsAwaitingAnalysisService.find(FROM, TO, ALL_TEAMS, CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of())
                 .thenReturn(ImmutableList.of(new ThreadToAnalyze(99L, "ts-99", CHANNEL)));
         doAnswer(_ -> null)
@@ -442,14 +648,14 @@ class SummaryRefreshServiceTest {
                     return null;
                 })
                 .when(analysisService)
-                .backfillWindow(FROM, TO);
+                .backfillWindow(FROM, TO, ALL_TEAMS);
 
         try {
             service.runWindowRefresh(FROM, TO);
 
             verifyNoInteractions(llmSummaryService, summarySnapshotRepository);
             verify(asyncJobRepository).deleteJob("analysis");
-            assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT))
+            assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT))
                     .isNull();
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
         } finally {
@@ -464,7 +670,7 @@ class SummaryRefreshServiceTest {
                     return null;
                 })
                 .when(analysisService)
-                .backfillWindow(FROM, TO);
+                .backfillWindow(FROM, TO, ALL_TEAMS);
 
         try {
             service.runWindowRefresh(FROM, TO);
@@ -475,7 +681,7 @@ class SummaryRefreshServiceTest {
             verify(asyncJobRepository).deleteJob("analysis");
             assertThat(service.status().running()).isFalse();
             // Nothing is pinned, so the next visit starts a fresh refresh.
-            assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT))
+            assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT))
                     .isNull();
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
         } finally {
@@ -488,7 +694,7 @@ class SummaryRefreshServiceTest {
         // Ticket 99 closes during the first pass and is picked up by the second; ticket 100 closes
         // during the second pass, too late for either. By the time the summary is generated both are
         // gaps in the database.
-        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
+        when(threadsAwaitingAnalysisService.find(FROM, TO, ALL_TEAMS, CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of())
                 .thenReturn(ImmutableList.of(new ThreadToAnalyze(99L, "ts-99", CHANNEL)));
         SummaryFingerprint current = new SummaryFingerprint(
@@ -497,9 +703,9 @@ class SummaryRefreshServiceTest {
                 LocalDate.of(2026, 3, 23).atTime(10, 0),
                 TICKET_UPDATED_AT,
                 ImmutableSet.of(new TicketId(99), new TicketId(100)));
-        when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+        when(summaryReadRepository.fingerprint(SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(current);
-        when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenReturn("the prose");
 
         service.runWindowRefresh(FROM, TO);
 
@@ -511,19 +717,19 @@ class SummaryRefreshServiceTest {
         assertThat(stored.getValue().fingerprint())
                 .isEqualTo(FINGERPRINT + "#1:99")
                 .isNotEqualTo(current.value());
-        verify(analysisService, times(2)).backfillWindow(FROM, TO);
+        verify(analysisService, times(2)).backfillWindow(FROM, TO, ALL_TEAMS);
     }
 
     @Test
     void aGapTheBackfillAttemptedAndCouldNotFillStaysInTheStoredFingerprint() {
         // Ticket 42's thread is gone: it awaits classification before the pass and still after it.
-        when(threadsAwaitingAnalysisService.find(FROM, TO, CLASSIFICATION_PROMPT_ID))
+        when(threadsAwaitingAnalysisService.find(FROM, TO, ALL_TEAMS, CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of(new ThreadToAnalyze(42L, "ts-42", CHANNEL)));
         SummaryFingerprint current = new SummaryFingerprint(
                 3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT, ImmutableSet.of(new TicketId(42)));
-        when(summaryReadRepository.fingerprint(WINDOW, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
+        when(summaryReadRepository.fingerprint(SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL)))
                 .thenReturn(current);
-        when(llmSummaryService.generate(any(), any(), any())).thenReturn("the prose");
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenReturn("the prose");
 
         service.runWindowRefresh(FROM, TO);
 
@@ -536,12 +742,12 @@ class SummaryRefreshServiceTest {
 
     @Test
     void rejectsAnEmptySummaryRatherThanCachingIt() {
-        when(llmSummaryService.generate(any(), any(), any())).thenReturn("   ");
+        when(llmSummaryService.generate(any(), any(), any(), any())).thenReturn("   ");
 
         service.runWindowRefresh(FROM, TO);
 
         verify(summarySnapshotRepository, never()).upsert(any());
-        assertThat(service.failureFor(WINDOW, SUMMARY_PROMPT_ID, FINGERPRINT))
+        assertThat(service.failureFor(SCOPE, SUMMARY_PROMPT_ID, FINGERPRINT))
                 .isEqualTo(SummaryRefreshService.ERROR_EMPTY_SUMMARY);
     }
 

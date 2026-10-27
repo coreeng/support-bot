@@ -2,16 +2,21 @@ package com.coreeng.supportbot.summary.rest;
 
 import com.coreeng.supportbot.summary.SummaryBreakdowns;
 import com.coreeng.supportbot.summary.SummaryCount;
+import com.coreeng.supportbot.summary.SummaryScope;
 import com.coreeng.supportbot.summary.SummaryService.SummaryResult;
 import com.coreeng.supportbot.summary.SummaryState;
 import com.coreeng.supportbot.summary.SummaryTicketExample;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryCountUI;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryProgressUI;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummarySectionUI;
+import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryTeamGroupUI;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryTicketUI;
+import com.coreeng.supportbot.teamgroups.TeamGroup;
+import com.coreeng.supportbot.teamgroups.TeamGroupService.DescribedTeamGroup;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Locale;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /** Maps the domain result onto the wire shape. */
@@ -32,7 +37,26 @@ public class SummaryMapper {
                 counts(breakdowns.features()),
                 counts(breakdowns.teams()),
                 counts(breakdowns.products()),
+                teamGroup(result.scope()),
                 section(result.summary()));
+    }
+
+    public TeamGroupsUI mapTeamGroups(String displayName, ImmutableList<DescribedTeamGroup> groups) {
+        return new TeamGroupsUI(
+                displayName,
+                groups.stream()
+                        .map(described -> new TeamGroupsUI.TeamGroupUI(
+                                described.group().code(),
+                                described.group().label(),
+                                described.members().stream()
+                                        .map(member -> new TeamGroupsUI.MemberUI(member.code(), member.label()))
+                                        .toList()))
+                        .toList());
+    }
+
+    private static @Nullable SummaryTeamGroupUI teamGroup(SummaryScope scope) {
+        TeamGroup group = scope.teamGroup();
+        return group == null ? null : new SummaryTeamGroupUI(group.code(), group.label());
     }
 
     private static List<SummaryCountUI> counts(ImmutableList<SummaryCount> counts) {

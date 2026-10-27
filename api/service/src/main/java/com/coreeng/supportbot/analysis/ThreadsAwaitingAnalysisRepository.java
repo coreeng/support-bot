@@ -28,8 +28,8 @@ public interface ThreadsAwaitingAnalysisRepository {
             int days, String promptId, Collection<String> channelIds);
 
     /**
-     * Finds threads from closed tickets <em>raised</em> in the given inclusive day range that don't
-     * have an analysis record with the given prompt ID.
+     * Finds threads from closed tickets <em>raised</em> in the given inclusive day range, optionally
+     * limited to the given teams, that don't have an analysis record with the given prompt ID.
      *
      * <p>Unlike {@link #findThreadsAwaitingAnalysis(int, String, Collection)}, which looks at
      * {@code ticket.last_interacted_at}, the window is defined by ticket creation time
@@ -38,12 +38,14 @@ public interface ThreadsAwaitingAnalysisRepository {
      *
      * @param from First day of the window (inclusive)
      * @param to Last day of the window (inclusive)
+     * @param teamCodes tenant team codes ({@code ticket.team}) to limit the result to; empty for every
+     *     ticket in the window, including those with no team
      * @param promptId The current prompt ID to check against existing analysis records
      * @param channelIds Slack channel IDs to include; tickets from any of these channels are returned
      * @return Immutable list of threads that need analysis
      */
     ImmutableList<ThreadToAnalyze> findThreadsAwaitingAnalysis(
-            LocalDate from, LocalDate to, String promptId, Collection<String> channelIds);
+            LocalDate from, LocalDate to, Collection<String> teamCodes, String promptId, Collection<String> channelIds);
 
     /**
      * DTO representing a thread that needs analysis.

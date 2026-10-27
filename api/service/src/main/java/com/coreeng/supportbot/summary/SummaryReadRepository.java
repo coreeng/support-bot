@@ -6,17 +6,18 @@ import java.util.Collection;
 /**
  * Windowed read side for the Support Summary page.
  *
- * <p>Everything here is scoped to tickets raised inside the window in a monitored channel, and —
- * where analysis is involved — to rows carrying the current prompt ID, so the figures never mix
- * classifications produced by different prompt versions.
+ * <p>Everything here is scoped to tickets raised inside the window in a monitored channel — and,
+ * for a team group, attributed to one of its teams — and, where analysis is involved, to rows
+ * carrying the current prompt ID, so the figures never mix classifications produced by different
+ * prompt versions.
  */
 public interface SummaryReadRepository {
 
     /** The live ranked breakdowns for the window. */
-    SummaryBreakdowns breakdowns(SummaryWindow window, String promptId, Collection<String> channelIds);
+    SummaryBreakdowns breakdowns(SummaryScope scope, String promptId, Collection<String> channelIds);
 
     /** Digest of the window's analysis rows, used to decide whether a cached summary is still valid. */
-    SummaryFingerprint fingerprint(SummaryWindow window, String promptId, Collection<String> channelIds);
+    SummaryFingerprint fingerprint(SummaryScope scope, String promptId, Collection<String> channelIds);
 
     /**
      * The per-ticket {@code Reason} texts ({@code analysis.summary}) for the window, each with the
@@ -26,6 +27,5 @@ public interface SummaryReadRepository {
      * @param limit maximum number of reasons to return, newest ticket first; keeps a very wide
      *     window from overflowing the model's context
      */
-    ImmutableList<SummaryReason> reasons(
-            SummaryWindow window, String promptId, Collection<String> channelIds, int limit);
+    ImmutableList<SummaryReason> reasons(SummaryScope scope, String promptId, Collection<String> channelIds, int limit);
 }

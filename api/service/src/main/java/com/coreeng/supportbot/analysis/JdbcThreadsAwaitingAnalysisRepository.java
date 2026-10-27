@@ -3,6 +3,7 @@ package com.coreeng.supportbot.analysis;
 import static com.coreeng.supportbot.dbschema.Tables.ANALYSIS;
 import static com.coreeng.supportbot.dbschema.Tables.QUERY;
 import static com.coreeng.supportbot.dbschema.Tables.TICKET;
+import static org.jooq.impl.DSL.any;
 import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.selectOne;
 
@@ -31,8 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>Excluding tickets that already have an analysis record with the current prompt ID</li>
  * </ol>
  *
- * <p>Both overloads run the same query; only the time predicate differs, so the two callers cannot
- * drift apart on the status/channel/prompt filters.
+ * <p>Both overloads run the same query; only the extra predicate differs (a cutoff on last
+ * interaction, or a creation window optionally limited to teams), so the two callers cannot drift
+ * apart on the status/channel/prompt filters.
  */
 @Repository
 @RequiredArgsConstructor
@@ -69,24 +71,34 @@ public class JdbcThreadsAwaitingAnalysisRepository implements ThreadsAwaitingAna
     @Override
     @Transactional(readOnly = true)
     public ImmutableList<ThreadToAnalyze> findThreadsAwaitingAnalysis(
-            LocalDate from, LocalDate to, String promptId, Collection<String> channelIds) {
+            LocalDate from,
+            LocalDate to,
+            Collection<String> teamCodes,
+            String promptId,
+            Collection<String> channelIds) {
         log.info(
-                "Finding threads awaiting analysis: channelIds={}, from={}, to={}, promptId={}",
+                "Finding threads awaiting analysis: channelIds={}, from={}, to={}, teamCodes={}, promptId={}",
                 channelIds,
                 from,
                 to,
+                teamCodes,
                 promptId);
 
         // Bind explicit UTC instants: the rest of the summary flow (controller clock, UI formatting) is
         // UTC, so the window must not shift with the JVM/session time zone.
-        Condition window = QUERY.DATE
+        Condition inScope = QUERY.DATE
                 .ge(from.atStartOfDay().toInstant(ZoneOffset.UTC))
                 .and(QUERY.DATE.lt(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)));
+        if (!teamCodes.isEmpty()) {
+            // The same team predicate as the Support Summary's group breakdowns and fingerprint, so a
+            // group's backfill targets are exactly the gaps its fingerprint counts.
+            inScope = inScope.and(TICKET.TEAM.eq(any(teamCodes.toArray(String[]::new))));
+        }
 
-        return find(window, promptId, channelIds);
+        return find(inScope, promptId, channelIds);
     }
 
-    private ImmutableList<ThreadToAnalyze> find(Condition timeWindow, String promptId, Collection<String> channelIds) {
+    private ImmutableList<ThreadToAnalyze> find(Condition filter, String promptId, Collection<String> channelIds) {
         if (channelIds.isEmpty()) {
             return ImmutableList.of();
         }
@@ -98,7 +110,7 @@ public class JdbcThreadsAwaitingAnalysisRepository implements ThreadsAwaitingAna
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
                 .where(TICKET.STATUS.eq(TicketStatus.closed))
                 .and(QUERY.CHANNEL_ID.in(channelIds))
-                .and(timeWindow)
+                .and(filter)
                 .and(notExists(selectOne()
                         .from(ANALYSIS)
                         .where(ANALYSIS.TICKET_ID.eq(TICKET.ID.coerce(ANALYSIS.TICKET_ID)))

@@ -239,6 +239,8 @@ platform-integration: # Whether to enable platform integration to automatically 
         - name: My Team # display value shown in the UI
           code: my-team # optional immutable identity used for mapping (ticket/escalation refs + escalation<->platform join); defaults to name
           group-ref: static:my-group # group whose members belong to the team: static:<group>, slack:<usergroup id>, google:<group email>, azure:<group id>
+          # attributes: # optional extra values about the team, returned on teams in the API; e.g. the attribute team groups are built from
+          #   department: Department A
     core-platform: # Scraper specific to CECG's Core Platform
       enabled: false
     k8s-generic: # A generic scraper that might be used in any K8S environment
@@ -373,6 +375,12 @@ summary-area:
     failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried
   offline-export: # The offline analysis kit served next to the export; independent of llm.*
     analysis-bundle-path: ${OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip (or directory to zip on the fly)
+
+# Team groups: named sets of tenant teams the Support Summary page can be narrowed to (ADR-010).
+# Full operator reference is in "Support Summary" → "Team groups" under Integrations below.
+team-groups:
+  display-name: ${TEAM_GROUPS_DISPLAY_NAME:Team group} # The noun the UI calls a group by, e.g. Domain, Tribe
+  # attribute: department # Team attribute whose value names a team's group; unset (the default) means no groups and no selector
 ```
 
 For deployment versatility across different secret delivery mechanisms, you can base64-encode the PEM file into a single line before storing it:
@@ -604,6 +612,57 @@ the [Support Summary runbook](../../../docs/runbooks/support-summary.md).
   failed — is retried after `SUMMARY_FAILURE_RETRY_DELAY`. Failed refreshes are remembered in
   process only; see the runbook for the single-replica trade-off.
 
+### Team groups
+
+A **team group** is a named set of tenant teams — a business *area*, *domain*, *tribe* or
+*business unit* — that the page can be narrowed to, so its figures and narrative cover only that
+group's tickets. The decision is recorded in [ADR-010](../../../docs/adr/adr-010-team-groups-for-support-summary.md).
+
+Groups are built from a **team attribute**: every tenant team with the same value for it forms one
+group, labelled with that value.
+
+```yaml
+team-groups:
+  display-name: Domain # what the UI calls a group; defaults to "Team group"
+  attribute: department # the team attribute whose value names a team's group
+```
+
+The attribute comes from the tenant team provider:
+
+- **k8s-generic:** an entry under `config.attributes`, read from each team's resource with CEL (see
+  the `teams-scraping` reference above).
+- **static:** `attributes` on each listed team, e.g. `attributes: {department: Department A}`.
+
+The core-platform provider has no attributes, so it has no groups.
+
+- **Off by default.** With no `attribute` the selector is hidden and the page is unchanged.
+- **Codes.** A group's code, used in shareable links, is its value in lowercase ASCII letters, digits
+  and hyphens, at most 64 characters: `Data & Analytics` becomes `data-analytics`. Accents are
+  removed first, and any other run of characters becomes one hyphen. So values that differ only in
+  case, accents, or the spaces and punctuation between words share one group (`A&B` and `A B` do,
+  `AB` and `A-B` don't), and the different spellings are logged at startup. A team whose value has
+  no ASCII letters or digits joins no group, with a warning.
+- **Current teams only.** Groups are built at startup from the teams fetched then. A team that is no
+  longer fetched leaves its group, so its past tickets drop out of the group's summary, and a team
+  that moves to another group takes its past tickets with it. Renaming a value changes the group's
+  code, so old links fall back to every team.
+- **Startup log.** One line gives the number of groups and how many tenant teams have a value. It is
+  a warning when no team has one, which usually means a misspelled attribute name. A second line
+  lists the teams that are in no group.
+- **What narrowing does.** Every figure, the per-ticket reasons and the narrative are limited to
+  tickets attributed to the group's teams. Tickets with no team or marked "Not a Tenant" belong to
+  no group, so the groups' totals don't add up to the whole window's.
+- **Classification follows the group.** Viewing a group classifies only the group's own tickets.
+  Viewing every team classifies whatever in the window is still unclassified, including tickets no
+  group shows (no team, "Not a Tenant", or a team in no group). A ticket already classified for the
+  current prompt is not classified again.
+- **Cache.** Each (window, group) has its own `summary_snapshot` row (`team_group`, `''` for the
+  whole window), and its fingerprint covers only the group's tickets plus the group's definition —
+  changing a group's members or label regenerates its narrative on the next visit.
+- **Roles.** `GET /summary/team-groups` lists the groups for the page and is open to the same roles
+  as `GET /summary`. `GET /summary?teamGroup=<code>` rejects an unknown code with
+  `SUMMARY_TEAM_GROUP_UNKNOWN`.
+
 ### Environment variables
 
 Set these on the **API**:
@@ -613,6 +672,7 @@ Set these on the **API**:
 | `LLM_PROVIDER` | Turns the page on (any value other than `none`); see [Analysis](#analysis-knowledge-gap-llm) above. |
 | `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons (newest first) included in the report sent to the model, so a very wide window cannot overflow its context. Default `1000`, which covers the 92-day window cap at roughly 80 tickets a week. |
 | `SUMMARY_FAILURE_RETRY_DELAY` | How long a failed summary refresh is reported as an error before the next visit retries it. A change to the window's data or to the in-use summary prompt retries sooner. Default `15m`. |
+| `TEAM_GROUPS_DISPLAY_NAME` | What the UI calls a [team group](#team-groups), e.g. `Domain` or `Tribe`. Default `Team group`. The attribute groups are built from is set in yaml (`team-groups.attribute`). |
 
 ## Single Sign-On (SSO)
 

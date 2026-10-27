@@ -51,19 +51,20 @@ class ThreadsAwaitingAnalysisServiceTest {
     }
 
     @Test
-    void find_shouldPassTheWindowThroughToTheRepository() {
+    void find_shouldPassTheWindowAndTeamsThroughToTheRepository() {
         LocalDate from = LocalDate.of(2026, 3, 10);
         LocalDate to = LocalDate.of(2026, 3, 23);
         String promptId = "prompt-v1.0";
         ImmutableList<ThreadToAnalyze> expectedThreads =
                 ImmutableList.of(new ThreadToAnalyze(1L, "1234.5678", "C123456"));
-        when(repository.findThreadsAwaitingAnalysis(from, to, promptId, List.of("C123456")))
+        List<String> teamCodes = List.of("team-a");
+        when(repository.findThreadsAwaitingAnalysis(from, to, teamCodes, promptId, List.of("C123456")))
                 .thenReturn(expectedThreads);
 
-        ImmutableList<ThreadToAnalyze> result = service.find(from, to, promptId);
+        ImmutableList<ThreadToAnalyze> result = service.find(from, to, teamCodes, promptId);
 
         assertThat(result).isEqualTo(expectedThreads);
-        verify(repository).findThreadsAwaitingAnalysis(from, to, promptId, List.of("C123456"));
+        verify(repository).findThreadsAwaitingAnalysis(from, to, teamCodes, promptId, List.of("C123456"));
     }
 
     @Test

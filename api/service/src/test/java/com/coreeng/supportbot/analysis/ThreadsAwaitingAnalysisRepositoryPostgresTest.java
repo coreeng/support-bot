@@ -12,6 +12,7 @@ import javax.sql.DataSource;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,7 +84,7 @@ class ThreadsAwaitingAnalysisRepositoryPostgresTest {
                 jdbcTemplate, stalePrompt, "Knowledge Gap", "Build & CI", "pipelines", "stale", "some-older-prompt");
 
         ImmutableList<ThreadToAnalyze> threads =
-                repository.findThreadsAwaitingAnalysis(FROM, TO, PROMPT_ID, List.of(CHANNEL));
+                repository.findThreadsAwaitingAnalysis(FROM, TO, List.of(), PROMPT_ID, List.of(CHANNEL));
 
         assertThat(threads)
                 .extracting(ThreadToAnalyze::ticketId)
@@ -103,7 +104,7 @@ class ThreadsAwaitingAnalysisRepositoryPostgresTest {
                 null);
 
         ImmutableList<ThreadToAnalyze> threads =
-                repository.findThreadsAwaitingAnalysis(FROM, TO, PROMPT_ID, List.of(CHANNEL));
+                repository.findThreadsAwaitingAnalysis(FROM, TO, List.of(), PROMPT_ID, List.of(CHANNEL));
 
         assertThat(threads).extracting(ThreadToAnalyze::threadTs).containsExactly("ts-monitored");
     }
@@ -112,13 +113,45 @@ class ThreadsAwaitingAnalysisRepositoryPostgresTest {
     void returnsNothingWhenNoChannelsAreMonitored() {
         closedTicket("2026-03-11T09:00:00", "ts-monitored");
 
-        assertThat(repository.findThreadsAwaitingAnalysis(FROM, TO, PROMPT_ID, List.of()))
+        assertThat(repository.findThreadsAwaitingAnalysis(FROM, TO, List.of(), PROMPT_ID, List.of()))
                 .isEmpty();
     }
 
+    @Test
+    void returnsOnlyTheGivenTeamsTicketsWhenTeamsAreGiven() {
+        // A team group's refresh backfills only the group's own tickets: one with another team or with
+        // no team is left to the refreshes that report on it.
+        long teamA = closedTicket("2026-03-11T09:00:00", "ts-team-a", "team-a");
+        long teamB = closedTicket("2026-03-11T10:00:00", "ts-team-b", "team-b");
+        closedTicket("2026-03-11T11:00:00", "ts-team-c", "team-c");
+        closedTicket("2026-03-11T12:00:00", "ts-no-team");
+        // The team filter narrows the other conditions rather than replacing them.
+        long analysed = closedTicket("2026-03-11T13:00:00", "ts-team-a-analysed", "team-a");
+        SummaryTestFixtures.insertAnalysis(
+                jdbcTemplate, analysed, "Knowledge Gap", "Build & CI", "pipelines", "already done", PROMPT_ID);
+        SummaryTestFixtures.insertTicket(
+                jdbcTemplate,
+                CHANNEL,
+                "ts-team-a-open",
+                LocalDateTime.parse("2026-03-11T14:00:00"),
+                "opened",
+                "team-a");
+
+        assertThat(repository.findThreadsAwaitingAnalysis(
+                        FROM, TO, List.of("team-a", "team-b"), PROMPT_ID, List.of(CHANNEL)))
+                .extracting(ThreadToAnalyze::ticketId)
+                .containsExactlyInAnyOrder(teamA, teamB);
+        assertThat(repository.findThreadsAwaitingAnalysis(FROM, TO, List.of(), PROMPT_ID, List.of(CHANNEL)))
+                .hasSize(4);
+    }
+
     private long closedTicket(String raisedAt, String ts) {
+        return closedTicket(raisedAt, ts, null);
+    }
+
+    private long closedTicket(String raisedAt, String ts, @Nullable String team) {
         return SummaryTestFixtures.insertTicket(
-                jdbcTemplate, CHANNEL, ts, LocalDateTime.parse(raisedAt), "closed", null);
+                jdbcTemplate, CHANNEL, ts, LocalDateTime.parse(raisedAt), "closed", team);
     }
 
     @Configuration(proxyBeanMethods = false)

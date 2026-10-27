@@ -7,12 +7,15 @@ import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SummaryAreaProps;
+import com.coreeng.supportbot.teamgroups.TeamGroup;
+import com.coreeng.supportbot.teamgroups.TeamGroupService;
 import com.google.common.collect.ImmutableList;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -37,11 +40,12 @@ public class SummaryService {
     private final SummarySnapshotRepository summarySnapshotRepository;
     private final SummaryRefreshService summaryRefresher;
     private final SlackChannelRegistry channelRegistry;
+    private final TeamGroupService teamGroupService;
     private final SummaryAreaProps summaryAreaProps;
     private final Clock clock;
 
-    /** Breakdowns plus whatever can be said about the prose summary right now. */
-    public record SummaryResult(SummaryBreakdowns breakdowns, SummaryState summary) {}
+    /** Breakdowns plus whatever can be said about the prose summary right now, for the given scope. */
+    public record SummaryResult(SummaryScope scope, SummaryBreakdowns breakdowns, SummaryState summary) {}
 
     /**
      * The in-use prompt the summary prose is generated with, for the page's View Prompts dialog.
@@ -56,21 +60,37 @@ public class SummaryService {
         return prompt.content();
     }
 
-    public SummaryResult get(LocalDate from, LocalDate to) {
-        SummaryWindow window = new SummaryWindow(from, to);
+    /**
+     * @param teamGroup the code of the team group to narrow the summary to; null or blank for every
+     *     ticket in the window
+     * @throws UnknownTeamGroupException when no team group has that code
+     */
+    public SummaryResult get(LocalDate from, LocalDate to, @Nullable String teamGroup) {
+        SummaryScope scope = new SummaryScope(new SummaryWindow(from, to), resolveTeamGroup(teamGroup));
         String classificationPromptId = analysisService.currentPromptId();
         ImmutableList<String> channelIds = channelRegistry.monitoredChannelIds();
 
-        SummaryBreakdowns breakdowns = summaryReadRepository.breakdowns(window, classificationPromptId, channelIds);
-        SummaryState state = resolveSummaryState(window, classificationPromptId, channelIds);
-        return new SummaryResult(breakdowns, state);
+        SummaryBreakdowns breakdowns = summaryReadRepository.breakdowns(scope, classificationPromptId, channelIds);
+        SummaryState state = resolveSummaryState(scope, classificationPromptId, channelIds);
+        return new SummaryResult(scope, breakdowns, state);
+    }
+
+    private @Nullable TeamGroup resolveTeamGroup(@Nullable String code) {
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        TeamGroup group = teamGroupService.find(code);
+        if (group == null) {
+            throw new UnknownTeamGroupException(code);
+        }
+        return group;
     }
 
     private SummaryState resolveSummaryState(
-            SummaryWindow window, String classificationPromptId, ImmutableList<String> channelIds) {
-        // A run in flight may be for a different window — the lock is global. Reporting `generating`
+            SummaryScope scope, String classificationPromptId, ImmutableList<String> channelIds) {
+        // A run in flight may be for a different scope — the lock is global. Reporting `generating`
         // either way is honest (nothing can start until it finishes) and converges: the next poll
-        // after it ends starts this window's refresh if it still needs one. Checked first: every open
+        // after it ends starts this scope's refresh if it still needs one. Checked first: every open
         // tab polls while a run is in flight, and none of them needs the summary prompt read below.
         SummaryRefreshStatus refresh = summaryRefresher.status();
         if (refresh.running()) {
@@ -83,12 +103,12 @@ public class SummaryService {
         }
         String summaryPromptId = AnalysisService.computePromptId(summaryPrompt.content());
 
-        SummaryFingerprint fingerprint = summaryReadRepository.fingerprint(window, classificationPromptId, channelIds);
+        SummaryFingerprint fingerprint = summaryReadRepository.fingerprint(scope, classificationPromptId, channelIds);
 
-        String failure = summaryRefresher.failureFor(window, summaryPromptId, fingerprint.value());
+        String failure = summaryRefresher.failureFor(scope, summaryPromptId, fingerprint.value());
         if (failure != null) {
             // Retrying on every poll would hammer the LLM with the same failing input; the failure is
-            // released as soon as the window's data or the summary prompt changes, or the retry delay
+            // released as soon as the scope's data or the summary prompt changes, or the retry delay
             // passes.
             return new SummaryState.Unavailable(failure);
         }
@@ -96,14 +116,14 @@ public class SummaryService {
         // The fingerprint covers the classification gaps too, so a snapshot generated after a backfill
         // that could not classify everything is still served: regenerating on every poll would only
         // re-run the same failing classifications and the same summary.
-        SummarySnapshot snapshot = summarySnapshotRepository.find(window, summaryPromptId);
+        SummarySnapshot snapshot = summarySnapshotRepository.find(scope, summaryPromptId);
         if (snapshot != null
                 && snapshot.fingerprint().equals(fingerprint.value())
                 && !gapsDueForRetry(snapshot, fingerprint)) {
             return new SummaryState.Ready(snapshot.content(), snapshot.model(), snapshot.generatedAt());
         }
 
-        if (summaryRefresher.start(window)) {
+        if (summaryRefresher.start(scope)) {
             return generating(SummaryState.Phase.CLASSIFYING);
         }
         // Someone claimed the lock between the check above and here; report their run.
@@ -131,9 +151,11 @@ public class SummaryService {
                 .isBefore(generatedAt.plus(summaryAreaProps.page().failureRetryDelay()));
         if (due) {
             log.info(
-                    "Snapshot for window {}..{} carries {} classification gap(s) and is older than {}; retrying them",
+                    "Snapshot for window {}..{} (team group '{}') carries {} classification gap(s) and is older"
+                            + " than {}; retrying them",
                     snapshot.window().from(),
                     snapshot.window().to(),
+                    snapshot.teamGroup(),
                     fingerprint.gapCount(),
                     summaryAreaProps.page().failureRetryDelay());
         }
