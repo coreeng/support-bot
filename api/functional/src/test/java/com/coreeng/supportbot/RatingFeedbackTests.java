@@ -2,6 +2,7 @@ package com.coreeng.supportbot;
 
 import static com.coreeng.supportbot.testkit.UserRole.tenant;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.coreeng.supportbot.testkit.RatingFeedbackForm;
 import com.coreeng.supportbot.testkit.RatingFeedbackFormSubmission;
@@ -10,6 +11,7 @@ import com.coreeng.supportbot.testkit.TestKit;
 import com.coreeng.supportbot.testkit.TestKitExtension;
 import com.coreeng.supportbot.testkit.Ticket;
 import com.google.common.collect.ImmutableList;
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -23,13 +25,15 @@ public class RatingFeedbackTests {
     private SupportBotClient supportBotClient;
 
     @Test
-    public void whenLowRatingWithAnonymousFeedback_feedbackIsNotLinkedToTicket() {
+    public void whenLowRatingWithAnonymousFeedback_feedbackIsNotReturnedDuringItsWeek() {
         // given
         TestKit.RoledTestKit asTenant = testKit.as(tenant);
         Ticket ticket = asTenant.ticket().create(builder -> builder.message("Rating feedback: low"));
         closeTicket(ticket);
 
         // when
+        // Captured before rating, so a rating that lands just before the week ends is caught by the assumption below
+        LocalDate weekStart = currentWeekStart();
         String triggerId = "rating_low_" + ticket.id();
         Ticket.RatingFlowStubs ratingStubs = ticket.stubRatingFlow("rated 2 stars", triggerId, 2);
         asTenant.slack().clickRatingButton(ticket.ratingButtonClick(triggerId, 2));
@@ -40,18 +44,22 @@ public class RatingFeedbackTests {
                 .containsExactly("What went wrong with your experience?", "Link this feedback to your thread?");
 
         String feedback = "Slow first response " + UUID.randomUUID();
-        asTenant.slack()
-                .submitView(RatingFeedbackFormSubmission.builder()
-                        .triggerId(triggerId)
-                        .form(form)
-                        .feedback(feedback)
-                        .shareName(false)
-                        .build());
+        String response = asTenant.slack()
+                .submitView(
+                        RatingFeedbackFormSubmission.builder()
+                                .triggerId(triggerId)
+                                .form(form)
+                                .feedback(feedback)
+                                .shareName(false)
+                                .build(),
+                        body -> body);
 
-        // then
-        SupportBotClient.RatingFeedbackItem item = findFeedback(feedback);
-        assertThat(item.rating()).isEqualTo(2);
-        assertThat(item.ticketId()).isNull();
+        // then: the submission was accepted, but the running week isn't over, so the item isn't returned yet
+        assertThat(response).doesNotContain("response_action");
+        assumeTrue(weekStart.equals(currentWeekStart()), "the week ended during the test");
+        assertThat(supportBotClient.ratingFeedback(weekStart, weekStart))
+                .extracting(SupportBotClient.RatingFeedbackItem::feedback)
+                .doesNotContain(feedback);
     }
 
     @Test
@@ -103,6 +111,10 @@ public class RatingFeedbackTests {
                         .impact("productionBlocking")
                         .build());
         closeStubs.awaitAllCalled(Duration.ofSeconds(5));
+    }
+
+    private static LocalDate currentWeekStart() {
+        return LocalDate.now(ZoneOffset.UTC).with(DayOfWeek.MONDAY);
     }
 
     private SupportBotClient.RatingFeedbackItem findFeedback(String feedback) {

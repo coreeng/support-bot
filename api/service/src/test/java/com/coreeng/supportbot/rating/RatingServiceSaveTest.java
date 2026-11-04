@@ -12,6 +12,7 @@ import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketInMemoryRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.google.common.collect.ImmutableList;
+import java.time.Clock;
 import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ class RatingServiceSaveTest {
     void setUp() {
         ratingRepository = new RatingInMemoryRepository();
         ticketRepository = new TicketInMemoryRepository(escalationQueryService, ZoneId.of("UTC"));
-        service = new RatingService(ratingRepository, ticketRepository, escalationQueryService);
+        service = new RatingService(ratingRepository, ticketRepository, escalationQueryService, Clock.systemUTC());
     }
 
     @Test

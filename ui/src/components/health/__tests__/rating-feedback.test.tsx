@@ -51,7 +51,41 @@ describe("RatingFeedback", () => {
     expect(within(tile("Feedback received")).getByText("3")).toBeInTheDocument();
     expect(within(tile("Needs attention")).getByText("1")).toBeInTheDocument();
     expect(within(tile("Positive")).getByText("2")).toBeInTheDocument();
-    expect(within(tile("Named")).getByText("33% shared their name")).toBeInTheDocument();
+    expect(within(tile("Linked to thread")).getByText("33% linked to thread in completed weeks")).toBeInTheDocument();
+  });
+
+  describe("linked share", () => {
+    afterEach(() => jest.useRealTimers());
+
+    it("leaves out the running week, which has no anonymous feedback yet", () => {
+      // Wednesday of the week starting Monday 2025-10-06
+      jest.useFakeTimers({ now: new Date("2025-10-08T12:00:00Z"), advanceTimers: true });
+      mockFeedback({
+        data: [
+          { rating: 5, weekStart: "2025-10-06", feedback: "Running week, linked", ticketId: 7 },
+          { rating: 4, weekStart: "2025-09-29", feedback: "Completed week, linked", ticketId: 8 },
+          { rating: 2, weekStart: "2025-09-29", feedback: "Completed week, anonymous", ticketId: null },
+        ],
+      });
+      render(<RatingFeedback />);
+
+      expect(within(tile("Linked to thread")).getByText("2")).toBeInTheDocument();
+      expect(within(tile("Linked to thread")).getByText("50% linked to thread in completed weeks")).toBeInTheDocument();
+    });
+
+    it("is hidden when only the running week is covered", () => {
+      jest.useFakeTimers({ now: new Date("2025-10-06T00:00:00Z"), advanceTimers: true });
+      mockFeedback({ data: [{ rating: 5, weekStart: "2025-10-06", feedback: "Running week, linked", ticketId: 7 }] });
+      render(<RatingFeedback />);
+
+      expect(within(tile("Linked to thread")).queryByText(/% linked to thread/)).not.toBeInTheDocument();
+    });
+  });
+
+  it("explains that anonymous feedback waits for its week to end", () => {
+    render(<RatingFeedback />);
+
+    expect(screen.getByText(/Anonymous feedback appears once its week \(Monday to Sunday, UTC\) has ended/)).toBeInTheDocument();
   });
 
   it("groups feedback by week, keeping the backend's order", () => {
@@ -145,7 +179,7 @@ describe("RatingFeedback", () => {
     await user.click(screen.getByRole("option", { name: /Needs attention/ }));
     await user.keyboard("{Escape}");
     await user.click(screen.getByRole("button", { name: "Attribution" }));
-    await user.click(screen.getByRole("option", { name: /Named/ }));
+    await user.click(screen.getByRole("option", { name: /Linked to thread/ }));
 
     expect(screen.getByText("No feedback matches these filters.")).toBeInTheDocument();
     expect(screen.queryByText("No written feedback in this period yet.")).not.toBeInTheDocument();

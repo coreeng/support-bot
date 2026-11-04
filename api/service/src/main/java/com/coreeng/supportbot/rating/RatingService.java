@@ -8,6 +8,7 @@ import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.google.common.collect.ImmutableList;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -31,6 +32,7 @@ public class RatingService {
     private final RatingRepository repository;
     private final TicketRepository ticketRepository;
     private final EscalationQueryService escalationQueryService;
+    private final Clock clock;
 
     @Transactional
     public Rating save(TicketId ticketId, int rating) {
@@ -77,8 +79,8 @@ public class RatingService {
     /**
      * Attaches follow-up feedback to a previously saved rating.
      *
-     * <p>The ticket is only linked when the submitter opted in to sharing their name. Anonymous feedback
-     * stays as unlinked as the rating itself, so nothing here may log the ticket together with the rating.
+     * <p>The ticket is only linked when the submitter opted in to linking their feedback to the thread. Anonymous
+     * feedback stays as unlinked as the rating itself, so nothing here may log the ticket together with the rating.
      *
      * <p>The text is stripped before it is checked and stored. Only the first submission for a rating is kept.
      *
@@ -115,7 +117,8 @@ public class RatingService {
      * first. A null bound leaves that side of the range open.
      *
      * <p>The range is widened to whole weeks and items are never ordered by their exact timestamp, so this endpoint
-     * never narrows anonymous feedback down to a day or a submission order (see ADR-009).
+     * never narrows anonymous feedback down to a day or a submission order (see ADR-009). Anonymous feedback is
+     * also held back until its UTC week has ended, even when {@code to} covers the running week.
      */
     public ImmutableList<RatingFeedbackItem> getFeedback(@Nullable LocalDate from, @Nullable LocalDate to) {
         long fromEpoch =
@@ -123,10 +126,15 @@ public class RatingService {
         long toEpoch = to != null
                 ? weekStartOf(to).plusWeeks(1).atStartOfDay(ZoneOffset.UTC).toEpochSecond()
                 : Long.MAX_VALUE;
+        // A running week would show anonymous items as they arrive, which dates them to the day
+        LocalDate runningWeekStart = weekStartOf(LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC));
+        long anonymousToEpoch =
+                Math.min(toEpoch, runningWeekStart.atStartOfDay(ZoneOffset.UTC).toEpochSecond());
         return repository.getAllFeedback().stream()
                 .filter(f -> {
                     long submitted = Long.parseLong(f.submittedTs());
-                    return submitted >= fromEpoch && submitted < toEpoch;
+                    long until = f.ticketId() != null ? toEpoch : anonymousToEpoch;
+                    return submitted >= fromEpoch && submitted < until;
                 })
                 .map(f -> new RatingFeedbackItem(f.rating(), weekStartOf(f.submittedTs()), f.feedback(), f.ticketId()))
                 .sorted(Comparator.comparing(RatingFeedbackItem::weekStart)

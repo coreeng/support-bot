@@ -9,6 +9,7 @@ import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketInMemoryRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -23,21 +24,23 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class RatingServiceFeedbackTest {
     private static final TicketId TICKET_ID = new TicketId(42);
+    // Long after every week used below, so those weeks have all ended
+    private static final Instant NOW = Instant.parse("2025-06-01T12:00:00Z");
 
     private RatingInMemoryRepository ratingRepository;
 
     @Mock
     private EscalationQueryService escalationQueryService;
 
+    private TicketInMemoryRepository ticketRepository;
     private RatingService service;
     private UUID ratingId;
 
     @BeforeEach
     void setUp() {
         ratingRepository = new RatingInMemoryRepository();
-        TicketInMemoryRepository ticketRepository =
-                new TicketInMemoryRepository(escalationQueryService, ZoneId.of("UTC"));
-        service = new RatingService(ratingRepository, ticketRepository, escalationQueryService);
+        ticketRepository = new TicketInMemoryRepository(escalationQueryService, ZoneId.of("UTC"));
+        service = serviceAt(NOW);
         ratingId = ratingRepository.insertRating(Rating.builder()
                 .rating(2)
                 .submittedTs("1704067200")
@@ -116,6 +119,70 @@ class RatingServiceFeedbackTest {
     }
 
     @Test
+    void getFeedback_returns_anonymous_feedback_without_a_ticket() {
+        service.submitFeedback(submission("Took too long", false));
+
+        assertThat(service.getFeedback(null, null))
+                .containsExactly(new RatingFeedbackItem(2, LocalDate.of(2024, 1, 1), "Took too long", null));
+    }
+
+    @Test
+    void getFeedback_holds_back_anonymous_feedback_until_its_week_has_ended() {
+        // With the clock at Monday 2024-02-12 10:00 UTC the running week starts that day; 2024-02-11 is the Sunday
+        // before
+        submitFeedbackAt(Instant.parse("2024-02-11T23:59:59Z"), 2, "last week");
+        submitFeedbackAt(Instant.parse("2024-02-12T00:00:00Z"), 2, "this week");
+        submitFeedbackAt(Instant.parse("2024-02-12T09:00:00Z"), 5, "this week, linked", true);
+
+        assertThat(serviceAt(Instant.parse("2024-02-12T10:00:00Z")).getFeedback(null, null))
+                .extracting(RatingFeedbackItem::feedback)
+                .containsExactly("this week, linked", "last week");
+        assertThat(serviceAt(Instant.parse("2024-02-19T00:00:00Z")).getFeedback(null, null))
+                .extracting(RatingFeedbackItem::feedback)
+                .containsExactly("this week", "this week, linked", "last week");
+    }
+
+    @Test
+    void getFeedback_ends_the_week_in_utc_whatever_the_clock_zone() {
+        submitFeedbackOn(LocalDate.of(2024, 2, 7), "running week");
+
+        // Sunday 23:00 UTC is already Monday in UTC+2
+        Clock aheadOfUtc = Clock.fixed(Instant.parse("2024-02-11T23:00:00Z"), ZoneOffset.ofHours(2));
+        RatingService serviceAheadOfUtc =
+                new RatingService(ratingRepository, ticketRepository, escalationQueryService, aheadOfUtc);
+
+        assertThat(serviceAheadOfUtc.getFeedback(null, null)).isEmpty();
+    }
+
+    @Test
+    void getFeedback_holds_back_anonymous_feedback_even_when_range_covers_the_running_week() {
+        submitFeedbackOn(LocalDate.of(2024, 2, 14), "running week");
+        submitFeedbackAt(
+                LocalDate.of(2024, 2, 14).atStartOfDay(ZoneOffset.UTC).toInstant(), 5, "running week, linked", true);
+
+        RatingService serviceInRunningWeek = serviceAt(Instant.parse("2024-02-18T23:59:59Z"));
+        assertThat(serviceInRunningWeek.getFeedback(LocalDate.of(2024, 2, 12), LocalDate.of(2024, 2, 18)))
+                .extracting(RatingFeedbackItem::feedback)
+                .containsExactly("running week, linked");
+        assertThat(serviceInRunningWeek.getFeedback(LocalDate.of(2024, 2, 12), null))
+                .extracting(RatingFeedbackItem::feedback)
+                .containsExactly("running week, linked");
+    }
+
+    @Test
+    void getFeedback_keeps_linked_feedback_within_the_date_range() {
+        // 2024-01-29 and 2024-03-04 are Mondays, so the range covers 2024-01-29 .. 2024-03-03
+        submitFeedbackAt(LocalDate.of(2024, 1, 28).atStartOfDay(ZoneOffset.UTC).toInstant(), 4, "before", true);
+        submitFeedbackAt(LocalDate.of(2024, 2, 14).atStartOfDay(ZoneOffset.UTC).toInstant(), 4, "inside, linked", true);
+        submitFeedbackOn(LocalDate.of(2024, 2, 15), "inside, anonymous");
+        submitFeedbackAt(LocalDate.of(2024, 3, 4).atStartOfDay(ZoneOffset.UTC).toInstant(), 4, "after", true);
+
+        assertThat(service.getFeedback(LocalDate.of(2024, 2, 1), LocalDate.of(2024, 2, 29)))
+                .extracting(RatingFeedbackItem::feedback)
+                .containsExactly("inside, anonymous", "inside, linked");
+    }
+
+    @Test
     void getFeedback_reports_the_monday_of_the_week_never_the_submission_day() {
         // Wednesday 2024-02-07 15:37:00 and Sunday 2024-02-11 23:59:59 UTC, both in the week of Monday 2024-02-05
         submitFeedbackAt(Instant.parse("2024-02-07T15:37:00Z"), 2, "mid-week");
@@ -162,12 +229,22 @@ class RatingServiceFeedbackTest {
     }
 
     private void submitFeedbackAt(Instant submittedAt, int rating, String feedback) {
+        submitFeedbackAt(submittedAt, rating, feedback, false);
+    }
+
+    private void submitFeedbackAt(Instant submittedAt, int rating, String feedback, boolean shareName) {
         UUID id = ratingRepository.insertRating(Rating.builder()
                 .rating(rating)
                 .submittedTs(String.valueOf(submittedAt.getEpochSecond()))
                 .status(TicketStatus.closed)
                 .build());
-        service.submitFeedback(new RatingFeedbackSubmission(id, TICKET_ID, feedback, false));
+        assertThat(service.submitFeedback(new RatingFeedbackSubmission(id, TICKET_ID, feedback, shareName)))
+                .isTrue();
+    }
+
+    private RatingService serviceAt(Instant now) {
+        return new RatingService(
+                ratingRepository, ticketRepository, escalationQueryService, Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private RatingFeedbackSubmission submission(String feedback, boolean shareName) {

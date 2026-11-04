@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Deliberately carries only the week it was submitted in.
  *
- * @param ticketId present only when the submitter chose to share their name
+ * @param ticketId present only when the submitter chose to link their thread
  */
 public record RatingFeedbackItem(
         int rating,

@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.security;
 
+import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -96,6 +98,23 @@ class RatingFeedbackAuthorizationTest {
                 .andExpect(jsonPath("$[0].weekStart").value("2024-01-08"))
                 .andExpect(jsonPath("$[0].ticketId").value(9))
                 // Anonymity: no rating id or exact timestamp leaves the API
+                .andExpect(jsonPath("$[0].ratingId").doesNotExist())
+                .andExpect(jsonPath("$[0].submittedTs").doesNotExist());
+    }
+
+    @Test
+    void anonymousFeedback_isSerialisedWithoutTicket() throws Exception {
+        when(ratingService.getFeedback(null, null))
+                .thenReturn(ImmutableList.of(new RatingFeedbackItem(2, LocalDate.of(2024, 1, 8), "Too slow", null)));
+
+        mockMvc.perform(get("/rating/feedback")
+                        .with(authentication(authTokenWithRoles(Role.USER, Role.SUPPORT_ENGINEER))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].feedback").value("Too slow"))
+                .andExpect(jsonPath("$[0].rating").value(2))
+                // Present as null, not left out, so the UI can tell anonymous items apart
+                .andExpect(jsonPath("$[0]").value(hasKey("ticketId")))
+                .andExpect(jsonPath("$[0].ticketId").value(nullValue()))
                 .andExpect(jsonPath("$[0].ratingId").doesNotExist())
                 .andExpect(jsonPath("$[0].submittedTs").doesNotExist());
     }

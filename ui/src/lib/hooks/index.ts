@@ -342,13 +342,14 @@ export type RatingFeedbackItem = {
   /** Monday of the UTC week the rating was submitted in, as YYYY-MM-DD; exact times are never exposed. */
   weekStart: string;
   feedback: string;
-  /** The rated ticket, or null when the submitter didn't share their name. Non-null is what makes feedback "named". */
+  /** The rated ticket, or null when the submitter didn't link their feedback to the thread. Non-null is what makes feedback "named". */
   ticketId: number | null;
 };
 
 /**
  * Follow-up feedback for the date range. The backend widens `from`/`to` to whole UTC weeks (ADR-009),
- * so results can include days just outside the range.
+ * so results can include days just outside the range. Anonymous feedback from the running UTC week is left out,
+ * even inside the range.
  */
 export const useRatingFeedback = (from?: string, to?: string) => {
   return useQuery({
