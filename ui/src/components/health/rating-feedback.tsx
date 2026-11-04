@@ -185,7 +185,7 @@ export default function RatingFeedback({ from, to }: { from?: string; to?: strin
           label="Linked to thread"
           value={ready ? stats.named : null}
           isLoading={isLoading}
-          hint={ready && stats.linkedShare !== null ? `${stats.linkedShare}% linked to thread in completed weeks` : undefined}
+          hint={ready && stats.linkedShare !== null ? `${stats.linkedShare}% linked (completed weeks)` : undefined}
           accent="bg-info/15"
         />
       </div>

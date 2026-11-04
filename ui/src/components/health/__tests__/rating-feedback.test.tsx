@@ -51,7 +51,7 @@ describe("RatingFeedback", () => {
     expect(within(tile("Feedback received")).getByText("3")).toBeInTheDocument();
     expect(within(tile("Needs attention")).getByText("1")).toBeInTheDocument();
     expect(within(tile("Positive")).getByText("2")).toBeInTheDocument();
-    expect(within(tile("Linked to thread")).getByText("33% linked to thread in completed weeks")).toBeInTheDocument();
+    expect(within(tile("Linked to thread")).getByText("33% linked (completed weeks)")).toBeInTheDocument();
   });
 
   describe("linked share", () => {
@@ -70,7 +70,7 @@ describe("RatingFeedback", () => {
       render(<RatingFeedback />);
 
       expect(within(tile("Linked to thread")).getByText("2")).toBeInTheDocument();
-      expect(within(tile("Linked to thread")).getByText("50% linked to thread in completed weeks")).toBeInTheDocument();
+      expect(within(tile("Linked to thread")).getByText("50% linked (completed weeks)")).toBeInTheDocument();
     });
 
     it("is hidden when only the running week is covered", () => {
@@ -78,7 +78,7 @@ describe("RatingFeedback", () => {
       mockFeedback({ data: [{ rating: 5, weekStart: "2025-10-06", feedback: "Running week, linked", ticketId: 7 }] });
       render(<RatingFeedback />);
 
-      expect(within(tile("Linked to thread")).queryByText(/% linked to thread/)).not.toBeInTheDocument();
+      expect(within(tile("Linked to thread")).queryByText(/% linked/)).not.toBeInTheDocument();
     });
   });
 
