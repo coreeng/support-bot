@@ -22,13 +22,20 @@ const SENTIMENT_OPTIONS = [
 ] satisfies (SingleSelectFilterOption & { value: Sentiment })[];
 
 const ATTRIBUTION_OPTIONS = [
-  { label: "Named", value: "named", icon: Ticket },
+  { label: "Linked to thread", value: "named", icon: Ticket },
   { label: "Anonymous", value: "anonymous", icon: EyeOff },
 ] satisfies (SingleSelectFilterOption & { value: Attribution })[];
 
 // Same threshold as the backend's RatingFeedbackViewInput.isPositive(): 4 and 5 stars are asked
 // what went well, 1 to 3 what went wrong. Keep the two in sync.
 export const isPositiveRating = (rating: number) => rating >= 4;
+
+// Monday of the current UTC week as YYYY-MM-DD, in the same form as the backend's weekStart
+function currentUtcWeekStart(now = new Date()) {
+  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+  return monday.toISOString().slice(0, 10);
+}
 
 function formatWeek(weekStart: string) {
   return new Date(`${weekStart}T00:00:00Z`).toLocaleDateString(undefined, {
@@ -55,7 +62,17 @@ export default function RatingFeedback({ from, to }: { from?: string; to?: strin
   const stats = useMemo(() => {
     const negative = items.filter((i) => !isPositiveRating(i.rating)).length;
     const named = items.filter((i) => i.ticketId !== null).length;
-    return { total: items.length, negative, positive: items.length - negative, named };
+    // The running week has no anonymous items yet (ADR-009), so it would inflate the linked share
+    const runningWeek = currentUtcWeekStart();
+    const completed = items.filter((i) => i.weekStart < runningWeek);
+    const completedNamed = completed.filter((i) => i.ticketId !== null).length;
+    return {
+      total: items.length,
+      negative,
+      positive: items.length - negative,
+      named,
+      linkedShare: completed.length > 0 ? Math.round((completedNamed / completed.length) * 100) : null,
+    };
   }, [items]);
 
   const filtered = useMemo(() => {
@@ -141,7 +158,9 @@ export default function RatingFeedback({ from, to }: { from?: string; to?: strin
     <div className="space-y-4">
       <div>
         <h2 className="text-foreground text-base font-semibold">What people said</h2>
-        <p className="text-muted-foreground text-sm">Written feedback left after rating a closed ticket.</p>
+        <p className="text-muted-foreground text-sm">
+          Written feedback left after rating a closed ticket. Anonymous feedback appears once its week (Monday to Sunday, UTC) has ended.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -163,10 +182,10 @@ export default function RatingFeedback({ from, to }: { from?: string; to?: strin
           valueClassName={ready ? "text-success" : undefined}
         />
         <StatTile
-          label="Named"
+          label="Linked to thread"
           value={ready ? stats.named : null}
           isLoading={isLoading}
-          hint={ready && stats.total > 0 ? `${Math.round((stats.named / stats.total) * 100)}% shared their name` : undefined}
+          hint={ready && stats.linkedShare !== null ? `${stats.linkedShare}% linked (completed weeks)` : undefined}
           accent="bg-info/15"
         />
       </div>
