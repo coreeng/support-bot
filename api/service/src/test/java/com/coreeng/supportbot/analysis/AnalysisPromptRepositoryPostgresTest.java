@@ -207,7 +207,10 @@ class AnalysisPromptRepositoryPostgresTest {
         AnalysisPrompt summary = repository.findInUse(AnalysisPromptType.SUMMARY);
 
         assertThat(summary).isNotNull();
-        assertThat(summary.content()).contains("[[phrase|123,456]]");
+        assertThat(summary.content())
+                .contains("[[phrase|123,456]]")
+                .contains("If the report has a Scope line, write about that group only")
+                .contains("If the Reason lines are a sample");
     }
 
     @Test

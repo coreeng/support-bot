@@ -412,6 +412,23 @@ class SummaryReadRepositoryPostgresTest {
     }
 
     @Test
+    void reasonsOverTheLimitAreSpreadAcrossTheWindowNotJustTheNewest() {
+        for (int hour = 10; hour <= 15; hour++) {
+            long id = ticket("2026-03-11T" + hour + ":00:00", "ts-" + hour, "team-a");
+            classify(id, "Knowledge Gap", "Build & CI", "ci", "Hour " + hour + ".");
+        }
+
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 3))
+                .extracting(SummaryReason::text)
+                .containsExactly("Hour 15.", "Hour 13.", "Hour 11.");
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 6)).hasSize(6);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 4))
+                .extracting(SummaryReason::text)
+                .hasSize(4)
+                .startsWith("Hour 15.");
+    }
+
+    @Test
     void reasonsLabelTheirClassificationExactlyAsTheBreakdownsDo() {
         // The model cites tickets for a breakdown value by matching the value on each reason line, so a
         // blank must read as the same bucket label the counts use, not as an empty field.

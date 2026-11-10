@@ -25,8 +25,10 @@ public interface SummaryReadRepository {
      * day its ticket was raised — the raw material the LLM summarises alongside the aggregated
      * counts.
      *
-     * @param limit maximum number of reasons to return, newest ticket first; keeps a very wide
-     *     window from overflowing the model's context
+     * @param limit maximum number of reasons to return; keeps a very wide window from overflowing
+     *     the model's context. When there are more, the ones returned are spread evenly across the
+     *     window, starting with the newest, rather than the newest alone
+     * @return newest ticket first
      */
     ImmutableList<SummaryReason> reasons(SummaryScope scope, String promptId, Collection<String> channelIds, int limit);
 

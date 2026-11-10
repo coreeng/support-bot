@@ -17,6 +17,7 @@ import static org.jooq.impl.DSL.name;
 import static org.jooq.impl.DSL.noCondition;
 import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.nullif;
+import static org.jooq.impl.DSL.orderBy;
 import static org.jooq.impl.DSL.partitionBy;
 import static org.jooq.impl.DSL.rowNumber;
 import static org.jooq.impl.DSL.selectOne;
@@ -191,8 +192,30 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
         Field<String> category = bucketed(ANALYSIS.CATEGORY, UNCLASSIFIED_LABEL);
         Field<String> feature = bucketed(ANALYSIS.FEATURE, NO_FEATURE_LABEL);
         Field<String> team = bucketed(TICKET.TEAM, UNKNOWN_TEAM_LABEL);
-        Result<Record7<Long, Instant, String, String, String, String, String>> rows = dsl.select(
-                        TICKET.ID, QUERY.DATE, driver, category, feature, team, ANALYSIS.SUMMARY)
+
+        // Unqualified names resolve against the derived table, as in breakdown(...).
+        Field<Long> ticketId = field(name("ticket_id"), Long.class);
+        Field<Instant> raisedAt = field(name("raised_at"), Instant.class);
+        Field<String> driverLabel = field(name("driver"), String.class);
+        Field<String> categoryLabel = field(name("category"), String.class);
+        Field<String> featureLabel = field(name("feature"), String.class);
+        Field<String> teamLabel = field(name("team"), String.class);
+        Field<String> reason = field(name("reason"), String.class);
+        Field<Integer> position = field(name("position"), Integer.class);
+        Field<Integer> available = field(name("available"), Integer.class);
+
+        Table<?> numbered = dsl.select(
+                        TICKET.ID.as(ticketId),
+                        QUERY.DATE.as(raisedAt),
+                        driver.as(driverLabel),
+                        category.as(categoryLabel),
+                        feature.as(featureLabel),
+                        team.as(teamLabel),
+                        ANALYSIS.SUMMARY.as(reason),
+                        rowNumber()
+                                .over(orderBy(QUERY.DATE.desc(), TICKET.ID.desc()))
+                                .as(position),
+                        count().over().as(available))
                 .from(QUERY)
                 .join(TICKET)
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
@@ -200,22 +223,36 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .on(analysisJoin(promptId))
                 .where(inScope(scope, channelIds))
                 .and(trim(ANALYSIS.SUMMARY).ne(""))
-                .orderBy(QUERY.DATE.desc(), TICKET.ID.desc())
+                .asTable("numbered");
+
+        // Every reason when they fit; otherwise `limit` of them spread evenly from newest to oldest, so
+        // a wide window's prose still covers its early weeks. Row p is kept when (p - 1) * limit mod n
+        // < limit: exactly one row in each run of n / limit, starting with the newest. When n <= limit
+        // the remainder is always below n, so every row is kept.
+        Result<Record7<Long, Instant, String, String, String, String, String>> rows = dsl.select(
+                        ticketId, raisedAt, driverLabel, categoryLabel, featureLabel, teamLabel, reason)
+                .from(numbered)
+                .where(position.minus(inline(1))
+                        .cast(Long.class)
+                        .times(inline((long) limit))
+                        .mod(available.cast(Long.class))
+                        .lt(inline((long) limit)))
+                .orderBy(raisedAt.desc(), ticketId.desc())
                 .limit(limit)
                 .fetch();
 
         ImmutableList.Builder<SummaryReason> reasons = ImmutableList.builderWithExpectedSize(rows.size());
         for (Record7<Long, Instant, String, String, String, String, String> row : rows) {
-            Long ticketId = row.value1();
-            Instant raisedAt = row.value2();
+            Long id = row.value1();
+            Instant at = row.value2();
             String text = row.value7();
-            if (ticketId == null || raisedAt == null || text == null) {
+            if (id == null || at == null || text == null) {
                 continue;
             }
             // The same UTC day the window is expressed in, so a reason never lands outside its window.
-            LocalDate raisedOn = raisedAt.atOffset(ZoneOffset.UTC).toLocalDate();
+            LocalDate raisedOn = at.atOffset(ZoneOffset.UTC).toLocalDate();
             reasons.add(new SummaryReason(
-                    ticketId,
+                    id,
                     raisedOn,
                     orLabel(row.value3(), UNCLASSIFIED_LABEL),
                     orLabel(row.value4(), UNCLASSIFIED_LABEL),

@@ -423,7 +423,7 @@ summary-area:
     exceptions: []
   # The page. On whenever llm.provider is not `none`; no switch of its own.
   page:
-    max-reasons: ${SUMMARY_MAX_REASONS:1000} # Newest per-ticket reasons fed to the summary model; sized for the 92-day window cap
+    max-reasons: ${SUMMARY_MAX_REASONS:1000} # Per-ticket reasons fed to the summary model, spread across the window when there are more; sized for the 92-day window cap
     failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried
   # The offline analysis kit served next to the export. Always on; can be dropped wholesale when retired.
   offline-export:

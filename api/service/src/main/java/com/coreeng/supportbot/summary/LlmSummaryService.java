@@ -99,7 +99,15 @@ public class LlmSummaryService {
         appendCounts(report, "Tenant teams", breakdowns.teams());
         appendCounts(report, "Products (from product tags)", breakdowns.products());
 
-        report.append("\nPer-ticket reasons (").append(reasons.size()).append("):\n");
+        report.append("\nPer-ticket reasons (").append(reasons.size());
+        // Said outright when the lines are a sample, so the prose weighs themes against the counts
+        // rather than reading the lines as the whole window.
+        if (reasons.size() < breakdowns.classifiedTickets()) {
+            report.append(" of the ")
+                    .append(breakdowns.classifiedTickets())
+                    .append(" classified tickets, spread across the window; the counts above cover every ticket");
+        }
+        report.append("):\n");
         for (SummaryReason reason : reasons) {
             report.append("- ").append(reason.line()).append('\n');
         }

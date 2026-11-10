@@ -118,10 +118,11 @@ function CitedClaim({
         data-testid="summary-evidence"
       >
         <div className="border-b px-4 py-3">
-          <p className="text-foreground text-sm font-medium">Tickets behind this</p>
+          {/* Examples, not the full set: a claim may cover more tickets than the five it can cite, or
+              than the sample of reasons the model was shown. */}
+          <p className="text-foreground text-sm font-medium">{tickets.length === 1 ? "Example ticket" : "Example tickets"}</p>
           <p className="text-muted-foreground text-xs">
-            Cited by the model · <span className="font-mono tabular-nums">{tickets.length}</span>{" "}
-            {tickets.length === 1 ? "ticket" : "tickets"}
+            Cited by the model · <span className="font-mono tabular-nums">{tickets.length}</span> shown
           </p>
         </div>
         <ul className="max-h-80 divide-y overflow-y-auto">

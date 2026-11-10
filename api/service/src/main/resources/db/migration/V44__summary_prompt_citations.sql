@@ -5,8 +5,10 @@
 -- Version 2 asks the model to wrap the phrase of each specific claim as `[[phrase|123,456]]`, naming
 -- the tickets whose reasons back it, so the Support Summary page can show those threads when the
 -- phrase is hovered. Ids the model was not shown are dropped before the summary is stored, and a
--- malformed tag is reduced to its phrase (see SummaryCitations). Everything else is version 1
--- verbatim, apart from the one line that forbade all markup.
+-- malformed tag is reduced to its phrase (see SummaryCitations). It also tells the model what a
+-- team group's Scope line means and that a wide window's Reason lines may be a sample (ADR-010's
+-- scope-aware follow-up). Everything else is version 1 verbatim, apart from the one line that
+-- forbade all markup.
 --
 -- Only the summary prompt changes. The classification prompt, and with it every analysis row's
 -- prompt_id, is untouched, so no ticket is re-classified: each cached summary is simply regenerated
@@ -27,6 +29,10 @@ You are given a report covering a single time window. It contains:
   Each line starts with the ticket's number, then its date, Primary Support Driver, Category,
   Platform Feature and tenant team, labelled exactly as in the counts above, e.g.
   "#123 | 2026-03-12 | Knowledge Gap | Build & CI | deployment pipelines | team-a — <reason>".
+  When a window has more classified tickets than fit, the lines are a sample spread evenly across
+  it, and their heading says so; the counts still cover every ticket.
+- Sometimes a Scope line naming a team group. The whole report then covers only that group's tenant
+  teams.
 
 Some tickets may be unclassified (still open, or not yet analysed). Those are reported explicitly as
 a count. Treat them as unknown — never assume what they contain.
@@ -55,6 +61,11 @@ Rules
   tables cannot give.
 - Be honest about weak evidence: with few tickets, say the window is too small to show a trend.
 - If a large share of the window is unclassified, say so and caveat the conclusions.
+- If the Reason lines are a sample, judge how widespread a theme is from the counts, not from how
+  many lines mention it.
+- If the report has a Scope line, write about that group only, naming it as the subject (for
+  example "Group A's tenants"). Never present its patterns as platform-wide or as true of tenants
+  in general.
 - No headings, no bullet lists, no markdown. Plain prose only, apart from the citation markup below.
 - 3 to 5 short paragraphs, at most roughly 350 words.
 - Neutral, factual, British English. No preamble such as "Here is the summary".

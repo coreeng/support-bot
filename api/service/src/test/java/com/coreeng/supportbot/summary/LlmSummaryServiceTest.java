@@ -139,6 +139,29 @@ class LlmSummaryServiceTest {
                         """);
     }
 
+    @Test
+    void aSampleOfReasonsSaysHowManyTicketsItIsDrawnFrom() {
+        RecordingModel model = new RecordingModel();
+
+        new LlmSummaryService(model, props(), teamGroups())
+                .generate(
+                        "Summarise.",
+                        SummaryScope.all(WINDOW),
+                        breakdowns(),
+                        ImmutableList.of(new SummaryReason(
+                                12L,
+                                LocalDate.of(2026, 3, 12),
+                                "Knowledge Gap",
+                                "Build & CI",
+                                "pipelines",
+                                "team-a",
+                                "Newer.")));
+
+        assertThat(model.lastPrompt)
+                .contains("Per-ticket reasons (1 of the 2 classified tickets, spread across the window; the counts"
+                        + " above cover every ticket):\n");
+    }
+
     private static final SummaryWindow WINDOW = new SummaryWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23));
 
     /** Remembers the last prompt it was sent. */

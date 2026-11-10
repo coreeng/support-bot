@@ -71,7 +71,8 @@ describe("SummaryProse", () => {
     fireEvent.click(claim());
 
     const popover = await screen.findByTestId("summary-evidence");
-    expect(within(popover).getByText("Cited by the model ·", { exact: false })).toHaveTextContent("2 tickets");
+    expect(within(popover).getByText("Example tickets")).toBeInTheDocument();
+    expect(within(popover).getByText("Cited by the model ·", { exact: false })).toHaveTextContent("2 shown");
     expect(within(popover).getByText("Could not find how X is configured.")).toBeInTheDocument();
     // A ticket the classifier gave no reason still gets a readable row.
     expect(within(popover).getByText("Ticket 12")).toBeInTheDocument();
