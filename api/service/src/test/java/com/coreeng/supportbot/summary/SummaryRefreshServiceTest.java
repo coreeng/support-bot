@@ -69,7 +69,9 @@ class SummaryRefreshServiceTest {
     private static final String SUMMARY_PROMPT_ID = AnalysisService.computePromptId(SUMMARY_PROMPT);
     private static final Instant TICKET_UPDATED_AT = Instant.parse("2026-03-23T09:30:00Z");
     private static final String FINGERPRINT = "3/2@2026-03-23T10:00~" + TICKET_UPDATED_AT;
-    private static final SummaryReason REASON = new SummaryReason(LocalDate.of(2026, 3, 12), "Because.");
+    private static final long REASON_TICKET = 42L;
+    private static final SummaryReason REASON = new SummaryReason(
+            REASON_TICKET, LocalDate.of(2026, 3, 12), "Knowledge Gap", "Build & CI", "pipelines", "team-a", "Because.");
     private static final Duration RETRY_DELAY = Duration.ofMinutes(15);
     private static final Instant NOW = Instant.parse("2026-03-23T12:00:00Z");
 
@@ -127,6 +129,10 @@ class SummaryRefreshServiceTest {
         lenient()
                 .when(summaryReadRepository.reasons(SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
                 .thenReturn(ImmutableList.of(REASON));
+        // Mockito answers null for an ImmutableList; the repository never does.
+        lenient()
+                .when(summaryReadRepository.reasons(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
+                .thenReturn(ImmutableList.of());
         lenient().when(llmSummaryService.modelName()).thenReturn("model-a");
     }
 
@@ -343,6 +349,20 @@ class SummaryRefreshServiceTest {
         ArgumentCaptor<SummarySnapshot> stored = ArgumentCaptor.forClass(SummarySnapshot.class);
         verify(summarySnapshotRepository).upsert(stored.capture());
         assertThat(stored.getValue().teamGroup()).isEqualTo(SummaryScope.ALL_KEY);
+    }
+
+    @Test
+    void storedProseKeepsOnlyCitationsOfTicketsTheModelWasShown() {
+        // 42 is the one reason in the report; 999 is not, so the model made it up or reached outside
+        // the scope. The claim citing only 999 keeps its words and loses its markup.
+        when(llmSummaryService.generate(SUMMARY_PROMPT, SCOPE, breakdowns(), ImmutableList.of(REASON)))
+                .thenReturn("  Tenants needed [[docs on X|42,999]] and [[help with Y|999]].  ");
+
+        service.runWindowRefresh(FROM, TO, null);
+
+        ArgumentCaptor<SummarySnapshot> stored = ArgumentCaptor.forClass(SummarySnapshot.class);
+        verify(summarySnapshotRepository).upsert(stored.capture());
+        assertThat(stored.getValue().content()).isEqualTo("Tenants needed [[docs on X|42]] and help with Y.");
     }
 
     @Test

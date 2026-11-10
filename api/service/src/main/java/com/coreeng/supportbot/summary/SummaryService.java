@@ -10,6 +10,8 @@ import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.coreeng.supportbot.teamgroups.TeamGroup;
 import com.coreeng.supportbot.teamgroups.TeamGroupService;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -120,7 +122,7 @@ public class SummaryService {
         if (snapshot != null
                 && snapshot.fingerprint().equals(fingerprint.value())
                 && !gapsDueForRetry(snapshot, fingerprint)) {
-            return new SummaryState.Ready(snapshot.content(), snapshot.model(), snapshot.generatedAt());
+            return ready(snapshot, scope, classificationPromptId, channelIds);
         }
 
         if (summaryRefresher.start(scope)) {
@@ -128,6 +130,42 @@ public class SummaryService {
         }
         // Someone claimed the lock between the check above and here; report their run.
         return generating(summaryRefresher.status().phase());
+    }
+
+    /**
+     * The snapshot as the page shows it: plain prose, plus its cited claims resolved to tickets.
+     *
+     * <p>Tickets are looked up afresh rather than stored with the snapshot, so the reason text shown is
+     * the one the fingerprint vouches for. A cited ticket that no longer resolves in the scope is
+     * dropped, and a claim left with none reads as plain text.
+     */
+    private SummaryState.Ready ready(
+            SummarySnapshot snapshot,
+            SummaryScope scope,
+            String classificationPromptId,
+            ImmutableList<String> channelIds) {
+        ImmutableList<SummaryCitations.Span> spans = SummaryCitations.parse(snapshot.content());
+        String content = SummaryCitations.plainText(spans);
+        ImmutableSet<Long> citedIds =
+                spans.stream().flatMap(span -> span.ticketIds().stream()).collect(ImmutableSet.toImmutableSet());
+        if (citedIds.isEmpty()) {
+            return new SummaryState.Ready(content, snapshot.model(), snapshot.generatedAt());
+        }
+
+        ImmutableMap<Long, SummaryEvidence> tickets =
+                summaryReadRepository.citedTickets(scope, classificationPromptId, channelIds, citedIds);
+        ImmutableList.Builder<SummarySegment> segments = ImmutableList.builder();
+        for (SummaryCitations.Span span : spans) {
+            ImmutableList.Builder<SummaryEvidence> evidence = ImmutableList.builder();
+            for (Long id : span.ticketIds()) {
+                SummaryEvidence ticket = tickets.get(id);
+                if (ticket != null) {
+                    evidence.add(ticket);
+                }
+            }
+            segments.add(new SummarySegment(span.text(), evidence.build()));
+        }
+        return new SummaryState.Ready(content, snapshot.model(), snapshot.generatedAt(), segments.build());
     }
 
     /**

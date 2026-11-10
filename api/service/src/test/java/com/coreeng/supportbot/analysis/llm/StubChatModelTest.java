@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.analysis.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -10,6 +11,7 @@ import com.coreeng.supportbot.config.LlmProps;
 import com.coreeng.supportbot.config.LlmProvider;
 import com.coreeng.supportbot.summary.LlmSummaryService;
 import com.coreeng.supportbot.summary.SummaryBreakdowns;
+import com.coreeng.supportbot.summary.SummaryCitations;
 import com.coreeng.supportbot.summary.SummaryCount;
 import com.coreeng.supportbot.summary.SummaryReason;
 import com.coreeng.supportbot.summary.SummaryScope;
@@ -91,13 +93,69 @@ class StubChatModelTest {
                 "Summarise the window.",
                 SummaryScope.all(breakdowns().window()),
                 breakdowns(),
-                ImmutableList.of(new SummaryReason(LocalDate.of(2026, 3, 12), "Because.")));
+                ImmutableList.of(new SummaryReason(
+                        7L,
+                        LocalDate.of(2026, 3, 12),
+                        "Knowledge Gap",
+                        "Build & CI",
+                        "pipelines",
+                        "team-a",
+                        "Because.")));
 
         assertThat(summary).isNotBlank();
         // The two shapes are mutually exclusive: prose must not carry the strict classification lines,
         // or the summary section would render a parser block as its briefing.
         assertThat(summary).doesNotContain("Primary Driver:").doesNotContain("Platform Feature:");
         assertThat(summary).contains("stub LLM provider");
+    }
+
+    @Test
+    void summaryCitesTheReportsTicketsSoTheEvidencePopoversCanBeExercised() {
+        // Read back through the real report builder: a change to the reason line's format must break
+        // here, not quietly leave local runs without a single citation.
+        LlmSummaryService summaryService =
+                new LlmSummaryService(stub, llmProps(), Mockito.mock(TeamGroupService.class));
+        ImmutableList<SummaryReason> reasons = ImmutableList.of(
+                new SummaryReason(
+                        11L, LocalDate.of(2026, 3, 12), "Knowledge Gap", "Build & CI", "pipelines", "team-a", "First."),
+                new SummaryReason(
+                        12L,
+                        LocalDate.of(2026, 3, 11),
+                        "Knowledge Gap",
+                        "Build & CI",
+                        "pipelines",
+                        "team-a",
+                        "Second."),
+                new SummaryReason(
+                        13L,
+                        LocalDate.of(2026, 3, 10),
+                        "Knowledge Gap",
+                        "Build & CI",
+                        "pipelines",
+                        "team-a",
+                        "Third."));
+
+        String summary =
+                summaryService.generate("Summarise the window.", SummaryScope.all(WINDOW), breakdowns(), reasons);
+
+        assertThat(SummaryCitations.parse(summary))
+                .filteredOn(SummaryCitations.Span::cited)
+                .extracting(SummaryCitations.Span::text, SummaryCitations.Span::ticketIds)
+                .containsExactly(
+                        tuple("configuration details", ImmutableList.of(11L, 12L)),
+                        tuple("task requests", ImmutableList.of(13L)));
+        assertThat(SummaryCitations.sanitise(summary, Set.of(11L, 12L, 13L))).isEqualTo(summary);
+    }
+
+    @Test
+    void summaryIsPlainProseWhenTheReportHasNoReasonsToCite() {
+        LlmSummaryService summaryService =
+                new LlmSummaryService(stub, llmProps(), Mockito.mock(TeamGroupService.class));
+
+        String summary = summaryService.generate(
+                "Summarise the window.", SummaryScope.all(WINDOW), breakdowns(), ImmutableList.of());
+
+        assertThat(summary).doesNotContain("[[").contains("configuration details");
     }
 
     @Test

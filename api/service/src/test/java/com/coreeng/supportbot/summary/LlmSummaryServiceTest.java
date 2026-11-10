@@ -105,6 +105,40 @@ class LlmSummaryServiceTest {
                 .doesNotContain("Scope:");
     }
 
+    @Test
+    void eachReasonLineCarriesItsTicketAndClassificationSoTheModelCanCiteIt() {
+        RecordingModel model = new RecordingModel();
+
+        new LlmSummaryService(model, props(), teamGroups())
+                .generate(
+                        "Summarise.",
+                        SummaryScope.all(WINDOW),
+                        breakdowns(),
+                        ImmutableList.of(
+                                new SummaryReason(
+                                        12L,
+                                        LocalDate.of(2026, 3, 12),
+                                        "Knowledge Gap",
+                                        "Build & CI",
+                                        "pipelines",
+                                        "team-a",
+                                        "Newer."),
+                                new SummaryReason(
+                                        7L,
+                                        LocalDate.of(2026, 3, 11),
+                                        "Task Request",
+                                        "Unclassified",
+                                        "None",
+                                        "Unknown",
+                                        "Older.")));
+
+        assertThat(model.lastPrompt).contains("""
+                        Per-ticket reasons (2):
+                        - #12 | 2026-03-12 | Knowledge Gap | Build & CI | pipelines | team-a — Newer.
+                        - #7 | 2026-03-11 | Task Request | Unclassified | None | Unknown — Older.
+                        """);
+    }
+
     private static final SummaryWindow WINDOW = new SummaryWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23));
 
     /** Remembers the last prompt it was sent. */

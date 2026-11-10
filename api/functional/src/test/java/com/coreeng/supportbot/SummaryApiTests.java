@@ -44,7 +44,7 @@ public class SummaryApiTests {
     // below are deterministic whatever else the suite has created.
     private static final String FIXED_WINDOW = "?from=2024-01-01&to=2024-01-14";
 
-    // First line of the V38 seed for the in-use `summary` prompt.
+    // First line of every seeded `summary` prompt version (V38, V44), whichever is in use.
     private static final String SEEDED_SUMMARY_PROMPT_TITLE = "Platform Support Demand Summary Prompt";
 
     // The prose the permanent generateContent stub (SlackWiremock) answers with. Seeing it in the

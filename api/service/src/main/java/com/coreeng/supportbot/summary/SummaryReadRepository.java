@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.summary;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.Collection;
 
 /**
@@ -28,4 +29,13 @@ public interface SummaryReadRepository {
      *     window from overflowing the model's context
      */
     ImmutableList<SummaryReason> reasons(SummaryScope scope, String promptId, Collection<String> channelIds, int limit);
+
+    /**
+     * The tickets a summary cites, looked up under the same scope as everything else here, so a
+     * ticket that has left the scope (or lost its analysis for the prompt) is simply absent.
+     *
+     * @return the found tickets by id; ids that do not resolve have no entry
+     */
+    ImmutableMap<Long, SummaryEvidence> citedTickets(
+            SummaryScope scope, String promptId, Collection<String> channelIds, Collection<Long> ticketIds);
 }

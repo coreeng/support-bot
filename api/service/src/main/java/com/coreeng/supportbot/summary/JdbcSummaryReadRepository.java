@@ -44,6 +44,7 @@ import org.jooq.Field;
 import org.jooq.Record2;
 import org.jooq.Record3;
 import org.jooq.Record4;
+import org.jooq.Record7;
 import org.jooq.Result;
 import org.jooq.SelectOnConditionStep;
 import org.jooq.Table;
@@ -185,7 +186,13 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
             return ImmutableList.of();
         }
 
-        Result<Record2<Instant, String>> rows = dsl.select(QUERY.DATE, ANALYSIS.SUMMARY)
+        // Labelled as the breakdowns label them, so a reason line names a bucket exactly as the counts do.
+        Field<String> driver = bucketed(ANALYSIS.DRIVER, UNCLASSIFIED_LABEL);
+        Field<String> category = bucketed(ANALYSIS.CATEGORY, UNCLASSIFIED_LABEL);
+        Field<String> feature = bucketed(ANALYSIS.FEATURE, NO_FEATURE_LABEL);
+        Field<String> team = bucketed(TICKET.TEAM, UNKNOWN_TEAM_LABEL);
+        Result<Record7<Long, Instant, String, String, String, String, String>> rows = dsl.select(
+                        TICKET.ID, QUERY.DATE, driver, category, feature, team, ANALYSIS.SUMMARY)
                 .from(QUERY)
                 .join(TICKET)
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
@@ -198,17 +205,56 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .fetch();
 
         ImmutableList.Builder<SummaryReason> reasons = ImmutableList.builderWithExpectedSize(rows.size());
-        for (Record2<Instant, String> row : rows) {
-            Instant raisedAt = row.value1();
-            String text = row.value2();
-            if (raisedAt == null || text == null) {
+        for (Record7<Long, Instant, String, String, String, String, String> row : rows) {
+            Long ticketId = row.value1();
+            Instant raisedAt = row.value2();
+            String text = row.value7();
+            if (ticketId == null || raisedAt == null || text == null) {
                 continue;
             }
             // The same UTC day the window is expressed in, so a reason never lands outside its window.
             LocalDate raisedOn = raisedAt.atOffset(ZoneOffset.UTC).toLocalDate();
-            reasons.add(new SummaryReason(raisedOn, text));
+            reasons.add(new SummaryReason(
+                    ticketId,
+                    raisedOn,
+                    orLabel(row.value3(), UNCLASSIFIED_LABEL),
+                    orLabel(row.value4(), UNCLASSIFIED_LABEL),
+                    orLabel(row.value5(), NO_FEATURE_LABEL),
+                    orLabel(row.value6(), UNKNOWN_TEAM_LABEL),
+                    text));
         }
         return reasons.build();
+    }
+
+    @Override
+    public ImmutableMap<Long, SummaryEvidence> citedTickets(
+            SummaryScope scope, String promptId, Collection<String> channelIds, Collection<Long> ticketIds) {
+        if (channelIds.isEmpty() || ticketIds.isEmpty()) {
+            return ImmutableMap.of();
+        }
+
+        Map<Long, SummaryEvidence> found = new HashMap<>();
+        dsl.select(TICKET.ID, ANALYSIS.SUMMARY, QUERY.DATE, QUERY.CHANNEL_ID, QUERY.TS)
+                .from(QUERY)
+                .join(TICKET)
+                .on(TICKET.QUERY_ID.eq(QUERY.ID))
+                .join(ANALYSIS)
+                .on(analysisJoin(promptId))
+                .where(inScope(scope, channelIds))
+                .and(TICKET.ID.in(ticketIds))
+                .fetch()
+                .forEach(row -> {
+                    Long id = row.value1();
+                    Instant raisedAt = row.value3();
+                    String channelId = row.value4();
+                    String queryTs = row.value5();
+                    if (id == null || raisedAt == null || channelId == null || queryTs == null) {
+                        return;
+                    }
+                    String text = row.value2();
+                    found.put(id, new SummaryEvidence(id, text == null ? "" : text, raisedAt, channelId, queryTs));
+                });
+        return ImmutableMap.copyOf(found);
     }
 
     /**
@@ -406,6 +452,11 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
      */
     private static Field<String> bucketed(TableField<?, String> field, String blankLabel) {
         return coalesce(nullif(trim(field), DSL.inline("")), DSL.inline(blankLabel));
+    }
+
+    /** A bucketed label is never null in SQL, but jOOQ's typed accessor is nullable. */
+    private static String orLabel(@Nullable String value, String blankLabel) {
+        return value == null ? blankLabel : value;
     }
 
     /** An aggregate over an empty result set still yields a row, but jOOQ's typed accessor is nullable. */

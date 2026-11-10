@@ -13,3 +13,4 @@ export * from "./utils/distribution";
 export * from "./utils/format";
 export * from "./utils/query-params";
 export * from "./utils/running-average";
+export * from "./utils/slack";

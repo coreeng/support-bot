@@ -73,7 +73,10 @@ team-groups:
   versions. A resumed group that no longer exists is refreshed for the whole window.
 - **Prompt unchanged.** The report sent to the model gains one `Scope:` line naming the group and its
   teams; the summary prompt is not versioned, because a new version would orphan every cached
-  snapshot.
+  snapshot. *(Amended 2026-11, [ADR-011](adr-011-support-summary-evidence.md): summary prompt
+  version 2 (V44) now versions the summary prompt so it can cite tickets, accepting one regeneration
+  per window and team group. It adds no scope rules, so the scope-aware follow-up below is still
+  open.)*
 
 ### Not decided here
 

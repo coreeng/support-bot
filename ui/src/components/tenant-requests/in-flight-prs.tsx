@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useInFlightPrs } from "@/lib/hooks";
 import type { InFlightPr } from "@/lib/types/dashboard";
+import { slackDeepLink } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, HelpCircle, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -53,10 +54,6 @@ function statusLabel(status: string): string {
     default:
       return status.charAt(0) + status.slice(1).toLowerCase();
   }
-}
-
-function slackDeepLink(channelId: string, queryTs: string): string {
-  return `https://slack.com/archives/${channelId}/p${queryTs.replace(".", "")}`;
 }
 
 function ageFromNow(isoDate: string): { totalSeconds: number; label: string } {
