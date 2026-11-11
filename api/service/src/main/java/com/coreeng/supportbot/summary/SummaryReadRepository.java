@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.summary;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collection;
 
@@ -28,9 +27,9 @@ public interface SummaryReadRepository {
      * @param limit maximum number of reasons to return; keeps a very wide window from overflowing
      *     the model's context. When there are more, the ones returned are spread evenly across the
      *     window, starting with the newest, rather than the newest alone
-     * @return newest ticket first
+     * @return the reasons, newest ticket first, with how many the scope had before sampling
      */
-    ImmutableList<SummaryReason> reasons(SummaryScope scope, String promptId, Collection<String> channelIds, int limit);
+    SummaryReasons reasons(SummaryScope scope, String promptId, Collection<String> channelIds, int limit);
 
     /**
      * The tickets a summary cites, looked up under the same scope as everything else here, so a

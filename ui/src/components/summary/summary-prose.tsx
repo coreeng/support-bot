@@ -59,6 +59,9 @@ function CitedClaim({
   const [open, setOpen] = useState(false);
   // Pinned by a click: hovering away must not close it, and it takes focus for keyboard users.
   const pinned = useRef(false);
+  // Whether this close hands focus back to the phrase: only for a pinned popover, as one opened by
+  // hovering never took focus.
+  const returnFocus = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancelTimer = () => {
@@ -77,6 +80,7 @@ function CitedClaim({
 
   const close = () => {
     cancelTimer();
+    returnFocus.current = pinned.current;
     pinned.current = false;
     setOpen(false);
   };
@@ -113,8 +117,12 @@ function CitedClaim({
         className="w-96 max-w-[calc(100vw-2rem)] p-0"
         onPointerEnter={(event) => event.pointerType === "mouse" && cancelTimer()}
         onPointerLeave={hoverTo(false)}
-        // Opening on hover must not pull focus away from wherever the reader is.
+        // Hovering must not pull focus away from wherever the reader is, on opening or on closing.
         onOpenAutoFocus={(event) => !pinned.current && event.preventDefault()}
+        onCloseAutoFocus={(event) => {
+          if (!returnFocus.current) event.preventDefault();
+          returnFocus.current = false;
+        }}
         data-testid="summary-evidence"
       >
         <div className="border-b px-4 py-3">

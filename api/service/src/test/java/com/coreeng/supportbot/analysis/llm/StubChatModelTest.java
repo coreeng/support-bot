@@ -14,6 +14,7 @@ import com.coreeng.supportbot.summary.SummaryBreakdowns;
 import com.coreeng.supportbot.summary.SummaryCitations;
 import com.coreeng.supportbot.summary.SummaryCount;
 import com.coreeng.supportbot.summary.SummaryReason;
+import com.coreeng.supportbot.summary.SummaryReasons;
 import com.coreeng.supportbot.summary.SummaryScope;
 import com.coreeng.supportbot.summary.SummaryWindow;
 import com.coreeng.supportbot.summarydata.ThreadService;
@@ -93,14 +94,14 @@ class StubChatModelTest {
                 "Summarise the window.",
                 SummaryScope.all(breakdowns().window()),
                 breakdowns(),
-                ImmutableList.of(new SummaryReason(
+                SummaryReasons.all(ImmutableList.of(new SummaryReason(
                         7L,
                         LocalDate.of(2026, 3, 12),
                         "Knowledge Gap",
                         "Build & CI",
                         "pipelines",
                         "team-a",
-                        "Because.")));
+                        "Because."))));
 
         assertThat(summary).isNotBlank();
         // The two shapes are mutually exclusive: prose must not carry the strict classification lines,
@@ -135,8 +136,8 @@ class StubChatModelTest {
                         "team-a",
                         "Third."));
 
-        String summary =
-                summaryService.generate("Summarise the window.", SummaryScope.all(WINDOW), breakdowns(), reasons);
+        String summary = summaryService.generate(
+                "Summarise the window.", SummaryScope.all(WINDOW), breakdowns(), SummaryReasons.all(reasons));
 
         assertThat(SummaryCitations.parse(summary))
                 .filteredOn(SummaryCitations.Span::cited)
@@ -153,7 +154,10 @@ class StubChatModelTest {
                 new LlmSummaryService(stub, llmProps(), Mockito.mock(TeamGroupService.class));
 
         String summary = summaryService.generate(
-                "Summarise the window.", SummaryScope.all(WINDOW), breakdowns(), ImmutableList.of());
+                "Summarise the window.",
+                SummaryScope.all(WINDOW),
+                breakdowns(),
+                SummaryReasons.all(ImmutableList.of()));
 
         assertThat(summary).doesNotContain("[[").contains("configuration details");
     }

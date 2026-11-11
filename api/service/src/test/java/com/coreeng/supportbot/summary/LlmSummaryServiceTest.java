@@ -84,7 +84,11 @@ class LlmSummaryServiceTest {
         TeamGroup group = new TeamGroup("area-a", "Area A", ImmutableSortedSet.of("team-b", "team-a"));
 
         new LlmSummaryService(model, props(), teamGroups())
-                .generate("Summarise.", new SummaryScope(WINDOW, group), breakdowns(), ImmutableList.of());
+                .generate(
+                        "Summarise.",
+                        new SummaryScope(WINDOW, group),
+                        breakdowns(),
+                        SummaryReasons.all(ImmutableList.of()));
 
         assertThat(model.lastPrompt)
                 .contains("Window: 2026-03-10 to 2026-03-23 (inclusive)\n"
@@ -98,7 +102,7 @@ class LlmSummaryServiceTest {
         RecordingModel model = new RecordingModel();
 
         new LlmSummaryService(model, props(), teamGroups())
-                .generate("Summarise.", SummaryScope.all(WINDOW), breakdowns(), ImmutableList.of());
+                .generate("Summarise.", SummaryScope.all(WINDOW), breakdowns(), SummaryReasons.all(ImmutableList.of()));
 
         assertThat(model.lastPrompt)
                 .contains("Window: 2026-03-10 to 2026-03-23 (inclusive)\nTickets raised in the window: 3\n")
@@ -114,7 +118,7 @@ class LlmSummaryServiceTest {
                         "Summarise.",
                         SummaryScope.all(WINDOW),
                         breakdowns(),
-                        ImmutableList.of(
+                        SummaryReasons.all(ImmutableList.of(
                                 new SummaryReason(
                                         12L,
                                         LocalDate.of(2026, 3, 12),
@@ -130,7 +134,7 @@ class LlmSummaryServiceTest {
                                         "Unclassified",
                                         "None",
                                         "Unknown",
-                                        "Older.")));
+                                        "Older."))));
 
         assertThat(model.lastPrompt).contains("""
                         Per-ticket reasons (2):
@@ -140,7 +144,7 @@ class LlmSummaryServiceTest {
     }
 
     @Test
-    void aSampleOfReasonsSaysHowManyTicketsItIsDrawnFrom() {
+    void aSampleOfReasonsSaysHowManyItIsDrawnFrom() {
         RecordingModel model = new RecordingModel();
 
         new LlmSummaryService(model, props(), teamGroups())
@@ -148,19 +152,31 @@ class LlmSummaryServiceTest {
                         "Summarise.",
                         SummaryScope.all(WINDOW),
                         breakdowns(),
-                        ImmutableList.of(new SummaryReason(
-                                12L,
-                                LocalDate.of(2026, 3, 12),
-                                "Knowledge Gap",
-                                "Build & CI",
-                                "pipelines",
-                                "team-a",
-                                "Newer.")));
+                        new SummaryReasons(ImmutableList.of(NEWER), 2));
 
         assertThat(model.lastPrompt)
-                .contains("Per-ticket reasons (1 of the 2 classified tickets, spread across the window; the counts"
-                        + " above cover every ticket):\n");
+                .contains("Per-ticket reasons (1 of 2, a sample spread evenly across the window; the counts above"
+                        + " cover every ticket):\n");
     }
+
+    @Test
+    void fewerReasonsThanClassifiedTicketsIsNotASampleWhenNoneWereLeftOut() {
+        // A classified ticket with a blank reason has no line to send, so it must not make the lines
+        // read as a sample.
+        RecordingModel model = new RecordingModel();
+
+        new LlmSummaryService(model, props(), teamGroups())
+                .generate(
+                        "Summarise.",
+                        SummaryScope.all(WINDOW),
+                        breakdowns(),
+                        SummaryReasons.all(ImmutableList.of(NEWER)));
+
+        assertThat(model.lastPrompt).contains("Per-ticket reasons (1):\n").doesNotContain("sample");
+    }
+
+    private static final SummaryReason NEWER = new SummaryReason(
+            12L, LocalDate.of(2026, 3, 12), "Knowledge Gap", "Build & CI", "pipelines", "team-a", "Newer.");
 
     private static final SummaryWindow WINDOW = new SummaryWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23));
 

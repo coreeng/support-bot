@@ -134,7 +134,8 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(breakdowns.totalTickets()).isEqualTo(1);
         assertThat(breakdowns.classifiedTickets()).isZero();
         assertThat(breakdowns.drivers()).isEmpty();
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100)).isEmpty();
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100).lines())
+                .isEmpty();
     }
 
     @Test
@@ -404,9 +405,19 @@ class SummaryReadRepositoryPostgresTest {
                 latest, LocalDate.of(2026, 3, 12), "Knowledge Gap", "Build & CI", "ci", "team-a", "Newest.");
         SummaryReason oldest = new SummaryReason(
                 old, LocalDate.of(2026, 3, 10), "Knowledge Gap", "Build & CI", "ci", "team-a", "Oldest.");
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100)).containsExactly(newest, oldest);
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 1)).containsExactly(newest);
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 0)).isEmpty();
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100).lines())
+                .containsExactly(newest, oldest);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 1).lines())
+                .containsExactly(newest);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 0).lines())
+                .isEmpty();
+        // The blank reason was never available, so all of them fitting is not a sample.
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100))
+                .extracting(SummaryReasons::available, SummaryReasons::sampled)
+                .containsExactly(2, false);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 1))
+                .extracting(SummaryReasons::available, SummaryReasons::sampled)
+                .containsExactly(2, true);
         assertThat(newest.line())
                 .isEqualTo("#" + latest + " | 2026-03-12 | Knowledge Gap | Build & CI | ci | team-a — Newest.");
     }
@@ -418,11 +429,14 @@ class SummaryReadRepositoryPostgresTest {
             classify(id, "Knowledge Gap", "Build & CI", "ci", "Hour " + hour + ".");
         }
 
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 3))
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 3).lines())
                 .extracting(SummaryReason::text)
                 .containsExactly("Hour 15.", "Hour 13.", "Hour 11.");
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 6)).hasSize(6);
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 4))
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 3).available())
+                .isEqualTo(6);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 6).lines())
+                .hasSize(6);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 4).lines())
                 .extracting(SummaryReason::text)
                 .hasSize(4)
                 .startsWith("Hour 15.");
@@ -435,8 +449,10 @@ class SummaryReadRepositoryPostgresTest {
         long blank = ticket("2026-03-11T09:00:00", "ts-blank", null);
         classify(blank, " Knowledge Gap ", "  ", "", "Reason.");
 
-        SummaryReason reason =
-                repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 10).getFirst();
+        SummaryReason reason = repository
+                .reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 10)
+                .lines()
+                .getFirst();
         SummaryBreakdowns breakdowns = repository.breakdowns(SCOPE, PROMPT_ID, List.of(CHANNEL));
 
         assertThat(reason)
@@ -498,7 +514,7 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(breakdowns.teams()).isEmpty();
         assertThat(repository.fingerprint(SCOPE, PROMPT_ID, List.of()).analysisCount())
                 .isZero();
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(), 10)).isEmpty();
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(), 10).lines()).isEmpty();
     }
 
     @Test
@@ -532,7 +548,9 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(group.teams())
                 .extracting(SummaryCount::label, SummaryCount::count)
                 .containsExactly(tuple("team-a", 1L), tuple("team-b", 1L));
-        assertThat(repository.reasons(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL), 100))
+        assertThat(repository
+                        .reasons(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL), 100)
+                        .lines())
                 .extracting(SummaryReason::text)
                 .containsExactly("B.", "A.");
 

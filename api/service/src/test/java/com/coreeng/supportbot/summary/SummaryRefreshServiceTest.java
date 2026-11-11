@@ -128,11 +128,11 @@ class SummaryRefreshServiceTest {
                         new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT));
         lenient()
                 .when(summaryReadRepository.reasons(SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
-                .thenReturn(ImmutableList.of(REASON));
-        // Mockito answers null for an ImmutableList; the repository never does.
+                .thenReturn(SummaryReasons.all(ImmutableList.of(REASON)));
+        // Mockito answers null for a record; the repository never does.
         lenient()
                 .when(summaryReadRepository.reasons(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
-                .thenReturn(ImmutableList.of());
+                .thenReturn(SummaryReasons.all(ImmutableList.of()));
         lenient().when(llmSummaryService.modelName()).thenReturn("model-a");
     }
 
@@ -238,8 +238,9 @@ class SummaryRefreshServiceTest {
                 .thenReturn(new SummaryFingerprint(
                         1, 1, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT, ImmutableSet.of(), "d1"));
         when(summaryReadRepository.reasons(GROUP_SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
-                .thenReturn(ImmutableList.of(REASON));
-        when(llmSummaryService.generate(SUMMARY_PROMPT, GROUP_SCOPE, breakdowns(), ImmutableList.of(REASON)))
+                .thenReturn(SummaryReasons.all(ImmutableList.of(REASON)));
+        when(llmSummaryService.generate(
+                        SUMMARY_PROMPT, GROUP_SCOPE, breakdowns(), SummaryReasons.all(ImmutableList.of(REASON))))
                 .thenReturn("the group's prose");
 
         service.runWindowRefresh(FROM, TO, "area-a");
@@ -340,7 +341,8 @@ class SummaryRefreshServiceTest {
     @Test
     void aResumedRunForATeamGroupThatNoLongerExistsRefreshesTheWholeWindow() {
         when(teamGroupService.find("gone")).thenReturn(null);
-        when(llmSummaryService.generate(SUMMARY_PROMPT, SCOPE, breakdowns(), ImmutableList.of(REASON)))
+        when(llmSummaryService.generate(
+                        SUMMARY_PROMPT, SCOPE, breakdowns(), SummaryReasons.all(ImmutableList.of(REASON))))
                 .thenReturn("the prose");
 
         service.runWindowRefresh(FROM, TO, "gone");
@@ -355,7 +357,8 @@ class SummaryRefreshServiceTest {
     void storedProseKeepsOnlyCitationsOfTicketsTheModelWasShown() {
         // 42 is the one reason in the report; 999 is not, so the model made it up or reached outside
         // the scope. The claim citing only 999 keeps its words and loses its markup.
-        when(llmSummaryService.generate(SUMMARY_PROMPT, SCOPE, breakdowns(), ImmutableList.of(REASON)))
+        when(llmSummaryService.generate(
+                        SUMMARY_PROMPT, SCOPE, breakdowns(), SummaryReasons.all(ImmutableList.of(REASON))))
                 .thenReturn("  Tenants needed [[docs on X|42,999]] and [[help with Y|999]].  ");
 
         service.runWindowRefresh(FROM, TO, null);
@@ -407,7 +410,8 @@ class SummaryRefreshServiceTest {
 
     @Test
     void backfillsBeforeGeneratingAndStoresTheResultingSnapshot() {
-        when(llmSummaryService.generate(SUMMARY_PROMPT, SCOPE, breakdowns(), ImmutableList.of(REASON)))
+        when(llmSummaryService.generate(
+                        SUMMARY_PROMPT, SCOPE, breakdowns(), SummaryReasons.all(ImmutableList.of(REASON))))
                 .thenReturn("  the prose  ");
 
         service.runWindowRefresh(FROM, TO);
@@ -501,7 +505,7 @@ class SummaryRefreshServiceTest {
                 .thenReturn(breakdowns());
         when(summaryReadRepository.reasons(
                         SummaryScope.all(otherWindow), CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), 400))
-                .thenReturn(ImmutableList.of(REASON));
+                .thenReturn(SummaryReasons.all(ImmutableList.of(REASON)));
         when(threadsAwaitingAnalysisService.find(
                         otherWindow.from(), otherWindow.to(), ALL_TEAMS, CLASSIFICATION_PROMPT_ID))
                 .thenReturn(ImmutableList.of());
@@ -529,7 +533,8 @@ class SummaryRefreshServiceTest {
                 .thenReturn(
                         new SummaryFingerprint(3, 2, LocalDate.of(2026, 3, 23).atTime(10, 0), TICKET_UPDATED_AT));
         when(summaryReadRepository.breakdowns(any(), any(), any())).thenReturn(breakdowns());
-        when(summaryReadRepository.reasons(any(), any(), any(), anyInt())).thenReturn(ImmutableList.of(REASON));
+        when(summaryReadRepository.reasons(any(), any(), any(), anyInt()))
+                .thenReturn(SummaryReasons.all(ImmutableList.of(REASON)));
         when(threadsAwaitingAnalysisService.find(any(), any(), any(), any())).thenReturn(ImmutableList.of());
 
         service.runWindowRefresh(FROM, TO);

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { SummarySegment } from "../../../lib/types/summary";
 import SummaryProse from "../summary-prose";
 
@@ -124,6 +124,40 @@ describe("SummaryProse", () => {
     fireEvent.pointerLeave(evidence() as HTMLElement, { pointerType: "mouse" });
     act(() => jest.advanceTimersByTime(500));
     expect(evidence()).not.toBeInTheDocument();
+  });
+
+  it("leaves focus where it was when a hover opens and closes the popover", () => {
+    jest.useFakeTimers();
+    render(
+      <>
+        <input aria-label="elsewhere" />
+        <SummaryProse content="" segments={cited} onOpenTicket={jest.fn()} />
+      </>
+    );
+    const elsewhere = screen.getByRole("textbox", { name: "elsewhere" });
+    elsewhere.focus();
+
+    fireEvent.pointerEnter(claim(), { pointerType: "mouse" });
+    act(() => jest.advanceTimersByTime(200));
+    expect(evidence()).toBeInTheDocument();
+    fireEvent.pointerLeave(claim(), { pointerType: "mouse" });
+    act(() => jest.advanceTimersByTime(500));
+    // Radix moves focus on a zero-delay timer it only sets once the close has rendered.
+    act(() => jest.runOnlyPendingTimers());
+
+    expect(evidence()).not.toBeInTheDocument();
+    expect(elsewhere).toHaveFocus();
+  });
+
+  it("hands focus back to the phrase when a pinned popover is closed with Escape", async () => {
+    renderProse(cited);
+
+    fireEvent.click(claim());
+    fireEvent.keyDown(await screen.findByTestId("summary-evidence"), { key: "Escape" });
+
+    expect(evidence()).not.toBeInTheDocument();
+    // Radix hands focus back on a zero-delay timer once the popover has unmounted.
+    await waitFor(() => expect(claim()).toHaveFocus());
   });
 
   it("a click on a hover-opened popover pins it open", () => {

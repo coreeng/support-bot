@@ -45,7 +45,7 @@ import org.jooq.Field;
 import org.jooq.Record2;
 import org.jooq.Record3;
 import org.jooq.Record4;
-import org.jooq.Record7;
+import org.jooq.Record8;
 import org.jooq.Result;
 import org.jooq.SelectOnConditionStep;
 import org.jooq.Table;
@@ -181,10 +181,9 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
     }
 
     @Override
-    public ImmutableList<SummaryReason> reasons(
-            SummaryScope scope, String promptId, Collection<String> channelIds, int limit) {
+    public SummaryReasons reasons(SummaryScope scope, String promptId, Collection<String> channelIds, int limit) {
         if (channelIds.isEmpty() || limit <= 0) {
-            return ImmutableList.of();
+            return SummaryReasons.all(ImmutableList.of());
         }
 
         // Labelled as the breakdowns label them, so a reason line names a bucket exactly as the counts do.
@@ -229,8 +228,8 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
         // a wide window's prose still covers its early weeks. Row p is kept when (p - 1) * limit mod n
         // < limit: exactly one row in each run of n / limit, starting with the newest. When n <= limit
         // the remainder is always below n, so every row is kept.
-        Result<Record7<Long, Instant, String, String, String, String, String>> rows = dsl.select(
-                        ticketId, raisedAt, driverLabel, categoryLabel, featureLabel, teamLabel, reason)
+        Result<Record8<Long, Instant, String, String, String, String, String, Integer>> rows = dsl.select(
+                        ticketId, raisedAt, driverLabel, categoryLabel, featureLabel, teamLabel, reason, available)
                 .from(numbered)
                 .where(position.minus(inline(1))
                         .cast(Long.class)
@@ -242,7 +241,13 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .fetch();
 
         ImmutableList.Builder<SummaryReason> reasons = ImmutableList.builderWithExpectedSize(rows.size());
-        for (Record7<Long, Instant, String, String, String, String, String> row : rows) {
+        // Every row carries the same count, of the reasons before sampling.
+        int availableReasons = 0;
+        for (Record8<Long, Instant, String, String, String, String, String, Integer> row : rows) {
+            Integer rowAvailable = row.value8();
+            if (rowAvailable != null) {
+                availableReasons = rowAvailable;
+            }
             Long id = row.value1();
             Instant at = row.value2();
             String text = row.value7();
@@ -260,7 +265,8 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                     orLabel(row.value6(), UNKNOWN_TEAM_LABEL),
                     text));
         }
-        return reasons.build();
+        ImmutableList<SummaryReason> lines = reasons.build();
+        return new SummaryReasons(lines, Math.max(availableReasons, lines.size()));
     }
 
     @Override
