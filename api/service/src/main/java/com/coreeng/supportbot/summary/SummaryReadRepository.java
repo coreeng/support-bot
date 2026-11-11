@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.summary;
 
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collection;
 
@@ -37,6 +38,6 @@ public interface SummaryReadRepository {
      *
      * @return the found tickets by id; ids that do not resolve have no entry
      */
-    ImmutableMap<Long, SummaryEvidence> citedTickets(
-            SummaryScope scope, String promptId, Collection<String> channelIds, Collection<Long> ticketIds);
+    ImmutableMap<TicketId, SummaryEvidence> citedTickets(
+            SummaryScope scope, String promptId, Collection<String> channelIds, Collection<TicketId> ticketIds);
 }

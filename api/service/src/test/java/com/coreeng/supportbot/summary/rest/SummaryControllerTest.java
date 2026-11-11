@@ -24,6 +24,8 @@ import com.coreeng.supportbot.security.OAuth2AvailabilityChecker;
 import com.coreeng.supportbot.security.Role;
 import com.coreeng.supportbot.security.SecurityConfig;
 import com.coreeng.supportbot.security.UserPrincipal;
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.summary.SummaryBreakdowns;
 import com.coreeng.supportbot.summary.SummaryEvidence;
 import com.coreeng.supportbot.summary.SummaryScope;
@@ -38,6 +40,7 @@ import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import java.time.Clock;
@@ -173,8 +176,12 @@ class SummaryControllerTest {
     @Test
     void serialisesCitedClaimsWithTheirTickets() throws Exception {
         SummaryWindow window = new SummaryWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23));
-        SummaryEvidence ticket =
-                new SummaryEvidence(42L, "Did not know pipelines existed.", Instant.EPOCH, "C123", "1710147600.000100");
+        SummaryEvidence ticket = new SummaryEvidence(
+                new TicketId(42L),
+                "Did not know pipelines existed.",
+                Instant.EPOCH,
+                SlackId.channel("C123"),
+                MessageTs.of("1710147600.000100"));
         when(summaryService.get(any(), any(), any()))
                 .thenReturn(new SummaryService.SummaryResult(
                         SummaryScope.all(window),

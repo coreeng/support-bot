@@ -8,6 +8,7 @@ import com.coreeng.supportbot.config.LlmProps;
 import com.coreeng.supportbot.config.LlmProvider;
 import com.coreeng.supportbot.teamgroups.TeamGroup;
 import com.coreeng.supportbot.teamgroups.TeamGroupService;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import dev.langchain4j.data.message.AiMessage;
@@ -120,7 +121,7 @@ class LlmSummaryServiceTest {
                         breakdowns(),
                         SummaryReasons.all(ImmutableList.of(
                                 new SummaryReason(
-                                        12L,
+                                        new TicketId(12L),
                                         LocalDate.of(2026, 3, 12),
                                         "Knowledge Gap",
                                         "Build & CI",
@@ -128,7 +129,7 @@ class LlmSummaryServiceTest {
                                         "team-a",
                                         "Newer."),
                                 new SummaryReason(
-                                        7L,
+                                        new TicketId(7L),
                                         LocalDate.of(2026, 3, 11),
                                         "Task Request",
                                         "Unclassified",
@@ -176,7 +177,13 @@ class LlmSummaryServiceTest {
     }
 
     private static final SummaryReason NEWER = new SummaryReason(
-            12L, LocalDate.of(2026, 3, 12), "Knowledge Gap", "Build & CI", "pipelines", "team-a", "Newer.");
+            new TicketId(12L),
+            LocalDate.of(2026, 3, 12),
+            "Knowledge Gap",
+            "Build & CI",
+            "pipelines",
+            "team-a",
+            "Newer.");
 
     private static final SummaryWindow WINDOW = new SummaryWindow(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 23));
 

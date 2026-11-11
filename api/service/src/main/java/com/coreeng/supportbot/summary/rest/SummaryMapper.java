@@ -94,11 +94,11 @@ public class SummaryMapper {
 
     private static SummaryEvidenceUI evidence(SummaryEvidence ticket) {
         return new SummaryEvidenceUI(
-                String.valueOf(ticket.ticketId()),
+                String.valueOf(ticket.ticketId().id()),
                 ticket.text(),
                 ticket.raisedAt(),
-                ticket.channelId(),
-                ticket.queryTs());
+                ticket.channel().id(),
+                ticket.queryTs().ts());
     }
 
     private static SummarySectionUI section(SummaryState state) {

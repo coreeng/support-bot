@@ -4,14 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.coreeng.supportbot.summary.SummaryCitations.Span;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import java.util.Arrays;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /** A citation the model got wrong costs that one citation, never the prose around it. */
 class SummaryCitationsTest {
 
-    private static final Set<Long> SHOWN = Set.of(1L, 2L, 3L, 4L, 5L, 6L, 7L);
+    private static final Set<TicketId> SHOWN = ImmutableSet.copyOf(ids(1, 2, 3, 4, 5, 6, 7));
 
     @Test
     void splitsProseIntoPlainRunsAndCitedClaims() {
@@ -22,9 +25,9 @@ class SummaryCitationsTest {
                 .extracting(Span::text, Span::ticketIds)
                 .containsExactly(
                         tuple("We need ", ImmutableList.of()),
-                        tuple("documentation on X", ImmutableList.of(1L, 2L)),
+                        tuple("documentation on X", ids(1, 2)),
                         tuple(", and to fix ", ImmutableList.of()),
-                        tuple("problem Y", ImmutableList.of(3L)),
+                        tuple("problem Y", ids(3)),
                         tuple(".", ImmutableList.of()));
         assertThat(SummaryCitations.plainText(spans)).isEqualTo("We need documentation on X, and to fix problem Y.");
     }
@@ -41,7 +44,7 @@ class SummaryCitationsTest {
     void toleratesSpacesAndHashesInTheIdList() {
         assertThat(SummaryCitations.parse("[[claim| #1 , 2]]"))
                 .extracting(Span::ticketIds)
-                .containsExactly(ImmutableList.of(1L, 2L));
+                .containsExactly(ids(1, 2));
     }
 
     @Test
@@ -64,7 +67,8 @@ class SummaryCitationsTest {
     void strippingStrayMarkupCannotAssembleANewTag() {
         // Removing "]]" and "|1]]" in one pass would join "[" + "[x|999]" + "]" into a tag that names a
         // ticket the model was never shown.
-        String sanitised = SummaryCitations.sanitise("Tenants hit []][x|999]|1]]] issues.", Set.of(1L));
+        String sanitised =
+                SummaryCitations.sanitise("Tenants hit []][x|999]|1]]] issues.", ImmutableSet.copyOf(ids(1)));
 
         assertThat(sanitised).doesNotContain("[[").doesNotContain("]]");
         assertThat(SummaryCitations.parse(sanitised)).noneMatch(Span::cited);
@@ -114,6 +118,10 @@ class SummaryCitationsTest {
         assertThat(SummaryCitations.parse(sanitised))
                 .filteredOn(Span::cited)
                 .extracting(Span::text, Span::ticketIds)
-                .containsExactly(tuple("one", ImmutableList.of(2L, 1L)), tuple("two", ImmutableList.of(3L)));
+                .containsExactly(tuple("one", ids(2, 1)), tuple("two", ids(3)));
+    }
+
+    private static ImmutableList<TicketId> ids(long... ids) {
+        return Arrays.stream(ids).mapToObj(TicketId::new).collect(ImmutableList.toImmutableList());
     }
 }

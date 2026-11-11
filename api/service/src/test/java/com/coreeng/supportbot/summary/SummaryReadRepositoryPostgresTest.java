@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository;
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.teamgroups.TeamGroup;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
@@ -13,6 +15,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -402,9 +405,15 @@ class SummaryReadRepositoryPostgresTest {
         classify(ticket("2026-03-11T09:00:00", "ts-empty", "team-a"), "Knowledge Gap", "Build & CI", "ci", "   ");
 
         SummaryReason newest = new SummaryReason(
-                latest, LocalDate.of(2026, 3, 12), "Knowledge Gap", "Build & CI", "ci", "team-a", "Newest.");
+                new TicketId(latest),
+                LocalDate.of(2026, 3, 12),
+                "Knowledge Gap",
+                "Build & CI",
+                "ci",
+                "team-a",
+                "Newest.");
         SummaryReason oldest = new SummaryReason(
-                old, LocalDate.of(2026, 3, 10), "Knowledge Gap", "Build & CI", "ci", "team-a", "Oldest.");
+                new TicketId(old), LocalDate.of(2026, 3, 10), "Knowledge Gap", "Build & CI", "ci", "team-a", "Oldest.");
         assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100).lines())
                 .containsExactly(newest, oldest);
         assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 1).lines())
@@ -469,15 +478,15 @@ class SummaryReadRepositoryPostgresTest {
         long cited = ticket("2026-03-11T09:00:00", "1710147600.000100", "team-a");
         classify(cited, "Knowledge Gap", "Build & CI", "ci", "Did not know pipelines existed.");
 
-        assertThat(repository.citedTickets(SCOPE, PROMPT_ID, List.of(CHANNEL), List.of(cited)))
+        assertThat(repository.citedTickets(SCOPE, PROMPT_ID, List.of(CHANNEL), List.of(new TicketId(cited))))
                 .containsExactlyEntriesOf(Map.of(
-                        cited,
+                        new TicketId(cited),
                         new SummaryEvidence(
-                                cited,
+                                new TicketId(cited),
                                 "Did not know pipelines existed.",
                                 Instant.parse("2026-03-11T09:00:00Z"),
-                                CHANNEL,
-                                "1710147600.000100")));
+                                SlackId.channel(CHANNEL),
+                                MessageTs.of("1710147600.000100"))));
     }
 
     @Test
@@ -493,12 +502,14 @@ class SummaryReadRepositoryPostgresTest {
         classify(otherTeam, "Knowledge Gap", "Build & CI", "ci", "Other team.");
         classify(beforeWindow, "Knowledge Gap", "Build & CI", "ci", "Before.");
         classifyWithPrompt(olderPrompt, "Knowledge Gap", "Build & CI", "ci", "Old.", "an-older-prompt");
-        List<Long> all = List.of(inGroup, otherTeam, beforeWindow, olderPrompt, unclassified);
+        List<TicketId> all = Stream.of(inGroup, otherTeam, beforeWindow, olderPrompt, unclassified)
+                .map(TicketId::new)
+                .toList();
 
         assertThat(repository.citedTickets(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL), all))
-                .containsOnlyKeys(inGroup);
+                .containsOnlyKeys(new TicketId(inGroup));
         assertThat(repository.citedTickets(SCOPE, PROMPT_ID, List.of(CHANNEL), all))
-                .containsOnlyKeys(inGroup, otherTeam);
+                .containsOnlyKeys(new TicketId(inGroup), new TicketId(otherTeam));
         assertThat(repository.citedTickets(SCOPE, PROMPT_ID, List.of(), all)).isEmpty();
         assertThat(repository.citedTickets(SCOPE, PROMPT_ID, List.of(CHANNEL), List.of()))
                 .isEmpty();

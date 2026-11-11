@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.summary;
 
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
+import com.coreeng.supportbot.ticket.TicketId;
 import java.time.Instant;
 
 /**
@@ -10,7 +13,8 @@ import java.time.Instant;
  * @param text the classifier's one-line {@code Reason} for the ticket ({@code analysis.summary}) —
  *     the line the model read when it cited the ticket
  * @param raisedAt when the ticket was raised ({@code query.date})
- * @param channelId the Slack channel the thread is in
+ * @param channel the Slack channel the thread is in
  * @param queryTs the Slack timestamp of the thread's opening message
  */
-public record SummaryEvidence(long ticketId, String text, Instant raisedAt, String channelId, String queryTs) {}
+public record SummaryEvidence(
+        TicketId ticketId, String text, Instant raisedAt, SlackId.Channel channel, MessageTs queryTs) {}

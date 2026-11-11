@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.summary;
 
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -41,7 +42,7 @@ public final class SummaryCitations {
      *
      * @param ticketIds the tickets backing the phrase, in the model's order; empty for plain text
      */
-    public record Span(String text, ImmutableList<Long> ticketIds) {
+    public record Span(String text, ImmutableList<TicketId> ticketIds) {
 
         public boolean cited() {
             return !ticketIds.isEmpty();
@@ -55,10 +56,10 @@ public final class SummaryCitations {
      * @return the same prose, with tags kept only where they name an allowed ticket (at most {@value
      *     #MAX_TICKETS_PER_CLAIM}, duplicates dropped) and everything else reduced to plain text
      */
-    public static String sanitise(String raw, Set<Long> allowedTicketIds) {
+    public static String sanitise(String raw, Set<TicketId> allowedTicketIds) {
         StringBuilder out = new StringBuilder(raw.length());
         for (Span span : parse(raw)) {
-            ImmutableList<Long> kept = span.ticketIds().stream()
+            ImmutableList<TicketId> kept = span.ticketIds().stream()
                     .filter(allowedTicketIds::contains)
                     .limit(MAX_TICKETS_PER_CLAIM)
                     .collect(ImmutableList.toImmutableList());
@@ -66,7 +67,8 @@ public final class SummaryCitations {
                 out.append(span.text());
             } else {
                 out.append("[[").append(span.text()).append('|');
-                out.append(String.join(",", kept.stream().map(String::valueOf).toList()));
+                out.append(String.join(
+                        ",", kept.stream().map(id -> String.valueOf(id.id())).toList()));
                 out.append("]]");
             }
         }
@@ -86,7 +88,7 @@ public final class SummaryCitations {
             plain.append(stripStray(text.substring(at, tag.start())));
             at = tag.end();
             String phrase = tag.group(1);
-            ImmutableList<Long> ids = ticketIds(tag.group(2));
+            ImmutableList<TicketId> ids = ticketIds(tag.group(2));
             if (ids.isEmpty() || phrase.isBlank()) {
                 plain.append(phrase);
                 continue;
@@ -112,14 +114,14 @@ public final class SummaryCitations {
     }
 
     /** The distinct ids in a tag's list, in order; empty when any entry is not a ticket id. */
-    private static ImmutableList<Long> ticketIds(String list) {
-        Set<Long> ids = new LinkedHashSet<>();
+    private static ImmutableList<TicketId> ticketIds(String list) {
+        Set<TicketId> ids = new LinkedHashSet<>();
         for (String entry : list.split(",", -1)) {
             Matcher id = TICKET_ID.matcher(entry.strip());
             if (!id.matches()) {
                 return ImmutableList.of();
             }
-            ids.add(Long.parseLong(id.group(1)));
+            ids.add(new TicketId(Long.parseLong(id.group(1))));
         }
         return ImmutableList.copyOf(ids);
     }

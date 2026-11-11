@@ -14,6 +14,8 @@ import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryAreaProps;
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.teamgroups.TeamGroup;
 import com.coreeng.supportbot.teamgroups.TeamGroupService;
 import com.coreeng.supportbot.ticket.TicketId;
@@ -135,8 +137,11 @@ class SummaryServiceTest {
         // that claim reads as plain text.
         SummaryEvidence first = evidence(1);
         when(summaryReadRepository.citedTickets(
-                        SCOPE, CLASSIFICATION_PROMPT_ID, List.of(CHANNEL), ImmutableSet.of(1L, 2L, 3L)))
-                .thenReturn(ImmutableMap.of(1L, first));
+                        SCOPE,
+                        CLASSIFICATION_PROMPT_ID,
+                        List.of(CHANNEL),
+                        ImmutableSet.of(new TicketId(1L), new TicketId(2L), new TicketId(3L))))
+                .thenReturn(ImmutableMap.of(new TicketId(1L), first));
 
         SummaryState.Ready ready =
                 (SummaryState.Ready) service.get(FROM, TO, null).summary();
@@ -363,11 +368,11 @@ class SummaryServiceTest {
 
     private static SummaryEvidence evidence(long ticketId) {
         return new SummaryEvidence(
-                ticketId,
+                new TicketId(ticketId),
                 "Reason " + ticketId + ".",
                 Instant.parse("2026-03-12T09:00:00Z"),
-                CHANNEL,
-                "1.000" + ticketId);
+                SlackId.channel(CHANNEL),
+                MessageTs.of("1.000" + ticketId));
     }
 
     private static SummaryRefreshStatus idle() {

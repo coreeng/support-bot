@@ -24,6 +24,8 @@ import static org.jooq.impl.DSL.selectOne;
 import static org.jooq.impl.DSL.trim;
 
 import com.coreeng.supportbot.dbschema.enums.TicketStatus;
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -36,6 +38,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 import lombok.RequiredArgsConstructor;
@@ -45,8 +48,7 @@ import org.jooq.Field;
 import org.jooq.Record2;
 import org.jooq.Record3;
 import org.jooq.Record4;
-import org.jooq.Record8;
-import org.jooq.Result;
+import org.jooq.Records;
 import org.jooq.SelectOnConditionStep;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -228,7 +230,7 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
         // a wide window's prose still covers its early weeks. Row p is kept when (p - 1) * limit mod n
         // < limit: exactly one row in each run of n / limit, starting with the newest. When n <= limit
         // the remainder is always below n, so every row is kept.
-        Result<Record8<Long, Instant, String, String, String, String, String, Integer>> rows = dsl.select(
+        List<ReasonRow> rows = dsl.select(
                         ticketId, raisedAt, driverLabel, categoryLabel, featureLabel, teamLabel, reason, available)
                 .from(numbered)
                 .where(position.minus(inline(1))
@@ -238,67 +240,95 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                         .lt(inline((long) limit)))
                 .orderBy(raisedAt.desc(), ticketId.desc())
                 .limit(limit)
-                .fetch();
+                .fetch(Records.mapping(ReasonRow::new));
 
         ImmutableList.Builder<SummaryReason> reasons = ImmutableList.builderWithExpectedSize(rows.size());
         // Every row carries the same count, of the reasons before sampling.
         int availableReasons = 0;
-        for (Record8<Long, Instant, String, String, String, String, String, Integer> row : rows) {
-            Integer rowAvailable = row.value8();
+        for (ReasonRow row : rows) {
+            Integer rowAvailable = row.available();
             if (rowAvailable != null) {
                 availableReasons = rowAvailable;
             }
-            Long id = row.value1();
-            Instant at = row.value2();
-            String text = row.value7();
+            Long id = row.ticketId();
+            Instant at = row.raisedAt();
+            String text = row.reason();
             if (id == null || at == null || text == null) {
                 continue;
             }
             // The same UTC day the window is expressed in, so a reason never lands outside its window.
             LocalDate raisedOn = at.atOffset(ZoneOffset.UTC).toLocalDate();
             reasons.add(new SummaryReason(
-                    id,
+                    new TicketId(id),
                     raisedOn,
-                    orLabel(row.value3(), UNCLASSIFIED_LABEL),
-                    orLabel(row.value4(), UNCLASSIFIED_LABEL),
-                    orLabel(row.value5(), NO_FEATURE_LABEL),
-                    orLabel(row.value6(), UNKNOWN_TEAM_LABEL),
+                    orLabel(row.driver(), UNCLASSIFIED_LABEL),
+                    orLabel(row.category(), UNCLASSIFIED_LABEL),
+                    orLabel(row.feature(), NO_FEATURE_LABEL),
+                    orLabel(row.team(), UNKNOWN_TEAM_LABEL),
                     text));
         }
         ImmutableList<SummaryReason> lines = reasons.build();
         return new SummaryReasons(lines, Math.max(availableReasons, lines.size()));
     }
 
+    /** One row of {@link #reasons}, as selected; {@code available} counts the scope's reasons before sampling. */
+    private record ReasonRow(
+            @Nullable Long ticketId,
+            @Nullable Instant raisedAt,
+            @Nullable String driver,
+            @Nullable String category,
+            @Nullable String feature,
+            @Nullable String team,
+            @Nullable String reason,
+            @Nullable Integer available) {}
+
     @Override
-    public ImmutableMap<Long, SummaryEvidence> citedTickets(
-            SummaryScope scope, String promptId, Collection<String> channelIds, Collection<Long> ticketIds) {
+    public ImmutableMap<TicketId, SummaryEvidence> citedTickets(
+            SummaryScope scope, String promptId, Collection<String> channelIds, Collection<TicketId> ticketIds) {
         if (channelIds.isEmpty() || ticketIds.isEmpty()) {
             return ImmutableMap.of();
         }
 
-        Map<Long, SummaryEvidence> found = new HashMap<>();
-        dsl.select(TICKET.ID, ANALYSIS.SUMMARY, QUERY.DATE, QUERY.CHANNEL_ID, QUERY.TS)
+        List<EvidenceRow> rows = dsl.select(TICKET.ID, ANALYSIS.SUMMARY, QUERY.DATE, QUERY.CHANNEL_ID, QUERY.TS)
                 .from(QUERY)
                 .join(TICKET)
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
                 .join(ANALYSIS)
                 .on(analysisJoin(promptId))
                 .where(inScope(scope, channelIds))
-                .and(TICKET.ID.in(ticketIds))
-                .fetch()
-                .forEach(row -> {
-                    Long id = row.value1();
-                    Instant raisedAt = row.value3();
-                    String channelId = row.value4();
-                    String queryTs = row.value5();
-                    if (id == null || raisedAt == null || channelId == null || queryTs == null) {
-                        return;
-                    }
-                    String text = row.value2();
-                    found.put(id, new SummaryEvidence(id, text == null ? "" : text, raisedAt, channelId, queryTs));
-                });
+                .and(TICKET.ID.in(ticketIds.stream().map(TicketId::id).toList()))
+                .fetch(Records.mapping(EvidenceRow::new));
+
+        Map<TicketId, SummaryEvidence> found = new HashMap<>();
+        for (EvidenceRow row : rows) {
+            Long id = row.ticketId();
+            Instant raisedAt = row.raisedAt();
+            String channelId = row.channelId();
+            String queryTs = row.queryTs();
+            if (id == null || raisedAt == null || channelId == null || queryTs == null) {
+                continue;
+            }
+            TicketId ticket = new TicketId(id);
+            String text = row.reason();
+            found.put(
+                    ticket,
+                    new SummaryEvidence(
+                            ticket,
+                            text == null ? "" : text,
+                            raisedAt,
+                            SlackId.channel(channelId),
+                            MessageTs.of(queryTs)));
+        }
         return ImmutableMap.copyOf(found);
     }
+
+    /** One row of {@link #citedTickets}, as selected. */
+    private record EvidenceRow(
+            @Nullable Long ticketId,
+            @Nullable String reason,
+            @Nullable Instant raisedAt,
+            @Nullable String channelId,
+            @Nullable String queryTs) {}
 
     /**
      * @param filter narrows the classified tickets being counted (e.g. to one driver);

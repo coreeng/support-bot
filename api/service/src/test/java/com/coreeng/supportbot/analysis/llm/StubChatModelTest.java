@@ -19,6 +19,7 @@ import com.coreeng.supportbot.summary.SummaryScope;
 import com.coreeng.supportbot.summary.SummaryWindow;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.coreeng.supportbot.teamgroups.TeamGroupService;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -95,7 +96,7 @@ class StubChatModelTest {
                 SummaryScope.all(breakdowns().window()),
                 breakdowns(),
                 SummaryReasons.all(ImmutableList.of(new SummaryReason(
-                        7L,
+                        new TicketId(7L),
                         LocalDate.of(2026, 3, 12),
                         "Knowledge Gap",
                         "Build & CI",
@@ -118,9 +119,15 @@ class StubChatModelTest {
                 new LlmSummaryService(stub, llmProps(), Mockito.mock(TeamGroupService.class));
         ImmutableList<SummaryReason> reasons = ImmutableList.of(
                 new SummaryReason(
-                        11L, LocalDate.of(2026, 3, 12), "Knowledge Gap", "Build & CI", "pipelines", "team-a", "First."),
+                        new TicketId(11L),
+                        LocalDate.of(2026, 3, 12),
+                        "Knowledge Gap",
+                        "Build & CI",
+                        "pipelines",
+                        "team-a",
+                        "First."),
                 new SummaryReason(
-                        12L,
+                        new TicketId(12L),
                         LocalDate.of(2026, 3, 11),
                         "Knowledge Gap",
                         "Build & CI",
@@ -128,7 +135,7 @@ class StubChatModelTest {
                         "team-a",
                         "Second."),
                 new SummaryReason(
-                        13L,
+                        new TicketId(13L),
                         LocalDate.of(2026, 3, 10),
                         "Knowledge Gap",
                         "Build & CI",
@@ -143,9 +150,10 @@ class StubChatModelTest {
                 .filteredOn(SummaryCitations.Span::cited)
                 .extracting(SummaryCitations.Span::text, SummaryCitations.Span::ticketIds)
                 .containsExactly(
-                        tuple("configuration details", ImmutableList.of(11L, 12L)),
-                        tuple("task requests", ImmutableList.of(13L)));
-        assertThat(SummaryCitations.sanitise(summary, Set.of(11L, 12L, 13L))).isEqualTo(summary);
+                        tuple("configuration details", ImmutableList.of(new TicketId(11L), new TicketId(12L))),
+                        tuple("task requests", ImmutableList.of(new TicketId(13L))));
+        assertThat(SummaryCitations.sanitise(summary, Set.of(new TicketId(11L), new TicketId(12L), new TicketId(13L))))
+                .isEqualTo(summary);
     }
 
     @Test

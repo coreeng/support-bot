@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.summary;
 
+import com.coreeng.supportbot.ticket.TicketId;
 import java.time.LocalDate;
 
 /**
@@ -22,14 +23,20 @@ import java.time.LocalDate;
  * @param text the reason as the classifier wrote it, never blank
  */
 public record SummaryReason(
-        long ticketId, LocalDate raisedOn, String driver, String category, String feature, String team, String text) {
+        TicketId ticketId,
+        LocalDate raisedOn,
+        String driver,
+        String category,
+        String feature,
+        String team,
+        String text) {
 
     /**
      * The report line for this reason: {@code #<ticket> | YYYY-MM-DD | <driver> | <category> |
      * <feature> | <team> — <reason>}.
      */
     public String line() {
-        return "#" + ticketId + " | " + raisedOn + " | " + driver + " | " + category + " | " + feature + " | " + team
-                + " — " + text;
+        return "#" + ticketId.id() + " | " + raisedOn + " | " + driver + " | " + category + " | " + feature + " | "
+                + team + " — " + text;
     }
 }

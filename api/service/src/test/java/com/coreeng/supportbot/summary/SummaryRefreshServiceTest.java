@@ -69,7 +69,7 @@ class SummaryRefreshServiceTest {
     private static final String SUMMARY_PROMPT_ID = AnalysisService.computePromptId(SUMMARY_PROMPT);
     private static final Instant TICKET_UPDATED_AT = Instant.parse("2026-03-23T09:30:00Z");
     private static final String FINGERPRINT = "3/2@2026-03-23T10:00~" + TICKET_UPDATED_AT;
-    private static final long REASON_TICKET = 42L;
+    private static final TicketId REASON_TICKET = new TicketId(42L);
     private static final SummaryReason REASON = new SummaryReason(
             REASON_TICKET, LocalDate.of(2026, 3, 12), "Knowledge Gap", "Build & CI", "pipelines", "team-a", "Because.");
     private static final Duration RETRY_DELAY = Duration.ofMinutes(15);

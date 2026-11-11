@@ -9,6 +9,7 @@ import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.coreeng.supportbot.teamgroups.TeamGroup;
 import com.coreeng.supportbot.teamgroups.TeamGroupService;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -146,18 +147,18 @@ public class SummaryService {
             ImmutableList<String> channelIds) {
         ImmutableList<SummaryCitations.Span> spans = SummaryCitations.parse(snapshot.content());
         String content = SummaryCitations.plainText(spans);
-        ImmutableSet<Long> citedIds =
+        ImmutableSet<TicketId> citedIds =
                 spans.stream().flatMap(span -> span.ticketIds().stream()).collect(ImmutableSet.toImmutableSet());
         if (citedIds.isEmpty()) {
             return new SummaryState.Ready(content, snapshot.model(), snapshot.generatedAt());
         }
 
-        ImmutableMap<Long, SummaryEvidence> tickets =
+        ImmutableMap<TicketId, SummaryEvidence> tickets =
                 summaryReadRepository.citedTickets(scope, classificationPromptId, channelIds, citedIds);
         ImmutableList.Builder<SummarySegment> segments = ImmutableList.builder();
         for (SummaryCitations.Span span : spans) {
             ImmutableList.Builder<SummaryEvidence> evidence = ImmutableList.builder();
-            for (Long id : span.ticketIds()) {
+            for (TicketId id : span.ticketIds()) {
                 SummaryEvidence ticket = tickets.get(id);
                 if (ticket != null) {
                     evidence.add(ticket);
