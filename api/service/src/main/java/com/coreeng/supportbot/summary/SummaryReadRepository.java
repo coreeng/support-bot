@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.summary;
 
-import com.google.common.collect.ImmutableList;
+import com.coreeng.supportbot.ticket.TicketId;
+import com.google.common.collect.ImmutableMap;
 import java.util.Collection;
 
 /**
@@ -24,8 +25,19 @@ public interface SummaryReadRepository {
      * day its ticket was raised — the raw material the LLM summarises alongside the aggregated
      * counts.
      *
-     * @param limit maximum number of reasons to return, newest ticket first; keeps a very wide
-     *     window from overflowing the model's context
+     * @param limit maximum number of reasons to return; keeps a very wide window from overflowing
+     *     the model's context. When there are more, the ones returned are spread evenly across the
+     *     window, starting with the newest, rather than the newest alone
+     * @return the reasons, newest ticket first, with how many the scope had before sampling
      */
-    ImmutableList<SummaryReason> reasons(SummaryScope scope, String promptId, Collection<String> channelIds, int limit);
+    SummaryReasons reasons(SummaryScope scope, String promptId, Collection<String> channelIds, int limit);
+
+    /**
+     * The tickets a summary cites, looked up under the same scope as everything else here, so a
+     * ticket that has left the scope (or lost its analysis for the prompt) is simply absent.
+     *
+     * @return the found tickets by id; ids that do not resolve have no entry
+     */
+    ImmutableMap<TicketId, SummaryEvidence> citedTickets(
+            SummaryScope scope, String promptId, Collection<String> channelIds, Collection<TicketId> ticketIds);
 }

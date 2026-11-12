@@ -64,11 +64,13 @@ public record SummaryUI(
 
     /**
      * @param state one of {@code ready}, {@code generating}, {@code unavailable}
-     * @param content the prose, present when ready
+     * @param content the prose as plain text, present when ready
      * @param model the model that produced it, present when ready
      * @param generatedAt when it was produced, present when ready
      * @param progress present while generating
      * @param error present when unavailable
+     * @param segments the prose split into plain runs and cited claims, which concatenate to {@code
+     *     content}; present when ready and the prose cites at least one ticket
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record SummarySectionUI(
@@ -77,7 +79,28 @@ public record SummaryUI(
             @Nullable String model,
             @Nullable Instant generatedAt,
             @Nullable SummaryProgressUI progress,
-            @Nullable String error) {}
+            @Nullable String error,
+            @Nullable List<SummarySegmentUI> segments) {}
+
+    /**
+     * @param text the run's text
+     * @param tickets the tickets behind a cited claim; absent for plain text, and for a claim none of
+     *     whose tickets still resolve
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record SummarySegmentUI(String text, @Nullable List<SummaryEvidenceUI> tickets) {}
+
+    /**
+     * A ticket a claim cites.
+     *
+     * @param ticketId the ticket, as a string to match the rest of the UI's ticket handling
+     * @param text the classifier's one-line reason for the ticket
+     * @param timestamp when the ticket was raised
+     * @param channelId the Slack channel of the thread
+     * @param queryTs the Slack timestamp of the thread's opening message
+     */
+    public record SummaryEvidenceUI(
+            String ticketId, String text, Instant timestamp, String channelId, String queryTs) {}
 
     /**
      * @param phase {@code classifying} while the backfill runs, {@code summarising} while the model

@@ -17,12 +17,15 @@ import static org.jooq.impl.DSL.name;
 import static org.jooq.impl.DSL.noCondition;
 import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.nullif;
+import static org.jooq.impl.DSL.orderBy;
 import static org.jooq.impl.DSL.partitionBy;
 import static org.jooq.impl.DSL.rowNumber;
 import static org.jooq.impl.DSL.selectOne;
 import static org.jooq.impl.DSL.trim;
 
 import com.coreeng.supportbot.dbschema.enums.TicketStatus;
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -35,6 +38,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +48,7 @@ import org.jooq.Field;
 import org.jooq.Record2;
 import org.jooq.Record3;
 import org.jooq.Record4;
-import org.jooq.Result;
+import org.jooq.Records;
 import org.jooq.SelectOnConditionStep;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -179,13 +183,40 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
     }
 
     @Override
-    public ImmutableList<SummaryReason> reasons(
-            SummaryScope scope, String promptId, Collection<String> channelIds, int limit) {
+    public SummaryReasons reasons(SummaryScope scope, String promptId, Collection<String> channelIds, int limit) {
         if (channelIds.isEmpty() || limit <= 0) {
-            return ImmutableList.of();
+            return SummaryReasons.all(ImmutableList.of());
         }
 
-        Result<Record2<Instant, String>> rows = dsl.select(QUERY.DATE, ANALYSIS.SUMMARY)
+        // Labelled as the breakdowns label them, so a reason line names a bucket exactly as the counts do.
+        Field<String> driver = bucketed(ANALYSIS.DRIVER, UNCLASSIFIED_LABEL);
+        Field<String> category = bucketed(ANALYSIS.CATEGORY, UNCLASSIFIED_LABEL);
+        Field<String> feature = bucketed(ANALYSIS.FEATURE, NO_FEATURE_LABEL);
+        Field<String> team = bucketed(TICKET.TEAM, UNKNOWN_TEAM_LABEL);
+
+        // Unqualified names resolve against the derived table, as in breakdown(...).
+        Field<Long> ticketId = field(name("ticket_id"), Long.class);
+        Field<Instant> raisedAt = field(name("raised_at"), Instant.class);
+        Field<String> driverLabel = field(name("driver"), String.class);
+        Field<String> categoryLabel = field(name("category"), String.class);
+        Field<String> featureLabel = field(name("feature"), String.class);
+        Field<String> teamLabel = field(name("team"), String.class);
+        Field<String> reason = field(name("reason"), String.class);
+        Field<Integer> position = field(name("position"), Integer.class);
+        Field<Integer> available = field(name("available"), Integer.class);
+
+        Table<?> numbered = dsl.select(
+                        TICKET.ID.as(ticketId),
+                        QUERY.DATE.as(raisedAt),
+                        driver.as(driverLabel),
+                        category.as(categoryLabel),
+                        feature.as(featureLabel),
+                        team.as(teamLabel),
+                        ANALYSIS.SUMMARY.as(reason),
+                        rowNumber()
+                                .over(orderBy(QUERY.DATE.desc(), TICKET.ID.desc()))
+                                .as(position),
+                        count().over().as(available))
                 .from(QUERY)
                 .join(TICKET)
                 .on(TICKET.QUERY_ID.eq(QUERY.ID))
@@ -193,23 +224,111 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
                 .on(analysisJoin(promptId))
                 .where(inScope(scope, channelIds))
                 .and(trim(ANALYSIS.SUMMARY).ne(""))
-                .orderBy(QUERY.DATE.desc(), TICKET.ID.desc())
+                .asTable("numbered");
+
+        // Every reason when they fit; otherwise `limit` of them spread evenly from newest to oldest, so
+        // a wide window's prose still covers its early weeks. Row p is kept when (p - 1) * limit mod n
+        // < limit: exactly one row in each run of n / limit, starting with the newest. When n <= limit
+        // the remainder is always below n, so every row is kept.
+        List<ReasonRow> rows = dsl.select(
+                        ticketId, raisedAt, driverLabel, categoryLabel, featureLabel, teamLabel, reason, available)
+                .from(numbered)
+                .where(position.minus(inline(1))
+                        .cast(Long.class)
+                        .times(inline((long) limit))
+                        .mod(available.cast(Long.class))
+                        .lt(inline((long) limit)))
+                .orderBy(raisedAt.desc(), ticketId.desc())
                 .limit(limit)
-                .fetch();
+                .fetch(Records.mapping(ReasonRow::new));
 
         ImmutableList.Builder<SummaryReason> reasons = ImmutableList.builderWithExpectedSize(rows.size());
-        for (Record2<Instant, String> row : rows) {
-            Instant raisedAt = row.value1();
-            String text = row.value2();
-            if (raisedAt == null || text == null) {
+        // Every row carries the same count, of the reasons before sampling.
+        int availableReasons = 0;
+        for (ReasonRow row : rows) {
+            Integer rowAvailable = row.available();
+            if (rowAvailable != null) {
+                availableReasons = rowAvailable;
+            }
+            Long id = row.ticketId();
+            Instant at = row.raisedAt();
+            String text = row.reason();
+            if (id == null || at == null || text == null) {
                 continue;
             }
             // The same UTC day the window is expressed in, so a reason never lands outside its window.
-            LocalDate raisedOn = raisedAt.atOffset(ZoneOffset.UTC).toLocalDate();
-            reasons.add(new SummaryReason(raisedOn, text));
+            LocalDate raisedOn = at.atOffset(ZoneOffset.UTC).toLocalDate();
+            reasons.add(new SummaryReason(
+                    new TicketId(id),
+                    raisedOn,
+                    orLabel(row.driver(), UNCLASSIFIED_LABEL),
+                    orLabel(row.category(), UNCLASSIFIED_LABEL),
+                    orLabel(row.feature(), NO_FEATURE_LABEL),
+                    orLabel(row.team(), UNKNOWN_TEAM_LABEL),
+                    text));
         }
-        return reasons.build();
+        ImmutableList<SummaryReason> lines = reasons.build();
+        return new SummaryReasons(lines, Math.max(availableReasons, lines.size()));
     }
+
+    /** One row of {@link #reasons}, as selected; {@code available} counts the scope's reasons before sampling. */
+    private record ReasonRow(
+            @Nullable Long ticketId,
+            @Nullable Instant raisedAt,
+            @Nullable String driver,
+            @Nullable String category,
+            @Nullable String feature,
+            @Nullable String team,
+            @Nullable String reason,
+            @Nullable Integer available) {}
+
+    @Override
+    public ImmutableMap<TicketId, SummaryEvidence> citedTickets(
+            SummaryScope scope, String promptId, Collection<String> channelIds, Collection<TicketId> ticketIds) {
+        if (channelIds.isEmpty() || ticketIds.isEmpty()) {
+            return ImmutableMap.of();
+        }
+
+        List<EvidenceRow> rows = dsl.select(TICKET.ID, ANALYSIS.SUMMARY, QUERY.DATE, QUERY.CHANNEL_ID, QUERY.TS)
+                .from(QUERY)
+                .join(TICKET)
+                .on(TICKET.QUERY_ID.eq(QUERY.ID))
+                .join(ANALYSIS)
+                .on(analysisJoin(promptId))
+                .where(inScope(scope, channelIds))
+                .and(TICKET.ID.in(ticketIds.stream().map(TicketId::id).toList()))
+                .fetch(Records.mapping(EvidenceRow::new));
+
+        Map<TicketId, SummaryEvidence> found = new HashMap<>();
+        for (EvidenceRow row : rows) {
+            Long id = row.ticketId();
+            Instant raisedAt = row.raisedAt();
+            String channelId = row.channelId();
+            String queryTs = row.queryTs();
+            if (id == null || raisedAt == null || channelId == null || queryTs == null) {
+                continue;
+            }
+            TicketId ticket = new TicketId(id);
+            String text = row.reason();
+            found.put(
+                    ticket,
+                    new SummaryEvidence(
+                            ticket,
+                            text == null ? "" : text,
+                            raisedAt,
+                            SlackId.channel(channelId),
+                            MessageTs.of(queryTs)));
+        }
+        return ImmutableMap.copyOf(found);
+    }
+
+    /** One row of {@link #citedTickets}, as selected. */
+    private record EvidenceRow(
+            @Nullable Long ticketId,
+            @Nullable String reason,
+            @Nullable Instant raisedAt,
+            @Nullable String channelId,
+            @Nullable String queryTs) {}
 
     /**
      * @param filter narrows the classified tickets being counted (e.g. to one driver);
@@ -406,6 +525,11 @@ public class JdbcSummaryReadRepository implements SummaryReadRepository {
      */
     private static Field<String> bucketed(TableField<?, String> field, String blankLabel) {
         return coalesce(nullif(trim(field), DSL.inline("")), DSL.inline(blankLabel));
+    }
+
+    /** A bucketed label is never null in SQL, but jOOQ's typed accessor is nullable. */
+    private static String orLabel(@Nullable String value, String blankLabel) {
+        return value == null ? blankLabel : value;
     }
 
     /** An aggregate over an empty result set still yields a row, but jOOQ's typed accessor is nullable. */

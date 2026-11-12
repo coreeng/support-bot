@@ -342,7 +342,7 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
                     current.gapCount() - fingerprint.gapCount(),
                     scope.describe());
         }
-        ImmutableList<SummaryReason> reasons = summaryReadRepository.reasons(
+        SummaryReasons reasons = summaryReadRepository.reasons(
                 scope,
                 classificationPromptId,
                 channelIds,
@@ -352,13 +352,18 @@ public class SummaryRefreshService implements WindowAnalysisRunner {
         if (content.isBlank()) {
             throw new EmptySummaryException();
         }
+        // Only the tickets the model was shown may be cited, so a stored snapshot can never point
+        // outside its scope whatever the model wrote.
+        String cited = SummaryCitations.sanitise(
+                content.strip(),
+                reasons.lines().stream().map(SummaryReason::ticketId).collect(ImmutableSet.toImmutableSet()));
 
         summarySnapshotRepository.upsert(new SummarySnapshot(
                 scope.window(),
                 scope.teamGroupKey(),
                 summaryPromptId,
                 fingerprint.value(),
-                content.strip(),
+                cited,
                 llmSummaryService.modelName(),
                 null));
     }

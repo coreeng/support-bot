@@ -1010,6 +1010,45 @@ describe("SupportSummaryPage", () => {
       expect(screen.queryByTestId("edit-ticket-modal")).not.toBeInTheDocument();
     });
 
+    it("shows the tickets behind a cited claim and opens one in the ticket modal", async () => {
+      mockApi(
+        ok(
+          withSummary({
+            ...readySection,
+            content: "Tenants needed docs on X.",
+            segments: [
+              { text: "Tenants needed " },
+              {
+                text: "docs on X",
+                tickets: [
+                  {
+                    ticketId: "101",
+                    text: "How do I rotate the credentials?",
+                    timestamp: "2026-08-31T09:15:00Z",
+                    channelId: "C1",
+                    queryTs: "1.0001",
+                  },
+                ],
+              },
+              { text: "." },
+            ],
+          })
+        )
+      );
+      renderPage();
+      const card = await findAtAGlance();
+
+      expect(within(card).getByTestId("summary-prose")).toHaveTextContent("Tenants needed docs on X.");
+      fireEvent.click(within(card).getByRole("button", { name: "docs on X" }));
+      const evidence = await screen.findByTestId("summary-evidence");
+      expect(within(evidence).getByText("How do I rotate the credentials?")).toBeInTheDocument();
+
+      fireEvent.click(within(evidence).getByRole("button", { name: "View ticket 101" }));
+
+      expect(screen.getByTestId("edit-ticket-modal")).toHaveTextContent("Ticket modal for 101");
+      expect(screen.queryByTestId("summary-evidence")).not.toBeInTheDocument();
+    });
+
     it("invalidates the summary, ticket list and ticket queries when a ticket is saved", async () => {
       const { invalidateQueries } = renderPage();
       const drivers = await screen.findByTestId("summary-drivers");

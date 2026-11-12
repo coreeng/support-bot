@@ -371,7 +371,7 @@ summary-area:
     patterns: [] # Regexes; every match is removed
     exceptions: [] # Matches to keep, compared case-insensitively
   page: # On whenever llm.provider is not `none`; no switch of its own
-    max-reasons: ${SUMMARY_MAX_REASONS:1000} # Newest per-ticket reasons fed to the summary model; sized for the 92-day window cap
+    max-reasons: ${SUMMARY_MAX_REASONS:1000} # Per-ticket reasons fed to the summary model, spread across the window when there are more; sized for the 92-day window cap
     failure-retry-delay: ${SUMMARY_FAILURE_RETRY_DELAY:15m} # How long a failed refresh is shown before it is retried
   offline-export: # The offline analysis kit served next to the export; independent of llm.*
     analysis-bundle-path: ${OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip} # Zip (or directory to zip on the fly)
@@ -597,9 +597,8 @@ the [Support Summary runbook](../../../docs/runbooks/support-summary.md).
 - **Windows.** Whole UTC calendar days, both ends inclusive. Default: the last 14 days ending
   yesterday (UTC). Maximum: 92 days (about one quarter); `GET /summary` rejects an inverted or
   longer window with `SUMMARY_WINDOW_INVALID`. The cap is there because the window's closed
-  tickets are handed to the model in a single call, bounded by `SUMMARY_MAX_REASONS`, whose
-  default is sized for a quarter at roughly 80 tickets a week. Longer windows need chunked
-  (map-reduce) summarisation, which is a follow-up.
+  tickets are handed to the model in a single call, bounded by `SUMMARY_MAX_REASONS`. Longer
+  windows need chunked (map-reduce) summarisation, which is a follow-up.
 - **Roles.** The page, `GET /summary` and `GET /summary/prompt` are open to `LEADERSHIP` and
   `SUPPORT_ENGINEER`. `GET /summary/enabled` is open to any authenticated user so the sidebar can
   decide whether to show the entry. `/summary` is not support-engineer-only even though serving it
@@ -670,7 +669,7 @@ Set these on the **API**:
 | Variable | Description |
 |----------|-------------|
 | `LLM_PROVIDER` | Turns the page on (any value other than `none`); see [Analysis](#analysis-knowledge-gap-llm) above. |
-| `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons (newest first) included in the report sent to the model, so a very wide window cannot overflow its context. Default `1000`, which covers the 92-day window cap at roughly 80 tickets a week. |
+| `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons included in the report sent to the model, so a very wide window cannot overflow its context. Past the cap, the reasons are a sample spread evenly across the window (newest first), and the report tells the model so; the counts still cover every ticket. Default `1000`. Raising it makes the report larger and the call slower, so check it against `AI_PROXY_TIMEOUT`. |
 | `SUMMARY_FAILURE_RETRY_DELAY` | How long a failed summary refresh is reported as an error before the next visit retries it. A change to the window's data or to the in-use summary prompt retries sooner. Default `15m`. |
 | `TEAM_GROUPS_DISPLAY_NAME` | What the UI calls a [team group](#team-groups), e.g. `Domain` or `Tribe`. Default `Team group`. The attribute groups are built from is set in yaml (`team-groups.attribute`). |
 

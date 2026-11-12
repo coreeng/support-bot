@@ -28,10 +28,31 @@ export interface SummaryProgress {
   totalThreads?: number;
 }
 
+/** A ticket the summary cites for a claim. */
+export interface SummaryEvidenceTicket {
+  ticketId: string;
+  /** The classifier's one-line reason for the ticket. */
+  text: string;
+  timestamp: string;
+  /** The Slack channel and opening-message timestamp of the ticket's thread. */
+  channelId: string;
+  queryTs: string;
+}
+
+/** One run of the prose: plain text, or a claim with the tickets behind it. */
+export interface SummarySegment {
+  text: string;
+  /** Present only for a cited claim. */
+  tickets?: SummaryEvidenceTicket[];
+}
+
 /** The prose section, which carries its own state and never blocks the breakdowns. */
 export interface SummarySection {
   state: "ready" | "generating" | "unavailable";
+  /** The prose as plain text. */
   content?: string;
+  /** The same prose split into runs, present when it cites at least one ticket; they concatenate to `content`. */
+  segments?: SummarySegment[];
   model?: string;
   generatedAt?: string;
   progress?: SummaryProgress;

@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.summary;
 
+import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
@@ -11,8 +12,21 @@ import org.jspecify.annotations.Nullable;
  */
 public sealed interface SummaryState {
 
-    /** A cached summary whose fingerprint still matches the window's data. */
-    record Ready(String content, String model, @Nullable Instant generatedAt) implements SummaryState {}
+    /**
+     * A cached summary whose fingerprint still matches the window's data.
+     *
+     * @param content the prose as plain text, citation markup removed
+     * @param segments the same prose split into plain runs and cited claims; empty when it cites
+     *     nothing, so the page renders {@code content} as it is
+     */
+    record Ready(String content, String model, @Nullable Instant generatedAt, ImmutableList<SummarySegment> segments)
+            implements SummaryState {
+
+        /** A summary with no citations. */
+        public Ready(String content, String model, @Nullable Instant generatedAt) {
+            this(content, model, generatedAt, ImmutableList.of());
+        }
+    }
 
     /**
      * A refresh is running (possibly one started by another visitor, possibly for another window —

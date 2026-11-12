@@ -14,10 +14,13 @@ import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryAreaProps;
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.teamgroups.TeamGroup;
 import com.coreeng.supportbot.teamgroups.TeamGroupService;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import java.time.Clock;
@@ -117,6 +120,51 @@ class SummaryServiceTest {
 
         assertThat(result.summary()).isEqualTo(new SummaryState.Ready("the prose", "model-a", Instant.EPOCH));
         verify(summaryRefresher, never()).start(any());
+    }
+
+    @Test
+    void servesCitedClaimsWithTheirTicketsAndThePlainProseAlongside() {
+        when(summarySnapshotRepository.find(SCOPE, SUMMARY_PROMPT_ID))
+                .thenReturn(new SummarySnapshot(
+                        WINDOW,
+                        "",
+                        SUMMARY_PROMPT_ID,
+                        FINGERPRINT,
+                        "Tenants need [[docs on X|1,2]] and [[help with Y|3]].",
+                        "model-a",
+                        Instant.EPOCH));
+        // Ticket 2 has left the scope since: dropped. Ticket 3 was the only one behind its claim, so
+        // that claim reads as plain text.
+        SummaryEvidence first = evidence(1);
+        when(summaryReadRepository.citedTickets(
+                        SCOPE,
+                        CLASSIFICATION_PROMPT_ID,
+                        List.of(CHANNEL),
+                        ImmutableSet.of(new TicketId(1L), new TicketId(2L), new TicketId(3L))))
+                .thenReturn(ImmutableMap.of(new TicketId(1L), first));
+
+        SummaryState.Ready ready =
+                (SummaryState.Ready) service.get(FROM, TO, null).summary();
+
+        assertThat(ready.content()).isEqualTo("Tenants need docs on X and help with Y.");
+        assertThat(ready.segments())
+                .containsExactly(
+                        new SummarySegment("Tenants need ", ImmutableList.of()),
+                        new SummarySegment("docs on X", ImmutableList.of(first)),
+                        new SummarySegment(" and ", ImmutableList.of()),
+                        new SummarySegment("help with Y", ImmutableList.of()),
+                        new SummarySegment(".", ImmutableList.of()));
+    }
+
+    @Test
+    void proseThatCitesNothingLooksUpNoTickets() {
+        when(summarySnapshotRepository.find(SCOPE, SUMMARY_PROMPT_ID))
+                .thenReturn(new SummarySnapshot(
+                        WINDOW, "", SUMMARY_PROMPT_ID, FINGERPRINT, "the prose", "model-a", Instant.EPOCH));
+
+        assertThat(((SummaryState.Ready) service.get(FROM, TO, null).summary()).segments())
+                .isEmpty();
+        verify(summaryReadRepository, never()).citedTickets(any(), any(), any(), any());
     }
 
     @Test
@@ -316,6 +364,15 @@ class SummaryServiceTest {
 
         assertThat(result.window()).isEqualTo(WINDOW);
         assertThat(result.unclassifiedTickets()).isEqualTo(1);
+    }
+
+    private static SummaryEvidence evidence(long ticketId) {
+        return new SummaryEvidence(
+                new TicketId(ticketId),
+                "Reason " + ticketId + ".",
+                Instant.parse("2026-03-12T09:00:00Z"),
+                SlackId.channel(CHANNEL),
+                MessageTs.of("1.000" + ticketId));
     }
 
     private static SummaryRefreshStatus idle() {

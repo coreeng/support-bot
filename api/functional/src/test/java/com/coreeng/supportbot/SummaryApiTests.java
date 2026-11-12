@@ -2,7 +2,10 @@ package com.coreeng.supportbot;
 
 import static com.coreeng.supportbot.testkit.UserRole.tenant;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,7 +30,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * {@code /summary}, {@code /summary/prompt}, {@code /summary/team-groups} and {@code /summary/enabled},
  * the window and team group validation, the seeded summary prompt, and the visit-triggered refresh
  * (generating → ready) that runs the backfill and the prose generation through the WireMock LLM proxy
- * stub — for the whole window and for a team group.
+ * stub — for the whole window and for a team group — and the prose's cited claims, checked when the
+ * summary is stored and resolved to tickets when it is read.
  */
 @ExtendWith(TestKitExtension.class)
 public class SummaryApiTests {
@@ -44,7 +48,7 @@ public class SummaryApiTests {
     // below are deterministic whatever else the suite has created.
     private static final String FIXED_WINDOW = "?from=2024-01-01&to=2024-01-14";
 
-    // First line of the V38 seed for the in-use `summary` prompt.
+    // First line of every seeded `summary` prompt version (V38, V44), whichever is in use.
     private static final String SEEDED_SUMMARY_PROMPT_TITLE = "Platform Support Demand Summary Prompt";
 
     // The prose the permanent generateContent stub (SlackWiremock) answers with. Seeing it in the
@@ -221,20 +225,7 @@ public class SummaryApiTests {
         // Opening a window that ends today starts a refresh, which classifies the window's closed
         // tickets and so fetches their Slack threads. Stub that, and let the refreshes finish inside
         // the test, so no fetch lands after the stub is gone.
-        slackWiremock.stubFor(post("/api/conversations.replies")
-                .withName("summary team group: thread replies for the window's closed tickets")
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {
-                                    "ok": true,
-                                    "messages": [
-                                        {"type": "message", "text": "Summary team group query", "ts": "1700000000.000100"}
-                                    ],
-                                    "has_more": false
-                                }
-                                """)));
+        stubThreadReplies("summary team group: thread replies for the window's closed tickets");
         try {
             var all = get(SUPPORT_ENGINEER_ROLE, allPath);
             var group = get(SUPPORT_ENGINEER_ROLE, groupPath);
@@ -252,6 +243,66 @@ public class SummaryApiTests {
             // The lock is global: the group's own refresh only starts once the whole window's ends.
             awaitSummarySettled(allPath);
             awaitSummarySettled(groupPath);
+        } finally {
+            slackWiremock.cleanupTestStubs();
+        }
+    }
+
+    @Test
+    void summary_resolvesTheTicketsItsProseCites_andDropsAnyTheModelWasNotShown() {
+        // A newly closed ticket changes the window's fingerprint, so this visit regenerates the prose
+        // while the stub below answers it. Its own window, so no other test's snapshot is reused.
+        closeTicketFor("wow");
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        String path = "/summary?from=" + today.minusDays(29) + "&to=" + today;
+
+        stubThreadReplies("summary citations: thread replies for the window's closed tickets");
+        // Answers only the prose request, ahead of the permanent stub: it cites the report's newest
+        // ticket, read from its first reason line, and a ticket the report never held.
+        slackWiremock.stubFor(post(urlPathMatching("/llm-proxy/v1beta/models/[^/]+:generateContent"))
+                .atPriority(1)
+                .withName("summary citations: prose citing a reported ticket and an unknown one")
+                .withRequestBody(containing("--- BEGIN WINDOW REPORT ---"))
+                .willReturn(okJson("""
+                        {
+                          "candidates": [{
+                            "content": {"role": "model", "parts": [{"text": "Tenants needed [[documentation on X|{{regexExtract request.body '(?<=- #)[0-9]+(?= [|])'}}]] and [[help with Y|999999999]]."}]},
+                            "finishReason": "STOP"
+                          }],
+                          "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1, "totalTokenCount": 2}
+                        }
+                        """)));
+        try {
+            Awaitility.await()
+                    .atMost(Duration.ofSeconds(60))
+                    .pollInterval(Duration.ofSeconds(1))
+                    .untilAsserted(() -> {
+                        var polled = get(SUPPORT_ENGINEER_ROLE, path);
+                        assertThat(polled.statusCode()).isEqualTo(200);
+                        assertThat(polled.jsonPath().getString("summary.state"))
+                                .as("summary section: %s", polled.jsonPath().getMap("summary"))
+                                .isEqualTo("ready");
+                    });
+
+            var summary = get(SUPPORT_ENGINEER_ROLE, path).jsonPath();
+            // The plain prose carries no markup, and the claim citing an unknown ticket reads as plain text.
+            assertThat(summary.getString("summary.content"))
+                    .isEqualTo("Tenants needed documentation on X and help with Y.");
+            assertThat(summary.getList("summary.segments.text", String.class))
+                    .containsExactly("Tenants needed ", "documentation on X", " and help with Y.");
+            assertThat(summary.getList("summary.segments[0].tickets")).isNull();
+            assertThat(summary.getList("summary.segments[2].tickets")).isNull();
+            // The cited ticket resolves with the classifier's reason and its Slack thread.
+            assertThat(summary.getList("summary.segments[1].tickets")).hasSize(1);
+            assertThat(summary.getString("summary.segments[1].tickets[0].ticketId"))
+                    .matches("\\d+");
+            assertThat(summary.getString("summary.segments[1].tickets[0].text")).isEqualTo(STUBBED_LLM_TEXT);
+            assertThat(summary.getString("summary.segments[1].tickets[0].channelId"))
+                    .isNotBlank();
+            assertThat(summary.getString("summary.segments[1].tickets[0].queryTs"))
+                    .isNotBlank();
+            assertThat(summary.getString("summary.segments[1].tickets[0].timestamp"))
+                    .isNotBlank();
         } finally {
             slackWiremock.cleanupTestStubs();
         }
@@ -292,6 +343,24 @@ public class SummaryApiTests {
         var ready = get(SUPPORT_ENGINEER_ROLE, "/summary" + window);
         assertThat(ready.jsonPath().getString("teamGroup.code")).isEqualTo(TEAM_GROUP);
         assertThat(ready.jsonPath().getString("summary.content")).contains(STUBBED_LLM_TEXT);
+    }
+
+    /** Answers the Slack thread fetches a refresh makes while classifying the window's closed tickets. */
+    private void stubThreadReplies(String name) {
+        slackWiremock.stubFor(post("/api/conversations.replies")
+                .withName(name)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {
+                                    "ok": true,
+                                    "messages": [
+                                        {"type": "message", "text": "Summary team group query", "ts": "1700000000.000100"}
+                                    ],
+                                    "has_more": false
+                                }
+                                """)));
     }
 
     private void closeTicketFor(String team) {

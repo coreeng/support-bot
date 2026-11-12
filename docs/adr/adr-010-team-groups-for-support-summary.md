@@ -73,7 +73,8 @@ team-groups:
   versions. A resumed group that no longer exists is refreshed for the whole window.
 - **Prompt unchanged.** The report sent to the model gains one `Scope:` line naming the group and its
   teams; the summary prompt is not versioned, because a new version would orphan every cached
-  snapshot.
+  snapshot. *(Amended by [ADR-011](adr-011-support-summary-evidence.md): summary prompt version 2
+  adds citations and a scope rule.)*
 
 ### Not decided here
 
@@ -105,8 +106,8 @@ team-groups:
 - Renaming a value changes the group's code, so old links fall back to every team and the group's
   narrative is regenerated.
 - Installations whose team provider sets no attributes (the core-platform fetcher) have no groups.
-- The model may still generalise beyond the group despite the `Scope:` line; a scope-aware prompt
-  version is the follow-up if it does.
+- The model may still generalise beyond the group despite the `Scope:` line. *(Addressed by
+  summary prompt version 2, [ADR-011](adr-011-support-summary-evidence.md).)*
 
 ## Alternatives considered
 

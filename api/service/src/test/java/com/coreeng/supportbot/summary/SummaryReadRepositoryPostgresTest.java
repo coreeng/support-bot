@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository;
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.teamgroups.TeamGroup;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
@@ -12,6 +14,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -133,7 +137,8 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(breakdowns.totalTickets()).isEqualTo(1);
         assertThat(breakdowns.classifiedTickets()).isZero();
         assertThat(breakdowns.drivers()).isEmpty();
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100)).isEmpty();
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100).lines())
+                .isEmpty();
     }
 
     @Test
@@ -392,17 +397,122 @@ class SummaryReadRepositoryPostgresTest {
 
     @Test
     void reasonsComeBackNewestFirstWithTheirRaisedDayAndSkipBlanks() {
-        classify(ticket("2026-03-10T09:00:00", "ts-old", "team-a"), "Knowledge Gap", "Build & CI", "ci", "Oldest.");
+        long old = ticket("2026-03-10T09:00:00", "ts-old", "team-a");
+        classify(old, "Knowledge Gap", "Build & CI", "ci", "Oldest.");
         // Late on the 12th in UTC: the day is the window's UTC day, not the session zone's.
-        classify(ticket("2026-03-12T23:30:00", "ts-new", "team-a"), "Knowledge Gap", "Build & CI", "ci", "Newest.");
+        long latest = ticket("2026-03-12T23:30:00", "ts-new", "team-a");
+        classify(latest, "Knowledge Gap", "Build & CI", "ci", "Newest.");
         classify(ticket("2026-03-11T09:00:00", "ts-empty", "team-a"), "Knowledge Gap", "Build & CI", "ci", "   ");
 
-        SummaryReason newest = new SummaryReason(LocalDate.of(2026, 3, 12), "Newest.");
-        SummaryReason oldest = new SummaryReason(LocalDate.of(2026, 3, 10), "Oldest.");
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100)).containsExactly(newest, oldest);
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 1)).containsExactly(newest);
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 0)).isEmpty();
-        assertThat(newest.line()).isEqualTo("2026-03-12 — Newest.");
+        SummaryReason newest = new SummaryReason(
+                new TicketId(latest),
+                LocalDate.of(2026, 3, 12),
+                "Knowledge Gap",
+                "Build & CI",
+                "ci",
+                "team-a",
+                "Newest.");
+        SummaryReason oldest = new SummaryReason(
+                new TicketId(old), LocalDate.of(2026, 3, 10), "Knowledge Gap", "Build & CI", "ci", "team-a", "Oldest.");
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100).lines())
+                .containsExactly(newest, oldest);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 1).lines())
+                .containsExactly(newest);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 0).lines())
+                .isEmpty();
+        // The blank reason was never available, so all of them fitting is not a sample.
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 100))
+                .extracting(SummaryReasons::available, SummaryReasons::sampled)
+                .containsExactly(2, false);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 1))
+                .extracting(SummaryReasons::available, SummaryReasons::sampled)
+                .containsExactly(2, true);
+        assertThat(newest.line())
+                .isEqualTo("#" + latest + " | 2026-03-12 | Knowledge Gap | Build & CI | ci | team-a — Newest.");
+    }
+
+    @Test
+    void reasonsOverTheLimitAreSpreadAcrossTheWindowNotJustTheNewest() {
+        for (int hour = 10; hour <= 15; hour++) {
+            long id = ticket("2026-03-11T" + hour + ":00:00", "ts-" + hour, "team-a");
+            classify(id, "Knowledge Gap", "Build & CI", "ci", "Hour " + hour + ".");
+        }
+
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 3).lines())
+                .extracting(SummaryReason::text)
+                .containsExactly("Hour 15.", "Hour 13.", "Hour 11.");
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 3).available())
+                .isEqualTo(6);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 6).lines())
+                .hasSize(6);
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 4).lines())
+                .extracting(SummaryReason::text)
+                .hasSize(4)
+                .startsWith("Hour 15.");
+    }
+
+    @Test
+    void reasonsLabelTheirClassificationExactlyAsTheBreakdownsDo() {
+        // The model cites tickets for a breakdown value by matching the value on each reason line, so a
+        // blank must read as the same bucket label the counts use, not as an empty field.
+        long blank = ticket("2026-03-11T09:00:00", "ts-blank", null);
+        classify(blank, " Knowledge Gap ", "  ", "", "Reason.");
+
+        SummaryReason reason = repository
+                .reasons(SCOPE, PROMPT_ID, List.of(CHANNEL), 10)
+                .lines()
+                .getFirst();
+        SummaryBreakdowns breakdowns = repository.breakdowns(SCOPE, PROMPT_ID, List.of(CHANNEL));
+
+        assertThat(reason)
+                .extracting(SummaryReason::driver, SummaryReason::category, SummaryReason::feature, SummaryReason::team)
+                .containsExactly("Knowledge Gap", "Unclassified", "None", "Unknown");
+        assertThat(breakdowns.drivers()).extracting(SummaryCount::label).containsExactly(reason.driver());
+        assertThat(breakdowns.categories()).extracting(SummaryCount::label).containsExactly(reason.category());
+        assertThat(breakdowns.features()).extracting(SummaryCount::label).containsExactly(reason.feature());
+        assertThat(breakdowns.teams()).extracting(SummaryCount::label).containsExactly(reason.team());
+    }
+
+    @Test
+    void citedTicketsResolveWithTheirThreadAndReason() {
+        long cited = ticket("2026-03-11T09:00:00", "1710147600.000100", "team-a");
+        classify(cited, "Knowledge Gap", "Build & CI", "ci", "Did not know pipelines existed.");
+
+        assertThat(repository.citedTickets(SCOPE, PROMPT_ID, List.of(CHANNEL), List.of(new TicketId(cited))))
+                .containsExactlyEntriesOf(Map.of(
+                        new TicketId(cited),
+                        new SummaryEvidence(
+                                new TicketId(cited),
+                                "Did not know pipelines existed.",
+                                Instant.parse("2026-03-11T09:00:00Z"),
+                                SlackId.channel(CHANNEL),
+                                MessageTs.of("1710147600.000100"))));
+    }
+
+    @Test
+    void citedTicketsOutsideTheScopeDoNotResolve() {
+        // A snapshot only ever cites tickets its own report held, but the lookup must not lean on
+        // that: a ticket that has since left the scope, or lost its analysis, is simply not found.
+        long inGroup = ticket("2026-03-11T09:00:00", "ts-in", "team-a");
+        long otherTeam = ticket("2026-03-11T10:00:00", "ts-team-c", "team-c");
+        long beforeWindow = ticket("2026-03-09T23:59:59", "ts-before", "team-a");
+        long olderPrompt = ticket("2026-03-11T11:00:00", "ts-stale", "team-a");
+        long unclassified = ticket("2026-03-11T12:00:00", "ts-gap", "team-a");
+        classify(inGroup, "Knowledge Gap", "Build & CI", "ci", "In.");
+        classify(otherTeam, "Knowledge Gap", "Build & CI", "ci", "Other team.");
+        classify(beforeWindow, "Knowledge Gap", "Build & CI", "ci", "Before.");
+        classifyWithPrompt(olderPrompt, "Knowledge Gap", "Build & CI", "ci", "Old.", "an-older-prompt");
+        List<TicketId> all = Stream.of(inGroup, otherTeam, beforeWindow, olderPrompt, unclassified)
+                .map(TicketId::new)
+                .toList();
+
+        assertThat(repository.citedTickets(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL), all))
+                .containsOnlyKeys(new TicketId(inGroup));
+        assertThat(repository.citedTickets(SCOPE, PROMPT_ID, List.of(CHANNEL), all))
+                .containsOnlyKeys(new TicketId(inGroup), new TicketId(otherTeam));
+        assertThat(repository.citedTickets(SCOPE, PROMPT_ID, List.of(), all)).isEmpty();
+        assertThat(repository.citedTickets(SCOPE, PROMPT_ID, List.of(CHANNEL), List.of()))
+                .isEmpty();
     }
 
     @Test
@@ -415,7 +525,7 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(breakdowns.teams()).isEmpty();
         assertThat(repository.fingerprint(SCOPE, PROMPT_ID, List.of()).analysisCount())
                 .isZero();
-        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(), 10)).isEmpty();
+        assertThat(repository.reasons(SCOPE, PROMPT_ID, List.of(), 10).lines()).isEmpty();
     }
 
     @Test
@@ -449,7 +559,9 @@ class SummaryReadRepositoryPostgresTest {
         assertThat(group.teams())
                 .extracting(SummaryCount::label, SummaryCount::count)
                 .containsExactly(tuple("team-a", 1L), tuple("team-b", 1L));
-        assertThat(repository.reasons(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL), 100))
+        assertThat(repository
+                        .reasons(GROUP_SCOPE, PROMPT_ID, List.of(CHANNEL), 100)
+                        .lines())
                 .extracting(SummaryReason::text)
                 .containsExactly("B.", "A.");
 

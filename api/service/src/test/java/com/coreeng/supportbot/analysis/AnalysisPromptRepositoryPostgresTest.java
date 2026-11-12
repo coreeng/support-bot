@@ -53,6 +53,14 @@ class AnalysisPromptRepositoryPostgresTest {
             + " flyway_schema_history and run the migrations again. An older branch's copy of this test deletes"
             + " every classification version above 1.";
 
+    /** The latest summary version a migration seeds (V44); tests reset to it. */
+    private static final int SEEDED_SUMMARY_VERSION = 2;
+
+    /** How to recover a local database whose seeded summary prompt was deleted. */
+    private static final String SUMMARY_RESEED_HINT = "Flyway will not re-seed an applied migration: delete version"
+            + " 44 from flyway_schema_history and run the migrations again. An older branch's copy of this test"
+            + " deletes every summary version above 1.";
+
     private final AnalysisPromptRepository repository;
     private final JdbcTemplate jdbcTemplate;
 
@@ -67,8 +75,8 @@ class AnalysisPromptRepositoryPostgresTest {
 
     /**
      * What the migrations leave in use, checked once before any reset can mask it: classification
-     * version 2 (V43) and summary version 1 (V38). Every reset below re-flags version 2 itself, so
-     * without this a V43 that inserted the row but never switched to it would go unnoticed.
+     * version 2 (V43) and summary version 2 (V44). Every reset below re-flags those versions itself,
+     * so without this a migration that inserted its row but never switched to it would go unnoticed.
      */
     @BeforeAll
     void migrationsLeaveTheSeededVersionsInUse() {
@@ -82,14 +90,16 @@ class AnalysisPromptRepositoryPostgresTest {
 
         assertThat(inUse)
                 .as("prompts in use after the migrations. " + why)
-                .containsExactly("classification v" + SEEDED_VERSION, "summary v1");
+                .containsExactly("classification v" + SEEDED_VERSION, "summary v" + SEEDED_SUMMARY_VERSION);
     }
 
     private boolean seededVersionExists() {
+        return versionExists("classification", SEEDED_VERSION);
+    }
+
+    private boolean versionExists(String type, int version) {
         Integer seeded = jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM analysis_prompt WHERE type = 'classification' AND version = ?",
-                Integer.class,
-                SEEDED_VERSION);
+                "SELECT count(*) FROM analysis_prompt WHERE type = ? AND version = ?", Integer.class, type, version);
         return seeded != null && seeded > 0;
     }
 
@@ -118,8 +128,16 @@ class AnalysisPromptRepositoryPostgresTest {
         jdbcTemplate.update(
                 "UPDATE analysis_prompt SET is_in_use = TRUE WHERE type = 'classification' AND version = ?",
                 SEEDED_VERSION);
-        jdbcTemplate.update("DELETE FROM analysis_prompt WHERE type = 'summary' AND version > 1");
-        jdbcTemplate.update("UPDATE analysis_prompt SET is_in_use = TRUE WHERE type = 'summary' AND version = 1");
+        if (!versionExists("summary", SEEDED_SUMMARY_VERSION)) {
+            throw new IllegalStateException(
+                    "Summary prompt version " + SEEDED_SUMMARY_VERSION + " is missing. " + SUMMARY_RESEED_HINT);
+        }
+        jdbcTemplate.update(
+                "DELETE FROM analysis_prompt WHERE type = 'summary' AND version > ?", SEEDED_SUMMARY_VERSION);
+        jdbcTemplate.update("UPDATE analysis_prompt SET is_in_use = FALSE WHERE type = 'summary'");
+        jdbcTemplate.update(
+                "UPDATE analysis_prompt SET is_in_use = TRUE WHERE type = 'summary' AND version = ?",
+                SEEDED_SUMMARY_VERSION);
     }
 
     @Test
@@ -180,16 +198,25 @@ class AnalysisPromptRepositoryPostgresTest {
 
         assertThat(classification).isNotNull();
         assertThat(summary).isNotNull();
-        assertThat(summary.version()).isEqualTo(1);
+        assertThat(summary.version()).isEqualTo(SEEDED_SUMMARY_VERSION);
         assertThat(summary.content()).isNotEqualTo(classification.content());
     }
 
     @Test
-    void versionsAreScopedPerType() {
-        // Classification version 2 is seeded, so a per-type unique constraint is the only reason this
-        // insert of summary version 2 can coexist with it.
-        insertPrompt(AnalysisPromptType.SUMMARY, 2, "a summary draft", false);
+    void theSeededSummaryPromptAsksForCitations() {
+        AnalysisPrompt summary = repository.findInUse(AnalysisPromptType.SUMMARY);
 
+        assertThat(summary).isNotNull();
+        assertThat(summary.content())
+                .contains("[[phrase|123,456]]")
+                .contains("If the report has a Scope line, write about that group only")
+                .contains("If the Reason lines are a sample");
+    }
+
+    @Test
+    void versionsAreScopedPerType() {
+        // V43 and V44 both seed a version 2, one per type: only a per-type unique constraint lets them
+        // coexist.
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM analysis_prompt WHERE version = 2", Integer.class))
                 .isEqualTo(2);
     }

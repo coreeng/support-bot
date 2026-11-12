@@ -2,13 +2,17 @@ package com.coreeng.supportbot.summary.rest;
 
 import com.coreeng.supportbot.summary.SummaryBreakdowns;
 import com.coreeng.supportbot.summary.SummaryCount;
+import com.coreeng.supportbot.summary.SummaryEvidence;
 import com.coreeng.supportbot.summary.SummaryScope;
+import com.coreeng.supportbot.summary.SummarySegment;
 import com.coreeng.supportbot.summary.SummaryService.SummaryResult;
 import com.coreeng.supportbot.summary.SummaryState;
 import com.coreeng.supportbot.summary.SummaryTicketExample;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryCountUI;
+import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryEvidenceUI;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryProgressUI;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummarySectionUI;
+import com.coreeng.supportbot.summary.rest.SummaryUI.SummarySegmentUI;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryTeamGroupUI;
 import com.coreeng.supportbot.summary.rest.SummaryUI.SummaryTicketUI;
 import com.coreeng.supportbot.teamgroups.TeamGroup;
@@ -73,10 +77,41 @@ public class SummaryMapper {
         return new SummaryTicketUI(String.valueOf(example.ticketId()), example.text(), example.raisedAt());
     }
 
+    private static @Nullable List<SummarySegmentUI> segments(ImmutableList<SummarySegment> segments) {
+        if (segments.isEmpty()) {
+            return null;
+        }
+        return segments.stream()
+                .map(segment -> new SummarySegmentUI(
+                        segment.text(),
+                        segment.evidence().isEmpty()
+                                ? null
+                                : segment.evidence().stream()
+                                        .map(SummaryMapper::evidence)
+                                        .toList()))
+                .toList();
+    }
+
+    private static SummaryEvidenceUI evidence(SummaryEvidence ticket) {
+        return new SummaryEvidenceUI(
+                String.valueOf(ticket.ticketId().id()),
+                ticket.text(),
+                ticket.raisedAt(),
+                ticket.channel().id(),
+                ticket.queryTs().ts());
+    }
+
     private static SummarySectionUI section(SummaryState state) {
         return switch (state) {
             case SummaryState.Ready ready ->
-                new SummarySectionUI("ready", ready.content(), ready.model(), ready.generatedAt(), null, null);
+                new SummarySectionUI(
+                        "ready",
+                        ready.content(),
+                        ready.model(),
+                        ready.generatedAt(),
+                        null,
+                        null,
+                        segments(ready.segments()));
             case SummaryState.Generating generating ->
                 new SummarySectionUI(
                         "generating",
@@ -87,9 +122,10 @@ public class SummaryMapper {
                                 generating.phase().name().toLowerCase(Locale.ROOT),
                                 generating.analysedThreads(),
                                 generating.totalThreads()),
+                        null,
                         null);
             case SummaryState.Unavailable unavailable ->
-                new SummarySectionUI("unavailable", null, null, null, null, unavailable.error());
+                new SummarySectionUI("unavailable", null, null, null, null, unavailable.error(), null);
         };
     }
 }

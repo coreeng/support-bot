@@ -30,8 +30,8 @@ public record SummaryAreaProps(
 
     /**
      * @param maxReasons upper bound on the per-ticket reason lines handed to the LLM, so a very wide
-     *     window cannot overflow the model's context; the default covers the widest allowed window
-     *     (one quarter, {@code SummaryController.MAX_WINDOW_DAYS}) at roughly 80 tickets a week
+     *     window cannot overflow the model's context; past it, the lines are a sample spread across
+     *     the window
      * @param failureRetryDelay how long a failed refresh is reported as an error before the next
      *     visit retries it, when neither the window's data nor the summary prompt has changed in
      *     between

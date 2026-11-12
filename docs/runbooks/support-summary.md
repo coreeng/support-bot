@@ -131,6 +131,33 @@ ALTER TABLE summary_snapshot
     ADD CONSTRAINT summary_snapshot_window_group_prompt_unique UNIQUE (window_from, window_to, team_group, prompt_id);
 ```
 
+## Summary prompt version 2 (V44): cited claims
+
+`V44__summary_prompt_citations.sql` seeds summary prompt version 2 and puts it in use in place of
+version 1. The model now wraps the phrase of each claim as `[[phrase|123,456]]`, naming the tickets
+whose reasons back it, and the page shows those tickets when the phrase is hovered (see
+[ADR-011](../adr/adr-011-support-summary-evidence.md)).
+
+Only the summary prompt changes, so **no ticket is re-classified**. Cached summaries key on the
+summary prompt's `prompt_id`, so each window and team group regenerates its prose once, from its
+existing classifications, the next time it is opened: one LLM call per window visited. Windows
+nobody opens keep their version 1 summary until they are.
+
+Citations are checked before a summary is stored: only tickets whose reasons were in the model's
+report are kept, and a tag that names none, or does not parse, is reduced to its phrase. A summary
+with no usable citation renders as plain prose, exactly as before.
+
+Rolling back to a release from before V44 needs the flags flipped first: the prompt in use is read
+from the table, and an older release would show version 2's `[[...|...]]` markup as raw text.
+Version 1's row and its cached snapshots are unchanged, so they are served again at once.
+
+```sql
+UPDATE analysis_prompt SET is_in_use = FALSE WHERE type = 'summary';
+UPDATE analysis_prompt SET is_in_use = TRUE WHERE type = 'summary' AND version = 1;
+```
+
+Rolling forward again, flip them back to version 2; its snapshots are still cached too.
+
 ## Re-running classification by hand
 
 The page classifies closed tickets in the window that have no analysis for the in-use

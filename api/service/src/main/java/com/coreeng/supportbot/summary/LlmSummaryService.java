@@ -49,22 +49,21 @@ public class LlmSummaryService {
      * @param scope what the summary covers; a team group adds a line saying so, so the model does
      *     not describe the group's tickets as the whole platform's
      * @param breakdowns the scope's aggregated counts
-     * @param reasons per-ticket {@code Reason}s for the scope, each dated
+     * @param reasons per-ticket {@code Reason}s for the scope, each dated, and how many there were
+     *     before sampling
      * @return the generated prose
      */
-    public String generate(
-            String prompt, SummaryScope scope, SummaryBreakdowns breakdowns, ImmutableList<SummaryReason> reasons) {
+    public String generate(String prompt, SummaryScope scope, SummaryBreakdowns breakdowns, SummaryReasons reasons) {
         String report = buildReport(scope.teamGroup(), breakdowns, reasons);
         log.info(
                 "Generating summary for {} ({} tickets, {} reasons)",
                 scope.describe(),
                 breakdowns.totalTickets(),
-                reasons.size());
+                reasons.lines().size());
         return chatModel.chat(prompt + "\n\n--- BEGIN WINDOW REPORT ---\n" + report + "\n--- END WINDOW REPORT ---\n");
     }
 
-    private String buildReport(
-            @Nullable TeamGroup teamGroup, SummaryBreakdowns breakdowns, ImmutableList<SummaryReason> reasons) {
+    private String buildReport(@Nullable TeamGroup teamGroup, SummaryBreakdowns breakdowns, SummaryReasons reasons) {
         StringBuilder report = new StringBuilder(1024);
         report.append("Window: ")
                 .append(breakdowns.window().from())
@@ -99,8 +98,16 @@ public class LlmSummaryService {
         appendCounts(report, "Tenant teams", breakdowns.teams());
         appendCounts(report, "Products (from product tags)", breakdowns.products());
 
-        report.append("\nPer-ticket reasons (").append(reasons.size()).append("):\n");
-        for (SummaryReason reason : reasons) {
+        report.append("\nPer-ticket reasons (").append(reasons.lines().size());
+        // Said outright when the lines are a sample, so the prose weighs themes against the counts
+        // rather than reading the lines as the whole window.
+        if (reasons.sampled()) {
+            report.append(" of ")
+                    .append(reasons.available())
+                    .append(", a sample spread evenly across the window; the counts above cover every ticket");
+        }
+        report.append("):\n");
+        for (SummaryReason reason : reasons.lines()) {
             report.append("- ").append(reason.line()).append('\n');
         }
         return report.toString();
