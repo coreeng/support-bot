@@ -1563,12 +1563,13 @@ export default function HealthPage() {
                       <TableHead>Status</TableHead>
                       <TableHead>Opened At</TableHead>
                       <TableHead>Rated</TableHead>
+                      <TableHead>Link</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedTickets.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAssignmentEnabled ? 7 : 6} className="text-muted-foreground py-8 text-center">
+                        <TableCell colSpan={isAssignmentEnabled ? 8 : 7} className="text-muted-foreground py-8 text-center">
                           <div className="flex flex-col items-center gap-2">
                             <AlertTriangle className="h-6 w-6" />
                             <p className="font-medium">No tickets found</p>
@@ -1618,6 +1619,17 @@ export default function HealthPage() {
                               ) : (
                                 <span className="text-muted-foreground">No</span>
                               )}
+                            </TableCell>
+                            <TableCell>
+                              <a
+                                href={`/api/tickets/${encodeURIComponent(t.id)}/permalink`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-link hover:underline"
+                                aria-label={`Open ticket ${t.id} in Slack`}
+                              >
+                                View
+                              </a>
                             </TableCell>
                           </TableRow>
                         );

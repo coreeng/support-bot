@@ -103,17 +103,17 @@ Given("Dashboard API endpoints are mocked", async function (this: CustomWorld) {
 
   await this.page.route("**/api/dashboard/resolution-time-by-tag*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
-  await this.page.route("**/api/dashboard/avg-escalation-duration-by-tag*", (route) =>
+  await this.page.route("**/api/dashboard/escalation-rate*", (route) =>
+    route.fulfill({ status: 200, body: JSON.stringify({ granularity: "DAY", data: [] }) })
+  );
+
+  await this.page.route("**/api/dashboard/resolution-escalated-vs-not*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
 
-  await this.page.route("**/api/dashboard/escalation-percentage-by-tag*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify([]) })
-  );
+  await this.page.route("**/api/dashboard/escalation-team-scorecard*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
-  await this.page.route("**/api/dashboard/escalation-trends-by-date*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
-
-  await this.page.route("**/api/dashboard/escalations-by-team*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
+  await this.page.route("**/api/dashboard/escalation-topics*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
   await this.page.route("**/api/dashboard/escalations-by-impact*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
@@ -433,7 +433,7 @@ Then("Only {} content should be visible", async function (this: CustomWorld, sec
     const content = this.page.locator("text=Ticket Resolution Durations");
     await expect(content).toBeVisible();
   } else if (sectionName.includes("Escalation")) {
-    const content = this.page.locator("text=Average Escalation Duration");
+    const content = this.page.locator("text=Most-Escalated Topics");
     await expect(content).toBeVisible();
   }
 });

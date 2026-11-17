@@ -2,13 +2,17 @@ package com.coreeng.supportbot.ticket.rest;
 
 import com.coreeng.supportbot.rating.RatingService;
 import com.coreeng.supportbot.rating.RatingTicketNotFoundException;
+import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/ticket")
 @RequiredArgsConstructor
+@Slf4j
 public class TicketController {
     private final TicketQueryService queryService;
     private final TicketUpdateService ticketUpdateService;
@@ -24,6 +29,7 @@ public class TicketController {
     private final RatingService ratingService;
     private final TicketUIMapper mapper;
     private final TicketTeamSuggestionsService teamSuggestionsService;
+    private final SlackClient slackClient;
 
     @GetMapping
     public ResponseEntity<Page<TicketUI>> list(
@@ -70,6 +76,28 @@ public class TicketController {
         }
         String queryText = queryService.fetchQueryText(ticket.ticket());
         return ResponseEntity.ok(mapper.mapToUI(ticket, queryText));
+    }
+
+    /** Resolves the Slack link for the ticket's query on demand, so list views don't pay a Slack call per row. */
+    @GetMapping("/{id}/permalink")
+    public ResponseEntity<Map<String, String>> permalink(@PathVariable TicketId id) {
+        Ticket ticket = queryService.findById(id);
+        if (ticket == null) {
+            return ResponseEntity.notFound().build();
+        }
+        try {
+            String permalink =
+                    slackClient.getPermalink(new SlackGetMessageByTsRequest(ticket.channelId(), ticket.queryTs()));
+            return ResponseEntity.ok(Map.of("permalink", permalink));
+        } catch (Exception ex) {
+            log.atError()
+                    .setCause(ex)
+                    .addKeyValue("ticketId", id)
+                    .addKeyValue("channelId", ticket.channelId())
+                    .addKeyValue("queryTs", ticket.queryTs())
+                    .log("Failed to resolve query permalink from Slack");
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @PatchMapping("/{id}")
