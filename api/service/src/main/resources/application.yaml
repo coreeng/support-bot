@@ -396,6 +396,10 @@ metrics:
   enabled: false
   refresh-interval: 60s
 
+troubleshooting:
+  enabled: ${TROUBLESHOOTING_ENABLED:false}
+  max-thread-chars: ${TROUBLESHOOTING_MAX_THREAD_CHARS:40000}
+
 # LLM configuration, shared by the knowledge-gap analysis run and the Support Summary page (/summary).
 # `provider` is the one switch for both features: `none` (default) turns them off and builds no
 # LLM client; `vertex`, `proxy` or `anthropic` turns them on, all features on the one selected model.

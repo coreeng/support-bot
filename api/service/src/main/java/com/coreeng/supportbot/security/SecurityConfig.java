@@ -53,6 +53,11 @@ public class SecurityConfig {
                         // caller as a 401 — and the UI signs the user out on 401.
                         .dispatcherTypeMatchers(DispatcherType.ERROR)
                         .permitAll()
+                        // An SseEmitter completes on an ASYNC dispatch, which the OncePerRequestFilter
+                        // auth filters also skip. The request was authorised on its REQUEST dispatch;
+                        // without this rule every stream close fails with "response already committed".
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC)
+                        .permitAll()
                         // Public endpoints
                         .requestMatchers("/oauth2/**", "/login/**")
                         .permitAll()
@@ -68,7 +73,7 @@ public class SecurityConfig {
                         // whether to show the nav item, without a 403 for users lacking that role.
                         // Listed ahead of the role-gated rules below so the check keeps working if
                         // one of those is ever widened to a wildcard.
-                        .requestMatchers("/elevate/enabled", "/summary/enabled")
+                        .requestMatchers("/elevate/enabled", "/summary/enabled", "/troubleshooting/enabled")
                         .authenticated()
                         // Dashboards, the Support Summary page, the read-only prompt texts its
                         // View Prompts dialog shows and the team groups its selector lists are open
@@ -92,6 +97,9 @@ public class SecurityConfig {
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Summary data export/import is restricted to support engineers
                         .requestMatchers("/summary-data/**")
+                        .hasAnyRole("SUPPORT_ENGINEER")
+                        // Troubleshooting sessions start paid LLM calls and hold thread content.
+                        .requestMatchers("/troubleshooting/**")
                         .hasAnyRole("SUPPORT_ENGINEER")
                         // Analysis endpoints restricted to support engineers
                         .requestMatchers("/analysis/status", "/analysis/run")

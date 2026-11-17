@@ -211,3 +211,22 @@ ticket_to_tag:
   reviewed:
     - ticket_id
     - tag_code
+
+troubleshooting_session:
+  reviewed:
+    - id
+    - ticket_id
+    - mode
+    - last_seq
+    - created_at
+
+troubleshooting_event:
+  anonymised:
+    - actor
+    - payload
+  reviewed:
+    - id
+    - session_id
+    - seq
+    - type
+    - created_at
