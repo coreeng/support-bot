@@ -67,7 +67,7 @@ Open the Stats page and check:
 1. Weekly ticket count — is volume trending up or down?
 2. First-response SLA distribution — are most tickets getting a response within the target window?
 3. Top escalated tags — are there recurring topics that could be addressed with runbooks or docs?
-4. Escalation rate and the escalation team scorecard: is the share of escalated tickets moving, and where are escalations waiting longest?
+4. Escalation rate and escalations by team: is the share of escalated tickets moving, and where are escalations waiting longest?
 
 ### Escalation trend investigation
 
