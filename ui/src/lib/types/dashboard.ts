@@ -45,24 +45,44 @@ export interface IncomingVsResolvedRate {
   data: IncomingVsResolvedRatePoint[];
 }
 
-export interface EscalationDurationByTag {
-  tag: string;
-  avgDuration: number;
-}
+export type EscalationRateGranularity = "DAY" | "WEEK";
 
-export interface EscalationPercentageByTag {
-  tag: string;
-  count: number;
-}
-
-export interface EscalationTrendsByDate {
+/** Of the tickets opened in a bucket, how many were escalated. `rate` is a fraction in [0, 1]. */
+export interface EscalationRatePoint {
   date: string;
-  escalations: number;
+  tickets: number;
+  escalatedTickets: number;
+  rate: number;
 }
 
-export interface EscalationsByTeam {
-  assigneeName: string;
-  totalEscalations: number;
+export interface EscalationRate {
+  granularity: EscalationRateGranularity;
+  data: EscalationRatePoint[];
+}
+
+/** Resolution percentiles in business seconds for escalated or never-escalated closed tickets. */
+export interface ResolutionByEscalation {
+  escalated: boolean;
+  tickets: number;
+  p50: number;
+  p90: number;
+}
+
+/** Per receiving team. Resolution percentiles are business seconds, null when nothing is resolved yet. */
+export interface EscalationTeamScorecardRow {
+  team: string;
+  escalations: number;
+  open: number;
+  resolutionP50: number | null;
+  resolutionP90: number | null;
+}
+
+/** Escalation tag ranked by total business seconds spent in escalation (resolved escalations only). */
+export interface EscalationTopic {
+  tag: string;
+  escalations: number;
+  avgSeconds: number;
+  totalSeconds: number;
 }
 
 export interface EscalationsByImpact {

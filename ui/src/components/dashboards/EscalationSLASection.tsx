@@ -1,30 +1,47 @@
 // src/components/dashboards/EscalationSLASection.tsx
-import { useRegistry } from "@/lib/hooks";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useEscalationTeams, useRegistry } from "@/lib/hooks";
+import type { EscalationRate, EscalationTeamScorecardRow, EscalationTopic, ResolutionByEscalation } from "@/lib/types/dashboard";
+import { formatDuration } from "@/lib/utils";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { HorizontalBarChart } from "./HorizontalBarChart";
+import { MetricCard } from "./MetricCard";
 import { RefreshButton } from "./RefreshButton";
+import { ResolutionComparison } from "./ResolutionComparison";
 import { TimeSeriesChart } from "./TimeSeriesChart";
 
 interface EscalationSLASectionProps {
-  avgEscalationDurationByTag: { tag: string; avgDuration: number }[] | undefined;
-  escalationPercentageByTag: { tag: string; count: number }[] | undefined;
-  escalationTrendsByDate: { date: string; escalations: number }[] | undefined;
-  escalationsByTeam: { assigneeName: string; totalEscalations: number }[] | undefined;
+  escalationRate: EscalationRate | undefined;
+  resolutionEscalatedVsNot: ResolutionByEscalation[] | undefined;
+  escalationTeamScorecard: EscalationTeamScorecardRow[] | undefined;
+  escalationTopics: EscalationTopic[] | undefined;
   escalationsByImpact: { impactLevel: string; totalEscalations: number }[] | undefined;
   isRefreshing: boolean;
   onRefresh: () => void;
 }
 
+function formatPercent(fraction: number): string {
+  return `${(fraction * 100).toFixed(1)}%`;
+}
+
+function ticketCount(count: number): string {
+  return `${count} ${count === 1 ? "ticket" : "tickets"}`;
+}
+
+function formatOptionalDuration(seconds: number | null | undefined): string {
+  return seconds == null ? "—" : formatDuration(seconds);
+}
+
 export function EscalationSLASection({
-  avgEscalationDurationByTag,
-  escalationPercentageByTag,
-  escalationTrendsByDate,
-  escalationsByTeam,
+  escalationRate,
+  resolutionEscalatedVsNot,
+  escalationTeamScorecard,
+  escalationTopics,
   escalationsByImpact,
   isRefreshing,
   onRefresh,
 }: EscalationSLASectionProps) {
   const { data: registryData } = useRegistry();
+  const { data: escalationTeams } = useEscalationTeams();
 
   const impactLabel = (code?: string) => {
     if (!code) return code;
@@ -32,9 +49,22 @@ export function EscalationSLASection({
     return match?.label || code;
   };
 
+  const teamLabel = (code: string) => escalationTeams?.find((t) => t.name === code)?.label || code;
+
   const mappedEscalationsByImpact = escalationsByImpact?.map((item) => ({
     ...item,
     impactLevelLabel: impactLabel(item.impactLevel) || item.impactLevel,
+  }));
+
+  // Tolerate a non-object payload (e.g. an empty-array mock) as "no data".
+  const ratePoints = Array.isArray(escalationRate?.data) ? escalationRate.data : [];
+  const totalTickets = ratePoints.reduce((sum, p) => sum + p.tickets, 0);
+  const totalEscalated = ratePoints.reduce((sum, p) => sum + p.escalatedTickets, 0);
+  const rateChartData = ratePoints.map((p) => ({
+    week: p.date,
+    rate: Math.round(p.rate * 1000) / 10,
+    tickets: p.tickets,
+    escalatedTickets: p.escalatedTickets,
   }));
 
   return (
@@ -42,45 +72,33 @@ export function EscalationSLASection({
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-foreground text-base font-semibold">Escalation Analysis</h2>
-          <p className="text-muted-foreground text-sm">Track escalation patterns and team performance</p>
+          <p className="text-muted-foreground text-sm">How often tickets escalate, how long escalations take, and where the time goes</p>
         </div>
         <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} />
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <HorizontalBarChart
-          title="Average Escalation Duration by Tag (Top 15)"
-          data={avgEscalationDurationByTag || []}
-          dataKey="avgDuration"
-          yAxisDataKey="tag"
-          color="var(--chart-4)"
-          tooltipFormatter={(value: number) => [value.toFixed(2) + " hours", "Avg Duration"]}
-        />
-
-        <HorizontalBarChart
-          title="Escalation Count by Tag (Top 15)"
-          data={escalationPercentageByTag || []}
-          dataKey="count"
-          yAxisDataKey="tag"
-          color="var(--chart-4)"
+      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <ResolutionComparison data={resolutionEscalatedVsNot} />
+        </div>
+        <MetricCard
+          title="Escalation Rate"
+          value={totalTickets > 0 ? formatPercent(totalEscalated / totalTickets) : "—"}
+          description={`${totalEscalated} of ${ticketCount(totalTickets)} opened in this range ${totalEscalated === 1 ? "was" : "were"} escalated`}
+          colorScheme="orange"
         />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* Escalation Trends */}
         <TimeSeriesChart
-          title="Escalation Trends Over Time"
-          data={escalationTrendsByDate?.map((d) => ({ week: d.date, escalations: d.escalations })) || []}
-          lines={[{ dataKey: "escalations", name: "Escalations", color: "var(--chart-1)" }]}
-          yAxisLabel="Escalations"
-        />
-
-        <HorizontalBarChart
-          title="Escalations by Team (Top 10)"
-          data={escalationsByTeam || []}
-          dataKey="totalEscalations"
-          yAxisDataKey="assigneeName"
-          color="var(--chart-9)"
+          title={`Escalation Rate Over Time (${escalationRate?.granularity === "WEEK" ? "weekly" : "daily"})`}
+          data={rateChartData}
+          lines={[{ dataKey: "rate", name: "Escalation rate", color: "var(--chart-1)" }]}
+          yAxisLabel="% of tickets"
+          tooltipFormatter={(value, name, item) => [
+            `${Number(value).toFixed(1)}% (${item.payload?.escalatedTickets ?? 0} of ${item.payload?.tickets ?? 0})`,
+            name,
+          ]}
         />
 
         {/* Escalations by Impact */}
@@ -119,6 +137,92 @@ export function EscalationSLASection({
           ) : (
             <p className="text-muted-foreground">No data available</p>
           )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        <div className="bg-card rounded-xl border p-6">
+          <h2 className="text-foreground text-base font-semibold">Escalations by Team</h2>
+          <p className="text-muted-foreground mb-4 text-sm">
+            Escalations opened in this range, by receiving team. Resolution counts resolved escalations only.
+          </p>
+          <div className="overflow-hidden rounded-lg border">
+            <Table>
+              <TableHeader className="bg-muted">
+                <TableRow>
+                  <TableHead>Team</TableHead>
+                  <TableHead className="text-right">Escalations</TableHead>
+                  <TableHead className="text-right">Open</TableHead>
+                  <TableHead className="text-right">Resolution P50</TableHead>
+                  <TableHead className="text-right">Resolution P90</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {escalationTeamScorecard && escalationTeamScorecard.length > 0 ? (
+                  escalationTeamScorecard.map((row) => (
+                    <TableRow key={row.team}>
+                      <TableCell className="text-foreground">{teamLabel(row.team)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums">{row.escalations}</TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums">{row.open}</TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums">
+                        {formatOptionalDuration(row.resolutionP50)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums">
+                        {formatOptionalDuration(row.resolutionP90)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-muted-foreground p-16 text-center text-sm">
+                      No escalations in this range
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        <div className="bg-card rounded-xl border p-6">
+          <h2 className="text-foreground text-base font-semibold">Most-Escalated Topics</h2>
+          <p className="text-muted-foreground mb-4 text-sm">
+            Escalation tags ranked by total time spent in escalation (count × average), resolved escalations only.
+          </p>
+          <div className="overflow-hidden rounded-lg border">
+            <Table>
+              <TableHeader className="bg-muted">
+                <TableRow>
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead>Tag</TableHead>
+                  <TableHead className="text-right">Escalations</TableHead>
+                  <TableHead className="text-right">Avg Time</TableHead>
+                  <TableHead className="text-right">Total Time</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {escalationTopics && escalationTopics.length > 0 ? (
+                  escalationTopics.map((topic, index) => (
+                    <TableRow key={topic.tag}>
+                      <TableCell className="text-muted-foreground font-mono text-sm tabular-nums">{index + 1}</TableCell>
+                      <TableCell className="text-foreground">{topic.tag}</TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums">{topic.escalations}</TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums">{formatDuration(topic.avgSeconds)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm font-semibold tabular-nums">
+                        {formatDuration(topic.totalSeconds)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-muted-foreground p-16 text-center text-sm">
+                      No resolved, tagged escalations in this range
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
     </div>

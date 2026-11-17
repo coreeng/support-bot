@@ -5,14 +5,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getDateRangeFromFilter, PRESET_DAYS } from "@/lib/dateRange";
 import {
-  useAvgEscalationDurationByTag,
-  useEscalationPercentageByTag,
+  useEscalationRate,
   useEscalationsByImpact,
-  useEscalationsByTeam,
-  useEscalationTrendsByDate,
+  useEscalationTeamScorecard,
+  useEscalationTopics,
   useFirstResponseDurationDistribution,
   useFirstResponsePercentiles,
   useIncomingVsResolvedRate,
+  useResolutionEscalatedVsNot,
   useResolutionTimeByTag,
   useResolutionTimesByWeek,
   useTicketResolutionDurationDistribution,
@@ -144,33 +144,34 @@ export default function DashboardsPage() {
     isFetching: isFetchingIncomingVsResolved,
   } = useIncomingVsResolvedRate(activeSection === "resolution" && isDateRangeValid, dateRange.from, dateRange.to, { granularity: "AUTO" });
 
+  const isEscalationActive = activeSection === "escalation" && isDateRangeValid;
   const {
-    data: avgEscalationDurationByTag,
-    refetch: refetchAvgEscDuration,
-    isFetching: isFetchingAvgEsc,
-  } = useAvgEscalationDurationByTag(activeSection === "escalation" && isDateRangeValid, dateRange.from, dateRange.to);
+    data: escalationRate,
+    refetch: refetchEscRate,
+    isFetching: isFetchingEscRate,
+  } = useEscalationRate(isEscalationActive, dateRange.from, dateRange.to);
   const {
-    data: escalationPercentageByTag,
-    refetch: refetchEscPercentage,
-    isFetching: isFetchingEscPerc,
-  } = useEscalationPercentageByTag(activeSection === "escalation" && isDateRangeValid, dateRange.from, dateRange.to);
+    data: resolutionEscalatedVsNot,
+    refetch: refetchResEscVsNot,
+    isFetching: isFetchingResEscVsNot,
+  } = useResolutionEscalatedVsNot(isEscalationActive, dateRange.from, dateRange.to);
   const {
-    data: escalationTrendsByDate,
-    refetch: refetchEscTrends,
-    isFetching: isFetchingEscTrends,
-  } = useEscalationTrendsByDate(activeSection === "escalation" && isDateRangeValid, dateRange.from, dateRange.to);
+    data: escalationTeamScorecard,
+    refetch: refetchEscScorecard,
+    isFetching: isFetchingEscScorecard,
+  } = useEscalationTeamScorecard(isEscalationActive, dateRange.from, dateRange.to);
   const {
-    data: escalationsByTeam,
-    refetch: refetchEscByTeam,
-    isFetching: isFetchingEscTeam,
-  } = useEscalationsByTeam(activeSection === "escalation" && isDateRangeValid, dateRange.from, dateRange.to);
+    data: escalationTopics,
+    refetch: refetchEscTopics,
+    isFetching: isFetchingEscTopics,
+  } = useEscalationTopics(isEscalationActive, dateRange.from, dateRange.to);
   const {
     data: escalationsByImpact,
     refetch: refetchEscByImpact,
     isFetching: isFetchingEscImpact,
-  } = useEscalationsByImpact(activeSection === "escalation" && isDateRangeValid, dateRange.from, dateRange.to);
+  } = useEscalationsByImpact(isEscalationActive, dateRange.from, dateRange.to);
   const isRefreshingEscalationSla =
-    isFetchingAvgEsc || isFetchingEscPerc || isFetchingEscTrends || isFetchingEscTeam || isFetchingEscImpact;
+    isFetchingEscRate || isFetchingResEscVsNot || isFetchingEscScorecard || isFetchingEscTopics || isFetchingEscImpact;
 
   // Weekly SLA Trends - only load when section is active
   const {
@@ -304,17 +305,17 @@ export default function DashboardsPage() {
 
           {activeSection === "escalation" && (
             <EscalationSLASection
-              avgEscalationDurationByTag={avgEscalationDurationByTag}
-              escalationPercentageByTag={escalationPercentageByTag}
-              escalationTrendsByDate={escalationTrendsByDate}
-              escalationsByTeam={escalationsByTeam}
+              escalationRate={escalationRate}
+              resolutionEscalatedVsNot={resolutionEscalatedVsNot}
+              escalationTeamScorecard={escalationTeamScorecard}
+              escalationTopics={escalationTopics}
               escalationsByImpact={escalationsByImpact}
               isRefreshing={isRefreshingEscalationSla}
               onRefresh={() => {
-                refetchAvgEscDuration();
-                refetchEscPercentage();
-                refetchEscTrends();
-                refetchEscByTeam();
+                refetchEscRate();
+                refetchResEscVsNot();
+                refetchEscScorecard();
+                refetchEscTopics();
                 refetchEscByImpact();
               }}
             />

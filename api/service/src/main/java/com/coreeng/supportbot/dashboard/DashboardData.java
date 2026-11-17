@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.dashboard;
 
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /** Transport-neutral result types returned by dashboard analytics queries. */
 public final class DashboardData {
@@ -30,13 +31,44 @@ public final class DashboardData {
         }
     }
 
-    public record TagDuration(String tag, double avgDuration) {}
-
     public record TagCount(String tag, long count) {}
 
-    public record DateEscalations(String date, long escalations) {}
+    public enum EscalationRateGranularity {
+        DAY,
+        WEEK
+    }
 
-    public record TeamEscalations(String assigneeName, long totalEscalations) {}
+    /**
+     * Share of the tickets opened in a bucket that were escalated at least once. {@code rate} is a fraction in
+     * [0, 1] and is zero when the bucket has no tickets.
+     */
+    public record EscalationRatePoint(String date, long tickets, long escalatedTickets, double rate) {}
+
+    public record EscalationRate(EscalationRateGranularity granularity, List<EscalationRatePoint> data) {
+        public EscalationRate {
+            data = List.copyOf(data);
+        }
+    }
+
+    /** Ticket resolution percentiles (business seconds) for escalated or never-escalated closed tickets. */
+    public record ResolutionByEscalation(boolean escalated, long tickets, double p50, double p90) {}
+
+    /**
+     * Per receiving team: escalations opened in the window, how many of those are still open, and resolution
+     * percentiles (business seconds, resolved escalations only; null when none are resolved yet).
+     */
+    public record TeamScorecard(
+            String team,
+            long escalations,
+            long open,
+            @Nullable Double resolutionP50,
+            @Nullable Double resolutionP90) {}
+
+    /**
+     * Escalation tag ranked by total business time spent in escalation ({@code escalations × avgSeconds}),
+     * resolved escalations only.
+     */
+    public record EscalationTopic(String tag, long escalations, double avgSeconds, double totalSeconds) {}
 
     public record ImpactEscalations(String impactLevel, long totalEscalations) {}
 

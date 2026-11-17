@@ -710,6 +710,24 @@ describe("HealthPage", () => {
     });
   });
 
+  describe("Ticket Workbench Link", () => {
+    it("links each ticket to its Slack thread via the permalink route", () => {
+      mockUseTickets.mockReturnValue({
+        data: { content: [createMockTicket("42", "opened", "Team A", false)], page: 0, totalPages: 1, totalElements: 1 },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useTickets>);
+      setMockUrlParamsInitial({ tab: "workbench" });
+
+      render(<HealthPage />, { wrapper: Wrapper });
+
+      const link = screen.getByRole("link", { name: "Open ticket 42 in Slack" });
+      expect(link).toHaveAttribute("href", "/api/tickets/42/permalink");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    });
+  });
+
   describe("Date Filter - Custom Range Logic", () => {
     beforeEach(() => {
       mockUseTickets.mockReturnValue({
