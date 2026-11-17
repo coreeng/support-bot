@@ -12,13 +12,13 @@ FROM ghcr.io/dexidp/dex:${DEX_BASE_TAG}
 
 USER root
 RUN apk add --no-cache \
-    alpine-release=3.24.3-r0 \
+    alpine-release=3.24.4-r0 \
     ca-certificates-bundle=20261020-r0 \
     libcrypto3=3.5.9-r0 \
     libssl3=3.5.9-r0 \
     musl=1.2.6-r3 \
     musl-utils=1.2.6-r3 \
-    zlib=1.3.2-r1
+    zlib=1.4-r0
 
 COPY --from=gomplate /gomplate /usr/local/bin/gomplate
 
