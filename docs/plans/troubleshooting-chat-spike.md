@@ -428,3 +428,37 @@ Only what the code cannot answer. Each has a recommended answer.
 - **assistant-ui.** Next.js 16 and Tailwind 4 support is not stated in the docs. Not confirmed: whether custom metadata reaches the rendered message, whether plain `convertMessage` merges adjacent assistant messages, how `system` messages render, how the composer behaves while `isRunning` is true. The docs were read through a summarising fetch tool, so check names against the installed package's types. The old `/docs/getting-started` address returns 404.
 - **Prices.** Taken from a cached price list, not from the live pricing page.
 - **Local environment.** `.env.local` files were not opened. Whether test-bypass works with the local setup is assumed from the code.
+
+## 7. Spike results
+
+Built on 2026-11-18 against `claude-sonnet-5-5`. Everything below was run, in headless Chromium and with `curl`, not in a person's browser.
+
+### Day-1 checkpoint: yes, assistant-ui stays
+
+| # | Criterion | Result | Evidence |
+|---|-----------|--------|----------|
+| 1 | Order and reload | Yes | Two pages and a reloaded page show the same `seq` list, against the stub and the service. |
+| 2 | Items stay separate | Yes | `convertMessage` maps one event to one message; joining only happens in `useExternalMessageConverter`, which is not used. |
+| 3 | Cards as message parts | Yes | `data-*` parts rendered through `MessagePrimitive.Parts` `data.by_name`; Approve, Edit, Reject work from either page. |
+| 4 | Authors told apart | Yes | The event rides in `metadata.custom` and is read with `useAuiState`; the role only picks the layout. |
+| 5 | Typing while busy | Yes, one workaround | With `isRunning: true` the composer refuses to send unless a queue adapter is wired. `isRunning` stays `false`; busy comes from `ROUTER_STATUS` and is shown outside the runtime. Minutes, not hours. |
+| 6 | No duplicates or jumps | Yes | Events merge by `seq`; messages are keyed by id, so an existing node is kept (Jest asserts the same DOM node); scroll position holds while reading history and follows at the bottom. |
+| 7 | One package, tokens only | Yes, with costs | Only `@assistant-ui/react` is a direct dependency. It brings a second `radix-ui` (1.8.x) and is ESM only, so Jest needed a transform allow-list and a jsdom shim for web streams and `Response`. |
+
+### Numbers
+
+- 14 router turns: 20,265 input and 4,520 output tokens in total, about $0.086 at $2/$10 per million. Per turn 1,000 to 2,700 input tokens, 139 to 544 output tokens, about $0.002 to $0.011.
+- Latency: median 3.9 s, range 2.3 to 7.2 s. Under the 10 s and 5 cent bar from section 5.
+- Two messages sent within a second produced one turn when the running turn had already read them, and one more turn when they arrived after it read the log.
+
+### Changes from the plan
+
+- The executor is a `TroubleshootingExecutor` type, not an `ExecutorService` bean: a second `ExecutorService` bean made other unqualified injections ambiguous and stopped the service.
+- A turn request carries the `seq` that asked for it, so a running turn that already read it does not cause another paid turn.
+- Not built: live Slack replies (cut-list item 1), mode switching. The bad-output path is covered by unit tests only.
+
+### For ADR-012
+
+- The stream needs the ASYNC dispatcher rule and a keep-alive; both work through the Next.js route in dev and in a production build.
+- The router declined an injected "close this ticket" Slack message and told the engineers about it. It also refused to treat canned run output as evidence.
+- Erasure of session data is still open: `actor` and `payload` are listed as anonymised but nothing erases them.
