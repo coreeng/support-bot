@@ -92,6 +92,7 @@ class ProxyChatModelContractTest {
                 Duration.ofMillis(1),
                 new LlmProps.Vertex("", ""),
                 new LlmProps.Proxy(BASE_URL, new LlmProps.Proxy.Auth(BASE64_TOKEN), timeout),
+                new LlmProps.Anthropic("", "", Duration.ofSeconds(60), 16000),
                 new LlmProps.Stub(false));
         return new LlmConfig().proxyChatModel(llmProps, httpClientBuilder);
     }

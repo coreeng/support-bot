@@ -23,13 +23,24 @@ public record LlmProps(
         @DefaultValue("500ms") Duration requestDelay,
         @DefaultValue Vertex vertex,
         @DefaultValue Proxy proxy,
+        @DefaultValue Anthropic anthropic,
         @DefaultValue Stub stub) {
+
+    static final String DEFAULT_GEMINI_MODEL_NAME = "gemini-2.5-flash";
 
     public LlmProps {
         modelName = modelName.trim();
+        // No default for anthropic: a Gemini name would only fail at the first call, not at startup.
+        if (modelName.isEmpty()) {
+            modelName = switch (provider) {
+                case VERTEX, PROXY, STUB -> DEFAULT_GEMINI_MODEL_NAME;
+                case NONE, ANTHROPIC -> "";
+            };
+        }
         if (provider != LlmProvider.NONE) {
             if (modelName.isEmpty()) {
-                throw new IllegalArgumentException("llm.model-name must not be blank");
+                throw new IllegalArgumentException("llm.model-name is required when llm.provider="
+                        + provider.name().toLowerCase(Locale.ROOT));
             }
             if (requestDelay.isNegative()) {
                 throw new IllegalArgumentException("llm.request-delay must not be negative");
@@ -37,6 +48,7 @@ public record LlmProps(
             switch (provider) {
                 case VERTEX -> vertex.validate();
                 case PROXY -> proxy.validate();
+                case ANTHROPIC -> anthropic.validate();
                 case STUB -> stub.validate();
                 case NONE -> throw new AssertionError("unreachable");
             }
@@ -81,10 +93,7 @@ public record LlmProps(
                 throw new IllegalArgumentException("llm.proxy.base-url is required when llm.provider=proxy"
                         + " (full URL including the /v1beta suffix)");
             }
-            URI baseUri = validateHttpUrl("llm.proxy.base-url", baseUrl);
-            if (baseUri.getQuery() != null || baseUri.getFragment() != null) {
-                throw new IllegalArgumentException("llm.proxy.base-url must not contain a query or fragment");
-            }
+            validateBaseUrl("llm.proxy.base-url", baseUrl);
             auth.validate();
             if (timeout.isZero() || timeout.isNegative()) {
                 throw new IllegalArgumentException("llm.proxy.timeout must be positive");
@@ -97,24 +106,6 @@ public record LlmProps(
                 normalized = normalized.substring(0, normalized.length() - 1);
             }
             return normalized;
-        }
-
-        private static URI validateHttpUrl(String propertyName, String value) {
-            try {
-                URI uri = new URI(value);
-                String scheme = uri.getScheme();
-                if (!uri.isAbsolute()
-                        || uri.getHost() == null
-                        || uri.getUserInfo() != null
-                        || scheme == null
-                        || !(scheme.toLowerCase(Locale.ROOT).equals("http")
-                                || scheme.toLowerCase(Locale.ROOT).equals("https"))) {
-                    throw new IllegalArgumentException(propertyName + " must be an absolute HTTP(S) URL");
-                }
-                return uri;
-            } catch (URISyntaxException e) {
-                throw new IllegalArgumentException(propertyName + " must be an absolute HTTP(S) URL", e);
-            }
         }
 
         public record Auth(@DefaultValue("") String basicAuthToken) {
@@ -140,6 +131,60 @@ public record LlmProps(
             public String toString() {
                 return "Auth[basicAuthToken=<redacted>]";
             }
+        }
+    }
+
+    public record Anthropic(
+            @DefaultValue("") String apiKey,
+            @DefaultValue("") String baseUrl,
+            @DefaultValue("60s") Duration timeout,
+            @DefaultValue("16000") int maxTokens) {
+
+        public Anthropic {
+            apiKey = apiKey.trim();
+            baseUrl = baseUrl.trim();
+        }
+
+        void validate() {
+            if (apiKey.isEmpty()) {
+                throw new IllegalArgumentException("llm.anthropic.api-key is required when llm.provider=anthropic");
+            }
+            if (!baseUrl.isEmpty()) {
+                validateBaseUrl("llm.anthropic.base-url", baseUrl);
+            }
+            if (timeout.isZero() || timeout.isNegative()) {
+                throw new IllegalArgumentException("llm.anthropic.timeout must be positive");
+            }
+            if (maxTokens <= 0) {
+                throw new IllegalArgumentException("llm.anthropic.max-tokens must be positive");
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "Anthropic[apiKey=<redacted>, baseUrl=" + baseUrl + ", timeout=" + timeout + ", maxTokens="
+                    + maxTokens + "]";
+        }
+    }
+
+    private static void validateBaseUrl(String propertyName, String value) {
+        URI uri;
+        try {
+            uri = new URI(value);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(propertyName + " must be an absolute HTTP(S) URL", e);
+        }
+        String scheme = uri.getScheme();
+        if (!uri.isAbsolute()
+                || uri.getHost() == null
+                || uri.getUserInfo() != null
+                || scheme == null
+                || !(scheme.toLowerCase(Locale.ROOT).equals("http")
+                        || scheme.toLowerCase(Locale.ROOT).equals("https"))) {
+            throw new IllegalArgumentException(propertyName + " must be an absolute HTTP(S) URL");
+        }
+        if (uri.getQuery() != null || uri.getFragment() != null) {
+            throw new IllegalArgumentException(propertyName + " must not contain a query or fragment");
         }
     }
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.config.LlmProps;
 import com.coreeng.supportbot.config.LlmProvider;
+import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.model.vertexai.gemini.VertexAiGeminiChatModel;
@@ -93,6 +94,34 @@ class LlmConfigTest {
     }
 
     @Test
+    void createsOnlyAnthropicModelWhenAnthropicSelected() {
+        // Vertex and proxy settings deliberately absent: anthropic mode must not need them.
+        contextRunner
+                .withPropertyValues(anthropicProperties())
+                .withPropertyValues("llm.provider=anthropic")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ChatModel.class);
+                    assertThat(context.getBean(ChatModel.class)).isInstanceOf(AnthropicChatModel.class);
+                    assertThat(context.getBean(ChatModel.class)
+                                    .defaultRequestParameters()
+                                    .modelName())
+                            .isEqualTo("claude-opus-5-5");
+                });
+    }
+
+    @Test
+    void failsStartupWhenAnthropicModeMissingModelName() {
+        contextRunner
+                .withPropertyValues("llm.provider=anthropic", "llm.anthropic.api-key=test-anthropic-key")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .rootCause()
+                            .hasMessageContaining("llm.model-name is required when llm.provider=anthropic");
+                });
+    }
+
+    @Test
     void failsStartupWhenProxyModeMissingBaseUrl() {
         contextRunner
                 .withPropertyValues(
@@ -126,7 +155,7 @@ class LlmConfigTest {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .rootCause()
-                            .hasMessageContaining("llm.provider must be one of none, vertex, proxy, stub")
+                            .hasMessageContaining("llm.provider must be one of none, vertex, proxy, anthropic, stub")
                             .hasMessageContaining("vertexai");
                 });
     }
@@ -167,6 +196,10 @@ class LlmConfigTest {
         return new String[] {
             "llm.model-name=gemini-2.5-flash", "llm.vertex.project-id=test-project", "llm.vertex.location=europe-west2"
         };
+    }
+
+    private static String[] anthropicProperties() {
+        return new String[] {"llm.model-name=claude-opus-5-5", "llm.anthropic.api-key=test-anthropic-key"};
     }
 
     private static String[] proxyProperties() {

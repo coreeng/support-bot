@@ -3,6 +3,7 @@ package com.coreeng.supportbot.analysis.llm;
 import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
 import com.coreeng.supportbot.config.LlmProps;
 import dev.langchain4j.http.client.HttpClientBuilder;
+import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.model.vertexai.gemini.VertexAiGeminiChatModel;
@@ -79,6 +80,35 @@ public class LlmConfig {
                 .customHeaders(
                         Map.of("Authorization", "Basic " + llm.proxy().auth().basicAuthToken()))
                 .timeout(llm.proxy().timeout());
+        if (httpClientBuilder != null) {
+            builder.httpClientBuilder(httpClientBuilder);
+        }
+        return builder.build();
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "llm.provider", havingValue = "anthropic")
+    public ChatModel anthropicChatModel(LlmProps llm) {
+        return anthropicChatModel(llm, null);
+    }
+
+    ChatModel anthropicChatModel(LlmProps llm, @Nullable HttpClientBuilder httpClientBuilder) {
+        LlmProps.Anthropic anthropic = llm.anthropic();
+        log.info(
+                "Configuring Anthropic model: baseUrl={}, model={}, timeout={}, maxTokens={}",
+                anthropic.baseUrl().isEmpty() ? "<default>" : anthropic.baseUrl(),
+                llm.modelName(),
+                anthropic.timeout(),
+                anthropic.maxTokens());
+
+        var builder = AnthropicChatModel.builder()
+                .apiKey(anthropic.apiKey())
+                .modelName(llm.modelName())
+                .maxTokens(anthropic.maxTokens())
+                .timeout(anthropic.timeout());
+        if (!anthropic.baseUrl().isEmpty()) {
+            builder.baseUrl(anthropic.baseUrl());
+        }
         if (httpClientBuilder != null) {
             builder.httpClientBuilder(httpClientBuilder);
         }

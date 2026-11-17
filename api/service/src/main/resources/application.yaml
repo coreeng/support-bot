@@ -398,12 +398,13 @@ metrics:
 
 # LLM configuration, shared by the knowledge-gap analysis run and the Support Summary page (/summary).
 # `provider` is the one switch for both features: `none` (default) turns them off and builds no
-# LLM client; `vertex` or `proxy` turns them on. Only the selected provider's settings are validated.
+# LLM client; `vertex`, `proxy` or `anthropic` turns them on, all features on the one selected model.
+# Only the selected provider's settings are validated.
 # `stub` is a local-development provider (canned, synthetic output) that additionally needs
 # llm.stub.acknowledge-synthetic-data=true; that key is deliberately absent here.
 llm:
-  provider: ${LLM_PROVIDER:none} # none | vertex | proxy | stub
-  model-name: ${LLM_MODEL_NAME:gemini-2.5-flash}
+  provider: ${LLM_PROVIDER:none} # none | vertex | proxy | anthropic | stub
+  model-name: ${LLM_MODEL_NAME:} # Empty means gemini-2.5-flash for vertex/proxy; required for anthropic
   request-delay: ${LLM_REQUEST_DELAY:500ms}
   vertex:
     project-id: ${VERTEX_PROJECT_ID:support-bot-cecg-efb3c84c}
@@ -413,6 +414,11 @@ llm:
     auth:
       basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:}
     timeout: ${AI_PROXY_TIMEOUT:20s}
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:}
+    base-url: ${ANTHROPIC_BASE_URL:} # Empty means the Claude API's default endpoint
+    timeout: ${ANTHROPIC_TIMEOUT:60s}
+    max-tokens: ${ANTHROPIC_MAX_TOKENS:16000}
 
 # Support Summary area: the /summary page and the /summary-data thread export.
 summary-area:

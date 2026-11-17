@@ -211,6 +211,7 @@ class StubChatModelTest {
                 Duration.ofMillis(1),
                 new LlmProps.Vertex("", ""),
                 new LlmProps.Proxy("", new LlmProps.Proxy.Auth(""), Duration.ofSeconds(30)),
+                new LlmProps.Anthropic("", "", Duration.ofSeconds(60), 16000),
                 new LlmProps.Stub(true));
     }
 

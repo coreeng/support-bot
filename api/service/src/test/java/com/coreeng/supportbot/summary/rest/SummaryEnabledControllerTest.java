@@ -38,6 +38,7 @@ class SummaryEnabledControllerTest {
                 Duration.ofMillis(100),
                 new LlmProps.Vertex("test-project", "europe-west2"),
                 new LlmProps.Proxy("", new LlmProps.Proxy.Auth(""), Duration.ofSeconds(30)),
+                new LlmProps.Anthropic("", "", Duration.ofSeconds(60), 16000),
                 new LlmProps.Stub(false)));
     }
 }

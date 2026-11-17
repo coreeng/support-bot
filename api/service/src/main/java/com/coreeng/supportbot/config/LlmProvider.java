@@ -12,6 +12,8 @@ public enum LlmProvider {
     VERTEX,
     /** An internal LLM proxy speaking the native Gemini REST API, authenticated with Basic auth. */
     PROXY,
+    /** The Claude API, authenticated with an API key. Needs an explicit {@code llm.model-name}. */
+    ANTHROPIC,
     /**
      * Local development only: canned deterministic responses that write synthetic data. Also needs
      * {@code llm.stub.acknowledge-synthetic-data=true}; see {@link LlmProps.Stub}.

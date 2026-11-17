@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -15,6 +16,7 @@ import org.springframework.boot.context.properties.source.MapConfigurationProper
 class LlmPropsTest {
 
     private static final String BASE64_TOKEN = "dXNlcjpwYXNz";
+    private static final String ANTHROPIC_KEY = "test-anthropic-key";
     private static final String STUB_GUARD = "llm.provider=stub also requires llm.stub.acknowledge-synthetic-data=true:"
             + " the stub LLM provider writes synthetic rows into analysis and summary_snapshot,"
             + " is for local development only and must never be enabled against a shared database";
@@ -31,6 +33,10 @@ class LlmPropsTest {
         assertThat(props.vertex().projectId()).isEmpty();
         assertThat(props.proxy().baseUrl()).isEmpty();
         assertThat(props.proxy().timeout()).isEqualTo(Duration.ofSeconds(20));
+        assertThat(props.anthropic().apiKey()).isEmpty();
+        assertThat(props.anthropic().baseUrl()).isEmpty();
+        assertThat(props.anthropic().timeout()).isEqualTo(Duration.ofSeconds(60));
+        assertThat(props.anthropic().maxTokens()).isEqualTo(16000);
         assertThat(props.stub().acknowledgeSyntheticData()).isFalse();
     }
 
@@ -92,11 +98,21 @@ class LlmPropsTest {
     }
 
     @Test
-    void rejectsBlankModelName() {
+    void geminiProvidersDefaultTheModelName() {
+        // application.yaml leaves llm.model-name empty; the Gemini providers keep their old default.
+        for (Map<String, Object> values : List.of(vertexValues(), proxyValues(), stubValues())) {
+            values.remove("llm.model-name");
+
+            assertThat(bind(values).modelName()).isEqualTo("gemini-2.5-flash");
+        }
+    }
+
+    @Test
+    void blankModelNameFallsBackToTheGeminiDefault() {
         Map<String, Object> values = vertexValues();
         values.put("llm.model-name", "  ");
 
-        assertThatThrownBy(() -> bind(values)).hasRootCauseMessage("llm.model-name must not be blank");
+        assertThat(bind(values).modelName()).isEqualTo("gemini-2.5-flash");
     }
 
     @Test
@@ -284,6 +300,127 @@ class LlmPropsTest {
     }
 
     @Test
+    void anthropicModeDoesNotRequireVertexOrProxySettings() {
+        LlmProps props = bind(anthropicValues());
+
+        assertThat(props.provider()).isEqualTo(LlmProvider.ANTHROPIC);
+        assertThat(props.enabled()).isTrue();
+        assertThat(props.modelName()).isEqualTo("claude-opus-5-5");
+        assertThat(props.anthropic().apiKey()).isEqualTo(ANTHROPIC_KEY);
+        assertThat(props.anthropic().baseUrl()).isEmpty();
+        assertThat(props.anthropic().timeout()).isEqualTo(Duration.ofSeconds(60));
+        assertThat(props.anthropic().maxTokens()).isEqualTo(16000);
+        assertThat(props.vertex().projectId()).isEmpty();
+        assertThat(props.proxy().baseUrl()).isEmpty();
+    }
+
+    @Test
+    void anthropicModeRequiresAnExplicitModelName() {
+        // No Gemini default here: it would only fail at the first call, so startup must fail instead.
+        Map<String, Object> values = anthropicValues();
+        values.remove("llm.model-name");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage("llm.model-name is required when llm.provider=anthropic");
+    }
+
+    @Test
+    void anthropicModeRejectsBlankModelName() {
+        Map<String, Object> values = anthropicValues();
+        values.put("llm.model-name", "  ");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage("llm.model-name is required when llm.provider=anthropic");
+    }
+
+    @Test
+    void anthropicModeRequiresApiKey() {
+        Map<String, Object> values = anthropicValues();
+        values.remove("llm.anthropic.api-key");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage("llm.anthropic.api-key is required when llm.provider=anthropic");
+    }
+
+    @Test
+    void trimsAnthropicApiKey() {
+        Map<String, Object> values = anthropicValues();
+        values.put("llm.anthropic.api-key", " " + ANTHROPIC_KEY + " ");
+
+        assertThat(bind(values).anthropic().apiKey()).isEqualTo(ANTHROPIC_KEY);
+    }
+
+    @Test
+    void anthropicModeAcceptsCustomBaseUrl() {
+        Map<String, Object> values = anthropicValues();
+        values.put("llm.anthropic.base-url", "https://llm-gateway.example.test/anthropic/v1");
+
+        assertThat(bind(values).anthropic().baseUrl()).isEqualTo("https://llm-gateway.example.test/anthropic/v1");
+    }
+
+    @ParameterizedTest(name = "llm.anthropic.base-url={0}")
+    @ValueSource(
+            strings = {
+                "ftp://llm-gateway.example.test/v1",
+                "llm-gateway.example.test/v1",
+                "https://user:pass@llm-gateway.example.test/v1"
+            })
+    void anthropicModeRejectsNonHttpOrRelativeBaseUrl(String baseUrl) {
+        Map<String, Object> values = anthropicValues();
+        values.put("llm.anthropic.base-url", baseUrl);
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage("llm.anthropic.base-url must be an absolute HTTP(S) URL");
+    }
+
+    @Test
+    void anthropicModeRejectsQueryInBaseUrl() {
+        Map<String, Object> values = anthropicValues();
+        values.put("llm.anthropic.base-url", "https://llm-gateway.example.test/v1?debug=true");
+
+        assertThatThrownBy(() -> bind(values))
+                .hasRootCauseMessage("llm.anthropic.base-url must not contain a query or fragment");
+    }
+
+    @ParameterizedTest(name = "llm.anthropic.timeout={0}")
+    @ValueSource(strings = {"0s", "-1s"})
+    void anthropicModeRejectsNonPositiveTimeout(String timeout) {
+        Map<String, Object> values = anthropicValues();
+        values.put("llm.anthropic.timeout", timeout);
+
+        assertThatThrownBy(() -> bind(values)).hasRootCauseMessage("llm.anthropic.timeout must be positive");
+    }
+
+    @ParameterizedTest(name = "llm.anthropic.max-tokens={0}")
+    @ValueSource(strings = {"0", "-1"})
+    void anthropicModeRejectsNonPositiveMaxTokens(String maxTokens) {
+        Map<String, Object> values = anthropicValues();
+        values.put("llm.anthropic.max-tokens", maxTokens);
+
+        assertThatThrownBy(() -> bind(values)).hasRootCauseMessage("llm.anthropic.max-tokens must be positive");
+    }
+
+    @Test
+    void anthropicToStringNeverIncludesApiKey() {
+        LlmProps props = bind(anthropicValues());
+
+        assertThat(props.anthropic().toString()).doesNotContain(ANTHROPIC_KEY).contains("apiKey=<redacted>");
+        assertThat(props.toString()).doesNotContain(ANTHROPIC_KEY);
+    }
+
+    @Test
+    void anthropicSettingsAreNotValidatedForOtherProviders() {
+        // Junk anthropic settings must not block a vertex or proxy deployment.
+        for (Map<String, Object> values : List.of(vertexValues(), proxyValues())) {
+            values.put("llm.anthropic.base-url", "not a url");
+            values.put("llm.anthropic.timeout", "0s");
+            values.put("llm.anthropic.max-tokens", "0");
+
+            assertThat(bind(values).enabled()).isTrue();
+        }
+    }
+
+    @Test
     void skipsProviderValidationWhenNoProviderIsSelected() {
         // Invalid for any provider (no model name, negative delay, junk proxy URL), but no provider
         // is selected, so binding must not block startup.
@@ -319,6 +456,14 @@ class LlmPropsTest {
         values.put("llm.provider", "stub");
         values.put("llm.model-name", "stub-local");
         values.put("llm.stub.acknowledge-synthetic-data", "true");
+        return values;
+    }
+
+    private static Map<String, Object> anthropicValues() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("llm.provider", "anthropic");
+        values.put("llm.model-name", "claude-opus-5-5");
+        values.put("llm.anthropic.api-key", ANTHROPIC_KEY);
         return values;
     }
 

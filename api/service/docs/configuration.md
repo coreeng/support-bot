@@ -350,8 +350,8 @@ pr-review-tracking:
 # `provider` is the one switch for both features. Full operator reference is in the
 # "Analysis (knowledge-gap LLM)" section under Integrations below.
 llm:
-  provider: ${LLM_PROVIDER:none} # none (off, default) | vertex | proxy | stub (local development only)
-  model-name: ${LLM_MODEL_NAME:gemini-2.5-flash} # Model id, used by the vertex and proxy providers
+  provider: ${LLM_PROVIDER:none} # none (off, default) | vertex | proxy | anthropic | stub (local development only)
+  model-name: ${LLM_MODEL_NAME:} # Model id. Empty means gemini-2.5-flash for vertex/proxy; required for anthropic
   request-delay: ${LLM_REQUEST_DELAY:500ms} # Pause between per-thread LLM calls (rate-limit mitigation)
   vertex: # Hosted Vertex AI via ADC. Validated only when provider=vertex.
     project-id: ${VERTEX_PROJECT_ID:} # Required when provider=vertex
@@ -361,6 +361,11 @@ llm:
     auth:
       basic-auth-token: ${AI_PROXY_BASIC_AUTH_TOKEN:} # Base64 user:password — deliver via a Secret
     timeout: ${AI_PROXY_TIMEOUT:20s} # Connect + read timeout per proxy call
+  anthropic: # The Claude API. Validated only when provider=anthropic.
+    api-key: ${ANTHROPIC_API_KEY:} # Claude API key; required when provider=anthropic — deliver via a Secret
+    base-url: ${ANTHROPIC_BASE_URL:} # Optional; empty means the default Claude API endpoint
+    timeout: ${ANTHROPIC_TIMEOUT:60s} # Connect + read timeout per call
+    max-tokens: ${ANTHROPIC_MAX_TOKENS:16000} # Output cap per call, thinking included
   stub: # LOCAL DEVELOPMENT ONLY: canned responses that write synthetic data. Not in application.yaml on purpose.
     acknowledge-synthetic-data: false # Must be true when provider=stub or startup fails; set in a local override only
 
@@ -531,15 +536,23 @@ built at startup:
   authenticates with a static `Authorization: Basic <token>` header instead of cloud credentials.
   No GCP credential discovery happens in this mode, and there is no silent fallback between
   providers.
+- **`anthropic`** — calls the Claude API directly with a Claude API key (`ANTHROPIC_API_KEY`),
+  sent as the `x-api-key` header. `LLM_MODEL_NAME` must be set to a Claude model id (for example
+  `claude-opus-5-5`): there is no default, and startup fails without one. Optionally point
+  `ANTHROPIC_BASE_URL` at a gateway that speaks the Claude Messages API.
 - **`stub`** — **local development only**: canned responses that write synthetic data, never for
   a deployed instance. Also requires `llm.stub.acknowledge-synthetic-data=true`. See
   [Running bot locally → Stub LLM provider](../README.md#6-stub-llm-provider-optional).
 
 With a provider selected, configuration is validated at startup: only that provider's settings
 are required, and the service fails fast naming the offending property (for example
-`llm.proxy.base-url is required when llm.provider=proxy`). A value that is not one of the four
+`llm.proxy.base-url is required when llm.provider=proxy`). A value that is not one of the five
 names also fails startup rather than silently meaning "off". With `none`, LLM settings are not
 validated and cannot block startup.
+
+There is one model for everything: switching the provider (say from `vertex` to `anthropic`)
+moves the analysis run and the Support Summary page to the new model together. There is no
+per-feature model choice.
 
 ### Environment variables
 
@@ -547,14 +560,18 @@ Set these on the **API**:
 
 | Variable | Description |
 |----------|-------------|
-| `LLM_PROVIDER` | `none` (default), `vertex`, `proxy` or `stub`. Turns the analysis run and the Support Summary page on together and picks the LLM client. Case-insensitive. |
-| `LLM_MODEL_NAME` | Model id used by the Vertex and proxy providers. Default `gemini-2.5-flash`. The stub ignores it and stamps summaries as `stub`. |
+| `LLM_PROVIDER` | `none` (default), `vertex`, `proxy`, `anthropic` or `stub`. Turns the analysis run and the Support Summary page on together and picks the LLM client. Case-insensitive. |
+| `LLM_MODEL_NAME` | Model id used by the Vertex, proxy and Anthropic providers. Defaults to `gemini-2.5-flash` for Vertex and proxy. **Required** for Anthropic (a Claude model id such as `claude-opus-5-5`). The stub ignores it and stamps summaries as `stub`. |
 | `LLM_REQUEST_DELAY` | Pause between per-thread LLM calls to stay under rate limits. Default `500ms`. |
 | `VERTEX_PROJECT_ID` | GCP project hosting Vertex AI. Required when `LLM_PROVIDER=vertex`. |
 | `VERTEX_LOCATION` | Vertex AI region, e.g. `europe-west2`. Required when `LLM_PROVIDER=vertex`. |
 | `AI_PROXY_BASE_URL` | Proxy base URL **including the `/v1beta` suffix**, e.g. `https://<proxy-host>/platform/google-vertex/proxy/v1beta`; the client appends `/models/<model>:generateContent`. Must be an absolute HTTP(S) URL without query or fragment; trailing slashes are stripped. Plain `http` is accepted for in-cluster proxies — note the Basic credential then travels unencrypted. Required when `LLM_PROVIDER=proxy`. |
 | `AI_PROXY_BASIC_AUTH_TOKEN` | Base64-encoded `user:password` proxy credential, sent as `Authorization: Basic <token>`. |
 | `AI_PROXY_TIMEOUT` | Connect and read timeout applied to each proxy HTTP call. |
+| `ANTHROPIC_API_KEY` | Claude API key, sent as the `x-api-key` header. Required when `LLM_PROVIDER=anthropic`; deliver via a Secret. Never logged. |
+| `ANTHROPIC_BASE_URL` | Optional. Base URL of the Claude API including the version path, e.g. `https://<gateway-host>/v1`; the client appends `/messages`. Empty (the default) means the Claude API's own endpoint. When set, must be an absolute HTTP(S) URL without query or fragment. |
+| `ANTHROPIC_TIMEOUT` | Connect and read timeout applied to each Claude API call. Default `60s`, sized for the Support Summary call; must be positive. |
+| `ANTHROPIC_MAX_TOKENS` | Cap on the tokens each Claude API call may generate. Default `16000`. On current Claude models thinking is on by default and counts towards this cap, so a low value can cut the Support Summary off mid-sentence. Must be positive. |
 | `LLM_STUB_ACKNOWLEDGE_SYNTHETIC_DATA` | **Local development only** (see [Stub LLM provider](../README.md#6-stub-llm-provider-optional)). Required alongside `LLM_PROVIDER=stub`: confirms synthetic rows in `analysis` and `summary_snapshot` are acceptable. Relaxed-binding name for `llm.stub.acknowledge-synthetic-data`; not wired in the Helm chart. |
 | `OFFLINE_EXPORT_ANALYSIS_BUNDLE_PATH` | Analysis bundle zip (or directory to zip on the fly) served by the summary-data download endpoint. Not an LLM setting: it belongs to the offline export (`summary-area.offline-export`), and the Helm chart sets it when `analysisBundle.enabled` is on. |
 
@@ -669,7 +686,7 @@ Set these on the **API**:
 | Variable | Description |
 |----------|-------------|
 | `LLM_PROVIDER` | Turns the page on (any value other than `none`); see [Analysis](#analysis-knowledge-gap-llm) above. |
-| `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons included in the report sent to the model, so a very wide window cannot overflow its context. Past the cap, the reasons are a sample spread evenly across the window (newest first), and the report tells the model so; the counts still cover every ticket. Default `1000`. Raising it makes the report larger and the call slower, so check it against `AI_PROXY_TIMEOUT`. |
+| `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons included in the report sent to the model, so a very wide window cannot overflow its context. Past the cap, the reasons are a sample spread evenly across the window (newest first), and the report tells the model so; the counts still cover every ticket. Default `1000`. Raising it makes the report larger and the call slower, so check it against `AI_PROXY_TIMEOUT` (or `ANTHROPIC_TIMEOUT`). |
 | `SUMMARY_FAILURE_RETRY_DELAY` | How long a failed summary refresh is reported as an error before the next visit retries it. A change to the window's data or to the in-use summary prompt retries sooner. Default `15m`. |
 | `TEAM_GROUPS_DISPLAY_NAME` | What the UI calls a [team group](#team-groups), e.g. `Domain` or `Tribe`. Default `Team group`. The attribute groups are built from is set in yaml (`team-groups.attribute`). |
 
