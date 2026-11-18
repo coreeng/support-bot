@@ -17,9 +17,18 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import SlackMessageRenderer from "@/components/ui/SlackMessageRenderer";
 import { useAuth } from "@/hooks/useAuth";
-import { useAssignmentEnabled, useRegistry, useSupportMembers, useTeamSuggestions, useTenantTeams, useTicket } from "@/lib/hooks";
+import {
+  useAssignmentEnabled,
+  useRegistry,
+  useSupportMembers,
+  useTeamSuggestions,
+  useTenantTeams,
+  useTicket,
+  useTroubleshootingEnabled,
+} from "@/lib/hooks";
 import { Escalation, SupportMember, TicketImpact, TicketTag, TicketWithLogs } from "@/lib/types";
-import { AlertCircle, Slack, Ticket } from "lucide-react";
+import { AlertCircle, Slack, Stethoscope, Ticket } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 interface EditTicketModalProps {
@@ -37,6 +46,7 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
   const { data: registryData } = useRegistry();
   const { data: supportMembers } = useSupportMembers();
   const { data: isAssignmentEnabled } = useAssignmentEnabled();
+  const { data: isTroubleshootingEnabled } = useTroubleshootingEnabled();
 
   // Form state
   const [status, setStatus] = useState<string>("");
@@ -520,13 +530,21 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
         )}
 
         <DialogFooter className="flex w-full items-center justify-between pt-2">
-          <div className="flex-1">
+          <div className="flex flex-1 gap-2">
             {displayTicket?.query?.link && (
               <Button asChild variant="outline" size="sm">
                 <a href={displayTicket.query.link} target="_blank" rel="noopener noreferrer">
                   <Slack className="h-4 w-4" />
                   Open in Slack
                 </a>
+              </Button>
+            )}
+            {isSupportEngineer && isTroubleshootingEnabled && ticketId && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/tickets/${ticketId}/session`}>
+                  <Stethoscope className="h-4 w-4" />
+                  Troubleshoot
+                </Link>
               </Button>
             )}
           </div>

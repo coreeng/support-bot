@@ -2,6 +2,7 @@
  * Consolidated hooks for client-side data fetching.
  * All hooks use React Query and call the Next.js API routes.
  */
+import { mergeEvents } from "@/components/troubleshooting/session-items";
 import type {
   ElevateIntegrityIssue,
   ElevateIntegrityIssueType,
@@ -25,7 +26,8 @@ import type {
   RequestBreakdown,
 } from "@/lib/types/dashboard";
 import type { SummaryData, SummaryStatus, SummaryTeamGroups } from "@/lib/types/summary";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import type { TroubleshootingSession, TroubleshootingStatus } from "@/lib/types/troubleshooting";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCsrfToken, signOut } from "next-auth/react";
 import { useState } from "react";
 
@@ -947,4 +949,63 @@ export function useElevateIntegrity(request: ElevatePageRequest & { type?: "all"
       true
     )
   );
+}
+
+// ===== Troubleshooting Hooks =====
+
+export function useTroubleshootingEnabled() {
+  return useQuery<boolean>({
+    queryKey: ["troubleshooting", "enabled"],
+    queryFn: async () => (await apiGet<TroubleshootingStatus>("/troubleshooting/enabled")).enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export const troubleshootingSessionKey = (ticketId: number) => ["troubleshooting", "session", ticketId] as const;
+
+/**
+ * The session for a ticket, or null when none has been started. The event stream keeps the cached
+ * copy current, so a refetch merges into it instead of replacing it: events the stream delivered
+ * while the request was in flight are not lost.
+ */
+export function useTroubleshootingSession(ticketId: number) {
+  const queryClient = useQueryClient();
+  return useQuery<TroubleshootingSession | null>({
+    queryKey: troubleshootingSessionKey(ticketId),
+    queryFn: async ({ signal }) => {
+      let fetched: TroubleshootingSession;
+      try {
+        fetched = await apiGet<TroubleshootingSession>(`/troubleshooting/tickets/${ticketId}/session`, { signal });
+      } catch (error) {
+        if (isApiError(error, 404)) return null;
+        throw error;
+      }
+      const cached = queryClient.getQueryData<TroubleshootingSession | null>(troubleshootingSessionKey(ticketId));
+      return cached && cached.id === fetched.id ? mergeEvents(fetched, cached.events) : fetched;
+    },
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+}
+
+async function troubleshootingPost<T>(path: string, body?: unknown): Promise<T> {
+  const response = await apiFetch(`/api/troubleshooting/tickets/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) {
+    let reason: string | undefined;
+    try {
+      reason = ((await response.json()) as { code?: string }).code;
+    } catch {
+      // The status alone is enough when the body is not JSON.
+    }
+    throw new ApiError(response.status, reason);
+  }
+  return response.json();
+}
+
+export function startTroubleshootingSession(ticketId: number) {
+  return troubleshootingPost<TroubleshootingSession>(`${ticketId}/session`);
 }
