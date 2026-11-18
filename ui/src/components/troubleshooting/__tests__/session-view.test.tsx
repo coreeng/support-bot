@@ -14,12 +14,15 @@ jest.mock("../../../lib/hooks", () => ({
   useTroubleshootingSession: jest.fn(),
   useTicket: jest.fn(() => ({ data: undefined })),
   sendTroubleshootingMessage: jest.fn(() => Promise.resolve({})),
+  decideTroubleshootingProposal: jest.fn(() => Promise.resolve({})),
   startTroubleshootingSession: jest.fn(),
   troubleshootingSessionKey: (id: number) => ["troubleshooting", "session", id],
+  isApiError: () => false,
 }));
 
 const mockUseSession = hooks.useTroubleshootingSession as jest.MockedFunction<typeof hooks.useTroubleshootingSession>;
 const mockSend = hooks.sendTroubleshootingMessage as jest.MockedFunction<typeof hooks.sendTroubleshootingMessage>;
+const mockDecide = hooks.decideTroubleshootingProposal as jest.MockedFunction<typeof hooks.decideTroubleshootingProposal>;
 const mockStart = hooks.startTroubleshootingSession as jest.MockedFunction<typeof hooks.startTroubleshootingSession>;
 
 function withSession(session: TroubleshootingSession | null) {
@@ -50,9 +53,10 @@ describe("SessionView with assistant-ui", () => {
 
     const { container } = renderView();
 
-    expect(renderedSeqs(container)).toEqual(["1", "3", "5", "6"]);
+    expect(renderedSeqs(container)).toEqual(["1", "3", "5", "6", "7"]);
     expect(screen.getByText("Pods are pending")).toBeInTheDocument();
     expect(screen.getByText("Looks like scheduling.")).toBeInTheDocument();
+    expect(screen.getByText("Proposal: Reply to the author")).toBeInTheDocument();
   });
 
   it("tells the two engineers and the Slack author apart", () => {
@@ -68,7 +72,7 @@ describe("SessionView with assistant-ui", () => {
   it("shows the busy state and still lets an engineer send", async () => {
     const busy: TroubleshootingEvent[] = [
       ...events,
-      { seq: 7, type: "ROUTER_STATUS", actor: "router", createdAt: "2026-11-18T10:00:00Z", payload: { state: "THINKING", error: null } },
+      { seq: 8, type: "ROUTER_STATUS", actor: "router", createdAt: "2026-11-18T10:00:00Z", payload: { state: "THINKING", error: null } },
     ];
     withSession(sessionWith(busy));
     renderView();
@@ -80,6 +84,17 @@ describe("SessionView with assistant-ui", () => {
     });
 
     await waitFor(() => expect(mockSend).toHaveBeenCalledWith(42, "One more thing"));
+  });
+
+  it("approves a proposal from its card", async () => {
+    withSession(sessionWith(events));
+    renderView();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Approve$/ }));
+    });
+
+    expect(mockDecide).toHaveBeenCalledWith(42, 7, "APPROVED", undefined);
   });
 
   it("renders every Slack message as its own message, in order", () => {

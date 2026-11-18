@@ -11,13 +11,38 @@ describe("buildSessionView", () => {
       [3, "router-message"],
       [5, "engineer-message"],
       [6, "engineer-message"],
+      [7, "proposal"],
     ]);
     expect(view.routerBusy).toBe(false);
-    expect(view.lastSeq).toBe(6);
+    expect(view.lastSeq).toBe(7);
   });
 
   it("is busy while the last router status is THINKING", () => {
     expect(buildSessionView(events.slice(0, 2)).routerBusy).toBe(true);
+  });
+
+  it("folds the first decision into its proposal and ignores later ones", () => {
+    const decided: TroubleshootingEvent[] = [
+      ...events,
+      {
+        seq: 8,
+        type: "DECISION",
+        actor: "bob@example.com",
+        createdAt: "",
+        payload: { proposalSeq: 7, decision: "APPROVED", text: "Edited" },
+      },
+      {
+        seq: 9,
+        type: "DECISION",
+        actor: "alice@example.com",
+        createdAt: "",
+        payload: { proposalSeq: 7, decision: "REJECTED", text: null },
+      },
+    ];
+
+    const proposal = buildSessionView(decided).items.find((item) => item.kind === "proposal");
+
+    expect(proposal).toMatchObject({ state: "APPROVED", decidedBy: "bob@example.com", decidedText: "Edited" });
   });
 
   it("shows a failed router turn as a note", () => {

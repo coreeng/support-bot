@@ -12,6 +12,7 @@ import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +46,16 @@ public class JdbcTroubleshootingRepository implements TroubleshootingRepository 
 
     @Override
     @Transactional
+    public TroubleshootingSession lockSession(long sessionId) {
+        TroubleshootingSessionRecord row = dsl.selectFrom(TROUBLESHOOTING_SESSION)
+                .where(TROUBLESHOOTING_SESSION.ID.eq(sessionId))
+                .forUpdate()
+                .fetchSingle();
+        return toSession(row);
+    }
+
+    @Override
+    @Transactional
     public TroubleshootingEvent append(long sessionId, TroubleshootingEventType type, String actor, Object payload) {
         Long seq = dsl.update(TROUBLESHOOTING_SESSION)
                 .set(TROUBLESHOOTING_SESSION.LAST_SEQ, TROUBLESHOOTING_SESSION.LAST_SEQ.plus(1))
@@ -71,6 +82,35 @@ public class JdbcTroubleshootingRepository implements TroubleshootingRepository 
                 .selectFrom(TROUBLESHOOTING_EVENT)
                 .where(TROUBLESHOOTING_EVENT.SESSION_ID.eq(sessionId))
                 .and(TROUBLESHOOTING_EVENT.SEQ.gt(afterSeq))
+                .orderBy(TROUBLESHOOTING_EVENT.SEQ)
+                .fetch(this::toEvent)
+                .stream()
+                .collect(ImmutableList.toImmutableList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public @Nullable TroubleshootingEvent findEvent(long sessionId, long seq) {
+        return dsl.selectFrom(TROUBLESHOOTING_EVENT)
+                .where(TROUBLESHOOTING_EVENT.SESSION_ID.eq(sessionId))
+                .and(TROUBLESHOOTING_EVENT.SEQ.eq(seq))
+                .fetchOne(this::toEvent);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ImmutableList<TroubleshootingEvent> findPendingProposals(long sessionId) {
+        var decision = TROUBLESHOOTING_EVENT.as("decision");
+        return dsl
+                .selectFrom(TROUBLESHOOTING_EVENT)
+                .where(TROUBLESHOOTING_EVENT.SESSION_ID.eq(sessionId))
+                .and(TROUBLESHOOTING_EVENT.TYPE.eq(TroubleshootingEventType.PROPOSAL.name()))
+                .andNotExists(DSL.selectOne()
+                        .from(decision)
+                        .where(decision.SESSION_ID.eq(sessionId))
+                        .and(decision.TYPE.eq(TroubleshootingEventType.DECISION.name()))
+                        .and(DSL.field("({0} ->> 'proposalSeq')::bigint", Long.class, decision.PAYLOAD)
+                                .eq(TROUBLESHOOTING_EVENT.SEQ)))
                 .orderBy(TROUBLESHOOTING_EVENT.SEQ)
                 .fetch(this::toEvent)
                 .stream()

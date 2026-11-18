@@ -700,8 +700,12 @@ Set these on the **API**:
 
 A support engineer can open a troubleshooting session for a ticket from the ticket dialog
 (**Troubleshoot**). Starting it copies the query's Slack thread into the session once. Engineers
-then write in the session, and a router on the configured LLM answers them, one turn per session
-at a time. The page follows the session live. Nothing is posted to Slack. The decision is recorded in
+then write in the session, and a router on the configured LLM answers them or proposes a reply to
+the author, a diagnostic run or closing the ticket, one turn per session at a time. Every proposal
+waits for an engineer to approve, edit or reject it; the first decision wins. Approved actions are
+canned for now: a reply or a close is recorded as "would post" or "would close", and a run plays
+three fake updates before the router takes another turn. The page follows the session live.
+Nothing is posted to Slack. The decision is recorded in
 [ADR-012](../../../docs/adr/adr-012-ai-troubleshooting-sessions.md); what the tables hold and how to
 erase one person from them is in the
 [troubleshooting sessions runbook](../../../docs/runbooks/troubleshooting-sessions.md).

@@ -1,10 +1,14 @@
 package com.coreeng.supportbot.troubleshooting;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.mock;
 
+import com.coreeng.supportbot.troubleshooting.Payloads.DecisionKind;
+import com.coreeng.supportbot.troubleshooting.Payloads.Proposal;
 import com.coreeng.supportbot.troubleshooting.Payloads.SlackMessage;
+import com.coreeng.supportbot.troubleshooting.router.RouterAction;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +40,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnabledIf("localDatabaseEnabled")
 class TroubleshootingSessionPostgresTest {
     private static final String TEST_CHANNEL = "C-TROUBLESHOOTING-TEST";
+    private static final Proposal PROPOSAL =
+            new Proposal(RouterAction.REPLY, "We are on it", "author waiting", "test-model", 1, 1, 1);
 
     private final TroubleshootingSessionService sessions;
     private final JdbcTemplate jdbc;
@@ -113,6 +119,36 @@ class TroubleshootingSessionPostgresTest {
                 .extracting(TroubleshootingEvent::seq, event -> event.text("text"))
                 .containsExactly(tuple(4L, "m4"), tuple(5L, "m5"));
         assertThat(sessions.requireByTicketId(ticketId).lastSeq()).isEqualTo(5);
+    }
+
+    @Test
+    void theSecondDecisionOnAProposalIsRefused() {
+        TroubleshootingEvent proposal =
+                sessions.appendRouterOutput(sessionId, TroubleshootingEventType.PROPOSAL, PROPOSAL);
+
+        sessions.decide(sessionId, proposal.seq(), "alice@example.com", DecisionKind.APPROVED, null);
+
+        assertThatThrownBy(() ->
+                        sessions.decide(sessionId, proposal.seq(), "bob@example.com", DecisionKind.REJECTED, null))
+                .isInstanceOf(ProposalNotPendingException.class);
+    }
+
+    @Test
+    void aNewRouterOutputReplacesTheWaitingProposal() {
+        TroubleshootingEvent first =
+                sessions.appendRouterOutput(sessionId, TroubleshootingEventType.PROPOSAL, PROPOSAL);
+
+        sessions.appendRouterOutput(sessionId, TroubleshootingEventType.PROPOSAL, PROPOSAL);
+
+        TroubleshootingEvent superseded = sessions.events(sessionId).stream()
+                .filter(event -> event.type() == TroubleshootingEventType.DECISION)
+                .findFirst()
+                .orElseThrow();
+        assertThat(superseded.text("decision")).isEqualTo("SUPERSEDED");
+        assertThat(superseded.payload().path("proposalSeq").asLong()).isEqualTo(first.seq());
+        assertThatThrownBy(
+                        () -> sessions.decide(sessionId, first.seq(), "alice@example.com", DecisionKind.APPROVED, null))
+                .isInstanceOf(ProposalNotPendingException.class);
     }
 
     @Configuration(proxyBeanMethods = false)

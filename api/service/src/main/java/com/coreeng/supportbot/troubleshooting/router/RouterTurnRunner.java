@@ -84,16 +84,29 @@ public class RouterTurnRunner {
             RouterResult result = router.decide(ticketContextLoader.load(ticketId), events);
             RouterDecision decision = result.decision();
             RouterUsage usage = result.usage();
-            sessions.append(
-                    sessionId,
-                    TroubleshootingEventType.ROUTER_MESSAGE,
-                    Actors.ROUTER,
-                    new Payloads.RouterMessage(
-                            decision.text(),
-                            usage.model(),
-                            usage.inputTokens(),
-                            usage.outputTokens(),
-                            usage.durationMs()));
+            if (decision.action() == RouterAction.DISCUSS) {
+                sessions.appendRouterOutput(
+                        sessionId,
+                        TroubleshootingEventType.ROUTER_MESSAGE,
+                        new Payloads.RouterMessage(
+                                decision.text(),
+                                usage.model(),
+                                usage.inputTokens(),
+                                usage.outputTokens(),
+                                usage.durationMs()));
+            } else {
+                sessions.appendRouterOutput(
+                        sessionId,
+                        TroubleshootingEventType.PROPOSAL,
+                        new Payloads.Proposal(
+                                decision.action(),
+                                decision.text(),
+                                decision.reason(),
+                                usage.model(),
+                                usage.inputTokens(),
+                                usage.outputTokens(),
+                                usage.durationMs()));
+            }
             sessions.append(
                     sessionId,
                     TroubleshootingEventType.ROUTER_STATUS,

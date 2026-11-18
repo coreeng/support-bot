@@ -3,11 +3,15 @@ package com.coreeng.supportbot.troubleshooting;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketQueryService;
+import com.coreeng.supportbot.troubleshooting.Payloads.DecisionKind;
 import com.coreeng.supportbot.troubleshooting.Payloads.EngineerMessage;
+import com.coreeng.supportbot.troubleshooting.router.RouterAction;
 import com.coreeng.supportbot.troubleshooting.router.RouterTurnRunner;
 import com.google.common.collect.ImmutableList;
+import java.util.Objects;
 import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -20,6 +24,7 @@ public class TroubleshootingService {
     private final TicketQueryService tickets;
     private final SlackThreadSnapshotter snapshotter;
     private final RouterTurnRunner turns;
+    private final CannedRunService cannedRuns;
     private final TroubleshootingEventBroadcaster broadcaster;
     private final TroubleshootingExecutor executor;
 
@@ -28,12 +33,14 @@ public class TroubleshootingService {
             TicketQueryService tickets,
             SlackThreadSnapshotter snapshotter,
             RouterTurnRunner turns,
+            CannedRunService cannedRuns,
             TroubleshootingEventBroadcaster broadcaster,
             TroubleshootingExecutor executor) {
         this.sessions = sessions;
         this.tickets = tickets;
         this.snapshotter = snapshotter;
         this.turns = turns;
+        this.cannedRuns = cannedRuns;
         this.broadcaster = broadcaster;
         this.executor = executor;
     }
@@ -73,6 +80,26 @@ public class TroubleshootingService {
         TroubleshootingEvent event = sessions.append(
                 session.id(), TroubleshootingEventType.ENGINEER_MESSAGE, actor, new EngineerMessage(text));
         turns.requestTurn(session.id(), ticketId, event.seq());
+        return event;
+    }
+
+    public TroubleshootingEvent decide(
+            long ticketId, long proposalSeq, String actor, DecisionKind decision, @Nullable String editedText) {
+        if (decision == DecisionKind.SUPERSEDED) {
+            throw new IllegalArgumentException("Engineers approve or reject; only the router supersedes");
+        }
+        TroubleshootingSession session = sessions.requireByTicketId(ticketId);
+        TroubleshootingEvent proposal = sessions.findEvent(session.id(), proposalSeq);
+        if (proposal == null || proposal.type() != TroubleshootingEventType.PROPOSAL) {
+            throw new ProposalNotPendingException(proposalSeq);
+        }
+        String text = editedText == null || editedText.isBlank() ? null : editedText.trim();
+        TroubleshootingEvent event = sessions.decide(session.id(), proposalSeq, actor, decision, text);
+        if (decision == DecisionKind.APPROVED) {
+            RouterAction action = RouterAction.valueOf(proposal.text("action"));
+            cannedRuns.approved(
+                    session.id(), ticketId, action, Objects.requireNonNullElse(text, proposal.text("text")));
+        }
         return event;
     }
 
