@@ -12,4 +12,16 @@ public final class Payloads {
     private Payloads() {}
 
     public record SlackMessage(@Nullable String ts, String text, boolean available) {}
+
+    public record EngineerMessage(String text) {}
+
+    public record RouterMessage(String text, String model, long inputTokens, long outputTokens, long durationMs) {}
+
+    public record RouterStatus(RouterState state, @Nullable String error) {}
+
+    public enum RouterState {
+        THINKING,
+        IDLE,
+        FAILED
+    }
 }

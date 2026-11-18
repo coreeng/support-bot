@@ -3,6 +3,8 @@ package com.coreeng.supportbot.troubleshooting;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketQueryService;
+import com.coreeng.supportbot.troubleshooting.Payloads.EngineerMessage;
+import com.coreeng.supportbot.troubleshooting.router.RouterTurnRunner;
 import com.google.common.collect.ImmutableList;
 import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,7 @@ public class TroubleshootingService {
     private final TroubleshootingSessionService sessions;
     private final TicketQueryService tickets;
     private final SlackThreadSnapshotter snapshotter;
+    private final RouterTurnRunner turns;
     private final TroubleshootingEventBroadcaster broadcaster;
     private final TroubleshootingExecutor executor;
 
@@ -24,11 +27,13 @@ public class TroubleshootingService {
             TroubleshootingSessionService sessions,
             TicketQueryService tickets,
             SlackThreadSnapshotter snapshotter,
+            RouterTurnRunner turns,
             TroubleshootingEventBroadcaster broadcaster,
             TroubleshootingExecutor executor) {
         this.sessions = sessions;
         this.tickets = tickets;
         this.snapshotter = snapshotter;
+        this.turns = turns;
         this.broadcaster = broadcaster;
         this.executor = executor;
     }
@@ -41,8 +46,8 @@ public class TroubleshootingService {
     }
 
     /**
-     * Safe to repeat: only the call that creates the session reads the thread, so two engineers
-     * opening it together start it once.
+     * Safe to repeat: only the call that creates the session reads the thread and starts the first
+     * turn, so two engineers opening it together start it once.
      */
     public SessionWithEvents start(long ticketId) {
         Ticket ticket = tickets.findById(new TicketId(ticketId));
@@ -52,9 +57,23 @@ public class TroubleshootingService {
         boolean created = sessions.createIfAbsent(ticketId);
         TroubleshootingSession session = sessions.requireByTicketId(ticketId);
         if (created) {
-            executor.execute(() -> snapshotter.snapshot(session.id(), ticket));
+            executor.execute(() -> {
+                try {
+                    snapshotter.snapshot(session.id(), ticket);
+                } finally {
+                    turns.requestTurn(session.id(), ticketId, 0);
+                }
+            });
         }
         return new SessionWithEvents(session, sessions.events(session.id()));
+    }
+
+    public TroubleshootingEvent sendMessage(long ticketId, String actor, String text) {
+        TroubleshootingSession session = sessions.requireByTicketId(ticketId);
+        TroubleshootingEvent event = sessions.append(
+                session.id(), TroubleshootingEventType.ENGINEER_MESSAGE, actor, new EngineerMessage(text));
+        turns.requestTurn(session.id(), ticketId, event.seq());
+        return event;
     }
 
     public SseEmitter stream(long ticketId, long afterSeq, Function<TroubleshootingEvent, Object> toWire) {

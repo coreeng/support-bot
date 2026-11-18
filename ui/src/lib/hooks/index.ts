@@ -1009,3 +1009,7 @@ async function troubleshootingPost<T>(path: string, body?: unknown): Promise<T> 
 export function startTroubleshootingSession(ticketId: number) {
   return troubleshootingPost<TroubleshootingSession>(`${ticketId}/session`);
 }
+
+export function sendTroubleshootingMessage(ticketId: number, text: string) {
+  return troubleshootingPost<unknown>(`${ticketId}/session/messages`, { text });
+}

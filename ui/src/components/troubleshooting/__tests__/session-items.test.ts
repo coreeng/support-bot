@@ -1,7 +1,33 @@
-import { sessionWith, slackEvents, threadNotAvailable } from "../../../test-utils/troubleshooting-fixtures";
+import type { TroubleshootingEvent } from "@/lib/types/troubleshooting";
+import { events, sessionWith, slackEvents, threadNotAvailable } from "../../../test-utils/troubleshooting-fixtures";
 import { actorLabel, buildSessionView, createItemReuser, mergeEvents } from "../session-items";
 
 describe("buildSessionView", () => {
+  it("keeps one item per visible event, in order, and hides status events", () => {
+    const view = buildSessionView(events);
+
+    expect(view.items.map((item) => [item.seq, item.kind])).toEqual([
+      [1, "slack-message"],
+      [3, "router-message"],
+      [5, "engineer-message"],
+      [6, "engineer-message"],
+    ]);
+    expect(view.routerBusy).toBe(false);
+    expect(view.lastSeq).toBe(6);
+  });
+
+  it("is busy while the last router status is THINKING", () => {
+    expect(buildSessionView(events.slice(0, 2)).routerBusy).toBe(true);
+  });
+
+  it("shows a failed router turn as a note", () => {
+    const failed: TroubleshootingEvent[] = [
+      { seq: 1, type: "ROUTER_STATUS", actor: "router", createdAt: "", payload: { state: "FAILED", error: "bad JSON" } },
+    ];
+
+    expect(buildSessionView(failed).items).toEqual([expect.objectContaining({ kind: "router-failed", error: "bad JSON" })]);
+  });
+
   it("keeps one item per Slack message, in order", () => {
     const view = buildSessionView(slackEvents);
 
@@ -48,6 +74,8 @@ describe("actorLabel", () => {
   it("shows Slack ids without their prefix and keeps erased actors readable", () => {
     expect(actorLabel("slack:U1")).toBe("U1");
     expect(actorLabel("system")).toBe("System");
+    expect(actorLabel("router")).toBe("Router");
+    expect(actorLabel("alice@example.com")).toBe("alice");
     expect(actorLabel("erased")).toBe("erased");
   });
 });

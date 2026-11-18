@@ -22,6 +22,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -127,6 +128,28 @@ class TroubleshootingApplicationTest {
     }
 
     @Test
+    void takesAnEngineersMessageAndAnswersItWithARouterTurn() throws Exception {
+        when(slackClient.getThreadPage(any())).thenThrow(new IllegalStateException("thread_not_found"));
+        mockMvc.perform(asEngineer(post(sessionPath()))).andExpect(status().isOk());
+
+        mockMvc.perform(asEngineer(post(sessionPath() + "/messages"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"Is it quota?\"}"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.type").value("ENGINEER_MESSAGE"))
+                .andExpect(jsonPath("$.actor").value("alice@example.com"));
+        mockMvc.perform(asEngineer(post(sessionPath() + "/messages"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\" \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TROUBLESHOOTING_REQUEST_INVALID"));
+
+        List<String> log = awaitSettledRouter();
+        assertThat(log).contains("ENGINEER_MESSAGE", "ROUTER_STATUS:THINKING");
+        assertThat(log.getLast()).isIn("ROUTER_STATUS:IDLE", "ROUTER_STATUS:FAILED");
+    }
+
+    @Test
     void refusesUsersWhoAreNotSupportEngineers() throws Exception {
         mockMvc.perform(get(sessionPath()).header("X-Test-User", "tenant@example.com"))
                 .andExpect(status().isForbidden());
@@ -138,6 +161,29 @@ class TroubleshootingApplicationTest {
 
     private static MockHttpServletRequestBuilder asEngineer(MockHttpServletRequestBuilder request) {
         return request.header("X-Test-User", "alice@example.com").header("X-Test-Role", "support");
+    }
+
+    /** The log as {@code TYPE} or {@code ROUTER_STATUS:STATE}, once no turn is running. */
+    private List<String> awaitSettledRouter() throws InterruptedException {
+        long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+        List<String> log = List.of();
+        while (System.nanoTime() < deadline) {
+            log = jdbc.queryForList(
+                    "SELECT e.type || COALESCE(':' || (e.payload ->> 'state'), '') FROM troubleshooting_event e"
+                            + " JOIN troubleshooting_session s ON s.id = e.session_id WHERE s.ticket_id = ?"
+                            + " ORDER BY e.seq",
+                    String.class,
+                    ticketId);
+            int lastMessage = log.lastIndexOf("ENGINEER_MESSAGE");
+            if (lastMessage >= 0
+                    && log.subList(lastMessage, log.size()).contains("ROUTER_STATUS:THINKING")
+                    && !log.getLast().equals("ROUTER_STATUS:THINKING")
+                    && log.getLast().startsWith("ROUTER_STATUS")) {
+                return log;
+            }
+            Thread.sleep(50);
+        }
+        return log;
     }
 
     private static String awaitBody(MvcResult result, String expected) throws Exception {
