@@ -13,6 +13,7 @@
     "test:watch": "jest --passWithNoTests --watch"
   },
   "dependencies": {
+    "@assistant-ui/react": "^0.15.36",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",

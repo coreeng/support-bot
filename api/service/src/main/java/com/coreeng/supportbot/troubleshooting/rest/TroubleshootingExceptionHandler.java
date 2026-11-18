@@ -1,0 +1,30 @@
+package com.coreeng.supportbot.troubleshooting.rest;
+
+import com.coreeng.supportbot.troubleshooting.TicketNotFoundForSessionException;
+import com.coreeng.supportbot.troubleshooting.TroubleshootingSessionNotFoundException;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice(assignableTypes = TroubleshootingController.class)
+public class TroubleshootingExceptionHandler {
+
+    @ExceptionHandler(TroubleshootingSessionNotFoundException.class)
+    public ProblemDetail sessionNotFound(TroubleshootingSessionNotFoundException failure) {
+        return problem(HttpStatus.NOT_FOUND, failure.getMessage(), "TROUBLESHOOTING_SESSION_NOT_FOUND");
+    }
+
+    @ExceptionHandler(TicketNotFoundForSessionException.class)
+    public ProblemDetail ticketNotFound(TicketNotFoundForSessionException failure) {
+        return problem(HttpStatus.NOT_FOUND, failure.getMessage(), "TROUBLESHOOTING_TICKET_NOT_FOUND");
+    }
+
+    private static ProblemDetail problem(HttpStatus status, @Nullable String detail, String code) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, Objects.requireNonNullElse(detail, code));
+        problem.setProperty("code", code);
+        return problem;
+    }
+}

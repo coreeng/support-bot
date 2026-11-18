@@ -23,5 +23,12 @@ const config: Config = {
   },
 };
 
-// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
-export default createJestConfig(config);
+// next/jest puts its own node_modules ignore pattern first, which would win over the one above, so
+// it is replaced here. assistant-ui and its runtime dependencies ship ESM only.
+const ESM_PACKAGES = "/node_modules/(?!(next-auth|@auth|@panva|@assistant-ui|assistant-stream|assistant-cloud|safe-content-frame|nanoid)/)";
+
+export default async function jestConfig(): Promise<Config> {
+  const resolved = await createJestConfig(config)();
+  const otherPatterns = (resolved.transformIgnorePatterns ?? []).filter((pattern) => !pattern.startsWith("/node_modules/"));
+  return { ...resolved, transformIgnorePatterns: [ESM_PACKAGES, ...otherPatterns] };
+}

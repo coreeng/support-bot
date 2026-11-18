@@ -346,6 +346,12 @@ pr-review-tracking:
     api-base-url: ${GITLAB_API_BASE_URL:https://gitlab.com/api/v4} # must include /api/v4, no trailing slash
     token: ${GITLAB_TOKEN:}
 
+# Troubleshooting sessions (ADR-012). Also needs an LLM provider. Full operator reference is in the
+# "Troubleshooting sessions" section under Integrations below.
+troubleshooting:
+  enabled: ${TROUBLESHOOTING_ENABLED:false}
+  max-thread-chars: ${TROUBLESHOOTING_MAX_THREAD_CHARS:40000}
+
 # LLM configuration, shared by the knowledge-gap analysis run and the Support Summary page (/summary).
 # `provider` is the one switch for both features. Full operator reference is in the
 # "Analysis (knowledge-gap LLM)" section under Integrations below.
@@ -689,6 +695,22 @@ Set these on the **API**:
 | `SUMMARY_MAX_REASONS` | Cap on the number of per-ticket reasons included in the report sent to the model, so a very wide window cannot overflow its context. Past the cap, the reasons are a sample spread evenly across the window (newest first), and the report tells the model so; the counts still cover every ticket. Default `1000`. Raising it makes the report larger and the call slower, so check it against `AI_PROXY_TIMEOUT` (or `ANTHROPIC_TIMEOUT`). |
 | `SUMMARY_FAILURE_RETRY_DELAY` | How long a failed summary refresh is reported as an error before the next visit retries it. A change to the window's data or to the in-use summary prompt retries sooner. Default `15m`. |
 | `TEAM_GROUPS_DISPLAY_NAME` | What the UI calls a [team group](#team-groups), e.g. `Domain` or `Tribe`. Default `Team group`. The attribute groups are built from is set in yaml (`team-groups.attribute`). |
+
+## Troubleshooting sessions
+
+A support engineer can open a troubleshooting session for a ticket from the ticket dialog
+(**Troubleshoot**). Starting it copies the query's Slack thread into the session once; the page
+follows the session live. Nothing is posted to Slack. The decision is recorded in
+[ADR-012](../../../docs/adr/adr-012-ai-troubleshooting-sessions.md); what the tables hold and how to
+erase one person from them is in the
+[troubleshooting sessions runbook](../../../docs/runbooks/troubleshooting-sessions.md).
+
+- **Enabling.** Off by default. Set `TROUBLESHOOTING_ENABLED=true` and select an LLM provider
+  (`LLM_PROVIDER`); with `none` the feature stays off. `GET /troubleshooting/enabled` reports the
+  result to any authenticated user so the UI can show or hide the link.
+- **Roles.** Everything else under `/troubleshooting/**` is for `SUPPORT_ENGINEER` only.
+- **Replicas.** Open streams are kept in memory, so the API must run as one replica (as the chart
+  does today).
 
 ## Single Sign-On (SSO)
 

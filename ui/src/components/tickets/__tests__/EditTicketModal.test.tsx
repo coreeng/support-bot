@@ -15,6 +15,7 @@ const mockUseTeamSuggestions = hooks.useTeamSuggestions as jest.MockedFunction<t
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
 const mockUseSupportMembers = hooks.useSupportMembers as jest.MockedFunction<typeof hooks.useSupportMembers>;
 const mockUseAssignmentEnabled = hooks.useAssignmentEnabled as jest.MockedFunction<typeof hooks.useAssignmentEnabled>;
+const mockUseTroubleshootingEnabled = hooks.useTroubleshootingEnabled as jest.MockedFunction<typeof hooks.useTroubleshootingEnabled>;
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 
 // Mock fetch for API calls
@@ -129,6 +130,12 @@ describe("EditTicketModal", () => {
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
+
+    mockUseTroubleshootingEnabled.mockReturnValue({
+      data: false,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useTroubleshootingEnabled>);
 
     global.fetch = mockFetch;
     mockFetch.mockResolvedValue({
@@ -369,6 +376,26 @@ describe("EditTicketModal", () => {
       });
 
       expect(screen.queryByText(/Open in Slack/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Troubleshoot Link", () => {
+    it("links to the session page when troubleshooting is enabled", () => {
+      mockUseTroubleshootingEnabled.mockReturnValue({ data: true } as unknown as ReturnType<typeof hooks.useTroubleshootingEnabled>);
+
+      render(<EditTicketModal ticketId="123" open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText(/Troubleshoot/i).closest("a")).toHaveAttribute("href", "/tickets/123/session");
+    });
+
+    it("is hidden when troubleshooting is disabled", () => {
+      render(<EditTicketModal ticketId="123" open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.queryByText(/Troubleshoot/i)).not.toBeInTheDocument();
     });
   });
 
