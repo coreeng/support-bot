@@ -1,21 +1,25 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
+import { useAuth } from "../../../hooks/useAuth";
 import * as hooks from "../../../lib/hooks";
-import type { TroubleshootingSession } from "../../../lib/types/troubleshooting";
+import type { TroubleshootingEvent, TroubleshootingSession } from "../../../lib/types/troubleshooting";
 import "../../../test-utils/assistant-ui-env";
-import { sessionWith, slackEvents, threadNotAvailable } from "../../../test-utils/troubleshooting-fixtures";
+import { events, sessionWith, slackEvents, threadNotAvailable } from "../../../test-utils/troubleshooting-fixtures";
 import SessionView from "../session-view";
 
+jest.mock("../../../hooks/useAuth");
 jest.mock("../use-session-stream", () => ({ useSessionStream: () => "open" }));
 jest.mock("../../../lib/hooks", () => ({
   useTroubleshootingSession: jest.fn(),
   useTicket: jest.fn(() => ({ data: undefined })),
+  sendTroubleshootingMessage: jest.fn(() => Promise.resolve({})),
   startTroubleshootingSession: jest.fn(),
   troubleshootingSessionKey: (id: number) => ["troubleshooting", "session", id],
 }));
 
 const mockUseSession = hooks.useTroubleshootingSession as jest.MockedFunction<typeof hooks.useTroubleshootingSession>;
+const mockSend = hooks.sendTroubleshootingMessage as jest.MockedFunction<typeof hooks.sendTroubleshootingMessage>;
 const mockStart = hooks.startTroubleshootingSession as jest.MockedFunction<typeof hooks.startTroubleshootingSession>;
 
 function withSession(session: TroubleshootingSession | null) {
@@ -37,7 +41,45 @@ function renderedSeqs(container: HTMLElement): string[] {
 describe("SessionView with assistant-ui", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (useAuth as jest.Mock).mockReturnValue({ user: { email: "alice@example.com" } });
     Element.prototype.scrollTo = jest.fn();
+  });
+
+  it("renders every visible event as its own message, in order", () => {
+    withSession(sessionWith(events));
+
+    const { container } = renderView();
+
+    expect(renderedSeqs(container)).toEqual(["1", "3", "5", "6"]);
+    expect(screen.getByText("Pods are pending")).toBeInTheDocument();
+    expect(screen.getByText("Looks like scheduling.")).toBeInTheDocument();
+  });
+
+  it("tells the two engineers and the Slack author apart", () => {
+    withSession(sessionWith(events));
+
+    renderView();
+
+    expect(screen.getByText("You")).toBeInTheDocument();
+    expect(screen.getByText("bob")).toBeInTheDocument();
+    expect(screen.getAllByText("U1").length).toBeGreaterThan(0);
+  });
+
+  it("shows the busy state and still lets an engineer send", async () => {
+    const busy: TroubleshootingEvent[] = [
+      ...events,
+      { seq: 7, type: "ROUTER_STATUS", actor: "router", createdAt: "2026-11-18T10:00:00Z", payload: { state: "THINKING", error: null } },
+    ];
+    withSession(sessionWith(busy));
+    renderView();
+
+    expect(screen.getByTestId("router-busy")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "One more thing" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Send/ }));
+    });
+
+    await waitFor(() => expect(mockSend).toHaveBeenCalledWith(42, "One more thing"));
   });
 
   it("renders every Slack message as its own message, in order", () => {

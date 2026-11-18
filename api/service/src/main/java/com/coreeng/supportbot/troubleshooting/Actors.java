@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.troubleshooting;
 
 public final class Actors {
+    public static final String ROUTER = "router";
     public static final String SYSTEM = "system";
 
     private Actors() {}

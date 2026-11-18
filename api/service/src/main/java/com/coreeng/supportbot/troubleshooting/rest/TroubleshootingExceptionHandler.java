@@ -22,6 +22,11 @@ public class TroubleshootingExceptionHandler {
         return problem(HttpStatus.NOT_FOUND, failure.getMessage(), "TROUBLESHOOTING_TICKET_NOT_FOUND");
     }
 
+    @ExceptionHandler(InvalidTroubleshootingRequestException.class)
+    public ProblemDetail invalid(InvalidTroubleshootingRequestException failure) {
+        return problem(HttpStatus.BAD_REQUEST, failure.getMessage(), "TROUBLESHOOTING_REQUEST_INVALID");
+    }
+
     private static ProblemDetail problem(HttpStatus status, @Nullable String detail, String code) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, Objects.requireNonNullElse(detail, code));
         problem.setProperty("code", code);

@@ -699,8 +699,9 @@ Set these on the **API**:
 ## Troubleshooting sessions
 
 A support engineer can open a troubleshooting session for a ticket from the ticket dialog
-(**Troubleshoot**). Starting it copies the query's Slack thread into the session once; the page
-follows the session live. Nothing is posted to Slack. The decision is recorded in
+(**Troubleshoot**). Starting it copies the query's Slack thread into the session once. Engineers
+then write in the session, and a router on the configured LLM answers them, one turn per session
+at a time. The page follows the session live. Nothing is posted to Slack. The decision is recorded in
 [ADR-012](../../../docs/adr/adr-012-ai-troubleshooting-sessions.md); what the tables hold and how to
 erase one person from them is in the
 [troubleshooting sessions runbook](../../../docs/runbooks/troubleshooting-sessions.md).
@@ -709,6 +710,10 @@ erase one person from them is in the
   (`LLM_PROVIDER`); with `none` the feature stays off. `GET /troubleshooting/enabled` reports the
   result to any authenticated user so the UI can show or hide the link.
 - **Roles.** Everything else under `/troubleshooting/**` is for `SUPPORT_ENGINEER` only.
+- **Cost.** Every turn is one LLM call that is sent the ticket and the session log, so turns get
+  dearer as a session grows. `TROUBLESHOOTING_MAX_THREAD_CHARS` (default 40000) caps how much of
+  the log is sent; older events are dropped first. Each turn logs its model, input and output
+  tokens and duration (`Router turn completed`).
 - **Replicas.** Open streams are kept in memory, so the API must run as one replica (as the chart
   does today).
 

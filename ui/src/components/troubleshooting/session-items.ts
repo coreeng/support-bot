@@ -1,9 +1,20 @@
-import type { TroubleshootingEvent, TroubleshootingSession } from "@/lib/types/troubleshooting";
+import type { RouterUsage, TroubleshootingEvent, TroubleshootingSession } from "@/lib/types/troubleshooting";
 
 interface ItemBase {
   seq: number;
   actor: string;
   createdAt: string;
+}
+
+export interface EngineerMessageItem extends ItemBase {
+  kind: "engineer-message";
+  text: string;
+}
+
+export interface RouterMessageItem extends ItemBase {
+  kind: "router-message";
+  text: string;
+  usage: RouterUsage;
 }
 
 export interface SlackMessageItem extends ItemBase {
@@ -12,29 +23,57 @@ export interface SlackMessageItem extends ItemBase {
   available: boolean;
 }
 
-export type SessionItem = SlackMessageItem;
+export interface RouterFailedItem extends ItemBase {
+  kind: "router-failed";
+  error: string;
+}
+
+export type SessionItem = EngineerMessageItem | RouterMessageItem | SlackMessageItem | RouterFailedItem;
 
 export interface SessionView {
   items: SessionItem[];
+  routerBusy: boolean;
   lastSeq: number;
 }
 
-/** Turns the event log into what the timeline shows. */
+function usageOf(payload: RouterUsage): RouterUsage {
+  return {
+    model: payload.model,
+    inputTokens: payload.inputTokens,
+    outputTokens: payload.outputTokens,
+    durationMs: payload.durationMs,
+  };
+}
+
+/** Turns the event log into what the timeline shows. Status events only drive `routerBusy`. */
 export function buildSessionView(events: readonly TroubleshootingEvent[]): SessionView {
   const items: SessionItem[] = [];
+  let routerBusy = false;
   let lastSeq = 0;
 
   for (const event of events) {
     lastSeq = Math.max(lastSeq, event.seq);
     const base = { seq: event.seq, actor: event.actor, createdAt: event.createdAt };
     switch (event.type) {
+      case "ENGINEER_MESSAGE":
+        items.push({ ...base, kind: "engineer-message", text: event.payload.text });
+        break;
+      case "ROUTER_MESSAGE":
+        items.push({ ...base, kind: "router-message", text: event.payload.text, usage: usageOf(event.payload) });
+        break;
       case "SLACK_MESSAGE":
         items.push({ ...base, kind: "slack-message", text: event.payload.text, available: event.payload.available });
+        break;
+      case "ROUTER_STATUS":
+        routerBusy = event.payload.state === "THINKING";
+        if (event.payload.state === "FAILED") {
+          items.push({ ...base, kind: "router-failed", error: event.payload.error ?? "The router could not answer." });
+        }
         break;
     }
   }
 
-  return { items, lastSeq };
+  return { items, routerBusy, lastSeq };
 }
 
 /** Adds events to a session, keeping order by `seq` and dropping any already present. */
@@ -64,6 +103,7 @@ export function createItemReuser(): (next: readonly SessionItem[]) => SessionIte
 
 /** `alex@example.com` reads better as `alex`; other actors are shown as they are. */
 export function actorLabel(actor: string): string {
+  if (actor === "router") return "Router";
   if (actor === "system") return "System";
   if (actor.startsWith("slack:")) return actor.slice("slack:".length);
   const at = actor.indexOf("@");

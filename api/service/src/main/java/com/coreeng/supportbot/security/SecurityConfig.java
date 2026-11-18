@@ -98,7 +98,7 @@ public class SecurityConfig {
                         // Summary data export/import is restricted to support engineers
                         .requestMatchers("/summary-data/**")
                         .hasAnyRole("SUPPORT_ENGINEER")
-                        // Troubleshooting sessions hold thread content.
+                        // Troubleshooting sessions start paid LLM calls and hold thread content.
                         .requestMatchers("/troubleshooting/**")
                         .hasAnyRole("SUPPORT_ENGINEER")
                         // Analysis endpoints restricted to support engineers

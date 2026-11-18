@@ -3,6 +3,10 @@ package com.coreeng.supportbot.troubleshooting;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
+import com.coreeng.supportbot.troubleshooting.Payloads.EngineerMessage;
+import com.coreeng.supportbot.troubleshooting.Payloads.RouterMessage;
+import com.coreeng.supportbot.troubleshooting.Payloads.RouterState;
+import com.coreeng.supportbot.troubleshooting.Payloads.RouterStatus;
 import com.coreeng.supportbot.troubleshooting.Payloads.SlackMessage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -71,6 +75,23 @@ class TroubleshootingErasurePostgresTest {
         slack(SLACK_ID, "My pods are pending. Reach me at Alice@Example.com");
         slack("U0BOB", "<@" + SLACK_ID + "> same here, cc " + EMAIL);
         slack("U0ALICE2", "Not the same person: <@U0ALICE2>, alice@example.org");
+        sessions.append(
+                sessionId, TroubleshootingEventType.ENGINEER_MESSAGE, EMAIL, new EngineerMessage("I will check quota"));
+        sessions.append(
+                sessionId,
+                TroubleshootingEventType.ENGINEER_MESSAGE,
+                "bob@example.com",
+                new EngineerMessage("Thanks ALICE@example.com"));
+        sessions.append(
+                sessionId,
+                TroubleshootingEventType.ROUTER_MESSAGE,
+                Actors.ROUTER,
+                new RouterMessage("Ask <@" + SLACK_ID + "> (" + EMAIL + ") for logs", "test-model", 1, 1, 1));
+        sessions.append(
+                sessionId,
+                TroubleshootingEventType.ROUTER_STATUS,
+                Actors.ROUTER,
+                new RouterStatus(RouterState.FAILED, "could not reach " + EMAIL));
 
         erase(EMAIL, SLACK_ID);
 
@@ -80,7 +101,13 @@ class TroubleshootingErasurePostgresTest {
                 .containsExactly(
                         tuple(1L, "erased", "[erased]"),
                         tuple(2L, "slack:U0BOB", "<@erased> same here, cc [erased]"),
-                        tuple(3L, "slack:U0ALICE2", "Not the same person: <@U0ALICE2>, alice@example.org"));
+                        tuple(3L, "slack:U0ALICE2", "Not the same person: <@U0ALICE2>, alice@example.org"),
+                        tuple(4L, "erased", "[erased]"),
+                        tuple(5L, "bob@example.com", "Thanks [erased]"),
+                        tuple(6L, "router", "Ask <@erased> ([erased]) for logs"),
+                        tuple(7L, "router", ""));
+        assertThat(sessions.events(sessionId).getLast().text("error")).isEqualTo("could not reach [erased]");
+        assertThat(sessions.events(sessionId).get(5).text("model")).isEqualTo("test-model");
         assertThat(sessions.events(sessionId)
                         .getFirst()
                         .payload()
@@ -93,7 +120,7 @@ class TroubleshootingErasurePostgresTest {
                                 Actors.SYSTEM,
                                 new SlackMessage(null, "after erasure", false))
                         .seq())
-                .isEqualTo(4);
+                .isEqualTo(8);
     }
 
     @Test
