@@ -64,6 +64,7 @@ public class PrLifecyclePoller {
     private final SlaLookup slaLookup;
     private final PrMessageRenderer messageRenderer;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
+    private final PrOutcomeReactions prOutcomeReactions;
 
     @Scheduled(cron = "${pr-review-tracking.poll-cron:0 0 9-18 * * 1-5}")
     public void poll() {
@@ -429,10 +430,13 @@ public class PrLifecyclePoller {
     }
 
     /**
-     * Posts the closure message (approved / merged / closed) and auto-closes the ticket when this was
-     * the last closable PR for it. The status write to {@code CLOSED} has already happened in {@link
-     * #apply} via {@link PrLifecycle.SlaOp.SetClosedAt}, so this runs after it — preserving the old
-     * "close, post, then auto-close" order.
+     * Posts the closure message (approved / merged / closed), auto-closes the ticket when this was the
+     * last closable PR for it, and finally swaps the ticket's PR emoji for the configured outcome emoji when
+     * this was the last active PR on it (see {@link PrOutcomeReactions}). The status write to {@code CLOSED}
+     * has already happened in {@link #apply} via {@link PrLifecycle.SlaOp.SetClosedAt}, so this runs after
+     * it — preserving the old "close, post, then auto-close" order. The emoji swap is cosmetic and runs last
+     * so it can never stand between a resolved PR and its ticket closing; it still runs if the auto-close
+     * throws.
      */
     private void notifyClosure(PrTrackingRecord record, MessageEvent event) {
         Ticket ticket = ticketRepository.findTicketById(new TicketId(record.ticketId()));
@@ -444,7 +448,16 @@ public class PrLifecyclePoller {
         }
 
         postMessage(closureMessage(record, event), ticket.channelId(), ticket.queryTs(), record);
+        try {
+            autoCloseTicketIfLastClosable(record, ticket);
+        } finally {
+            // Also after a failed auto-close: the record is already CLOSED and won't be polled again, so
+            // this is the only chance to swap the emoji. onPrResolved never throws, so it can't mask the error.
+            prOutcomeReactions.onPrResolved(ticket, event);
+        }
+    }
 
+    private void autoCloseTicketIfLastClosable(PrTrackingRecord record, Ticket ticket) {
         if (!record.canAutoCloseTicket()) {
             log.atInfo()
                     .addArgument(record::ticketId)

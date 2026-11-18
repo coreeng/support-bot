@@ -171,7 +171,10 @@ ticket:
 pr-review-tracking:
   enabled: false
   poll-cron: 0 0 9-18 * * 1-5
-  pr-emoji: pr                           # Slack emoji name added to the message when a PR is detected
+  pr-emoji: pr                           # Slack emoji added to the ticket's top-level message when a PR is tracked
+  # outcome-emojis:                      # optional: replace pr-emoji once every tracked PR on the ticket has resolved
+  #   merged: <emoji-name>               # PR merged or approved and ready to merge, and any ticket with several PRs; unset = keep pr-emoji
+  #   closed: <emoji-name>               # the ticket's only PR closed without merging; unset = keep pr-emoji
   tags: PR                               # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
   impact: Information Request            # Required when enabled: impact code from enums.impacts, applied when the bot auto-closes a ticket
   repositories: [ ]

@@ -322,7 +322,10 @@ metrics: # Prometheus metrics populated from database
 pr-review-tracking:
   enabled: false # Feature flag — off by default
   poll-cron: 0 0 9-18 * * 1-5 # Cron for the lifecycle poller (default: business hours Mon–Fri UTC)
-  pr-emoji: pr # Slack reaction added when a PR/MR is detected — must already exist in your workspace
+  pr-emoji: pr # Slack reaction added to the ticket's top-level message when a PR/MR is tracked — must already exist in your workspace
+  # outcome-emojis: # Optional: swap pr-emoji for an outcome emoji once every PR on the ticket has resolved
+  #   merged: <emoji-name> # Merged or approved and ready to merge, and any ticket with several PRs
+  #   closed: <emoji-name> # The ticket's only PR closed without merging
   tags: # Required when enabled: tag code(s) from enums.tags applied when the bot auto-closes the ticket
     - <tag-code>
   impact: <impact-code> # Required when enabled: impact code from enums.impacts applied on auto-close
@@ -826,7 +829,10 @@ the app from starting rather than failing silently at runtime.
 pr-review-tracking:
   enabled: true                            # master feature flag (default: false)
   poll-cron: "0 0 9-18 * * 1-5"            # lifecycle poller schedule (default: business hours, Mon–Fri UTC)
-  pr-emoji: pr                             # Slack reaction added to the detected message (default: pr)
+  pr-emoji: pr                             # Slack reaction added to the ticket's top-level message when a PR is tracked (default: pr)
+  outcome-emojis:                          # optional; replaces pr-emoji once every tracked PR on the ticket has resolved
+    merged: pr-merged                      # merged or approved and ready to merge, and any ticket with several PRs (unset: keep pr-emoji)
+    closed: pr-closed                      # the ticket's only PR closed without merging (unset: keep pr-emoji)
   tags: [PR]                               # tag code(s) from enums.tags, applied when the bot auto-closes the ticket
   impact: Information Request              # impact code from enums.impacts, applied on auto-close
   duration-unit: days                      # optional; how bare SLA numbers are read: hours | days | weeks (default: days)
@@ -856,7 +862,9 @@ pr-review-tracking:
 |-----|----------|---------|-------------|
 | `enabled` | — | `false` | Master feature flag. When false, no PR-tracking beans, schedulers, or REST endpoints are created. |
 | `poll-cron` | when enabled | `0 0 9-18 * * 1-5` | Spring cron expression for the lifecycle poller. |
-| `pr-emoji` | — | `pr` | Slack reaction added to the detected message. Must already exist in the workspace. |
+| `pr-emoji` | — | `pr` | Slack reaction added to the ticket's top-level message when a PR is tracked, even if the link was posted in a reply. Must already exist in the workspace. |
+| `outcome-emojis.merged` | — | — | Slack reaction that replaces `pr-emoji` when the ticket's PR was merged, or approved and ready to merge, and for any ticket with several tracked PRs once they are all done. Unset keeps `pr-emoji`. See [Outcome emojis](#outcome-emojis). |
+| `outcome-emojis.closed` | — | — | Slack reaction that replaces `pr-emoji` when the ticket's only tracked PR was closed without merging. Unset keeps `pr-emoji`. See [Outcome emojis](#outcome-emojis). |
 | `tags` | when enabled | — | One or more codes from `enums.tags`, applied to the ticket on auto-close. |
 | `impact` | when enabled | — | A code from `enums.impacts`, applied to the ticket on auto-close. |
 | `duration-unit` | — | `days` | How a bare numeric SLA value is interpreted: `hours`, `days`, or `weeks`. |
@@ -864,6 +872,37 @@ pr-review-tracking:
 | `github` | when any GitHub repo | — | GitHub connection block (see [Token permissions](#token-permissions)). |
 | `gitlab` | when any GitLab repo | — | GitLab connection block (see [Token permissions](#token-permissions)). |
 | `repositories` | when enabled | — | Repositories to watch; at least one entry. See [Per-repository configuration](#per-repository-configuration). |
+
+### Outcome emojis
+
+By default the `pr-emoji` reaction stays on the ticket's query message after the PR resolves. Set
+`outcome-emojis` to have the bot replace it with an emoji for how things ended:
+
+- `merged` is used when the PR is merged. For repositories without `requires-codeowners`, tracking
+  ends once the PR is approved and ready to merge, so `merged` appears at that point. For
+  `requires-codeowners` repositories it appears when the PR is actually merged.
+- `closed` is used when the PR is closed without merging.
+
+The ticket's query message normally keeps a single PR emoji. When a ticket has several tracked PRs, `pr-emoji`
+stays until none of them are still active, and then becomes `merged`. Outcomes aren't tracked per PR,
+so a ticket with several PRs always shows `merged`, even if some or all of them were closed without
+merging. If a new PR is tracked on the ticket later, `pr-emoji` is added back and, once it's on, the
+outcome emoji is removed.
+
+The bot adds the outcome emoji before it removes `pr-emoji`. If the add fails (for example, the emoji
+doesn't exist in the workspace), `pr-emoji` stays and the failure is logged. If removing `pr-emoji`
+fails after the outcome emoji was added, both stay on the message. The swap runs after the ticket
+auto-close, never blocks it, and still runs if the auto-close fails; a failed swap is not retried.
+
+Both emojis must already exist in the workspace and use the bare name without surrounding colons
+(skin-tone variants such as `thumbsup::skin-tone-2` are fine). When either is set, they must differ from `pr-emoji` and
+from the ticket reactions on the same message (the `slack.ticket.*-reaction` settings), and
+`pr-emoji` itself must not be one of those ticket reactions, because the swap
+removes it. The bot refuses to start otherwise. No extra Slack scopes are needed beyond the
+`reactions:write` the bot already uses.
+
+The bot only clears the outcome emojis that are configured now. If you rename or remove one, tickets
+that already show the old emoji keep it.
 
 ### Token permissions
 

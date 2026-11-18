@@ -2,6 +2,7 @@
 
 **Date:** 2026-03-24
 **Status:** Accepted
+**Amended:** 2026-11-18 — closure can also swap the ticket's PR emoji for a configured outcome emoji (§5).
 
 ---
 
@@ -120,6 +121,8 @@ A support ticket is closed when all active closable PR tracking records for that
 | PR is merged | Closure notification (existing) |
 | PR is closed (not merged) | Closure notification (existing) |
 | PR is approved by owning team AND mergeable | Approval + ready-to-merge notification |
+
+When `outcome-emojis` is configured, the closure that leaves no active tracked PR on the ticket also replaces its PR emoji with the outcome emoji (see [ADR-004](adr-004-pr-identification-and-sla-tracking.md) §5 step 4). Unlike auto-close, this waits for every tracked PR, including thread-reply PRs that can't close the ticket, so a ticket can close while its PR emoji stays. It runs after any auto-close attempt (and still runs if that fails) and is best-effort, so it never blocks the ticket closing.
 
 "Mergeable" means the GitHub API reports the PR as mergeable (checks passing, no blocking reviews outstanding, no merge conflicts). If the PR is approved but not yet mergeable, it remains in `APPROVED` state and will be checked again on the next poll cycle.
 

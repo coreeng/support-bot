@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -49,7 +52,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -93,6 +99,9 @@ class PrLifecyclePollerTest {
 
     @Mock
     private EscalationTeamsRegistry escalationTeamsRegistry;
+
+    @Mock
+    private PrOutcomeReactions prOutcomeReactions;
 
     // Tracks every PrTrackingRecord built by a test (via record()/pausedRecord()/register()), keyed by
     // id, so the generic write-method stubs below can return an updated row — mirroring
@@ -526,6 +535,8 @@ class PrLifecyclePollerTest {
         // then
         verify(ticketProcessingService, never()).closeForPrResolution(any(), any(), any());
         verify(prTrackingRepository, never()).hasAnyActiveClosableForTicket(anyLong());
+        // a thread-reply PR can't auto-close the ticket, but its emoji sits on the top-level message too
+        verify(prOutcomeReactions).onPrResolved(ticketWithId(100L), eq(MessageEvent.CLOSED));
     }
 
     @Test
@@ -553,6 +564,7 @@ class PrLifecyclePollerTest {
         ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
         verify(slackClient).postMessage(captor.capture());
         assertThat(captor.getValue().message().getText()).contains("has been merged");
+        verify(prOutcomeReactions).onPrResolved(ticketWithId(100L), eq(MessageEvent.MERGED));
     }
 
     @Test
@@ -580,6 +592,118 @@ class PrLifecyclePollerTest {
         ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
         verify(slackClient).postMessage(captor.capture());
         assertThat(captor.getValue().message().getText()).contains("has been closed");
+        verify(prOutcomeReactions).onPrResolved(ticketWithId(100L), eq(MessageEvent.CLOSED));
+    }
+
+    @Test
+    void handsOffToOutcomeReactionsOnlyAfterTheClosedWriteAndTheTicketAutoClose() {
+        // given — the emoji is cosmetic, so it must never stand between a resolved PR and its ticket closing
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record = record(
+                1L,
+                100L,
+                "my-org/repo-a",
+                42,
+                PrTrackingStatus.OPEN,
+                Instant.now().plusSeconds(7200));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                .thenReturn(mergedPr(record));
+        Ticket ticket = ticket(100L);
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket);
+        when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
+                .thenReturn(false);
+        when(prTrackingProps.tags()).thenReturn(List.of("pr-review"));
+        when(prTrackingProps.impact()).thenReturn("low");
+
+        // when
+        poller.poll();
+
+        // then
+        InOrder inOrder = inOrder(prTrackingRepository, ticketProcessingService, prOutcomeReactions);
+        inOrder.verify(prTrackingRepository)
+                .updateStatus(eq(record.id()), eq(PrTrackingStatus.CLOSED), any(Instant.class), isNull());
+        inOrder.verify(ticketProcessingService).closeForPrResolution(eq(new TicketId(100L)), any(), any());
+        inOrder.verify(prOutcomeReactions).onPrResolved(eq(ticket), eq(MessageEvent.MERGED));
+    }
+
+    @Test
+    void handsOffToOutcomeReactionsEvenWhenTheTicketAutoCloseFails() {
+        // given — the record is already CLOSED and won't be polled again, so this is the only chance to swap
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record = record(
+                1L,
+                100L,
+                "my-org/repo-a",
+                42,
+                PrTrackingStatus.OPEN,
+                Instant.now().plusSeconds(7200));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                .thenReturn(mergedPr(record));
+        Ticket ticket = ticket(100L);
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket);
+        when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
+                .thenReturn(false);
+        when(prTrackingProps.tags()).thenReturn(List.of("pr-review"));
+        when(prTrackingProps.impact()).thenReturn("low");
+        doThrow(new IllegalStateException("chat.update failed"))
+                .when(ticketProcessingService)
+                .closeForPrResolution(any(), any(), any());
+
+        // when — the auto-close failure is still caught and logged per record, exactly as before
+        assertDoesNotThrow(poller::poll);
+
+        // then
+        verify(prOutcomeReactions).onPrResolved(eq(ticket), eq(MessageEvent.MERGED));
+    }
+
+    // Merge-phase states (requires-codeowners) close only on the real merge; the other active states are
+    // covered by their own "closes when merged" tests.
+    @ParameterizedTest
+    @EnumSource(
+            value = PrTrackingStatus.class,
+            names = {"AWAITING_MERGE", "MERGE_ESCALATED"})
+    void handsOffToOutcomeReactionsWhenAMergePhasePrMerges(PrTrackingStatus from) {
+        // given
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record =
+                record(1L, 100L, "my-org/repo-a", 42, from, Instant.now().plusSeconds(7200));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                .thenReturn(mergedPr(record));
+        Ticket ticket = ticket(100L);
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket);
+        when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
+                .thenReturn(true);
+
+        // when
+        poller.poll();
+
+        // then
+        verify(prOutcomeReactions).onPrResolved(eq(ticket), eq(MessageEvent.MERGED));
+    }
+
+    @Test
+    void doesNotTouchOutcomeReactionsWhileThePrStaysOpen() {
+        // given
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record = record(
+                1L,
+                100L,
+                "my-org/repo-a",
+                42,
+                PrTrackingStatus.OPEN,
+                Instant.now().plusSeconds(7200));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                .thenReturn(openPr(record));
+
+        // when
+        poller.poll();
+
+        // then
+        verifyNoInteractions(prOutcomeReactions);
     }
 
     @Test
@@ -802,6 +926,7 @@ class PrLifecyclePollerTest {
             ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
             verify(slackClient).postMessage(captor.capture());
             assertThat(captor.getValue().message().getText()).contains("approved and is ready to merge");
+            verify(prOutcomeReactions).onPrResolved(ticketWithId(100L), eq(MessageEvent.APPROVED));
         }
 
         @Test
@@ -1228,6 +1353,7 @@ class PrLifecyclePollerTest {
             // then
             verify(prTrackingRepository)
                     .updateStatus(eq(record.id()), eq(PrTrackingStatus.CLOSED), any(Instant.class), isNull());
+            verify(prOutcomeReactions).onPrResolved(ticketWithId(100L), eq(MessageEvent.MERGED));
         }
     }
 
@@ -2410,6 +2536,7 @@ class PrLifecyclePollerTest {
             // then — closed via handlePrClosed, not processEscalatedRecord
             verify(prTrackingRepository)
                     .updateStatus(eq(record.id()), eq(PrTrackingStatus.CLOSED), any(Instant.class), isNull());
+            verify(prOutcomeReactions).onPrResolved(ticketWithId(100L), eq(MessageEvent.MERGED));
         }
 
         @Test
@@ -2481,7 +2608,8 @@ class PrLifecyclePollerTest {
                 prTrackingProps,
                 slaLookup,
                 messageRenderer,
-                escalationTeamsRegistry);
+                escalationTeamsRegistry,
+                prOutcomeReactions);
     }
 
     /** mergePhaseEntered is derived from status: AWAITING_MERGE/MERGE_ESCALATED means it's already true. */
@@ -2638,5 +2766,10 @@ class PrLifecyclePollerTest {
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                 .lastInteractedAt(Instant.now())
                 .build();
+    }
+
+    private static Ticket ticketWithId(long id) {
+        return argThat(
+                ticket -> ticket != null && ticket.id() != null && ticket.id().id() == id);
     }
 }

@@ -190,6 +190,29 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                                 PrTrackingStatus.MERGE_ESCALATED)));
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public boolean hasAnyActiveForTicket(long ticketId) {
+        return dsl.fetchExists(
+                PR_TRACKING,
+                PR_TRACKING
+                        .TICKET_ID
+                        .eq(ticketId)
+                        .and(PR_TRACKING.STATUS.in(
+                                PrTrackingStatus.OPEN,
+                                PrTrackingStatus.ESCALATED,
+                                PrTrackingStatus.CHANGES_REQUESTED,
+                                PrTrackingStatus.APPROVED,
+                                PrTrackingStatus.AWAITING_MERGE,
+                                PrTrackingStatus.MERGE_ESCALATED)));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public int countForTicket(long ticketId) {
+        return dsl.fetchCount(PR_TRACKING, PR_TRACKING.TICKET_ID.eq(ticketId));
+    }
+
     @Override
     public void updateActivityTimestamps(
             long id, @Nullable Instant lastReviewAt, @Nullable Instant lastAuthorActivityAt) {
