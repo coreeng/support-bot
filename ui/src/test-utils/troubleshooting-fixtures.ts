@@ -10,6 +10,13 @@ export const events: TroubleshootingEvent[] = [
   { seq: 4, type: "ROUTER_STATUS", actor: "router", createdAt: at, payload: { state: "IDLE", error: null } },
   { seq: 5, type: "ENGINEER_MESSAGE", actor: "alice@example.com", createdAt: at, payload: { text: "Quota?" } },
   { seq: 6, type: "ENGINEER_MESSAGE", actor: "bob@example.com", createdAt: at, payload: { text: "Check events first." } },
+  {
+    seq: 7,
+    type: "PROPOSAL",
+    actor: "router",
+    createdAt: at,
+    payload: { ...usage, action: "REPLY", text: "We are on it.", reason: "The author is waiting." },
+  },
 ];
 
 export const slackEvents: TroubleshootingEvent[] = [

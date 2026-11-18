@@ -19,6 +19,10 @@ export function convertItem(item: SessionItem): ThreadMessageLike {
       return { ...common, role: "assistant", status: COMPLETE, content: [{ type: "text", text: item.text }] };
     case "slack-message":
       return { ...common, role: "assistant", status: COMPLETE, content: [{ type: "data-slack-message", data: item }] };
+    case "proposal":
+      return { ...common, role: "assistant", status: COMPLETE, content: [{ type: "data-proposal", data: item }] };
+    case "run-update":
+      return { ...common, role: "assistant", status: COMPLETE, content: [{ type: "data-run-update", data: item }] };
     case "router-failed":
       return { ...common, role: "assistant", status: COMPLETE, content: [{ type: "data-router-failed", data: item }] };
   }

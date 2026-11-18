@@ -1,4 +1,6 @@
-import type { RouterUsage, TroubleshootingEvent, TroubleshootingSession } from "@/lib/types/troubleshooting";
+import type { DecisionKind, RouterAction, RouterUsage, TroubleshootingEvent, TroubleshootingSession } from "@/lib/types/troubleshooting";
+
+export type ProposalState = "PENDING" | DecisionKind;
 
 interface ItemBase {
   seq: number;
@@ -23,12 +25,29 @@ export interface SlackMessageItem extends ItemBase {
   available: boolean;
 }
 
+export interface ProposalItem extends ItemBase {
+  kind: "proposal";
+  action: RouterAction;
+  text: string;
+  reason: string;
+  usage: RouterUsage;
+  state: ProposalState;
+  decidedBy: string | null;
+  decidedText: string | null;
+}
+
+export interface RunUpdateItem extends ItemBase {
+  kind: "run-update";
+  runKind: string;
+  text: string;
+}
+
 export interface RouterFailedItem extends ItemBase {
   kind: "router-failed";
   error: string;
 }
 
-export type SessionItem = EngineerMessageItem | RouterMessageItem | SlackMessageItem | RouterFailedItem;
+export type SessionItem = EngineerMessageItem | RouterMessageItem | SlackMessageItem | ProposalItem | RunUpdateItem | RouterFailedItem;
 
 export interface SessionView {
   items: SessionItem[];
@@ -45,9 +64,10 @@ function usageOf(payload: RouterUsage): RouterUsage {
   };
 }
 
-/** Turns the event log into what the timeline shows. Status events only drive `routerBusy`. */
+/** Turns the event log into what the timeline shows. Decisions fold into their proposal; status events only drive `routerBusy`. */
 export function buildSessionView(events: readonly TroubleshootingEvent[]): SessionView {
   const items: SessionItem[] = [];
+  const proposals = new Map<number, ProposalItem>();
   let routerBusy = false;
   let lastSeq = 0;
 
@@ -63,6 +83,34 @@ export function buildSessionView(events: readonly TroubleshootingEvent[]): Sessi
         break;
       case "SLACK_MESSAGE":
         items.push({ ...base, kind: "slack-message", text: event.payload.text, available: event.payload.available });
+        break;
+      case "PROPOSAL": {
+        const proposal: ProposalItem = {
+          ...base,
+          kind: "proposal",
+          action: event.payload.action,
+          text: event.payload.text,
+          reason: event.payload.reason,
+          usage: usageOf(event.payload),
+          state: "PENDING",
+          decidedBy: null,
+          decidedText: null,
+        };
+        proposals.set(event.seq, proposal);
+        items.push(proposal);
+        break;
+      }
+      case "DECISION": {
+        const proposal = proposals.get(event.payload.proposalSeq);
+        if (proposal && proposal.state === "PENDING") {
+          proposal.state = event.payload.decision;
+          proposal.decidedBy = event.actor;
+          proposal.decidedText = event.payload.text;
+        }
+        break;
+      }
+      case "RUN_UPDATE":
+        items.push({ ...base, kind: "run-update", runKind: event.payload.kind, text: event.payload.text });
         break;
       case "ROUTER_STATUS":
         routerBusy = event.payload.state === "THINKING";

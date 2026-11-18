@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.troubleshooting.router;
 
 public enum RouterAction {
-    DISCUSS
+    DISCUSS,
+    REPLY,
+    INVESTIGATE,
+    CLOSE
 }

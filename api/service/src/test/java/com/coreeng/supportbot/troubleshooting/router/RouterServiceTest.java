@@ -39,17 +39,9 @@ class RouterServiceTest {
     @Test
     void parsesAWellFormedDecision() {
         RouterDecision decision = service(mock(ChatModel.class))
-                .parse("{\"action\":\"DISCUSS\",\"text\":\"Hello\",\"reason\":\"waiting\"}", FinishReason.STOP);
+                .parse("{\"action\":\"REPLY\",\"text\":\"Hello\",\"reason\":\"waiting\"}", FinishReason.STOP);
 
-        assertThat(decision).isEqualTo(new RouterDecision(RouterAction.DISCUSS, "Hello", "waiting"));
-    }
-
-    @Test
-    void refusesAnActionThatWouldNeedAnEngineersApproval() {
-        assertThatThrownBy(() -> service(mock(ChatModel.class))
-                        .parse("{\"action\":\"REPLY\",\"text\":\"x\",\"reason\":\"y\"}", FinishReason.STOP))
-                .isInstanceOf(RouterFailureException.class)
-                .hasMessage("unknown action 'REPLY'");
+        assertThat(decision).isEqualTo(new RouterDecision(RouterAction.REPLY, "Hello", "waiting"));
     }
 
     @Test
@@ -113,7 +105,7 @@ class RouterServiceTest {
         assertThat(body.at("/output_config/format/type").asText()).isEqualTo("json_schema");
         assertThat(body.at("/output_config/format/schema/properties/action/enum")
                         .toString())
-                .isEqualTo("[\"DISCUSS\"]");
+                .contains("DISCUSS", "REPLY", "INVESTIGATE", "CLOSE");
         String userText = body.at("/messages/0/content/0/text").asText();
         assertThat(userText)
                 .contains(RouterPromptBuilder.LOG_START)

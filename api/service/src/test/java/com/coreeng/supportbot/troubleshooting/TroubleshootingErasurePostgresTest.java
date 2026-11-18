@@ -3,11 +3,15 @@ package com.coreeng.supportbot.troubleshooting;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
+import com.coreeng.supportbot.troubleshooting.Payloads.DecisionKind;
 import com.coreeng.supportbot.troubleshooting.Payloads.EngineerMessage;
+import com.coreeng.supportbot.troubleshooting.Payloads.Proposal;
 import com.coreeng.supportbot.troubleshooting.Payloads.RouterMessage;
 import com.coreeng.supportbot.troubleshooting.Payloads.RouterState;
 import com.coreeng.supportbot.troubleshooting.Payloads.RouterStatus;
+import com.coreeng.supportbot.troubleshooting.Payloads.RunUpdate;
 import com.coreeng.supportbot.troubleshooting.Payloads.SlackMessage;
+import com.coreeng.supportbot.troubleshooting.router.RouterAction;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -92,6 +96,23 @@ class TroubleshootingErasurePostgresTest {
                 TroubleshootingEventType.ROUTER_STATUS,
                 Actors.ROUTER,
                 new RouterStatus(RouterState.FAILED, "could not reach " + EMAIL));
+        TroubleshootingEvent proposal = sessions.appendRouterOutput(
+                sessionId,
+                TroubleshootingEventType.PROPOSAL,
+                new Proposal(
+                        RouterAction.REPLY,
+                        "Hi <@" + SLACK_ID + ">, can you share the pod events?",
+                        "Asked by " + EMAIL,
+                        "test-model",
+                        1,
+                        1,
+                        1));
+        sessions.decide(sessionId, proposal.seq(), EMAIL, DecisionKind.APPROVED, "Hi, can you share the events?");
+        sessions.append(
+                sessionId,
+                TroubleshootingEventType.RUN_UPDATE,
+                Actors.SYSTEM,
+                new RunUpdate("WOULD_POST", "Would post to the Slack thread (not posted):\nHi <@" + SLACK_ID + ">"));
 
         erase(EMAIL, SLACK_ID);
 
@@ -105,8 +126,19 @@ class TroubleshootingErasurePostgresTest {
                         tuple(4L, "erased", "[erased]"),
                         tuple(5L, "bob@example.com", "Thanks [erased]"),
                         tuple(6L, "router", "Ask <@erased> ([erased]) for logs"),
-                        tuple(7L, "router", ""));
-        assertThat(sessions.events(sessionId).getLast().text("error")).isEqualTo("could not reach [erased]");
+                        tuple(7L, "router", ""),
+                        tuple(8L, "router", "Hi <@erased>, can you share the pod events?"),
+                        tuple(9L, "erased", "[erased]"),
+                        tuple(10L, "system", "Would post to the Slack thread (not posted):\nHi <@erased>"));
+        assertThat(sessions.events(sessionId).get(7).text("reason")).isEqualTo("Asked by [erased]");
+        assertThat(sessions.events(sessionId).get(8).text("decision")).isEqualTo("APPROVED");
+        assertThat(sessions.events(sessionId)
+                        .get(8)
+                        .payload()
+                        .path("proposalSeq")
+                        .asLong())
+                .isEqualTo(8);
+        assertThat(sessions.events(sessionId).get(6).text("error")).isEqualTo("could not reach [erased]");
         assertThat(sessions.events(sessionId).get(5).text("model")).isEqualTo("test-model");
         assertThat(sessions.events(sessionId)
                         .getFirst()
@@ -120,7 +152,7 @@ class TroubleshootingErasurePostgresTest {
                                 Actors.SYSTEM,
                                 new SlackMessage(null, "after erasure", false))
                         .seq())
-                .isEqualTo(8);
+                .isEqualTo(11);
     }
 
     @Test

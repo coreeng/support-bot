@@ -2,7 +2,9 @@ package com.coreeng.supportbot.troubleshooting.rest;
 
 import com.coreeng.supportbot.security.UserPrincipal;
 import com.coreeng.supportbot.troubleshooting.ConditionalOnTroubleshootingEnabled;
+import com.coreeng.supportbot.troubleshooting.Payloads.DecisionKind;
 import com.coreeng.supportbot.troubleshooting.TroubleshootingService;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -50,6 +52,23 @@ public class TroubleshootingController {
                     "Message text must be between 1 and " + MAX_MESSAGE_CHARS + " characters");
         }
         return TroubleshootingMapper.toUI(service.sendMessage(ticketId, user.email(), text));
+    }
+
+    @PostMapping("/proposals/{seq}/decision")
+    public TroubleshootingEventUI decide(
+            @PathVariable long ticketId,
+            @PathVariable long seq,
+            @RequestBody DecisionRequest request,
+            @AuthenticationPrincipal UserPrincipal user) {
+        String decision = request.decision() == null ? "" : request.decision().toUpperCase(Locale.ROOT);
+        DecisionKind kind =
+                switch (decision) {
+                    case "APPROVED" -> DecisionKind.APPROVED;
+                    case "REJECTED" -> DecisionKind.REJECTED;
+                    default ->
+                        throw new InvalidTroubleshootingRequestException("Decision must be APPROVED or REJECTED");
+                };
+        return TroubleshootingMapper.toUI(service.decide(ticketId, seq, user.email(), kind, request.text()));
     }
 
     @GetMapping(path = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

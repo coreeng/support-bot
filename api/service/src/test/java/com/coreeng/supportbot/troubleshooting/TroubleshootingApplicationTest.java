@@ -2,6 +2,8 @@ package com.coreeng.supportbot.troubleshooting;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,6 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.troubleshooting.Payloads.Proposal;
+import com.coreeng.supportbot.troubleshooting.router.RouterAction;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.model.Message;
 import java.time.Duration;
@@ -57,6 +61,9 @@ class TroubleshootingApplicationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private TroubleshootingSessionService sessions;
 
     @MockitoBean
     private SlackClient slackClient;
@@ -150,6 +157,38 @@ class TroubleshootingApplicationTest {
     }
 
     @Test
+    void theFirstDecisionOnAProposalWinsAndAnApprovedReplyIsOnlyRecorded() throws Exception {
+        when(slackClient.getThreadPage(any())).thenThrow(new IllegalStateException("thread_not_found"));
+        mockMvc.perform(asEngineer(post(sessionPath()))).andExpect(status().isOk());
+        awaitSettledRouter();
+        long sessionId = sessions.requireByTicketId(ticketId).id();
+        long proposalSeq = sessions.appendRouterOutput(
+                        sessionId,
+                        TroubleshootingEventType.PROPOSAL,
+                        new Proposal(RouterAction.REPLY, "We are on it", "author waiting", "test-model", 1, 1, 1))
+                .seq();
+        String decision = sessionPath() + "/proposals/" + proposalSeq + "/decision";
+
+        mockMvc.perform(asEngineer(post(decision))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"APPROVED\",\"text\":\"We are on it, edited\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("DECISION"))
+                .andExpect(jsonPath("$.payload.text").value("We are on it, edited"));
+        mockMvc.perform(post(decision)
+                        .header("X-Test-User", "bob@example.com")
+                        .header("X-Test-Role", "support")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"REJECTED\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TROUBLESHOOTING_PROPOSAL_NOT_PENDING"));
+
+        verify(slackClient, never()).postMessage(any());
+        assertThat(sessions.events(sessionId).getLast().text("text"))
+                .isEqualTo("Would post to the Slack thread (not posted):\nWe are on it, edited");
+    }
+
+    @Test
     void refusesUsersWhoAreNotSupportEngineers() throws Exception {
         mockMvc.perform(get(sessionPath()).header("X-Test-User", "tenant@example.com"))
                 .andExpect(status().isForbidden());
@@ -174,8 +213,8 @@ class TroubleshootingApplicationTest {
                             + " ORDER BY e.seq",
                     String.class,
                     ticketId);
-            int lastMessage = log.lastIndexOf("ENGINEER_MESSAGE");
-            if (lastMessage >= 0
+            int lastMessage = Math.max(0, log.lastIndexOf("ENGINEER_MESSAGE"));
+            if (!log.isEmpty()
                     && log.subList(lastMessage, log.size()).contains("ROUTER_STATUS:THINKING")
                     && !log.getLast().equals("ROUTER_STATUS:THINKING")
                     && log.getLast().startsWith("ROUTER_STATUS")) {

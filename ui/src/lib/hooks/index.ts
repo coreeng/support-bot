@@ -1013,3 +1013,7 @@ export function startTroubleshootingSession(ticketId: number) {
 export function sendTroubleshootingMessage(ticketId: number, text: string) {
   return troubleshootingPost<unknown>(`${ticketId}/session/messages`, { text });
 }
+
+export function decideTroubleshootingProposal(ticketId: number, proposalSeq: number, decision: "APPROVED" | "REJECTED", text?: string) {
+  return troubleshootingPost<unknown>(`${ticketId}/session/proposals/${proposalSeq}/decision`, { decision, text });
+}

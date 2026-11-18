@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.troubleshooting.rest;
 
+import com.coreeng.supportbot.troubleshooting.ProposalNotPendingException;
 import com.coreeng.supportbot.troubleshooting.TicketNotFoundForSessionException;
 import com.coreeng.supportbot.troubleshooting.TroubleshootingSessionNotFoundException;
 import java.util.Objects;
@@ -20,6 +21,12 @@ public class TroubleshootingExceptionHandler {
     @ExceptionHandler(TicketNotFoundForSessionException.class)
     public ProblemDetail ticketNotFound(TicketNotFoundForSessionException failure) {
         return problem(HttpStatus.NOT_FOUND, failure.getMessage(), "TROUBLESHOOTING_TICKET_NOT_FOUND");
+    }
+
+    /** A second decision, or one on a proposal a newer turn replaced. The card updates from the stream. */
+    @ExceptionHandler(ProposalNotPendingException.class)
+    public ProblemDetail proposalNotPending(ProposalNotPendingException failure) {
+        return problem(HttpStatus.CONFLICT, failure.getMessage(), "TROUBLESHOOTING_PROPOSAL_NOT_PENDING");
     }
 
     @ExceptionHandler(InvalidTroubleshootingRequestException.class)

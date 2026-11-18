@@ -13,7 +13,7 @@ places, which is what `erasure-compliance.yaml` lists as `anonymised`:
 - **`actor`**: who the event is from. The engineer's email for what an engineer did,
   `slack:<user id>` for a message in the query's Slack thread (`slack:bot:<bot id>` for a bot),
   `router` or `system`.
-- **Free text in `payload`**: the `text` and `error` fields. A person's own words are in the events
+- **Free text in `payload`**: the `text`, `reason` and `error` fields. A person's own words are in the events
   whose `actor` is that person. Anyone's text can mention someone else, as an email address or as a
   Slack mention such as `<@U0123ABCD>`.
 
@@ -24,6 +24,9 @@ No payload field holds a user id or an email on its own: who an event is from is
 | `SLACK_MESSAGE` | `slack:<user id>`, or `system` when the thread could not be read | `text` |
 | `ENGINEER_MESSAGE` | engineer email | `text` |
 | `ROUTER_MESSAGE` | `router` | `text` |
+| `PROPOSAL` | `router` | `text`, `reason` |
+| `DECISION` | engineer email, or `router` when a newer turn replaced the proposal | `text` (an engineer's edit) |
+| `RUN_UPDATE` | `system` | `text` |
 | `ROUTER_STATUS` | `router` | `error` |
 
 ## Erasing one person
@@ -64,4 +67,7 @@ What it does not reach:
   messages from other people can do that, and so can the router: its messages are model output
   written from the whole log, and can repeat what the person wrote. If the request needs it, search the `text` fields for
   the name and rewrite those events by hand, or delete the ticket's session (its events first).
+- Words the person wrote that another event copies. An approved reply's text, which may be an
+  engineer's edit, is repeated in the `WOULD_POST` run update that follows the decision; that run
+  update keeps it unless it also holds the email or Slack id.
 - The Slack thread itself. Sessions copy it; erasing it in Slack is a separate step.
