@@ -16,6 +16,18 @@ public interface TicketSlackService {
 
     void markTicketEscalated(MessageRef threadRef);
 
+    /**
+     * Adds the bot's {@code name} reaction to the message, tolerating it already being there. Any other Slack
+     * error propagates. A mocked message is skipped.
+     */
+    void addReaction(MessageRef messageRef, String name);
+
+    /**
+     * Removes the bot's {@code name} reaction from the message, tolerating it already being absent. Any other
+     * Slack error propagates. A mocked message is skipped.
+     */
+    void removeReaction(MessageRef messageRef, String name);
+
     MessageRef postTicketForm(MessageRef threadRef, TicketCreatedMessage message);
 
     void editTicketForm(MessageRef threadRef, TicketCreatedMessage message);

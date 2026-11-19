@@ -94,6 +94,9 @@ team:
 pr-review-tracking:
   enabled: true
   pr-emoji: pr
+  outcome-emojis:
+    merged: pr-merged
+    closed: pr-closed
   tags: networking
   impact: productionBlocking
   repositories:

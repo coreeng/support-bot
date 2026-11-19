@@ -48,6 +48,15 @@ public interface PrTrackingRepository {
      */
     boolean hasAnyActiveClosableForTicket(long ticketId);
 
+    /**
+     * Returns true if any non-terminal record (OPEN, ESCALATED, CHANGES_REQUESTED, APPROVED, AWAITING_MERGE,
+     * MERGE_ESCALATED) still exists for this ticket, whether or not it can auto-close the ticket.
+     */
+    boolean hasAnyActiveForTicket(long ticketId);
+
+    /** Returns the number of PR tracking records for this ticket, in any status. */
+    int countForTicket(long ticketId);
+
     /** Updates activity timestamps on a tracking record. */
     void updateActivityTimestamps(long id, @Nullable Instant lastReviewAt, @Nullable Instant lastAuthorActivityAt);
 

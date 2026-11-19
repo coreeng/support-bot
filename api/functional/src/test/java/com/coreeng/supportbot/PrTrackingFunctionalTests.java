@@ -329,6 +329,99 @@ public class PrTrackingFunctionalTests {
     }
 
     @Test
+    public void whenANewPrIsTrackedOnATicketWhosePrsHadResolved_outcomeEmojiIsCleared() {
+        // given — a ticket whose earlier PR has already resolved (so its query message would show an outcome
+        // emoji)
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        SlackTestKit asTenantSlack = asTenant.slack();
+        SlackTestKit asSupportSlack = testKit.as(support).slack();
+
+        MessageTs queryTs = MessageTs.now();
+        String queryText = "Please help with my issue";
+        SlackMessage tenantsQuery = asTenantSlack.postMessage(queryTs, queryText);
+
+        MessageTs ticketMessageTs = MessageTs.now();
+        var creationStubs = tenantsQuery.stubTicketCreationFlow("ticket created", ticketMessageTs);
+        asSupportSlack.addReactionTo(tenantsQuery, "eyes");
+        creationStubs.awaitAllCalled(Duration.ofSeconds(5));
+
+        var ticket = supportBotClient.findTicketByQueryTs(tenantsQuery.channelId(), queryTs);
+        assertThat(ticket).isNotNull();
+        var earlierPr = supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticket.id())
+                        .githubRepo(PR_REPO)
+                        .prNumber(2)
+                        .prCreatedAt(java.time.Instant.now().minus(Duration.ofHours(2)))
+                        .slaDeadline(java.time.Instant.now().plus(Duration.ofHours(22)))
+                        .owningTeam("wow")
+                        .canAutoCloseTicket(false)
+                        .build());
+        supportBotClient.test().closePrTrackingRecord(earlierPr.id());
+
+        var githubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR #1", PR_REPO, 1, "open", recentCreatedAt());
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("PR reaction on query")
+                        .reaction("pr")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Eyes reaction on query")
+                        .reaction("eyes")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
+        var ticketReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Ticket reaction on query")
+                        .reaction("ticket")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
+        var slaReplyStub =
+                testKit.slack().wiremock().stubChatPostMessage("PR SLA reply in thread", tenantsQuery.channelId());
+        var mergedOutcomeRemovedStub = testKit.slack()
+                .wiremock()
+                .stubReactionRemove(ReactionAddedExpectation.builder()
+                        .description("Merged outcome emoji cleared")
+                        .reaction("pr-merged")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
+        var closedOutcomeRemovedStub = testKit.slack()
+                .wiremock()
+                .stubReactionRemove(ReactionAddedExpectation.builder()
+                        .description("Closed outcome emoji cleared")
+                        .reaction("pr-closed")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
+
+        // when — a new PR link is posted in the thread
+        asTenantSlack.postThreadReply(MessageTs.now(), queryTs, "Another fix: " + PR_LINK_1);
+
+        // then — pr-emoji comes back and the outcome emojis from the earlier PR are cleared
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            githubStub.assertIsCalled();
+            prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
+            ticketReactionStub.assertIsCalled();
+            slaReplyStub.assertIsCalled();
+            mergedOutcomeRemovedStub.assertIsCalled();
+            closedOutcomeRemovedStub.assertIsCalled();
+        });
+    }
+
+    @Test
     public void whenTwoPrLinksPostedAsOriginalMessage_bothTrackedAndTicketCreated() {
         // given — set up all stubs before posting (app will create ticket and run PR detection on the same event)
         TestKit.RoledTestKit asTenant = testKit.as(tenant);

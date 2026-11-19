@@ -4,6 +4,7 @@
 **Status:** Accepted
 **Amended:** 2026-06-23 — author-admission gate ([#285](https://github.com/coreeng/support-bot/pull/285)) added ahead of the §5 side effects.
 **Amended:** 2026-06-24 — author admission reworked to a Slack-poster deny-list (`exclude-author-teams`), resolved via the bot's platform teams instead of the VCS provider.
+**Amended:** 2026-11-18 — optional `outcome-emojis` replace `pr-emoji` once every tracked PR on the ticket has resolved (Behaviour Configuration, §5 step 4).
 
 ---
 
@@ -80,6 +81,7 @@ pr-review-tracking:
 ```
 
 - `pr-emoji` — Slack emoji name added to the query message when an **open** PR is tracked.
+- `outcome-emojis` (optional: `merged`, `closed`) — Slack emoji names that replace `pr-emoji` once every tracked PR on the ticket has resolved. Unset keeps `pr-emoji`, as before.
 - `tags` — tag codes used as defaults during top-level metadata initialisation when ticket tags are empty, and passed to the PR-resolution close flow.
 - `impact` — impact code used as a default during top-level metadata initialisation when ticket impact is unset, and passed to the PR-resolution close flow.
 
@@ -120,7 +122,7 @@ When an admitted PR link is found:
 1. Fetch PR metadata via GitHub API (`created_at`, current state).
 2. For PR links detected on the top-level query message (not thread replies), if the ticket is missing metadata, initialise it with configured defaults (`tags`, `impact`) and suggested author team when available. Existing team/tags/impact are preserved.
 3. Post a thread reply with SLA tracking messaging. If the SLA is still within bounds, the message states the deadline and owning team label (named, not tagged). If already breached at detection time, the message states that the timeframe has been exceeded and the ticket is escalated immediately to the configured owning team.
-4. React to the **top-level thread message** with the configured PR emoji (`pr-emoji`, default `pr`) to indicate the ticket contains a tracked PR request, regardless of which reply introduced the PR link.
+4. React to the **top-level thread message** with the configured PR emoji (`pr-emoji`, default `pr`) to indicate the ticket contains a tracked PR request, regardless of which reply introduced the PR link. If `outcome-emojis` is configured, the top-level message normally keeps a single PR emoji: once no tracked PR on the ticket is still active, `pr-emoji` is replaced with `merged` (merged, or approved and ready to merge) or `closed` (the ticket's only PR was closed without merging); a ticket with several tracked PRs always gets `merged`, because per-PR outcomes aren't stored. The outcome emoji is added before `pr-emoji` is removed, so a failed add keeps the open marker. Tracking a new PR later brings `pr-emoji` back and clears the outcome emoji. In code the reaction is applied after the step 5 record is saved, and clearing the outcome emoji relies on that order: it only runs when the ticket already has an earlier tracked PR.
 5. Persist a `pr_tracking` record for lifecycle polling, including whether ticket auto-close is allowed for this PR (`can_auto_close_ticket`: true for top-level detections, false for thread-reply detections).
 
 ### 6. PR Tracking State

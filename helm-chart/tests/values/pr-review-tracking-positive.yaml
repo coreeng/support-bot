@@ -14,6 +14,9 @@ configMap:
           - example.com
     pr-review-tracking:
       enabled: true
+      outcome-emojis:
+        merged: pr-merged
+        closed: pr-closed
       tags:
         - pr-review
       impact: prReview

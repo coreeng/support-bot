@@ -64,6 +64,16 @@ public class TicketSlackServiceImpl implements TicketSlackService {
     }
 
     @Override
+    public void addReaction(MessageRef messageRef, String name) {
+        addReactionToPostIfPresent(name, messageRef);
+    }
+
+    @Override
+    public void removeReaction(MessageRef messageRef, String name) {
+        removeReactionFromPostIfPresent(name, messageRef);
+    }
+
+    @Override
     public MessageRef postTicketForm(MessageRef threadRef, TicketCreatedMessage message) {
         ChatPostMessageResponse postMessageResponse = slackClient.postMessage(new SlackPostMessageRequest(
                 createdMessageMapper.renderMessage(message), threadRef.channelId(), threadRef.ts()));

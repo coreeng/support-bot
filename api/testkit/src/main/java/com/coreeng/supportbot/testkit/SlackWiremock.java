@@ -4,6 +4,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
@@ -153,6 +154,20 @@ public class SlackWiremock implements WireMockBackend {
                         + "\"mergeable\":false,\"mergeable_state\":\"unknown\","
                         + "\"created_at\":\"2026-01-01T00:00:00Z\",\"title\":\"\","
                         + "\"user\":{\"login\":\"test\"}}")));
+        // Catch-alls for PR outcome emojis. The names must match pr-review-tracking.pr-emoji and
+        // outcome-emojis in application-functionaltests.yaml: resolving a ticket's last tracked PR swaps
+        // pr-emoji for an outcome emoji, and tracking a later PR clears it. Low priority, so tests that
+        // assert the swap register exact stubs that take precedence and are counted on their own.
+        givenThat(post("/api/reactions.add")
+                .atPriority(100)
+                .withName("PR outcome emoji add catch-all")
+                .withFormParam("name", matching("pr-merged|pr-closed"))
+                .willReturn(okJson("{\"ok\":true}")));
+        givenThat(post("/api/reactions.remove")
+                .atPriority(100)
+                .withName("PR and outcome emoji remove catch-all")
+                .withFormParam("name", matching("pr|pr-merged|pr-closed"))
+                .willReturn(okJson("{\"ok\":true}")));
         givenThat(get(urlMatching("/repos/[^/]+/[^/]+"))
                 .withName("GitHub repo metadata catch-all")
                 .willReturn(okJson("{\"id\":1,\"name\":\"catchall\",\"full_name\":\"catchall/catchall\","

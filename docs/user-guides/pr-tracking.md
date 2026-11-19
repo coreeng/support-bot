@@ -146,8 +146,14 @@ command surface.
   escalated) each post a reply in the same thread as they happen.
 - **Escalation** additionally surfaces the PR to the owning team via the
   standard escalation flow when an SLA deadline is missed.
-- **Auto-close**: once every tracked PR on the thread reaches `CLOSED`, the
-  bot closes the support ticket.
+- **Auto-close**: once every PR linked in the original message reaches
+  `CLOSED`, the bot closes the support ticket. PRs first linked in thread
+  replies are tracked but don't trigger auto-close.
+- **Outcome emoji** (if `outcome-emojis` is configured): once every tracked PR
+  on the thread is done, including ones linked in replies, the PR emoji on the original message is replaced with
+  the `merged` emoji (merged, or approved and ready to merge) or the `closed`
+  emoji (the thread's only PR was closed without merging). A thread with
+  several PRs always shows `merged`.
 
 You can dedicate a channel to PR tracking by configuring it with `track: PRS`
 under `slack.ticket.channels` (a `PRS` channel suppresses the normal

@@ -32,6 +32,9 @@ tests:
           pattern: 'sla-discovery:\n\s+cache: PT5M'
       - matchRegex:
           path: data["application.yaml"]
+          pattern: 'outcome-emojis:\n\s+closed: pr-closed\n\s+merged: pr-merged'
+      - matchRegex:
+          path: data["application.yaml"]
           pattern: 'api-base-url: https://github\.example/api'
       - matchRegex:
           path: data["application.yaml"]
