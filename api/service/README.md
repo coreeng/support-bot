@@ -73,7 +73,7 @@ What to know before switching it on:
 - The service logs a startup `WARN` whenever the stub is active.
 - `LLM_MODEL_NAME` is ignored; summaries are stamped with the model name `stub`.
 
-The rest of the LLM configuration (Vertex and proxy providers, model, delays) is described in
+The rest of the LLM configuration (Vertex, proxy and Anthropic providers, model, delays) is described in
 [configuration.md](docs/configuration.md#analysis-knowledge-gap-llm).
 
 # CodeStyle and Linting

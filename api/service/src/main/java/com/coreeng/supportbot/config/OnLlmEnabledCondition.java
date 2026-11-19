@@ -39,7 +39,7 @@ class OnLlmEnabledCondition extends SpringBootCondition {
         return Arrays.stream(LlmProvider.values())
                 .filter(candidate -> candidate.name().equals(normalized))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException(
-                        PROPERTY + " must be one of none, vertex, proxy, stub" + " but was '" + value + "'"));
+                .orElseThrow(() -> new IllegalArgumentException(PROPERTY
+                        + " must be one of none, vertex, proxy, anthropic, stub" + " but was '" + value + "'"));
     }
 }
