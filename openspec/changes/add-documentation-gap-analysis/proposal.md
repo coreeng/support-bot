@@ -91,7 +91,7 @@ None. The Support Summary page and the existing ticket classification behave as 
   through the Helm chart. The API pod's existing writable `/tmp` holds the local copy.
 - Concurrency: a documentation run can be active alongside a Support Summary refresh or a
   manual analysis run, so two LLM jobs can call the provider at once. Today there is only ever
-  one. ADR-012 records this.
+  one. An amendment note in ADR-002 records this.
 - LLM cost and time: far more per ticket than the existing classification, which sends only the
   thread. With the GitHub source on the reference repository used for sizing, each ticket costs
   a routing call of roughly 20k input tokens (the page index) and, for a documentation

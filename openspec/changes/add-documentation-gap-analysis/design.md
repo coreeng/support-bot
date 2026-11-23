@@ -197,13 +197,13 @@ calls stay sequential and paced by `llm.request-delay`. At most two LLM jobs run
 two of the same kind.
 
 This departs from ADR-002, which keeps LLM calls sequential to avoid provider rate limits, and
-from the existing code's rule that analysis runs never overlap on the LLM. ADR-012 records the
-change.
+from the existing code's rule that analysis runs never overlap on the LLM. An amendment note in
+ADR-002 records the change.
 
-Alternative considered: one shared lock, with the runs taking turns. It needs no ADR and cannot
-raise the request rate, but a Support Summary refresh would wait behind a documentation run for
-as long as it takes, which on a first visit to a busy window is far longer than the refresh
-itself. Holding up an existing page for a new one is the worse outcome.
+Alternative considered: one shared lock, with the runs taking turns. It needs no amendment to
+ADR-002 and cannot raise the request rate, but a Support Summary refresh would wait behind a
+documentation run for as long as it takes, which on a first visit to a busy window is far longer
+than the refresh itself. Holding up an existing page for a new one is the worse outcome.
 
 ### 5. The endpoint follows `/summary`
 
