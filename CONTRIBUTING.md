@@ -190,6 +190,12 @@ make stop-local-dex-ldap
 
 > We require all code changes to be accompanied by adequate test coverage
 
+## Proposals and Decisions
+
+- **OpenSpec changes** (`openspec/changes/<name>/`) propose a feature before it is built: why, what changes, the design, the tasks, and the behaviour as requirements and scenarios. Check one with `openspec validate <name> --strict`.
+- **ADRs** (`docs/adr/`) are the lasting record of architectural decisions, and the one reviews check a change against.
+- A change that introduces an architectural decision, or departs from an accepted ADR, adds or amends an ADR as one of its tasks. The change's `design.md` explains the decision in context; the ADR records it once the change is built.
+
 ## Contributing
 
 ### Update the README
