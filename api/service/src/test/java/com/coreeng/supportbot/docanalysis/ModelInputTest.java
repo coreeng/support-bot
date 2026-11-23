@@ -2,7 +2,9 @@ package com.coreeng.supportbot.docanalysis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -100,10 +102,49 @@ class ModelInputTest {
                 "</areas_not_supplied>",
                 "<thread",
                 "</thr</thread>ead>",
-                "<<thread>/thread>"
+                "<<thread>/thread>",
+                "<\u200b/thread>",
+                "</thr\u00adead>",
+                "<\u00a0/thread>",
+                "<\ufeffthread>",
+                "<//thread>",
+                "<\\thread>",
+                "</thread_>",
+                "</thread2>",
+                "<\nthread>",
+                "<thread\n>",
+                "<thread\n  id=\"2\"\n>"
             })
     void removesEveryFormOfATagName(String tag) {
         assertThat(ModelInput.removeTags("before " + tag + " after")).isEqualTo("before  after");
+    }
+
+    @Test
+    void removesInvisibleCharactersButKeepsLineBreaksAndTabs() {
+        assertThat(ModelInput.removeTags("a\u200bb\u0007c\td\r\ne")).isEqualTo("abc\td\r\ne");
+    }
+
+    @Test
+    void removesTextThatReadsAsATagEvenWhenItIsNotMeantAsOne() {
+        assertThat(ModelInput.removeTags("returns List<Page> of results")).isEqualTo("returns List of results");
+    }
+
+    @Test
+    void stripsALongRunAfterAnOpeningBracketQuickly() {
+        String input = "<" + " ".repeat(32_000) + "x";
+
+        String result = assertTimeoutPreemptively(Duration.ofSeconds(2), () -> ModelInput.removeTags(input));
+
+        assertThat(result).isEqualTo(input);
+    }
+
+    @Test
+    void stripsDeeplyNestedTagsQuicklyAndLeavesNoTag() {
+        String input = "<".repeat(16_000) + "thread ".repeat(16_000);
+
+        String result = assertTimeoutPreemptively(Duration.ofSeconds(2), () -> ModelInput.removeTags(input));
+
+        assertThat(result).doesNotContain("<");
     }
 
     @Test
@@ -126,8 +167,19 @@ class ModelInputTest {
                 .endsWith(instructions);
     }
 
+    @Test
+    void cannotBeUsedAfterTheInstructions() {
+        ModelInput input = ModelInput.start().part(InputTag.THREAD, "hi");
+        input.instructions("Classify the thread.");
+
+        assertThatThrownBy(() -> input.part(InputTag.THREAD, "more")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> input.group(InputTag.DOCUMENTATION, docs -> {}))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> input.instructions("again")).isInstanceOf(IllegalStateException.class);
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"a\".md", "a<b>.md", "a\nb.md"})
+    @ValueSource(strings = {"a\".md", "a<b>.md", "a\nb.md", "a\tb.md", "a\u2028b.md", " a.md"})
     void rejectsAnAttributeValueThatCouldBreakTheTag(String value) {
         ModelInput input = ModelInput.start();
 

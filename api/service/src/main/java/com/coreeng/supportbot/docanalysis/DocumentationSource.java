@@ -1,9 +1,17 @@
 package com.coreeng.supportbot.docanalysis;
 
+import java.util.Optional;
+
 public interface DocumentationSource {
 
     /** Called once at the start of a run; this is where a source refreshes whatever it keeps. */
     OpenResult open();
+
+    /**
+     * What the source holds now, for showing without starting a run. Never refreshes and never
+     * touches the network. Empty when the source holds nothing yet.
+     */
+    Optional<SourceStatus> status();
 
     /**
      * Changes whenever the source would answer the same thread differently: its type, its prompts

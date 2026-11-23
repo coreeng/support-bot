@@ -21,6 +21,10 @@ import org.junit.jupiter.api.Test;
  * Each documentation source is a package directly under {@value #SOURCES_PACKAGE}, such as
  * {@code docanalysis.source.github}, with any subpackages of its own. Nothing outside a source's
  * package may refer to its types, so a source can be replaced without changing the analysis.
+ *
+ * <p>ArchUnit reads class files, so it cannot see a use that leaves no trace in them: a compile-time
+ * constant is inlined, and a type used only in a catch clause, a cast or a local variable may be
+ * missed. Codes and constants that cross the boundary therefore belong in {@code docanalysis}.
  */
 class DocumentationSourcePackagesTest {
 
@@ -52,6 +56,39 @@ class DocumentationSourcePackagesTest {
                         .contains("source.beta.BetaSource")
                         .contains("source.alpha.internal.AlphaIndex"))
                 .allSatisfy(detail -> assertThat(detail).containsAnyOf("FixtureAnalysis", "BetaSource"));
+    }
+
+    @Test
+    void everySourceLivesInASourcePackage() {
+        JavaClasses production = new ClassFileImporter()
+                .withImportOption(new ImportOption.DoNotIncludeTests())
+                .importPackages("com.coreeng.supportbot");
+
+        sourcesLiveInSourcePackages(SOURCES_PACKAGE).check(production);
+    }
+
+    @Test
+    void reportsASourceOrSessionOutsideASourcePackage() {
+        JavaClasses fixtures = new ClassFileImporter().importPackages(FIXTURES_PACKAGE);
+
+        EvaluationResult result =
+                sourcesLiveInSourcePackages(FIXTURES_PACKAGE + ".source").evaluate(fixtures);
+
+        assertThat(result.getFailureReport().getDetails())
+                .hasSize(2)
+                .anySatisfy(detail -> assertThat(detail).contains("archfixture.MisplacedSource"))
+                .anySatisfy(detail -> assertThat(detail).contains("archfixture.source.RootSession"));
+    }
+
+    static ArchRule sourcesLiveInSourcePackages(String sourcesPackage) {
+        return classes()
+                .that()
+                .implement(DocumentationSource.class)
+                .or()
+                .implement(DocumentationSession.class)
+                .should()
+                .resideInAPackage(sourcesPackage + ".(*)..")
+                .allowEmptyShould(true);
     }
 
     static ArchRule sourceTypesStayInTheirPackage(String sourcesPackage) {

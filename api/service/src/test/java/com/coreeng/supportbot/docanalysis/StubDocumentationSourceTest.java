@@ -4,6 +4,7 @@ import static com.coreeng.supportbot.docanalysis.StubDocumentationSource.page;
 import static com.coreeng.supportbot.docanalysis.StubDocumentationSource.question;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 class StubDocumentationSourceTest {
@@ -76,13 +77,38 @@ class StubDocumentationSourceTest {
     }
 
     @Test
-    void hasAFingerprintThatATestCanChange() {
-        StubDocumentationSource source = new StubDocumentationSource();
-        assertThat(source.fingerprint()).isEqualTo(StubDocumentationSource.DEFAULT_FINGERPRINT);
+    void holdsNothingUntilOpened() {
+        assertThat(new StubDocumentationSource().status()).isEmpty();
+    }
 
-        source.fingerprint("changed");
+    @Test
+    void reportsWhatItHoldsWithoutOpening() {
+        Instant refreshed = Instant.parse("2026-02-01T08:00:00Z");
+        StubDocumentationSource source = new StubDocumentationSource().holding("abc123", refreshed);
 
-        assertThat(source.fingerprint()).isEqualTo("changed");
+        assertThat(source.status()).contains(new SourceStatus("abc123", refreshed));
+        assertThat(source.openCount()).isZero();
+    }
+
+    @Test
+    void reportsTheVersionItLastOpenedWith() {
+        Instant refreshed = Instant.parse("2026-02-02T08:00:00Z");
+        StubDocumentationSource source =
+                new StubDocumentationSource().holding("old", Instant.EPOCH).version("new", refreshed);
+
+        opened(source);
+
+        assertThat(source.status()).contains(new SourceStatus("new", refreshed));
+    }
+
+    @Test
+    void anUnavailableSourceKeepsWhatItHeld() {
+        StubDocumentationSource source =
+                StubDocumentationSource.unavailable("fetch failed").holding("old", Instant.EPOCH);
+
+        source.open();
+
+        assertThat(source.status()).contains(new SourceStatus("old", Instant.EPOCH));
     }
 
     private static DocumentationSession opened(DocumentationSource source) {
