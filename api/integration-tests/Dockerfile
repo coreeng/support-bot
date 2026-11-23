@@ -41,7 +41,7 @@ COPY helm-chart helm-chart
 RUN helm repo add dex https://charts.dexidp.io \
     && helm dependency build helm-chart
 
-FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
+FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24-5
 WORKDIR /app
 
 COPY --from=builder /usr/local/bin/helm /usr/local/bin/helm

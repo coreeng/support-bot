@@ -21,7 +21,7 @@ COPY functional/src functional/src
 # Build runnable fat jar that includes tests and all deps
 RUN ./gradlew :functional:jar --no-daemon
 
-FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
+FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24-5
 WORKDIR /app
 
 # Copy tests jar
