@@ -67,3 +67,18 @@ tests:
       - matchRegex:
           path: data["application.yaml"]
           pattern: 'pr-review-tracking:\n\s+impact: ""\n\s+tags: \[\]'
+
+  - it: renders the documentation analysis config
+    values:
+      - values/documentation-analysis.yaml
+    asserts:
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'documentation-analysis:\n\s+enabled: true\n\s+failure-retry-delay: 24h\n\s+max-input-tokens: 150000\n\s+source:\n\s+github:\n\s+file-extensions:\n\s+- \.md\n\s+- \.mdx\n\s+max-areas-per-ticket: 2\n\s+max-copy-size: 50MB\n\s+path: docs\n\s+repository: example-org/docs\n\s+type: github'
+
+  - it: rejects an unknown documentation analysis setting
+    set:
+      configMap.config.documentation-analysis.max-pages: 10
+    asserts:
+      - failedTemplate:
+          errorPattern: "max-pages"

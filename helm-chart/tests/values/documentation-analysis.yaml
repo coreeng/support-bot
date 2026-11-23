@@ -1,0 +1,14 @@
+configMap:
+  config:
+    documentation-analysis:
+      enabled: true
+      max-input-tokens: 150000
+      failure-retry-delay: 24h
+      source:
+        type: github
+        github:
+          repository: example-org/docs
+          path: docs
+          file-extensions: [.md, .mdx]
+          max-copy-size: 50MB
+          max-areas-per-ticket: 2

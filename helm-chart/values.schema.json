@@ -354,6 +354,48 @@
                 "attribute": { "type": "string", "minLength": 1 }
               }
             },
+            "documentation-analysis": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "max-input-tokens": { "type": "integer", "minimum": 1 },
+                "max-tickets-per-day": { "type": "integer", "minimum": 1 },
+                "failure-retry-delay": { "type": "string" },
+                "max-attempts": { "type": "integer", "minimum": 1 },
+                "run-retry-delay": { "type": "string" },
+                "source": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "type": { "type": "string", "enum": ["github"] },
+                    "github": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "repository": { "type": "string" },
+                        "branch": { "type": "string" },
+                        "path": { "type": "string" },
+                        "file-extensions": {
+                          "type": "array",
+                          "items": { "type": "string" }
+                        },
+                        "copy-location": { "type": "string" },
+                        "max-copy-age": { "type": "string" },
+                        "max-copy-size": {
+                          "oneOf": [
+                            { "type": "string" },
+                            { "type": "integer", "minimum": 1 }
+                          ]
+                        },
+                        "max-files": { "type": "integer", "minimum": 1 },
+                        "max-areas-per-ticket": { "type": "integer", "minimum": 1 }
+                      }
+                    }
+                  }
+                }
+              }
+            },
             "security": {
               "type": "object",
               "additionalProperties": true,
