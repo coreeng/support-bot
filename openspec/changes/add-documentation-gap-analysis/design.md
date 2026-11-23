@@ -194,8 +194,8 @@ calls stay sequential and paced by `llm.request-delay`. At most two LLM jobs run
 two of the same kind.
 
 This departs from ADR-002, which keeps LLM calls sequential to avoid provider rate limits, and
-from the existing code's rule that analysis runs never overlap on the LLM. A new ADR records the
-change (task 6.2).
+from the existing code's rule that analysis runs never overlap on the LLM. ADR-012 records the
+change.
 
 Alternative considered: one shared lock, with the runs taking turns. It needs no ADR and cannot
 raise the request rate, but a Support Summary refresh would wait behind a documentation run for
