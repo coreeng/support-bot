@@ -1,6 +1,6 @@
 # ADR: Documentation Gap Analysis
 
-**Status:** Proposed
+**Status:** Accepted
 
 ## Context
 
