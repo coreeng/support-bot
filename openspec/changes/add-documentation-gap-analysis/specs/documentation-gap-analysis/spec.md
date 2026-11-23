@@ -25,8 +25,8 @@ A request to add a feature or change the platform SHALL be treated as not a docu
 question; a question whether something is supported SHALL be treated as one. When a thread
 raises several questions, the first substantive one SHALL be the one classified.
 
-Every result SHALL record the distilled question, a summary of support's answer when there is
-one, the product areas consulted where the documentation has areas, a short rationale, the model
+Every result SHALL record the distilled question, up to five topic tags for it, a summary of
+support's answer when there is one, the product areas consulted where the documentation has areas, a short rationale, the model
 used, the documentation source, and the documentation version it was made against. A `correct` or `incorrect` result SHALL also record the one page
 and the passage it relies on. The bot SHALL accept such a result only when that page was among
 those given to the model and contains the passage, comparing the two without regard to
@@ -36,8 +36,12 @@ failed attempt. A `missing` result SHALL record the closest pages found, when th
 A failed attempt SHALL be recorded with its time and a reason code, SHALL NOT count as a
 classification, and SHALL be treated as a ticket that failed to classify.
 
-The question, the summary of support's answer and the rationale SHALL be passed through the
-deployment's configured thread sanitisation before they are saved.
+The question, its tags, the summary of support's answer and the rationale SHALL be passed
+through the deployment's configured thread sanitisation before they are saved.
+
+A tag SHALL be lowercase words joined by hyphens. The bot SHALL drop a tag in any other form,
+and a repeated one, and SHALL keep at most five. A result SHALL NOT be refused for having no
+tags.
 
 #### Scenario: Model reports that the documentation answers the question
 
@@ -73,6 +77,16 @@ deployment's configured thread sanitisation before they are saved.
 
 - **WHEN** the model returns `not_applicable` for a closed ticket
 - **THEN** the ticket is saved as `not_applicable`, with no page or passage
+
+#### Scenario: Tags are recorded
+
+- **WHEN** a result comes with the tags `deploy-key`, `Rotate Credentials` and `deploy-key`
+- **THEN** the result is saved with the single tag `deploy-key`
+
+#### Scenario: Result without tags
+
+- **WHEN** a result that passes its checks comes with no tags
+- **THEN** the result is saved without tags
 
 #### Scenario: Stored text is sanitised
 
@@ -112,7 +126,8 @@ its thread.
   others.
 
 A source SHALL NOT be required to judge whether a thread asks a documentation question, nor to
-state the question. When it does neither, both SHALL be settled when the ticket is classified.
+state the question or its tags. What the source leaves out SHALL be settled when the ticket is
+classified.
 
 When the pages given to the model are not enough to judge the question, because it belongs to
 a part of the documentation that was not given or the thread is too unclear, the attempt SHALL

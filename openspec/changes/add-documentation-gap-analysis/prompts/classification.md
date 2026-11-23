@@ -36,6 +36,13 @@ If <question> is empty, state the tenant's underlying question yourself in one
 sentence, in general terms, using the whole thread. If the thread raises several
 separate questions, take the first substantive one.
 
+Then give 3 to 5 tags for the question, so that the same question asked again can be
+found later. Name the product or feature, what the tenant was trying to do, and
+the error or symptom if there is one. Each tag is lowercase words joined by
+hyphens, such as `deploy-key`, `rotate-credentials` or `permission-denied`. Prefer
+the terms the documentation and the product use over the tenant's wording. Do not
+include names of people, teams, hostnames or identifiers.
+
 Step 2 — Is this a documentation question?
 A documentation question is one the tenant could have answered themselves had the
 right page existed: how to do something, how a feature behaves, what its limits or
@@ -120,6 +127,7 @@ Return only a JSON object, with no text before or after it:
 {
   "classification": "correct | missing | incorrect | not_applicable | undetermined",
   "question": "<the question you judged: <question> unchanged, or your own sentence when it was empty>",
+  "tags": ["<tag>", "<tag>", "<tag>"],
   "answer_summary": "<one or two sentences, or empty when support gave no answer>",
   "doc_paths": ["<path>"],
   "evidence_quote": "<verbatim passage, or empty>",

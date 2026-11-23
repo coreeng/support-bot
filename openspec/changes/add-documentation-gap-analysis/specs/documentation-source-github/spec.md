@@ -63,8 +63,8 @@ The version the source reports SHALL be the commit of the copy it answered from.
 ### Requirement: The GitHub source finds context by routing to product areas
 
 The source SHALL keep an index of the documentation's pages, with the path, title and
-description of each. In one call it SHALL have the model state what the thread asks, say
-whether that is a documentation question, and choose which product areas, up to a configured
+description of each. In one call it SHALL have the model state what the thread asks, give
+topic tags for it, say whether that is a documentation question, and choose which product areas, up to a configured
 number, could answer it. It SHALL return every page of the areas chosen, together with the
 pages outside any area, and SHALL name the areas it did not return.
 
@@ -92,7 +92,8 @@ removed.
 
 - **WHEN** the model reports that a thread, such as one reporting an outage, does not ask a
   documentation question
-- **THEN** the source reports that, with the question and the reason, and returns no pages
+- **THEN** the source reports that, with the question, its tags and the reason, and returns no
+  pages
 
 #### Scenario: No area chosen
 

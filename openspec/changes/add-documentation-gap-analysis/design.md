@@ -58,6 +58,7 @@ at the price of showing fewer results until the window has been classified again
 | `failed_at`, `failure_reason` | Set instead of a classification when the attempt failed. The reason is a code from Decisions 8 and 9, never model or provider text |
 | `attempts` | Failed attempts under the current `prompt_id` |
 | `question`, `answer_summary` | What was asked, as distilled by the source when it gives one and by the classification call otherwise, and what support answered |
+| `tags` | Up to five topic tags for the question, kept so that a later change can search earlier tickets |
 | `product_areas` | The areas the source consulted, when the source has areas |
 | `doc_paths`, `evidence_quote` | For `correct` and `incorrect`, the one page cited and the quoted passage. For `missing`, the closest pages, if any, and no quote |
 | `rationale` | One or two sentences |
@@ -117,6 +118,8 @@ The rules that keep the source replaceable:
   is required of a source: the classification call makes the same judgement and distils the
   question when the source has not. An answer that ends a ticket without classification must
   carry the question, since nothing later will supply it.
+- Topic tags travel with the question: a source that states the question gives its tags too,
+  and otherwise the classification call gives both.
 - `budget` is the most text a source may return, as estimated tokens: `max-input-tokens` less
   the thread and the prompt. How it stays inside is the source's business. The analysis checks
   the answer and fails the ticket if it is over.
@@ -381,9 +384,17 @@ What comes back:
 - The question is distilled once. When the source gives one, it is passed to the classification
   call and stored, so the two calls cannot disagree about what was asked. Otherwise the
   classification call distils it.
-- `question`, `answer_summary` and `rationale` are passed through the deployment's sanitisation
-  patterns (ADR-005) before they are saved, behind the prompt's own writing rules. The quote is
-  documentation text and is saved as it is.
+- `question`, `answer_summary`, `rationale` and `tags` are passed through the deployment's
+  sanitisation patterns (ADR-005) before they are saved, behind the prompt's own writing rules.
+  The quote is documentation text and is saved as it is.
+- Tags are for finding the same question again: a later change can search earlier tickets by
+  tag and by the stored question. The model chooses them freely, 3 to 5 for each question. The
+  bot lowercases them, drops duplicates and any that are not words joined by hyphens, and keeps
+  at most five. A ticket never fails over its tags; it may have none.
+- Free tags drift: the same topic can be tagged in more than one way, so a search cannot rely
+  on exact matches alone. The stored question is the better key, and tags help to narrow and
+  group. A fixed list of tags would not drift, but someone would have to own it, so it is left
+  until a search exists to show whether it is needed.
 
 ### 11. `incorrect` is shown as a conflict, and the page leads with gaps
 
@@ -510,6 +521,7 @@ None remain. Settled:
   rate measured in Validation decides whether a later change adds it.
 - A failed ticket is retried only after a delay, and a limited number of times; see Decision 9
   and the spec.
+- Tags are free, not taken from a fixed list; see Decision 10.
 - Runs start on a visit, not from a button, and tickets are not reordered by product area;
   see the alternatives under Decision 9.
 - There is no triage call ahead of the source; the source's own call covers it. See the

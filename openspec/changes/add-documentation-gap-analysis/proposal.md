@@ -34,6 +34,7 @@ are missing or wrong.
 | Reliability | Verdicts are compared with support engineers' labels on at least 150 real tickets, before building and again before release, against targets in `design.md`. | A missed target delays the build or the release. |
 | Meaning of `incorrect` | The documentation contradicts the answer support gave, so it applies only to threads that contain a support answer. The page calls it "Conflicts with support's answer" and shows both, because either may be the one that is wrong. | Gives the model something to compare against; an error nobody corrected in the thread is not detected, and a person decides which side to fix. |
 | Who said what | The bot labels each thread message as tenant, support or bot, from the support team's current membership, and sends the label instead of the author. | The model does not guess which message is support's answer; a message from someone who has since left the team counts as a tenant's. |
+| Tags | Each result stores up to five topic tags for its question, chosen by the model. | A later change can search earlier tickets by tag and question; free tags drift, so they narrow a search more than they decide it. |
 | Staleness | A result is redone only when the prompts, or the settings that change results, change, not when the documentation changes. Each result records the documentation version it was made against. After such a change, old results are hidden until redone. | Cheap and simple; a ticket stays `missing` after its page is written, and the page shows fewer results while a window is being redone. |
 | Fetch failure | When a refresh fails and a copy exists, the run uses the old copy. | The page keeps working; results may use documentation fetched more than 24 hours ago. |
 | Access | The Support Summary page's roles: leadership and support engineers. | A reader's visit starts LLM work, as it does there. |
@@ -55,6 +56,8 @@ copy under `/tmp`) are in `design.md`.
 - Classifying tickets that are still open.
 - Any documentation source other than the GitHub repository one, and more than one source or
   repository at a time. The boundary is built so that a source can be added later.
+- Searching earlier tickets for a question already answered. This change only stores the
+  question and its tags for it.
 - A second, wider check of `missing` verdicts.
 - A button to start or repeat a run. Visits start runs, bounded by the daily limit.
 - Showing that the documentation improves over time. A result is not redone when the

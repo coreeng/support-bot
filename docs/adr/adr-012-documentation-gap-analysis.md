@@ -88,7 +88,11 @@ ticket, so the first can be replaced without touching the second.
 - **Structured output.** The answer is one JSON record per ticket.
   [ADR-011](adr-011-support-summary-evidence.md) chose inline markup because one malformed answer
   would cost a whole summary; here it costs one ticket, which is tried again.
-- **Stored text is sanitised.** The question, answer summary and rationale pass through the
+- **Tags for a later search.** Each result stores the distilled question and up to five topic tags
+  for it, chosen by the model in the same call that states the question. They are kept so that a
+  later change can find earlier tickets that asked the same thing. A ticket never fails over its
+  tags.
+- **Stored text is sanitised.** The question, tags, answer summary and rationale pass through the
   deployment's sanitisation patterns ([ADR-005](adr-005-configurable-thread-sanitisation.md))
   before they are saved.
 
@@ -120,6 +124,7 @@ ticket, so the first can be replaced without touching the second.
 - A scheduled run. The run is built so that one can start it the way the page does.
 - A button that starts a run.
 - Suggesting or raising documentation fixes.
+- Searching earlier tickets for a question already answered. Only the question and tags are stored.
 - Re-classifying when the documentation changes.
 - GitHub credentials of the feature's own.
 
@@ -157,6 +162,8 @@ ticket, so the first can be replaced without touching the second.
   as a tenant's, so some conflicts in old threads are missed.
 - ⚠️ **The copy is lost when the pod is replaced** and fetched again on the next run. A run resumed
   after that may continue against a newer version; each result records the one it used.
+- ⚠️ **Tags drift.** The model may tag the same topic in more than one way, so a search cannot rely
+  on exact tag matches; the stored question is the better key.
 - ⚠️ **Documentation content is sent to the LLM provider**, which the bot has not done before.
 
 ## Alternatives considered
@@ -193,5 +200,7 @@ ticket, so the first can be replaced without touching the second.
   version, and it would need a second way of fetching.
 - **Keeping old results visible, marked as old, after a prompt change.** Rejected: the counts would
   mix two versions of the prompt.
+- **Tags from a fixed list.** They would not drift, but someone would have to own the list.
+  Deferred until a search exists to show whether it is needed.
 - **Skipping tickets the existing classification marks as task requests.** Rejected for now: it
   would tie this feature to the other classifier having run and being right.
