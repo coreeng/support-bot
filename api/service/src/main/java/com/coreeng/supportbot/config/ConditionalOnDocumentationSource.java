@@ -8,9 +8,9 @@ import java.lang.annotation.Target;
 import org.springframework.context.annotation.Conditional;
 
 /**
- * Registers the annotated bean only when the documentation analysis is on and {@link #value()} is the
- * selected source. The analysis is on when {@code documentation-analysis.enabled} is true and an LLM
- * provider is selected. Each source's own configuration carries this, so exactly one source is built.
+ * Registers the annotated bean only when the documentation analysis is on (see {@link
+ * ConditionalOnDocumentationAnalysis}) and {@link #value()} is the selected source. Each source's own
+ * configuration carries this, so exactly one source is built.
  */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)

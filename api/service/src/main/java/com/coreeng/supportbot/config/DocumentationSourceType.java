@@ -5,7 +5,6 @@ import static java.util.stream.Collectors.joining;
 import java.util.Arrays;
 import java.util.Locale;
 
-/** The documentation sources the documentation analysis can be configured with. */
 public enum DocumentationSourceType {
     GITHUB;
 

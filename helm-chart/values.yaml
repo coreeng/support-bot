@@ -176,7 +176,7 @@ configMap:
     #     github:
     #       repository: example-org/docs
     #       branch: main
-    #       path: docs
+    #       path: docs # empty or . for the repository root
     #       file-extensions: [.md, .mdx]
     #       copy-location: /tmp/documentation-analysis
     #       max-copy-age: 24h

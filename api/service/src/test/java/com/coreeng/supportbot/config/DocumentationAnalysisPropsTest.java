@@ -33,7 +33,7 @@ class DocumentationAnalysisPropsTest {
         assertThat(github.branch()).isEqualTo("main");
         assertThat(github.path()).isEqualTo("docs");
         assertThat(github.fileExtensions()).containsExactly(".md", ".mdx");
-        assertThat(github.copyLocation()).isEqualTo(Path.of("/tmp/documentation-analysis"));
+        assertThat(github.copyLocationPath()).isEqualTo(Path.of("/tmp/documentation-analysis"));
         assertThat(github.maxCopyAge()).isEqualTo(Duration.ofHours(24));
         assertThat(github.maxCopySize()).isEqualTo(DataSize.ofMegabytes(50));
         assertThat(github.maxFiles()).isEqualTo(5000);
@@ -48,6 +48,14 @@ class DocumentationAnalysisPropsTest {
         values.put("documentation-analysis.source.github.repository", "not-a-repository");
 
         assertThat(bind(values).enabled()).isFalse();
+    }
+
+    @Test
+    void failsOnAValueThatCannotBeReadEvenWhileOff() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("documentation-analysis.max-input-tokens", "abc");
+
+        assertThatThrownBy(() -> bind(values)).hasStackTraceContaining("max-input-tokens");
     }
 
     @Test
@@ -96,17 +104,44 @@ class DocumentationAnalysisPropsTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"", " ", ".", "/", "./", "//"})
+    void readsABlankOrDotPathAsTheRepositoryRoot(String path) {
+        Map<String, Object> values = enabledGitHub();
+        values.put("documentation-analysis.source.github.path", path);
+
+        assertThat(bind(values).source().github().path()).isEmpty();
+    }
+
+    @Test
+    void readsABareNumberInTheUnitOfItsDefault() {
+        Map<String, Object> values = enabledGitHub();
+        values.put("documentation-analysis.failure-retry-delay", "24");
+        values.put("documentation-analysis.run-retry-delay", "15");
+        values.put("documentation-analysis.source.github.max-copy-age", "12");
+        values.put("documentation-analysis.source.github.max-copy-size", "50");
+
+        DocumentationAnalysisProps props = bind(values);
+
+        assertThat(props.failureRetryDelay()).isEqualTo(Duration.ofHours(24));
+        assertThat(props.runRetryDelay()).isEqualTo(Duration.ofMinutes(15));
+        assertThat(props.source().github().maxCopyAge()).isEqualTo(Duration.ofHours(12));
+        assertThat(props.source().github().maxCopySize()).isEqualTo(DataSize.ofMegabytes(50));
+    }
+
+    @ParameterizedTest
     @CsvSource(
             delimiter = '|',
             value = {
                 "source.github.repository | example-org     | source.github.repository must be in owner/name format",
                 "source.github.repository | a/b/c           | source.github.repository must be in owner/name format",
                 "source.github.branch     | ' '             | source.github.branch is required",
-                "source.github.path       | /               | source.github.path is required",
                 "source.github.path       | docs/../secrets | source.github.path must be a relative directory",
                 "source.github.path       | ./docs          | source.github.path must be a relative directory",
                 "source.github.file-extensions | md         | source.github.file-extensions must each start with '.'",
                 "source.github.copy-location | tmp/copy     | source.github.copy-location must be an absolute path",
+                "source.github.copy-location | /            | source.github.copy-location must be an absolute path",
+                "source.github.copy-location | /tmp/..      | source.github.copy-location must be an absolute path",
+                "source.github.copy-location | ' '          | source.github.copy-location must be an absolute path",
                 "source.github.max-copy-age | 0s            | source.github.max-copy-age must be positive",
                 "source.github.max-copy-size | 0B           | source.github.max-copy-size must be positive",
                 "source.github.max-files  | 0               | source.github.max-files must be positive",

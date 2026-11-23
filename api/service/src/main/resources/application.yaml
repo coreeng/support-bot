@@ -446,6 +446,7 @@ team-groups:
 # Documentation analysis: classifies closed tickets against the documentation. Off by default; on
 # when `enabled` is true and llm.provider is not `none`. The analysis's settings are at the top and
 # each documentation source's under `source`; only the selected source's settings are validated.
+# A bare number is read in the unit of the default it replaces (hours, minutes, megabytes).
 documentation-analysis:
   enabled: ${DOCUMENTATION_ANALYSIS_ENABLED:false}
   max-input-tokens: ${DOCUMENTATION_ANALYSIS_MAX_INPUT_TOKENS:150000} # Estimated size limit of one classification call
@@ -458,7 +459,7 @@ documentation-analysis:
     github: # Credentials are read from pr-review-tracking.github
       repository: ${DOCUMENTATION_ANALYSIS_GITHUB_REPOSITORY:} # owner/name; required when this source is selected
       branch: ${DOCUMENTATION_ANALYSIS_GITHUB_BRANCH:main}
-      path: ${DOCUMENTATION_ANALYSIS_GITHUB_PATH:docs} # Directory holding the documentation
+      path: ${DOCUMENTATION_ANALYSIS_GITHUB_PATH:docs} # Directory holding the documentation; empty or . for the repository root
       file-extensions: [.md, .mdx]
       copy-location: /tmp/documentation-analysis
       max-copy-age: 24h # Fetch again when the copy is older

@@ -361,9 +361,9 @@
                 "enabled": { "type": "boolean" },
                 "max-input-tokens": { "type": "integer", "minimum": 1 },
                 "max-tickets-per-day": { "type": "integer", "minimum": 1 },
-                "failure-retry-delay": { "type": "string" },
+                "failure-retry-delay": { "type": "string", "pattern": "^([0-9]+(ns|us|ms|s|m|h|d)|[Pp][0-9A-Za-z.]+)$" },
                 "max-attempts": { "type": "integer", "minimum": 1 },
-                "run-retry-delay": { "type": "string" },
+                "run-retry-delay": { "type": "string", "pattern": "^([0-9]+(ns|us|ms|s|m|h|d)|[Pp][0-9A-Za-z.]+)$" },
                 "source": {
                   "type": "object",
                   "additionalProperties": false,
@@ -375,19 +375,18 @@
                       "properties": {
                         "repository": { "type": "string" },
                         "branch": { "type": "string" },
-                        "path": { "type": "string" },
+                        "path": {
+                          "type": "string",
+                          "description": "Directory relative to the repository root; empty or . for the root",
+                          "not": { "pattern": "(^|/)\\.\\.(/|$)" }
+                        },
                         "file-extensions": {
                           "type": "array",
                           "items": { "type": "string" }
                         },
                         "copy-location": { "type": "string" },
-                        "max-copy-age": { "type": "string" },
-                        "max-copy-size": {
-                          "oneOf": [
-                            { "type": "string" },
-                            { "type": "integer", "minimum": 1 }
-                          ]
-                        },
+                        "max-copy-age": { "type": "string", "pattern": "^([0-9]+(ns|us|ms|s|m|h|d)|[Pp][0-9A-Za-z.]+)$" },
+                        "max-copy-size": { "type": "string", "pattern": "^[0-9]+(B|KB|MB|GB|TB)$" },
                         "max-files": { "type": "integer", "minimum": 1 },
                         "max-areas-per-ticket": { "type": "integer", "minimum": 1 }
                       }

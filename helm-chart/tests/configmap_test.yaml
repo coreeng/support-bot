@@ -82,3 +82,32 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "max-pages"
+
+  - it: rejects a documentation analysis duration without a unit
+    set:
+      configMap.config.documentation-analysis.failure-retry-delay: "24"
+    asserts:
+      - failedTemplate:
+          errorPattern: "failure-retry-delay"
+
+  - it: rejects a documentation analysis copy size without a unit
+    set:
+      configMap.config.documentation-analysis.source.github.max-copy-size: 50
+    asserts:
+      - failedTemplate:
+          errorPattern: "max-copy-size"
+
+  - it: rejects a documentation path that leaves the repository
+    set:
+      configMap.config.documentation-analysis.source.github.path: docs/../secrets
+    asserts:
+      - failedTemplate:
+          errorPattern: "path"
+
+  - it: renders a documentation path at the repository root
+    set:
+      configMap.config.documentation-analysis.source.github.path: ""
+    asserts:
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'path: ""'

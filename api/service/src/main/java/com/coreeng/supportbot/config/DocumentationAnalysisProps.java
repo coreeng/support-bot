@@ -1,30 +1,41 @@
 package com.coreeng.supportbot.config;
 
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.boot.convert.DataSizeUnit;
+import org.springframework.boot.convert.DurationUnit;
 import org.springframework.util.unit.DataSize;
+import org.springframework.util.unit.DataUnit;
 
 /**
  * Settings of the documentation analysis: the analysis's own at the top, each source's under
- * {@link Source}. Nothing is validated while {@link #enabled()} is false, so a deployment with the
- * feature off is never blocked from starting by settings it does not use. The feature also needs an
- * LLM provider; see {@link ConditionalOnDocumentationSource}.
+ * {@link Source}. While {@link #enabled()} is false the values are not checked, so settings the
+ * feature does not use cannot block startup; a value that cannot be read as its type at all still
+ * fails binding. The feature also needs an LLM provider; see {@link ConditionalOnDocumentationAnalysis}.
+ *
+ * <p>A duration or size given as a bare number is read in the unit its default is written in, not in
+ * milliseconds or bytes.
  */
-@ConfigurationProperties(prefix = "documentation-analysis")
+@ConfigurationProperties(prefix = DocumentationAnalysisProps.PREFIX)
 public record DocumentationAnalysisProps(
         @DefaultValue("false") boolean enabled,
         @DefaultValue("150000") int maxInputTokens,
         @DefaultValue("500") int maxTicketsPerDay,
-        @DefaultValue("24h") Duration failureRetryDelay,
+        @DefaultValue("24h") @DurationUnit(ChronoUnit.HOURS) Duration failureRetryDelay,
         @DefaultValue("3") int maxAttempts,
-        @DefaultValue("15m") Duration runRetryDelay,
+
+        @DefaultValue("15m") @DurationUnit(ChronoUnit.MINUTES)
+        Duration runRetryDelay,
+
         @DefaultValue Source source) {
 
-    private static final String PREFIX = "documentation-analysis.";
+    static final String PREFIX = "documentation-analysis";
 
     public DocumentationAnalysisProps {
         if (enabled) {
@@ -53,27 +64,38 @@ public record DocumentationAnalysisProps(
         }
     }
 
+    /** @param path relative to the repository root; empty for the root itself */
     public record GitHub(
             @DefaultValue("") String repository,
             @DefaultValue("main") String branch,
             @DefaultValue("docs") String path,
             @DefaultValue({".md", ".mdx"}) List<String> fileExtensions,
-            @DefaultValue("/tmp/documentation-analysis") Path copyLocation,
-            @DefaultValue("24h") Duration maxCopyAge,
-            @DefaultValue("50MB") DataSize maxCopySize,
+            @DefaultValue("/tmp/documentation-analysis") String copyLocation,
+
+            @DefaultValue("24h") @DurationUnit(ChronoUnit.HOURS)
+            Duration maxCopyAge,
+
+            @DefaultValue("50MB") @DataSizeUnit(DataUnit.MEGABYTES)
+            DataSize maxCopySize,
+
             @DefaultValue("5000") int maxFiles,
             @DefaultValue("2") int maxAreasPerTicket) {
 
-        private static final String GITHUB_PREFIX = PREFIX + "source.github.";
+        private static final String GITHUB_PREFIX = PREFIX + ".source.github.";
         private static final String WHEN_SELECTED = " when " + DocumentationSourceType.PROPERTY + "=github";
 
         public GitHub {
             repository = repository.trim();
             branch = branch.trim();
-            path = trimSlashes(path.trim());
+            path = normalisePath(path);
             fileExtensions = fileExtensions.stream()
                     .map(extension -> extension.trim().toLowerCase(Locale.ROOT))
                     .toList();
+            copyLocation = copyLocation.trim();
+        }
+
+        public Path copyLocationPath() {
+            return Path.of(copyLocation).normalize();
         }
 
         void validate() {
@@ -88,13 +110,13 @@ public record DocumentationAnalysisProps(
             if (branch.isEmpty()) {
                 throw new IllegalArgumentException(GITHUB_PREFIX + "branch is required" + WHEN_SELECTED);
             }
-            if (path.isEmpty()) {
-                throw new IllegalArgumentException(GITHUB_PREFIX + "path is required" + WHEN_SELECTED);
-            }
-            for (String segment : path.split("/", -1)) {
-                if (segment.isEmpty() || segment.equals(".") || segment.equals("..")) {
-                    throw new IllegalArgumentException(GITHUB_PREFIX
-                            + "path must be a relative directory without empty, '.' or '..' segments, got: " + path);
+            if (!path.isEmpty()) {
+                for (String segment : path.split("/", -1)) {
+                    if (segment.isEmpty() || segment.equals(".") || segment.equals("..")) {
+                        throw new IllegalArgumentException(GITHUB_PREFIX
+                                + "path must be a relative directory without empty, '.' or '..' segments, got: "
+                                + path);
+                    }
                 }
             }
             if (fileExtensions.isEmpty()) {
@@ -106,10 +128,7 @@ public record DocumentationAnalysisProps(
                             GITHUB_PREFIX + "file-extensions must each start with '.', got: " + extension);
                 }
             }
-            if (!copyLocation.isAbsolute()) {
-                throw new IllegalArgumentException(
-                        GITHUB_PREFIX + "copy-location must be an absolute path, got: " + copyLocation);
-            }
+            validateCopyLocation();
             requirePositive(maxCopyAge, "source.github.max-copy-age");
             if (maxCopySize.toBytes() <= 0) {
                 throw new IllegalArgumentException(GITHUB_PREFIX + "max-copy-size must be positive");
@@ -118,28 +137,44 @@ public record DocumentationAnalysisProps(
             requirePositive(maxAreasPerTicket, "source.github.max-areas-per-ticket");
         }
 
-        private static String trimSlashes(String value) {
+        private void validateCopyLocation() {
+            Path location;
+            try {
+                location = copyLocationPath();
+            } catch (InvalidPathException e) {
+                throw new IllegalArgumentException(
+                        GITHUB_PREFIX + "copy-location is not a valid path, got: " + copyLocation, e);
+            }
+            if (!location.isAbsolute() || location.getParent() == null) {
+                throw new IllegalArgumentException(GITHUB_PREFIX
+                        + "copy-location must be an absolute path below the file system root, got: " + copyLocation);
+            }
+        }
+
+        private static String normalisePath(String value) {
+            String trimmed = value.trim();
             int start = 0;
-            int end = value.length();
-            while (start < end && value.charAt(start) == '/') {
+            int end = trimmed.length();
+            while (start < end && trimmed.charAt(start) == '/') {
                 start++;
             }
-            while (end > start && value.charAt(end - 1) == '/') {
+            while (end > start && trimmed.charAt(end - 1) == '/') {
                 end--;
             }
-            return value.substring(start, end);
+            String path = trimmed.substring(start, end);
+            return path.equals(".") ? "" : path;
         }
     }
 
     private static void requirePositive(int value, String setting) {
         if (value <= 0) {
-            throw new IllegalArgumentException(PREFIX + setting + " must be positive");
+            throw new IllegalArgumentException(PREFIX + "." + setting + " must be positive");
         }
     }
 
     private static void requirePositive(Duration value, String setting) {
         if (value.isZero() || value.isNegative()) {
-            throw new IllegalArgumentException(PREFIX + setting + " must be positive");
+            throw new IllegalArgumentException(PREFIX + "." + setting + " must be positive");
         }
     }
 }
