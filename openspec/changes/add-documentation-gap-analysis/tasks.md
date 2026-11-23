@@ -2,7 +2,7 @@
 
 - [ ] 1.1 Build the labelled set: take at least one month of closed tickets and have a support engineer give each of at least 150 of them one of the four classifications and, for documentation questions, the product area that should answer it. Add tickets until each classification has at least 15. Have a second support engineer label 30 of the same tickets independently and record how often the two agree. Keep the set out of the repository.
 - [ ] 1.2 Draft the routing and classification prompts and run them over the labelled set against a local clone of a documentation repository, through the LLM provider the deployment is approved to send ticket text to. Label each message as tenant, support or bot, as design Decision 7 describes, and lay out the inputs and apply the checks of Decisions 2, 8 and 10 by script. Record the measures listed under Validation in `design.md`, and replace the cost and time estimates in the proposal's Impact with the measured ones.
-- [ ] 1.3 Compare 1.2 with the targets under Validation in `design.md`. Build only when they are met; otherwise revise the prompts, `design.md`, the spec and ADR-012 and repeat 1.2. Keep on record the share of tickets whose existing primary driver is Task Request or Product Temporary Issue, for a later decision on a pre-filter.
+- [ ] 1.3 Compare 1.2 with the targets under Validation in `design.md`. Release only when they are met; otherwise revise the prompts, `design.md`, the spec, ADR-012 and whatever has been built, and repeat 1.2. Building may start before this task is done, with the feature left off. Keep on record the share of tickets whose existing primary driver is Task Request or Product Temporary Issue, for a later decision on a pre-filter.
 
 ## 2. Documentation source boundary
 

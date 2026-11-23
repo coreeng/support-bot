@@ -459,8 +459,9 @@ Alternatives considered:
 ## Validation
 
 The feature is released only if its verdicts agree with support engineers' on real tickets. The
-same measures are taken twice: by script before building (tasks 1.2 and 1.3) and from the built
-feature before release (task 6.3). The labelled set is at least 150 closed tickets from at
+same measures are taken twice, both before release: by script (tasks 1.2 and 1.3) and from the
+built feature (task 6.3). Building may start before the first is done, with the feature left
+off. The labelled set is at least 150 closed tickets from at
 least one month, with at least 15 in each classification, each labelled by a support engineer;
 30 are labelled by a second engineer to show how far people agree with each other.
 

@@ -115,8 +115,8 @@ ticket, so the first can be replaced without touching the second.
 - **Bounded cost.** The feature is off by default and has its own `enabled` switch. At most a
   configured number of tickets, 500 by default, are attempted in any 24 hours.
 - **Checked against people.** Verdicts are compared with support engineers' labels on at least 150
-  real tickets, against stated targets, once by script before building and once from the built
-  feature before release.
+  real tickets, against stated targets, once by script and once from the built feature. Both must
+  pass before release.
 
 ### Not decided here
 
