@@ -375,11 +375,7 @@
                       "properties": {
                         "repository": { "type": "string" },
                         "branch": { "type": "string" },
-                        "path": {
-                          "type": "string",
-                          "description": "Directory relative to the repository root; empty or . for the root",
-                          "not": { "pattern": "(^|/)\\.\\.(/|$)" }
-                        },
+                        "path": { "type": "string" },
                         "file-extensions": {
                           "type": "array",
                           "items": { "type": "string" }

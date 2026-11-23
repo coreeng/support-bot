@@ -15,21 +15,21 @@ public sealed interface ContextAnswer {
     /**
      * The pages to classify the thread against, in the order they are to be sent.
      *
-     * @param areasConsulted the product areas whose pages are among {@code pages}, most likely first;
+     * @param areasSupplied the product areas whose pages are among {@code pages}, most likely first;
      *     pages that belong to no area are not counted. Empty for a source without areas
      * @param areasNotSupplied product areas that exist and whose pages are not among {@code pages}
      * @param question null when the source did not distil one; the classification call then does
      */
     record Pages(
             List<DocumentationPage> pages,
-            List<String> areasConsulted,
+            List<String> areasSupplied,
             List<String> areasNotSupplied,
             @Nullable DistilledQuestion question)
             implements ContextAnswer {
 
         public Pages {
             pages = List.copyOf(pages);
-            areasConsulted = List.copyOf(areasConsulted);
+            areasSupplied = List.copyOf(areasSupplied);
             areasNotSupplied = List.copyOf(areasNotSupplied);
             if (pages.isEmpty()) {
                 throw new IllegalArgumentException("pages must not be empty; answer NothingCovers instead");
@@ -40,22 +40,22 @@ public sealed interface ContextAnswer {
                     throw new IllegalArgumentException("page ids must be unique: " + page.id());
                 }
             }
-            Set<String> consulted = new LinkedHashSet<>(areasConsulted);
-            if (consulted.size() != areasConsulted.size()) {
-                throw new IllegalArgumentException("areasConsulted must not repeat an area: " + areasConsulted);
+            Set<String> supplied = new LinkedHashSet<>(areasSupplied);
+            if (supplied.size() != areasSupplied.size()) {
+                throw new IllegalArgumentException("areasSupplied must not repeat an area: " + areasSupplied);
             }
             Set<String> pageAreas = new HashSet<>();
             pages.stream().map(DocumentationPage::area).filter(Objects::nonNull).forEach(pageAreas::add);
-            if (!pageAreas.equals(consulted)) {
+            if (!pageAreas.equals(supplied)) {
                 throw new IllegalArgumentException(
-                        "areasConsulted " + areasConsulted + " must be exactly the areas of the pages " + pageAreas);
+                        "areasSupplied " + areasSupplied + " must be exactly the areas of the pages " + pageAreas);
             }
             for (String area : areasNotSupplied) {
                 if (area.isBlank()) {
                     throw new IllegalArgumentException("areasNotSupplied must not hold a blank name");
                 }
-                if (consulted.contains(area)) {
-                    throw new IllegalArgumentException("area is both consulted and not supplied: " + area);
+                if (supplied.contains(area)) {
+                    throw new IllegalArgumentException("area is both supplied and not supplied: " + area);
                 }
             }
         }

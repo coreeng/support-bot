@@ -32,13 +32,13 @@ class DocumentationSourcePackagesTest {
 
     private static final String FIXTURES_PACKAGE = "com.coreeng.supportbot.docanalysis.archfixture";
 
+    private static final JavaClasses PRODUCTION = new ClassFileImporter()
+            .withImportOption(new ImportOption.DoNotIncludeTests())
+            .importPackages("com.coreeng.supportbot");
+
     @Test
     void nothingOutsideASourcePackageRefersToItsTypes() {
-        JavaClasses production = new ClassFileImporter()
-                .withImportOption(new ImportOption.DoNotIncludeTests())
-                .importPackages("com.coreeng.supportbot");
-
-        sourceTypesStayInTheirPackage(SOURCES_PACKAGE).check(production);
+        sourceTypesStayInTheirPackage(SOURCES_PACKAGE).check(PRODUCTION);
     }
 
     @Test
@@ -60,35 +60,15 @@ class DocumentationSourcePackagesTest {
 
     @Test
     void everySourceLivesInASourcePackage() {
-        JavaClasses production = new ClassFileImporter()
-                .withImportOption(new ImportOption.DoNotIncludeTests())
-                .importPackages("com.coreeng.supportbot");
-
-        sourcesLiveInSourcePackages(SOURCES_PACKAGE).check(production);
-    }
-
-    @Test
-    void reportsASourceOrSessionOutsideASourcePackage() {
-        JavaClasses fixtures = new ClassFileImporter().importPackages(FIXTURES_PACKAGE);
-
-        EvaluationResult result =
-                sourcesLiveInSourcePackages(FIXTURES_PACKAGE + ".source").evaluate(fixtures);
-
-        assertThat(result.getFailureReport().getDetails())
-                .hasSize(2)
-                .anySatisfy(detail -> assertThat(detail).contains("archfixture.MisplacedSource"))
-                .anySatisfy(detail -> assertThat(detail).contains("archfixture.source.RootSession"));
-    }
-
-    static ArchRule sourcesLiveInSourcePackages(String sourcesPackage) {
-        return classes()
+        classes()
                 .that()
                 .implement(DocumentationSource.class)
                 .or()
                 .implement(DocumentationSession.class)
                 .should()
-                .resideInAPackage(sourcesPackage + ".(*)..")
-                .allowEmptyShould(true);
+                .resideInAPackage(SOURCES_PACKAGE + ".(*)..")
+                .allowEmptyShould(true)
+                .check(PRODUCTION);
     }
 
     static ArchRule sourceTypesStayInTheirPackage(String sourcesPackage) {

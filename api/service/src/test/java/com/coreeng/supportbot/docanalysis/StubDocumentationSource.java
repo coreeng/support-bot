@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.docanalysis;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -12,17 +11,13 @@ public final class StubDocumentationSource implements DocumentationSource {
 
     public static final String DEFAULT_VERSION = "stub-version-1";
     public static final String DEFAULT_FINGERPRINT = "stub-fingerprint-1";
-    public static final Instant DEFAULT_REFRESHED_AT = Instant.parse("2026-01-05T09:00:00Z");
 
     private @Nullable String unavailableReason;
     private String version = DEFAULT_VERSION;
-    private Instant refreshedAt = DEFAULT_REFRESHED_AT;
     private String fingerprint = DEFAULT_FINGERPRINT;
-    private @Nullable SourceStatus status;
     private ContextAnswer defaultAnswer = new ContextAnswer.Failed("no_canned_answer", true);
     private final Map<String, ContextAnswer> answersByThread = new HashMap<>();
     private final List<Request> requests = new ArrayList<>();
-    private int openCount;
 
     public record Request(String thread, int budget) {}
 
@@ -46,20 +41,8 @@ public final class StubDocumentationSource implements DocumentationSource {
         return this;
     }
 
-    /** The version, and the refresh time, that the next successful {@link #open()} takes. */
-    public StubDocumentationSource version(String version, Instant refreshedAt) {
-        this.version = version;
-        this.refreshedAt = refreshedAt;
-        return this;
-    }
-
     public StubDocumentationSource version(String version) {
-        return version(version, refreshedAt);
-    }
-
-    /** What the source holds before any run opens it, as after a restart with a kept copy. */
-    public StubDocumentationSource holding(String version, Instant refreshedAt) {
-        this.status = new SourceStatus(version, refreshedAt);
+        this.version = version;
         return this;
     }
 
@@ -72,18 +55,12 @@ public final class StubDocumentationSource implements DocumentationSource {
         return List.copyOf(requests);
     }
 
-    public int openCount() {
-        return openCount;
-    }
-
     @Override
     public OpenResult open() {
-        openCount++;
         if (unavailableReason != null) {
             return new OpenResult.Unavailable(unavailableReason);
         }
         String sessionVersion = version;
-        status = new SourceStatus(sessionVersion, refreshedAt);
         return new OpenResult.Opened(new DocumentationSession() {
             @Override
             public String version() {
@@ -100,7 +77,7 @@ public final class StubDocumentationSource implements DocumentationSource {
 
     @Override
     public Optional<SourceStatus> status() {
-        return Optional.ofNullable(status);
+        return Optional.empty();
     }
 
     @Override

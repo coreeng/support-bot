@@ -4,7 +4,6 @@ import static com.coreeng.supportbot.docanalysis.StubDocumentationSource.page;
 import static com.coreeng.supportbot.docanalysis.StubDocumentationSource.question;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 class StubDocumentationSourceTest {
@@ -55,7 +54,6 @@ class StubDocumentationSourceTest {
                 .containsExactly(
                         new StubDocumentationSource.Request("[tenant] one", 100),
                         new StubDocumentationSource.Request("[tenant] two", 200));
-        assertThat(source.openCount()).isEqualTo(1);
     }
 
     @Test
@@ -74,41 +72,6 @@ class StubDocumentationSourceTest {
 
         assertThat(first.version()).isEqualTo("v1");
         assertThat(opened(source).version()).isEqualTo("v2");
-    }
-
-    @Test
-    void holdsNothingUntilOpened() {
-        assertThat(new StubDocumentationSource().status()).isEmpty();
-    }
-
-    @Test
-    void reportsWhatItHoldsWithoutOpening() {
-        Instant refreshed = Instant.parse("2026-02-01T08:00:00Z");
-        StubDocumentationSource source = new StubDocumentationSource().holding("abc123", refreshed);
-
-        assertThat(source.status()).contains(new SourceStatus("abc123", refreshed));
-        assertThat(source.openCount()).isZero();
-    }
-
-    @Test
-    void reportsTheVersionItLastOpenedWith() {
-        Instant refreshed = Instant.parse("2026-02-02T08:00:00Z");
-        StubDocumentationSource source =
-                new StubDocumentationSource().holding("old", Instant.EPOCH).version("new", refreshed);
-
-        opened(source);
-
-        assertThat(source.status()).contains(new SourceStatus("new", refreshed));
-    }
-
-    @Test
-    void anUnavailableSourceKeepsWhatItHeld() {
-        StubDocumentationSource source =
-                StubDocumentationSource.unavailable("fetch failed").holding("old", Instant.EPOCH);
-
-        source.open();
-
-        assertThat(source.status()).contains(new SourceStatus("old", Instant.EPOCH));
     }
 
     private static DocumentationSession opened(DocumentationSource source) {

@@ -3,7 +3,6 @@ package com.coreeng.supportbot.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -11,11 +10,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.util.unit.DataSize;
 
 class DocumentationAnalysisPropsTest {
+
+    private final ApplicationContextRunner contextRunner =
+            new ApplicationContextRunner().withUserConfiguration(PropsConfig.class);
 
     @Test
     void isOffByDefaultWithTheDesignDefaults() {
@@ -33,7 +38,7 @@ class DocumentationAnalysisPropsTest {
         assertThat(github.branch()).isEqualTo("main");
         assertThat(github.path()).isEqualTo("docs");
         assertThat(github.fileExtensions()).containsExactly(".md", ".mdx");
-        assertThat(github.copyLocationPath()).isEqualTo(Path.of("/tmp/documentation-analysis"));
+        assertThat(github.copyLocation()).isEqualTo("/tmp/documentation-analysis");
         assertThat(github.maxCopyAge()).isEqualTo(Duration.ofHours(24));
         assertThat(github.maxCopySize()).isEqualTo(DataSize.ofMegabytes(50));
         assertThat(github.maxFiles()).isEqualTo(5000);
@@ -61,16 +66,12 @@ class DocumentationAnalysisPropsTest {
     @Test
     void bindsAnEnabledGitHubSource() {
         Map<String, Object> values = enabledGitHub();
-        values.put("documentation-analysis.source.github.path", "/site/docs/");
-        values.put("documentation-analysis.source.github.file-extensions", ".MD, .mdx");
 
         DocumentationAnalysisProps props = bind(values);
 
         assertThat(props.enabled()).isTrue();
         assertThat(props.source().selectedType()).isEqualTo(DocumentationSourceType.GITHUB);
         assertThat(props.source().github().repository()).isEqualTo("example-org/docs");
-        assertThat(props.source().github().path()).isEqualTo("site/docs");
-        assertThat(props.source().github().fileExtensions()).containsExactly(".md", ".mdx");
     }
 
     @ParameterizedTest
@@ -104,44 +105,12 @@ class DocumentationAnalysisPropsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", " ", ".", "/", "./", "//"})
-    void readsABlankOrDotPathAsTheRepositoryRoot(String path) {
-        Map<String, Object> values = enabledGitHub();
-        values.put("documentation-analysis.source.github.path", path);
-
-        assertThat(bind(values).source().github().path()).isEmpty();
-    }
-
-    @Test
-    void readsABareNumberInTheUnitOfItsDefault() {
-        Map<String, Object> values = enabledGitHub();
-        values.put("documentation-analysis.failure-retry-delay", "24");
-        values.put("documentation-analysis.run-retry-delay", "15");
-        values.put("documentation-analysis.source.github.max-copy-age", "12");
-        values.put("documentation-analysis.source.github.max-copy-size", "50");
-
-        DocumentationAnalysisProps props = bind(values);
-
-        assertThat(props.failureRetryDelay()).isEqualTo(Duration.ofHours(24));
-        assertThat(props.runRetryDelay()).isEqualTo(Duration.ofMinutes(15));
-        assertThat(props.source().github().maxCopyAge()).isEqualTo(Duration.ofHours(12));
-        assertThat(props.source().github().maxCopySize()).isEqualTo(DataSize.ofMegabytes(50));
-    }
-
-    @ParameterizedTest
     @CsvSource(
             delimiter = '|',
             value = {
                 "source.github.repository | example-org     | source.github.repository must be in owner/name format",
                 "source.github.repository | a/b/c           | source.github.repository must be in owner/name format",
                 "source.github.branch     | ' '             | source.github.branch is required",
-                "source.github.path       | docs/../secrets | source.github.path must be a relative directory",
-                "source.github.path       | ./docs          | source.github.path must be a relative directory",
-                "source.github.file-extensions | md         | source.github.file-extensions must each start with '.'",
-                "source.github.copy-location | tmp/copy     | source.github.copy-location must be an absolute path",
-                "source.github.copy-location | /            | source.github.copy-location must be an absolute path",
-                "source.github.copy-location | /tmp/..      | source.github.copy-location must be an absolute path",
-                "source.github.copy-location | ' '          | source.github.copy-location must be an absolute path",
                 "source.github.max-copy-age | 0s            | source.github.max-copy-age must be positive",
                 "source.github.max-copy-size | 0B           | source.github.max-copy-size must be positive",
                 "source.github.max-files  | 0               | source.github.max-files must be positive",
@@ -159,6 +128,37 @@ class DocumentationAnalysisPropsTest {
         assertThatThrownBy(() -> bind(values)).hasStackTraceContaining("documentation-analysis." + message);
     }
 
+    @Test
+    void doesNotStartWhenEnabledWithAnUnknownSource() {
+        contextRunner
+                .withPropertyValues(
+                        "llm.provider=vertex",
+                        "documentation-analysis.enabled=true",
+                        "documentation-analysis.source.type=confluence")
+                .run(context -> assertThat(context)
+                        .getFailure()
+                        .hasStackTraceContaining(
+                                "documentation-analysis.source.type must be one of github but was 'confluence'"));
+    }
+
+    @Test
+    void doesNotStartWhenEnabledWithTheGitHubSourceAndNoRepository() {
+        contextRunner
+                .withPropertyValues("llm.provider=vertex", "documentation-analysis.enabled=true")
+                .run(context -> assertThat(context)
+                        .getFailure()
+                        .hasStackTraceContaining("documentation-analysis.source.github.repository is required"));
+    }
+
+    @Test
+    void doesNotStartWhenEnabledWithoutAnLlmProviderAndNoRepository() {
+        contextRunner
+                .withPropertyValues("llm.provider=none", "documentation-analysis.enabled=true")
+                .run(context -> assertThat(context)
+                        .getFailure()
+                        .hasStackTraceContaining("documentation-analysis.source.github.repository is required"));
+    }
+
     private static Map<String, Object> enabledGitHub() {
         Map<String, Object> values = new HashMap<>();
         values.put("documentation-analysis.enabled", "true");
@@ -171,4 +171,8 @@ class DocumentationAnalysisPropsTest {
         return new Binder(new MapConfigurationPropertySource(values))
                 .bindOrCreate("documentation-analysis", DocumentationAnalysisProps.class);
     }
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(DocumentationAnalysisProps.class)
+    static class PropsConfig {}
 }

@@ -399,9 +399,9 @@ documentation-analysis:
   source:
     type: ${DOCUMENTATION_ANALYSIS_SOURCE_TYPE:github} # Which source supplies the documentation: github
     github: # Validated only when source.type=github; credentials come from pr-review-tracking.github
-      repository: ${DOCUMENTATION_ANALYSIS_GITHUB_REPOSITORY:} # owner/name; required when this source is selected
-      branch: ${DOCUMENTATION_ANALYSIS_GITHUB_BRANCH:main}
-      path: ${DOCUMENTATION_ANALYSIS_GITHUB_PATH:docs} # Directory holding the documentation; empty or . for the repository root
+      repository: ${DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_REPOSITORY:} # owner/name; required when this source is selected
+      branch: ${DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_BRANCH:main}
+      path: ${DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_PATH:docs} # Directory holding the documentation; empty or . for the repository root
       file-extensions: [.md, .mdx]
       copy-location: /tmp/documentation-analysis
       max-copy-age: 24h # Fetch again when the copy is older
@@ -720,15 +720,16 @@ feature is being built and has no page yet; these settings exist so that it can 
 
 - **Enabling.** Off by default. It is on when `documentation-analysis.enabled` is `true` and
   `LLM_PROVIDER` is not `none`. It has its own switch, unlike the Support Summary page, because it
-  sends documentation to the LLM provider and costs more per ticket.
+  sends documentation to the LLM provider and costs more per ticket. Leave it off until the feature
+  is released: turning it on today only validates the settings, and later releases will require
+  GitHub credentials and start work that calls the LLM provider.
 - **Validation.** While `enabled` is `false` the values are not checked, but a value that cannot
   be read as its type at all (`max-input-tokens: abc`, or `DOCUMENTATION_ANALYSIS_ENABLED` set to
   an empty string) still fails startup. When `enabled` is `true`, startup fails with a message
   naming the setting if a number or duration is not positive, `source.type` names no known source,
   or the selected source lacks a setting it needs. This holds whether or not an LLM provider is set.
-- **Units.** Give durations and sizes with a unit (`24h`, `15m`, `50MB`). A bare number is read in
-  the unit of the default it replaces: hours for `failure-retry-delay` and `max-copy-age`, minutes
-  for `run-retry-delay`, megabytes for `max-copy-size`. The Helm chart's schema requires the unit.
+- **Units.** Give durations and sizes with a unit (`24h`, `15m`, `50MB`); the Helm chart's schema
+  refuses a bare number.
 - **Documentation source.** One source supplies the documentation, chosen by `source.type`. Each
   source has its settings under `source.<type>`, and only the selected one's are validated. The
   only source is `github`.
@@ -736,9 +737,9 @@ feature is being built and has no page yet; these settings exist so that it can 
 ### GitHub source
 
 Reads the documentation from one GitHub repository. It needs `repository` (`owner/name`). The
-`path` is a directory relative to the repository root, without `.` or `..` segments; leave it empty
-or set it to `.` for documentation at the root. `copy-location` is an absolute path below the file
-system root. GitHub credentials are read from `pr-review-tracking.github`
+`path` is the directory holding the documentation, relative to the repository root; leave it empty
+or set it to `.` for documentation at the root. `copy-location` is where the bot keeps its copy.
+GitHub credentials will be read from `pr-review-tracking.github`
 (see [PR review tracking](#pr-review-tracking)), whether or not PR tracking is enabled.
 
 ### Environment variables
@@ -754,9 +755,9 @@ Set these on the **API**:
 | `DOCUMENTATION_ANALYSIS_MAX_ATTEMPTS` | Failed attempts before a ticket waits for a prompt or setting change. Default `3`. |
 | `DOCUMENTATION_ANALYSIS_RUN_RETRY_DELAY` | Wait before a run starts again after the LLM provider stopped one. Default `15m`. |
 | `DOCUMENTATION_ANALYSIS_SOURCE_TYPE` | The documentation source. Default `github`, the only one. |
-| `DOCUMENTATION_ANALYSIS_GITHUB_REPOSITORY` | The documentation repository, `owner/name`. Required with the GitHub source. |
-| `DOCUMENTATION_ANALYSIS_GITHUB_BRANCH` | The branch to read. Default `main`. |
-| `DOCUMENTATION_ANALYSIS_GITHUB_PATH` | The directory holding the documentation; empty or `.` for the repository root. Default `docs`. |
+| `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_REPOSITORY` | The documentation repository, `owner/name`. Required with the GitHub source. |
+| `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_BRANCH` | The branch to read. Default `main`. |
+| `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_PATH` | The directory holding the documentation; empty or `.` for the repository root. Default `docs`. |
 
 ## Single Sign-On (SSO)
 

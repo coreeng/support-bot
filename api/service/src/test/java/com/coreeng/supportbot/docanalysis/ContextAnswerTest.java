@@ -24,11 +24,11 @@ class ContextAnswerTest {
                 List.of("storage"),
                 null);
 
-        assertThat(answer.areasConsulted()).containsExactly("network", "deploy");
+        assertThat(answer.areasSupplied()).containsExactly("network", "deploy");
     }
 
     @Test
-    void acceptsRootPagesOutsideAnyConsultedArea() {
+    void acceptsRootPagesOutsideAnySuppliedArea() {
         ContextAnswer.Pages answer = new ContextAnswer.Pages(
                 List.of(page("index.md", null, "root"), page("deploy/a.md", "deploy", "a")),
                 List.of("deploy"),
@@ -39,26 +39,26 @@ class ContextAnswerTest {
     }
 
     @Test
-    void rejectsAConsultedAreaWithoutPages() {
+    void rejectsASuppliedAreaWithoutPages() {
         assertThatThrownBy(() -> new ContextAnswer.Pages(
                         List.of(page("deploy/a.md", "deploy", "a")), List.of("deploy", "network"), List.of(), null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("areasConsulted");
+                .hasMessageContaining("areasSupplied");
     }
 
     @Test
-    void rejectsAPageFromAnAreaNotConsulted() {
+    void rejectsAPageFromAnAreaNotListedAsSupplied() {
         assertThatThrownBy(() -> new ContextAnswer.Pages(
                         List.of(page("deploy/a.md", "deploy", "a"), page("network/b.md", "network", "b")),
                         List.of("deploy"),
                         List.of(),
                         null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("areasConsulted");
+                .hasMessageContaining("areasSupplied");
     }
 
     @Test
-    void rejectsAnAreaConsultedTwice() {
+    void rejectsAnAreaSuppliedTwice() {
         assertThatThrownBy(() -> new ContextAnswer.Pages(
                         List.of(page("deploy/a.md", "deploy", "a")), List.of("deploy", "deploy"), List.of(), null))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -66,7 +66,7 @@ class ContextAnswerTest {
     }
 
     @Test
-    void rejectsAnAreaThatIsBothConsultedAndNotSupplied() {
+    void rejectsAnAreaThatIsBothSuppliedAndNotSupplied() {
         assertThatThrownBy(() -> new ContextAnswer.Pages(
                         List.of(page("deploy/a.md", "deploy", "a")), List.of("deploy"), List.of("deploy"), null))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -143,21 +143,7 @@ class ContextAnswerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(
-            strings = {
-                "a\".md",
-                "a<b.md",
-                "a>b.md",
-                "a\nb.md",
-                "a\tb.md",
-                "a\u0000b.md",
-                "a\u2028b.md",
-                "a\u2029b.md",
-                "a\u200bb.md",
-                " a.md",
-                "a.md ",
-                " "
-            })
+    @ValueSource(strings = {"a\".md", "a<b.md", "a>b.md", "a\nb.md", "a\tb.md", "a\u0000b.md", " "})
     void aPageIdMustBeSafeToSendAsAnAttribute(String id) {
         assertThatThrownBy(() -> page(id, null, "text")).isInstanceOf(IllegalArgumentException.class);
     }

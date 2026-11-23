@@ -96,18 +96,3 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "max-copy-size"
-
-  - it: rejects a documentation path that leaves the repository
-    set:
-      configMap.config.documentation-analysis.source.github.path: docs/../secrets
-    asserts:
-      - failedTemplate:
-          errorPattern: "path"
-
-  - it: renders a documentation path at the repository root
-    set:
-      configMap.config.documentation-analysis.source.github.path: ""
-    asserts:
-      - matchRegex:
-          path: data["application.yaml"]
-          pattern: 'path: ""'

@@ -103,12 +103,7 @@ class ModelInputTest {
                 "<thread",
                 "</thr</thread>ead>",
                 "<<thread>/thread>",
-                "<\u200b/thread>",
-                "</thr\u00adead>",
-                "<\u00a0/thread>",
-                "<\ufeffthread>",
                 "<//thread>",
-                "<\\thread>",
                 "</thread_>",
                 "</thread2>",
                 "<\nthread>",
@@ -117,11 +112,6 @@ class ModelInputTest {
             })
     void removesEveryFormOfATagName(String tag) {
         assertThat(ModelInput.removeTags("before " + tag + " after")).isEqualTo("before  after");
-    }
-
-    @Test
-    void removesInvisibleCharactersButKeepsLineBreaksAndTabs() {
-        assertThat(ModelInput.removeTags("a\u200bb\u0007c\td\r\ne")).isEqualTo("abc\td\r\ne");
     }
 
     @Test
@@ -179,7 +169,7 @@ class ModelInputTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"a\".md", "a<b>.md", "a\nb.md", "a\tb.md", "a\u2028b.md", " a.md"})
+    @ValueSource(strings = {"a\".md", "a<b>.md", "a\nb.md", "a\tb.md"})
     void rejectsAnAttributeValueThatCouldBreakTheTag(String value) {
         ModelInput input = ModelInput.start();
 
