@@ -66,8 +66,6 @@ ticket, so the first can be replaced without touching the second.
   returns every page of those areas, plus the pages at the root.
 - **Over the budget.** When two areas are too much, the first is returned alone and the second is
   named as not supplied. When the first alone is too much, the ticket fails and is not retried.
-- **Credentials.** It uses the GitHub credentials configured for PR tracking, and startup fails
-  when the feature is enabled without them, whether or not PR tracking is on.
 
 ### Results and evidence
 
@@ -160,7 +158,6 @@ ticket, so the first can be replaced without touching the second.
 - ⚠️ **The copy is lost when the pod is replaced** and fetched again on the next run. A run resumed
   after that may continue against a newer version; each result records the one it used.
 - ⚠️ **Documentation content is sent to the LLM provider**, which the bot has not done before.
-- ⚠️ **A deployment without PR tracking still fills in its GitHub block** to use the GitHub source.
 
 ## Alternatives considered
 
