@@ -85,6 +85,14 @@ class DocumentationAnalysisPropsTest {
         assertThat(bind(values).source().selectedType()).isEqualTo(DocumentationSourceType.GITHUB);
     }
 
+    @Test
+    void bindsTheGitHubSourceRoutingToProductAreas() {
+        Map<String, Object> values = enabledGitHub();
+        values.put("documentation-analysis.source.github.context", "routed");
+
+        assertThat(bind(values).source().github().selectedContext()).isEqualTo(GitHubSourceContext.ROUTED);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"confluence", "", " github "})
     void failsWhenEnabledWithAnUnknownSource(String type) {
@@ -126,8 +134,8 @@ class DocumentationAnalysisPropsTest {
                 "source.github.max-copy-size | 0B           | source.github.max-copy-size must be positive",
                 "source.github.max-files  | 0               | source.github.max-files must be positive",
                 "source.github.max-areas-per-ticket | 0     | source.github.max-areas-per-ticket must be positive",
-                "source.github.context    | routed          | source.github.context must be one of whole but was 'routed'",
-                "source.github.context    | ' whole'        | source.github.context must be one of whole but was ' whole'",
+                "source.github.context    | search          | source.github.context must be one of whole, routed but was 'search'",
+                "source.github.context    | ' whole'        | source.github.context must be one of whole, routed but was ' whole'",
                 "max-input-tokens         | 0               | max-input-tokens must be positive",
                 "max-tickets-per-day      | -1              | max-tickets-per-day must be positive",
                 "failure-retry-delay      | 0s              | failure-retry-delay must be positive",

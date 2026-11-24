@@ -20,7 +20,10 @@ public enum AnalysisPromptType {
     SUMMARY("summary"),
 
     /** Per-ticket documentation gap classifier: drives {@code doc_analysis}. */
-    DOCUMENTATION_CLASSIFICATION("documentation_classification");
+    DOCUMENTATION_CLASSIFICATION("documentation_classification"),
+
+    /** The GitHub documentation source's choice of product areas for a ticket, when it routes. */
+    DOCUMENTATION_ROUTING("documentation_routing");
 
     /** The value stored in {@code analysis_prompt.type}. */
     private final String dbValue;

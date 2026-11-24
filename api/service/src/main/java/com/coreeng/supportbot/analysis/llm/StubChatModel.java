@@ -35,7 +35,8 @@ import org.jspecify.annotations.Nullable;
  *
  * Every consumer sends a single blob, so the stub has to work out which one it is answering. The
  * documentation classification is laid out by {@code ModelInput} and opens with its
- * {@code <documentation>} tag. The other two are told apart by the delimiter the summary call site
+ * {@code <documentation>} tag, and the GitHub documentation source's routing call opens with its
+ * {@code <page_index>} tag. The other two are told apart by the delimiter the summary call site
  * wraps its report in, because that string is owned by our own code ({@code LlmSummaryService})
  * rather than by prompt text stored in the database — prompts get rewritten by migration,
  * delimiters do not. Anything without either marker is treated as a classification request: that
@@ -59,6 +60,12 @@ public class StubChatModel implements ChatModel {
             Pattern.DOTALL);
     private static final Pattern QUESTION = Pattern.compile(
             "<" + InputTag.QUESTION.tagName() + ">\n(.*?)</" + InputTag.QUESTION.tagName() + ">", Pattern.DOTALL);
+    private static final String PAGE_INDEX_MARKER = "<" + InputTag.PAGE_INDEX.tagName() + ">";
+    private static final Pattern PAGE_INDEX = Pattern.compile(
+            "<" + InputTag.PAGE_INDEX.tagName() + ">\n(.*?)</" + InputTag.PAGE_INDEX.tagName() + ">", Pattern.DOTALL);
+    /** The heading the GitHub source puts above each product area's pages in its index. */
+    private static final Pattern AREA_HEADING = Pattern.compile("^## (.+)$", Pattern.MULTILINE);
+
     private static final int MAX_QUOTE_LENGTH = 200;
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -101,6 +108,8 @@ public class StubChatModel implements ChatModel {
         String answer;
         if (prompt.startsWith(DOCUMENTATION_MARKER)) {
             answer = documentationClassification(prompt);
+        } else if (prompt.startsWith(PAGE_INDEX_MARKER)) {
+            answer = documentationRouting(prompt);
         } else if (prompt.contains(SUMMARY_MARKER)) {
             answer = summary(prompt);
         } else {
@@ -177,11 +186,42 @@ public class StubChatModel implements ChatModel {
         answer.put("doc_paths", paths);
         answer.put("evidence_quote", quote);
         answer.put("rationale", "Stubbed classification. This text is generated locally and describes no real thread.");
+        return json(answer);
+    }
+
+    private static String json(Map<String, Object> answer) {
         try {
             return JSON.writeValueAsString(answer);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("a map of strings always serialises", e);
+            throw new IllegalStateException("a map of strings, booleans and lists always serialises", e);
         }
+    }
+
+    /**
+     * A JSON answer that passes the GitHub source's routing checks: not a documentation question, a
+     * documentation question that no area covers, or one area of the index, varying with the request
+     * so the page shows each outcome and more than one area.
+     */
+    private static String documentationRouting(String prompt) {
+        int seed = Math.floorMod(prompt.hashCode(), Integer.MAX_VALUE);
+        Matcher index = PAGE_INDEX.matcher(prompt);
+        List<String> areas = index.find()
+                ? AREA_HEADING
+                        .matcher(index.group(1))
+                        .results()
+                        .map(match -> match.group(1).strip())
+                        .toList()
+                : List.of();
+        boolean documentationQuestion = seed % 4 != 0;
+        List<String> chosen =
+                !documentationQuestion || seed % 4 == 1 || areas.isEmpty() ? List.of() : List.of(pick(areas, seed / 4));
+        Map<String, Object> answer = new LinkedHashMap<>();
+        answer.put("question", "How does a tenant use this platform feature?");
+        answer.put("tags", List.of("stub-routing", "platform-feature"));
+        answer.put("is_documentation_question", documentationQuestion);
+        answer.put("areas", chosen);
+        answer.put("reason", "Stubbed routing. This text is generated locally and describes no real thread.");
+        return json(answer);
     }
 
     /**

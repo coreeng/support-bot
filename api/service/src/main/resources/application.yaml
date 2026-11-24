@@ -464,5 +464,5 @@ documentation-analysis:
       max-copy-age: 24h # Fetch again when the copy is older
       max-copy-size: 50MB # A fetch that keeps more than this fails
       max-files: 5000 # A fetch that keeps more files than this fails
-      context: ${DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_CONTEXT:whole} # whole: every page is sent with every ticket
-      max-areas-per-ticket: 2
+      context: ${DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_CONTEXT:whole} # whole: every page with every ticket, when the documentation fits in max-input-tokens; routed: only the product areas a model call picks, when it does not
+      max-areas-per-ticket: 2 # Product areas the model may pick for one ticket; used when context is routed

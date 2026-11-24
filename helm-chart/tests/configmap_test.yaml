@@ -90,9 +90,19 @@ tests:
       - failedTemplate:
           errorPattern: "failure-retry-delay"
 
-  - it: rejects an unknown documentation analysis context
+  - it: renders the documentation analysis config routing to product areas
+    values:
+      - values/documentation-analysis.yaml
     set:
       configMap.config.documentation-analysis.source.github.context: routed
+    asserts:
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'context: routed'
+
+  - it: rejects an unknown documentation analysis context
+    set:
+      configMap.config.documentation-analysis.source.github.context: search
     asserts:
       - failedTemplate:
           errorPattern: "context"
