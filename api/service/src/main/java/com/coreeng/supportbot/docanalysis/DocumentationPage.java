@@ -19,4 +19,9 @@ public record DocumentationPage(String id, @Nullable String area, String text) {
             throw new IllegalArgumentException("area must not be blank when present");
         }
     }
+
+    /** Whether {@code id} can identify a page, so that a source can leave out one that cannot. */
+    public static boolean isValidId(String id) {
+        return !id.isBlank() && ModelInput.isAttributeValue(id);
+    }
 }

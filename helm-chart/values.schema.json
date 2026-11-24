@@ -384,6 +384,7 @@
                         "max-copy-age": { "type": "string", "pattern": "^([0-9]+(ns|us|ms|s|m|h|d)|[Pp][0-9A-Za-z.]+)$" },
                         "max-copy-size": { "type": "string", "pattern": "^[0-9]+(B|KB|MB|GB|TB)$" },
                         "max-files": { "type": "integer", "minimum": 1 },
+                        "context": { "type": "string", "enum": ["whole"] },
                         "max-areas-per-ticket": { "type": "integer", "minimum": 1 }
                       }
                     }

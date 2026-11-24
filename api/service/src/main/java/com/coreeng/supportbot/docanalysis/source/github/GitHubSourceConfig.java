@@ -2,6 +2,7 @@ package com.coreeng.supportbot.docanalysis.source.github;
 
 import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
 import com.coreeng.supportbot.config.DocumentationAnalysisProps;
+import com.coreeng.supportbot.docanalysis.DocumentationSource;
 import com.coreeng.supportbot.github.GitHubClient;
 import java.time.Clock;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -17,5 +18,11 @@ class GitHubSourceConfig {
     @Bean
     DocumentationCopy documentationCopy(GitHubClient gitHubClient, DocumentationAnalysisProps props, Clock clock) {
         return new DocumentationCopy(gitHubClient, props.source().github(), clock);
+    }
+
+    @Bean
+    DocumentationSource gitHubDocumentationSource(
+            DocumentationCopy documentationCopy, DocumentationAnalysisProps props) {
+        return new GitHubDocumentationSource(documentationCopy, props.source().github(), props.maxInputTokens());
     }
 }

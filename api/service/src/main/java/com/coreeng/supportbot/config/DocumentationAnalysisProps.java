@@ -64,6 +64,7 @@ public record DocumentationAnalysisProps(
             @DefaultValue("24h") Duration maxCopyAge,
             @DefaultValue("50MB") DataSize maxCopySize,
             @DefaultValue("5000") int maxFiles,
+            @DefaultValue("whole") String context,
             @DefaultValue("2") int maxAreasPerTicket) {
 
         private static final String GITHUB_PREFIX = PREFIX + ".source.github.";
@@ -75,6 +76,11 @@ public record DocumentationAnalysisProps(
             path = normalisePath(path);
             fileExtensions = fileExtensions.stream().map(String::trim).toList();
             copyLocation = copyLocation.trim();
+        }
+
+        /** How the source finds context. Fails when {@code context} names no known way. */
+        public GitHubSourceContext selectedContext() {
+            return GitHubSourceContext.parse(context);
         }
 
         /**
@@ -126,6 +132,7 @@ public record DocumentationAnalysisProps(
                 throw new IllegalArgumentException(GITHUB_PREFIX + "max-copy-size must be positive");
             }
             requirePositive(maxFiles, "source.github.max-files");
+            selectedContext();
             requirePositive(maxAreasPerTicket, "source.github.max-areas-per-ticket");
         }
     }

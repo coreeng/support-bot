@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.config.DocumentationAnalysisProps;
 import com.coreeng.supportbot.config.PrTrackingProps;
+import com.coreeng.supportbot.docanalysis.DocumentationSource;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.prtracking.PrTrackingGitHubConfig;
 import com.coreeng.supportbot.prtracking.source.PrSourceClient;
@@ -35,8 +36,22 @@ class GitHubSourceConfigTest {
                     assertThat(context).hasSingleBean(GitHub.class);
                     assertThat(context).hasSingleBean(GitHubClient.class);
                     assertThat(context).hasSingleBean(DocumentationCopy.class);
+                    assertThat(context).hasSingleBean(DocumentationSource.class);
                     assertThat(context).doesNotHaveBean(PrSourceClient.class);
                 });
+    }
+
+    @Test
+    void doesNotStartWithAnUnknownWayOfFindingContext() {
+        contextRunner
+                .withPropertyValues(enabled())
+                .withPropertyValues(
+                        "pr-review-tracking.github.token=test-token",
+                        "documentation-analysis.source.github.context=routed")
+                .run(context -> assertThat(context)
+                        .getFailure()
+                        .hasStackTraceContaining(
+                                "documentation-analysis.source.github.context must be one of whole but was 'routed'"));
     }
 
     @Test
@@ -67,7 +82,10 @@ class GitHubSourceConfigTest {
         contextRunner
                 .withPropertyValues(enabled())
                 .withPropertyValues("llm.provider=none", "pr-review-tracking.github.token=test-token")
-                .run(context -> assertThat(context).doesNotHaveBean(DocumentationCopy.class));
+                .run(context -> {
+                    assertThat(context).doesNotHaveBean(DocumentationCopy.class);
+                    assertThat(context).doesNotHaveBean(DocumentationSource.class);
+                });
     }
 
     @Test
@@ -77,6 +95,7 @@ class GitHubSourceConfigTest {
             assertThat(context).doesNotHaveBean(GitHub.class);
             assertThat(context).doesNotHaveBean(GitHubClient.class);
             assertThat(context).doesNotHaveBean(DocumentationCopy.class);
+            assertThat(context).doesNotHaveBean(DocumentationSource.class);
         });
     }
 
