@@ -29,8 +29,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache libcrypto3=3.5.9-r0 \
-    libssl3=3.5.9-r0 \
+RUN apk add --no-cache libcrypto3=3.5.9-r1 \
+    libssl3=3.5.9-r1 \
     libstdc++=15.2.0-r2 \
     musl=1.2.5-r24 \
     musl-utils=1.2.5-r24 \
