@@ -4,35 +4,26 @@ import { hasActiveProductTags } from "@/components/products/products";
 import BreakdownCard, { DISTINCT_ROW_COLORS, sharePercent, sumCounts } from "@/components/summary/breakdown-card";
 import PromptDialog from "@/components/summary/prompt-dialog";
 import SummaryProse from "@/components/summary/summary-prose";
+import {
+  chosenWindow,
+  formatWindow,
+  PRESET_LABELS,
+  presetForWindow,
+  WINDOW_PARAM_DEFAULTS,
+  WINDOW_PARAM_VALIDATORS,
+  WindowPicker,
+} from "@/components/summary/window-picker";
 import EditTicketModal from "@/components/tickets/EditTicketModal";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SingleSelectFilter } from "@/components/ui/single-select-filter";
 import { isApiError, MAX_SUMMARY_POLL_FAILURES, useRegistry, useSummary, useSummaryEnabled, useSummaryTeamGroups } from "@/lib/hooks";
-import { enumValidator, isoDateValidator, useUrlParams, type ParamValidator } from "@/lib/hooks/useUrlParams";
+import { useUrlParams, type ParamValidator } from "@/lib/hooks/useUrlParams";
 import type { SummaryCount, SummaryData, SummarySection, SummaryTeamGroup } from "@/lib/types/summary";
 import { cn, formatUtcDateTime } from "@/lib/utils";
-import { MAX_SUMMARY_WINDOW_DAYS, presetWindow, summaryWindowProblem, type SummaryWindowPreset } from "@/lib/utils/summary-window";
+import { MAX_SUMMARY_WINDOW_DAYS } from "@/lib/utils/summary-window";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Eye } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-
-/**
- * The presets this page offers. Each named one is a whole business period before the current
- * one (see `presetWindow`); the default is the two weeks before this one.
- */
-const SUMMARY_PRESETS = ["lastWeek", "last2Weeks", "lastMonth", "custom"] as const satisfies readonly SummaryPreset[];
-type SummaryPreset = SummaryWindowPreset | "custom";
-
-const DEFAULT_PRESET: SummaryWindowPreset = "last2Weeks";
-
-const PRESET_LABELS: Record<SummaryPreset, string> = {
-  lastWeek: "Last week",
-  last2Weeks: "Last 2 weeks",
-  lastMonth: "Last month",
-  custom: "Custom range",
-};
 
 /** What a group is called when the deployment's groups have not loaded (yet). */
 const DEFAULT_TEAM_GROUP_NAME = "Team group";
@@ -48,41 +39,9 @@ const TEAM_GROUP_SEARCH_THRESHOLD = 8;
 const teamGroupCodeValidator: ParamValidator = (raw, defaultValue) =>
   /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/.test(raw) ? raw : defaultValue;
 
-/**
- * Formats an inclusive date window compactly, sharing whatever the two ends have in common:
- * "12 – 25 Aug 2026", "28 Jul – 25 Aug 2026", "28 Dec 2025 – 10 Jan 2026".
- */
-function formatWindow(from: string, to: string): string {
-  const start = new Date(`${from}T12:00:00Z`);
-  const end = new Date(`${to}T12:00:00Z`);
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return `${from} – ${to}`;
-
-  const part = (date: Date, options: Intl.DateTimeFormatOptions) =>
-    new Intl.DateTimeFormat("en-GB", { ...options, timeZone: "UTC" }).format(date);
-  const full = { day: "numeric", month: "short", year: "numeric" } as const;
-
-  if (start.getUTCFullYear() !== end.getUTCFullYear()) return `${part(start, full)} – ${part(end, full)}`;
-  if (start.getUTCMonth() !== end.getUTCMonth()) return `${part(start, { day: "numeric", month: "short" })} – ${part(end, full)}`;
-  return `${part(start, { day: "numeric" })} – ${part(end, full)}`;
-}
-
 /** A count or percentage inline in prose; every metric is set in a monospaced, tabular face. */
 function Metric({ children }: { children: ReactNode }) {
   return <span className="font-mono tabular-nums">{children}</span>;
-}
-
-/**
- * The preset whose business period is exactly this window, or `custom` when none is.
- * Deriving the label from the window on screen keeps it honest while a newly chosen preset is
- * still loading and the previous window's figures are shown in its place.
- */
-function presetForWindow(from: string, to: string): SummaryPreset {
-  for (const preset of SUMMARY_PRESETS) {
-    if (preset === "custom") continue;
-    const window = presetWindow(preset);
-    if (window.from === from && window.to === to) return preset;
-  }
-  return "custom";
 }
 
 /** The scope line's description of the team group on screen, with its member teams on hover. */
@@ -347,37 +306,13 @@ export function summaryErrorMessage(error: unknown): { title: string; detail: st
   return { title: "Error loading support summary", detail: "Please try again later" };
 }
 
-/** Inline guidance next to the custom range inputs; nothing while the range is valid or incomplete. */
-const RANGE_PROBLEM_LABELS = {
-  inverted: "Invalid range: end date is before start date",
-  tooLong: `Invalid range: ${MAX_SUMMARY_WINDOW_DAYS} days at most`,
-} as const;
-
 export default function SupportSummaryPage() {
   const [params, setParams] = useUrlParams(
-    // Widened to string so `setParams` accepts any preset, not just the default's literal type.
-    { dateFilter: DEFAULT_PRESET as string, dateFrom: "", dateTo: "", teamGroup: "" },
-    {
-      dateFilter: enumValidator(SUMMARY_PRESETS, DEFAULT_PRESET),
-      dateFrom: isoDateValidator,
-      dateTo: isoDateValidator,
-      teamGroup: teamGroupCodeValidator,
-    }
+    { ...WINDOW_PARAM_DEFAULTS, teamGroup: "" },
+    { ...WINDOW_PARAM_VALIDATORS, teamGroup: teamGroupCodeValidator }
   );
-  // Safe to cast: the validator guarantees a valid preset.
-  const dateFilter = params.dateFilter as SummaryPreset;
-  // Mirrors the backend's window rules, so a range it would reject with 400 is never requested.
-  const rangeProblem = params.dateFrom && params.dateTo ? summaryWindowProblem(params.dateFrom, params.dateTo) : null;
-
-  // Falls back to the default preset while a custom range is incomplete or invalid, so the
-  // page always has a window to load rather than sitting empty.
-  const summaryWindow = useMemo(() => {
-    if (dateFilter === "custom" && params.dateFrom && params.dateTo && summaryWindowProblem(params.dateFrom, params.dateTo) === null) {
-      return { from: params.dateFrom, to: params.dateTo };
-    }
-    const preset = dateFilter === "custom" ? DEFAULT_PRESET : dateFilter;
-    return presetWindow(preset);
-  }, [dateFilter, params.dateFrom, params.dateTo]);
+  const { dateFilter, dateFrom, dateTo } = params;
+  const summaryWindow = useMemo(() => chosenWindow({ dateFilter, dateFrom, dateTo }), [dateFilter, dateFrom, dateTo]);
 
   // The sidebar hides the entry while the feature is off, but a direct visit must not fall through
   // to a request the backend will refuse.
@@ -498,45 +433,7 @@ export default function SupportSummaryPage() {
                 />
               </span>
             )}
-            <Select
-              value={dateFilter}
-              onValueChange={(value) =>
-                setParams(value !== "custom" ? { dateFilter: value, dateFrom: "", dateTo: "" } : { dateFilter: value })
-              }
-            >
-              <SelectTrigger className="w-[160px]" data-testid="summary-date-filter">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="lastWeek">Last Week</SelectItem>
-                <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
-                <SelectItem value="lastMonth">Last Month</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
-            {dateFilter === "custom" && (
-              <>
-                <Input
-                  type="date"
-                  aria-label="From date"
-                  value={params.dateFrom}
-                  onChange={(event) => setParams({ dateFrom: event.target.value })}
-                  className="w-[150px]"
-                />
-                <Input
-                  type="date"
-                  aria-label="To date"
-                  value={params.dateTo}
-                  onChange={(event) => setParams({ dateTo: event.target.value })}
-                  className="w-[150px]"
-                />
-              </>
-            )}
-            {dateFilter === "custom" && rangeProblem !== null && (
-              <span className="text-destructive text-xs font-medium" role="alert">
-                {RANGE_PROBLEM_LABELS[rangeProblem]}
-              </span>
-            )}
+            <WindowPicker params={{ dateFilter, dateFrom, dateTo }} onChange={setParams} testId="summary-date-filter" />
           </div>
         )}
       </div>
