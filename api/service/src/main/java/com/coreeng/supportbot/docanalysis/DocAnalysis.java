@@ -13,6 +13,8 @@ public sealed interface DocAnalysis {
     String promptId();
 
     /**
+     * @param productAreas the areas the ticket counts under, the one it is counted under first; empty
+     *     when it counts under none
      * @param docPaths for {@code correct} and {@code incorrect} the one page cited; for {@code missing}
      *     the closest pages, if any
      */
