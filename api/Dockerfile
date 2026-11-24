@@ -35,10 +35,9 @@ RUN service postgresql start && sleep 6 && \
 FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24-5
 USER 0
 RUN microdnf update -y \
-        libattr-2.6.0-2.el9 \
-        pcre2-10.40-7.el9_8 \
-        pcre2-syntax-10.40-7.el9_8 \
-        sqlite-libs-3.34.1-11.el9_8 \
+        curl-minimal-7.76.1-44.el9_9.1 \
+        expat-2.5.0-9.el9_9.8 \
+        libcurl-minimal-7.76.1-44.el9_9.1 \
     && microdnf clean all
 USER 185
 ARG P2P_VERSION=dev
