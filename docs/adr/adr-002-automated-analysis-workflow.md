@@ -3,6 +3,7 @@
 **Date:** 2026-02-23
 **Status:** Proposed
 **Amended:** 2026-09 — [PR #327](https://github.com/coreeng/support-bot/pull/327) retired the UI that triggered this pipeline (`/knowledge-gaps`, now redirecting to `/summary`); the backfill is triggered server-side while serving `GET /summary`, and `POST /analysis/run` remains as an API-only path. The Support Summary settings are documented in `api/service/docs/configuration.md`.
+**Amended:** 2026-11 — a documentation analysis run ([ADR-012](adr-012-documentation-gap-analysis.md)) can be active alongside one analysis job, each on its own lock and single-thread executor. Calls within each run stay sequential.
 
 ---
 
@@ -59,5 +60,5 @@ Compare current analysis to current prompt, if the same prompt was used for the 
 - **Long-running async task in-process.** Potential infinite timeout on LLM calls
 - **No retry logic in v1.** Individual thread failures will be logged but will not stop the batch;
 - **Vertex API rate limits.** Large exports (many threads) may hit Gemini rate limits. A configurable delay between LLM calls will be added as an initial mitigation; proper backoff/retry is a follow-up.
-- **Thread-level parallelism not in scope.** Threads are summarized sequentially to keep implementation simple and avoid hitting rate limits. Parallelism can be added later with a bounded executor.
+- **Thread-level parallelism not in scope.** Threads are summarized sequentially to keep implementation simple and avoid hitting rate limits. Parallelism can be added later with a bounded executor. *(Amended 2026-11, [ADR-012](adr-012-documentation-gap-analysis.md): still true within a run, but a documentation analysis run and an analysis job can each have an LLM call in flight at once.)*
 - **Prompt hash computation.** The hash is computed from the prompt text string. If the prompt is changed (even whitespace), all threads will be re-analyzed. This is intentional but may cause unexpected re-analysis if prompts are edited frequently.
