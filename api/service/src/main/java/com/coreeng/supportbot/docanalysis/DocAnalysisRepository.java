@@ -32,6 +32,15 @@ public interface DocAnalysisRepository {
             Instant failedBefore,
             int maxAttempts);
 
+    /**
+     * Closed tickets raised in the window, in the given channels, each with its row whatever its
+     * {@code prompt_id}, or none.
+     *
+     * @param from first day of the window, inclusive, in UTC
+     * @param to last day of the window, inclusive, in UTC
+     */
+    List<WindowTicket> findWindow(LocalDate from, LocalDate to, Collection<String> channelIds);
+
     /** Tickets whose row, a result or a failed attempt, was saved at or after {@code since}. */
     int countAttemptedSince(Instant since);
 

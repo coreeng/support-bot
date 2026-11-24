@@ -15,6 +15,7 @@ public final class StubDocumentationSource implements DocumentationSource {
     private @Nullable String unavailableReason;
     private String version = DEFAULT_VERSION;
     private String fingerprint = DEFAULT_FINGERPRINT;
+    private @Nullable SourceStatus status;
     private ContextAnswer defaultAnswer = new ContextAnswer.Failed("no_canned_answer", true);
     private final Map<String, ContextAnswer> answersByThread = new HashMap<>();
     private final List<Request> requests = new ArrayList<>();
@@ -51,6 +52,11 @@ public final class StubDocumentationSource implements DocumentationSource {
         return this;
     }
 
+    public StubDocumentationSource status(@Nullable SourceStatus status) {
+        this.status = status;
+        return this;
+    }
+
     public List<Request> requests() {
         return List.copyOf(requests);
     }
@@ -77,7 +83,7 @@ public final class StubDocumentationSource implements DocumentationSource {
 
     @Override
     public Optional<SourceStatus> status() {
-        return Optional.empty();
+        return Optional.ofNullable(status);
     }
 
     @Override

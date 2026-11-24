@@ -68,15 +68,16 @@ public class SecurityConfig {
                         // whether to show the nav item, without a 403 for users lacking that role.
                         // Listed ahead of the role-gated rules below so the check keeps working if
                         // one of those is ever widened to a wildcard.
-                        .requestMatchers("/elevate/enabled", "/summary/enabled")
+                        .requestMatchers("/elevate/enabled", "/summary/enabled", "/documentation-analysis/enabled")
                         .authenticated()
-                        // Dashboards, the Support Summary page, the read-only prompt texts its
-                        // View Prompts dialog shows and the team groups its selector lists are open
-                        // to leadership or support engineers.
+                        // Dashboards, the Support Summary and Documentation Analysis pages, the
+                        // read-only prompt texts the View Prompts dialog shows and the team groups its
+                        // selector lists are open to leadership or support engineers.
                         // /summary is deliberately not support-engineer-only: serving it triggers the
                         // backfill server-side, so leadership must reach it without the /analysis/run
-                        // permission. It is also not method-scoped: Spring MVC serves HEAD through
-                        // @GetMapping, so a GET-only rule would let anyone start the backfill with HEAD.
+                        // permission; /documentation-analysis starts its run the same way. Neither is
+                        // method-scoped: Spring MVC serves HEAD through @GetMapping, so a GET-only rule
+                        // would let anyone start the work with HEAD.
                         .requestMatchers(
                                 "/dashboard/**",
                                 "/summary-data/results",
@@ -84,6 +85,7 @@ public class SecurityConfig {
                                 "/summary",
                                 "/summary/prompt",
                                 "/summary/team-groups",
+                                "/documentation-analysis",
                                 "/analysis/prompt")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Free-text rating feedback can name people and, when the submitter opted in, link to
