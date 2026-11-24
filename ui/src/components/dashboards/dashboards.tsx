@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getDateRangeFromFilter, PRESET_DAYS } from "@/lib/dateRange";
 import {
   useEscalationRate,
-  useEscalationsByImpact,
+  useEscalationRateByTeam,
   useEscalationTeamScorecard,
   useEscalationTopics,
   useFirstResponseDurationDistribution,
@@ -17,6 +17,7 @@ import {
   useResolutionTimesByWeek,
   useTicketResolutionDurationDistribution,
   useTicketResolutionPercentiles,
+  useTimeBeforeEscalation,
   useTopEscalatedTagsThisWeek,
   useUnattendedQueriesCount,
   useUnresolvedTicketAges,
@@ -166,12 +167,22 @@ export default function DashboardsPage() {
     isFetching: isFetchingEscTopics,
   } = useEscalationTopics(isEscalationActive, dateRange.from, dateRange.to);
   const {
-    data: escalationsByImpact,
-    refetch: refetchEscByImpact,
-    isFetching: isFetchingEscImpact,
-  } = useEscalationsByImpact(isEscalationActive, dateRange.from, dateRange.to);
+    data: timeBeforeEscalation,
+    refetch: refetchTimeBeforeEsc,
+    isFetching: isFetchingTimeBeforeEsc,
+  } = useTimeBeforeEscalation(isEscalationActive, dateRange.from, dateRange.to);
+  const {
+    data: escalationRateByTeam,
+    refetch: refetchEscRateByTeam,
+    isFetching: isFetchingEscRateByTeam,
+  } = useEscalationRateByTeam(isEscalationActive, dateRange.from, dateRange.to);
   const isRefreshingEscalationSla =
-    isFetchingEscRate || isFetchingResEscVsNot || isFetchingEscScorecard || isFetchingEscTopics || isFetchingEscImpact;
+    isFetchingEscRate ||
+    isFetchingResEscVsNot ||
+    isFetchingEscScorecard ||
+    isFetchingEscTopics ||
+    isFetchingTimeBeforeEsc ||
+    isFetchingEscRateByTeam;
 
   // Weekly SLA Trends - only load when section is active
   const {
@@ -309,14 +320,16 @@ export default function DashboardsPage() {
               resolutionEscalatedVsNot={resolutionEscalatedVsNot}
               escalationTeamScorecard={escalationTeamScorecard}
               escalationTopics={escalationTopics}
-              escalationsByImpact={escalationsByImpact}
+              timeBeforeEscalation={timeBeforeEscalation}
+              escalationRateByTeam={escalationRateByTeam}
               isRefreshing={isRefreshingEscalationSla}
               onRefresh={() => {
                 refetchEscRate();
                 refetchResEscVsNot();
                 refetchEscScorecard();
                 refetchEscTopics();
-                refetchEscByImpact();
+                refetchTimeBeforeEsc();
+                refetchEscRateByTeam();
               }}
             />
           )}

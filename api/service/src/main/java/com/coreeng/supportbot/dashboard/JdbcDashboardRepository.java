@@ -539,6 +539,20 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
     // ===== Escalation SLAs =====
 
+    /**
+     * An escalation ends at its resolution, or at the last interaction of the close that ended it if that came first;
+     * no earlier than it opened.
+     */
+    // The close is matched by log order: a reopen logs its open just after the interaction time a later close uses.
+    private static final String ESCALATION_END = """
+            GREATEST(ed.open_ts::timestamptz, LEAST(ed.resolved_ts::timestamptz, (
+                SELECT tl.date::timestamptz FROM ticket_log tl
+                WHERE tl.ticket_id = ed.ticket_id AND tl.event = 'closed' AND tl.id > (
+                    SELECT o.id FROM ticket_log o
+                    WHERE o.ticket_id = ed.ticket_id AND o.event = 'opened' AND o.date <= ed.open_ts
+                    ORDER BY o.date DESC, o.id DESC LIMIT 1)
+                ORDER BY tl.id LIMIT 1)))""";
+
     /** Windows up to this many days are bucketed by day; longer (or unbounded) windows by week. */
     private static final long MAX_DAILY_ESCALATION_RATE_RANGE_DAYS = 31;
 
@@ -548,8 +562,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
         String truncUnit = granularity == EscalationRateGranularity.DAY ? "day" : "week";
         String dateFilter = buildDateFilter(dateFrom, dateTo, "td.first_open_ts");
 
-        // Cohort by ticket creation: of the tickets opened in a bucket, how many were ever escalated.
-        // Reads the escalation table directly; the aggregated view's per-row subqueries aren't needed here.
+        // Of the tickets opened in a bucket, how many were ever escalated.
         String sql = """
             WITH cohort AS (
                 SELECT
@@ -598,26 +611,16 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public List<ResolutionByEscalation> getResolutionEscalatedVsNot(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "td.first_open_ts");
 
-        // Closed tickets split by whether they were ever escalated, measured like getResolutionPercentiles
-        // (ticket opened -> closed, business time). One difference: a ticket's close is logged at its last
-        // human thread message, and the escalation post is a bot message. A ticket whose escalation was handled
-        // without further thread replies would otherwise look resolved at (or before) the moment it was
-        // escalated. So an escalated ticket's resolution ends at the later of its logged close and its last
-        // escalation resolution. GREATEST ignores NULLs, so tickets without a resolved escalation keep their close.
+        // Both groups end at the ticket's close, which is logged at its last interaction.
         String sql = """
             WITH tickets AS (
                 SELECT
                     td.first_open_ts::timestamptz AS opened_at,
-                    GREATEST(
-                        td.last_closed_ts::timestamptz,
-                        (SELECT max(l.date)
-                           FROM escalation e
-                           JOIN escalation_log l ON l.escalation_id = e.id AND l.event = 'resolved'
-                          WHERE e.ticket_id = td.ticket_id)
-                    ) AS resolved_at,
+                    td.last_closed_ts::timestamptz AS resolved_at,
                     EXISTS (SELECT 1 FROM escalation e WHERE e.ticket_id = td.ticket_id) AS escalated
                 FROM aggregated_ticket_data td
-                WHERE td.last_closed_ts IS NOT NULL
+                WHERE td.status = 'closed'
+                  AND td.last_closed_ts IS NOT NULL
                   AND td.first_open_ts IS NOT NULL
                   %s
             ),
@@ -626,7 +629,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
                     escalated,
                     EXTRACT(EPOCH FROM business_time_between(opened_at, resolved_at, 'Europe/London')) AS duration
                 FROM tickets
-                WHERE resolved_at > opened_at
+                WHERE resolved_at >= opened_at
             )
             SELECT
                 escalated,
@@ -634,7 +637,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) AS p50,
                 percentile_cont(0.9) WITHIN GROUP (ORDER BY duration) AS p90
             FROM durations
-            WHERE duration IS NOT NULL AND duration > 0
+            WHERE duration IS NOT NULL
             GROUP BY escalated
             ORDER BY escalated DESC
             """.formatted(dateFilter);
@@ -651,19 +654,18 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public List<TeamScorecard> getEscalationTeamScorecard(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "ed.open_ts");
 
-        // percentile_cont ignores NULLs, so unresolved escalations count towards the totals but not the
-        // resolution percentiles. A team with nothing resolved yet gets NULL percentiles.
+        // Unresolved escalations count towards the totals but not the percentiles.
         String sql = """
             WITH esc AS (
                 SELECT
                     ed.team_id,
                     ed.status,
-                    CASE WHEN ed.resolved_ts IS NOT NULL AND ed.resolved_ts > ed.open_ts
-                        THEN EXTRACT(EPOCH FROM business_time_between(ed.open_ts, ed.resolved_ts, 'Europe/London'))
+                    CASE WHEN ed.resolved_ts IS NOT NULL
+                        THEN EXTRACT(EPOCH FROM business_time_between(ed.open_ts, %1$s, 'Europe/London'))
                     END AS resolution
                 FROM aggregated_escalation_data ed
                 WHERE ed.open_ts IS NOT NULL
-                  %s
+                  %2$s
             )
             SELECT
                 COALESCE(team_id, 'Unassigned') AS team,
@@ -674,7 +676,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
             FROM esc
             GROUP BY team_id
             ORDER BY escalations DESC, team
-            """.formatted(dateFilter);
+            """.formatted(ESCALATION_END, dateFilter);
 
         return dsl.resultQuery(sql)
                 .fetch(r -> new TeamScorecard(
@@ -689,62 +691,126 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public List<EscalationTopic> getEscalationTopics(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "ed.open_ts");
 
-        // Ranked by total business time in escalation (count × average), so frequent and slow tags rise together.
+        // Ranked by total time of resolved escalations; the wait counts every manual escalation.
+        // Tags sharing a label form one topic, counting each escalation once.
         String sql = """
-            WITH durations AS (
+            WITH per_escalation AS (
                 SELECT
-                    unnest(ed.tags) AS tag,
-                    EXTRACT(EPOCH FROM business_time_between(ed.open_ts, ed.resolved_ts, 'Europe/London')) AS duration
+                    ed.escalation_id,
+                    ed.tags,
+                    CASE WHEN ed.resolved_ts IS NOT NULL
+                        THEN EXTRACT(EPOCH FROM business_time_between(ed.open_ts, %1$s, 'Europe/London'))
+                    END AS duration,
+                    CASE WHEN e.source = 'manual' AND ed.open_ts >= td.first_open_ts
+                        THEN EXTRACT(EPOCH FROM business_time_between(
+                            td.first_open_ts::timestamptz, ed.open_ts::timestamptz, 'Europe/London'))
+                    END AS wait
                 FROM aggregated_escalation_data ed
+                JOIN escalation e ON e.id = ed.escalation_id
+                LEFT JOIN aggregated_ticket_data td ON td.ticket_id = ed.ticket_id
                 WHERE ed.open_ts IS NOT NULL
-                  AND ed.resolved_ts IS NOT NULL
                   AND ed.tags IS NOT NULL
-                  %s
+                  %2$s
+            ),
+            durations AS (
+                SELECT DISTINCT pe.escalation_id, tag, pe.duration, pe.wait
+                FROM per_escalation pe, unnest(pe.tags) AS tag
             )
             SELECT
                 tag,
-                COUNT(*) AS escalations,
+                COUNT(duration) AS escalations,
                 AVG(duration) AS avg_seconds,
-                SUM(duration) AS total_seconds
+                SUM(duration) AS total_seconds,
+                AVG(wait) AS avg_wait_seconds
             FROM durations
             GROUP BY tag
-            HAVING SUM(duration) > 0
+            HAVING COUNT(duration) > 0
             ORDER BY total_seconds DESC, escalations DESC, tag
             LIMIT 15
-            """.formatted(dateFilter);
+            """.formatted(ESCALATION_END, dateFilter);
 
         return dsl.resultQuery(sql)
                 .fetch(r -> new EscalationTopic(
                         r.get("tag", String.class),
                         nullToZero(r.get("escalations", Long.class)),
                         nullToZero(r.get("avg_seconds", Double.class)),
-                        nullToZero(r.get("total_seconds", Double.class))));
+                        nullToZero(r.get("total_seconds", Double.class)),
+                        r.get("avg_wait_seconds", Double.class)));
     }
 
     @Override
-    public List<ImpactEscalations> getEscalationsByImpact(LocalDate dateFrom, LocalDate dateTo) {
-        String dateFilter = buildDateFilter(dateFrom, dateTo, "ed.open_ts");
+    public TimeBeforeEscalation getTimeBeforeEscalation(LocalDate dateFrom, LocalDate dateTo) {
+        String dateFilter = buildDateFilter(dateFrom, dateTo, "td.first_open_ts");
 
+        // Wait from ticket opening to its first manual escalation, for tickets opened in the window.
         String sql = """
+            WITH first_escalation AS (
+                SELECT DISTINCT ON (ed.ticket_id) td.first_open_ts, ed.open_ts
+                FROM aggregated_escalation_data ed
+                JOIN escalation e ON e.id = ed.escalation_id
+                JOIN aggregated_ticket_data td ON td.ticket_id = ed.ticket_id
+                WHERE ed.open_ts IS NOT NULL
+                  AND e.source = 'manual'
+                  AND td.first_open_ts IS NOT NULL
+                  AND ed.open_ts >= td.first_open_ts
+                  %s
+                ORDER BY ed.ticket_id, ed.open_ts
+            ),
+            waits AS (
+                SELECT EXTRACT(EPOCH FROM business_time_between(
+                    first_open_ts::timestamptz, open_ts::timestamptz, 'Europe/London')) AS wait
+                FROM first_escalation
+            )
             SELECT
-                COALESCE(td.impact, 'Not yet tagged') AS impact_level,
-                COUNT(ed.escalation_id) AS total_escalations
-            FROM aggregated_escalation_data ed
-            INNER JOIN aggregated_ticket_data td ON ed.ticket_id = td.ticket_id
-            WHERE ed.open_ts IS NOT NULL
-              %s
-            GROUP BY td.impact
-            HAVING COUNT(ed.escalation_id) > 0
-            ORDER BY total_escalations DESC
+                COUNT(*) AS escalations,
+                percentile_cont(0.5) WITHIN GROUP (ORDER BY wait) AS p50,
+                percentile_cont(0.9) WITHIN GROUP (ORDER BY wait) AS p90
+            FROM waits
+            WHERE wait IS NOT NULL
             """.formatted(dateFilter);
 
-        return dsl
-                .resultQuery(sql)
-                .fetch(r -> new ImpactEscalations(
-                        r.get("impact_level", String.class), nullToZero(r.get("total_escalations", Long.class))))
-                .stream()
-                .filter(ie -> ie.totalEscalations() > 0)
-                .toList();
+        var result = dsl.resultQuery(sql).fetchOne();
+        if (result == null) {
+            return new TimeBeforeEscalation(0, 0.0, 0.0);
+        }
+        return new TimeBeforeEscalation(
+                nullToZero(result.get("escalations", Long.class)),
+                nullToZero(result.get("p50", Double.class)),
+                nullToZero(result.get("p90", Double.class)));
+    }
+
+    @Override
+    public List<TeamEscalationRate> getEscalationRateByTeam(LocalDate dateFrom, LocalDate dateTo) {
+        String dateFilter = buildDateFilter(dateFrom, dateTo, "td.first_open_ts");
+
+        // Same cohort as getEscalationRate, grouped by requesting team.
+        String sql = """
+            WITH cohort AS (
+                SELECT
+                    td.team_id,
+                    EXISTS (SELECT 1 FROM escalation e WHERE e.ticket_id = td.ticket_id) AS escalated
+                FROM aggregated_ticket_data td
+                WHERE td.ticket_id IS NOT NULL
+                  AND td.first_open_ts IS NOT NULL
+                  %s
+            )
+            SELECT
+                COALESCE(team_id, 'Unassigned') AS team,
+                COUNT(*) AS tickets,
+                COUNT(*) FILTER (WHERE escalated) AS escalated_tickets
+            FROM cohort
+            GROUP BY team_id
+            HAVING COUNT(*) FILTER (WHERE escalated) > 0
+            ORDER BY escalated_tickets DESC, tickets, team
+            LIMIT 15
+            """.formatted(dateFilter);
+
+        return dsl.resultQuery(sql).fetch(r -> {
+            long tickets = nullToZero(r.get("tickets", Long.class));
+            long escalated = nullToZero(r.get("escalated_tickets", Long.class));
+            return new TeamEscalationRate(
+                    r.get("team", String.class), tickets, escalated, tickets == 0 ? 0.0 : (double) escalated / tickets);
+        });
     }
 
     // ===== Weekly Trends =====

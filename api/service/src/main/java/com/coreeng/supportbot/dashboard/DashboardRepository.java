@@ -37,7 +37,9 @@ public interface DashboardRepository {
 
     List<EscalationTopic> getEscalationTopics(LocalDate dateFrom, LocalDate dateTo);
 
-    List<ImpactEscalations> getEscalationsByImpact(LocalDate dateFrom, LocalDate dateTo);
+    TimeBeforeEscalation getTimeBeforeEscalation(LocalDate dateFrom, LocalDate dateTo);
+
+    List<TeamEscalationRate> getEscalationRateByTeam(LocalDate dateFrom, LocalDate dateTo);
 
     // Weekly Trends
     List<WeeklyTicketCounts> getWeeklyTicketCounts();

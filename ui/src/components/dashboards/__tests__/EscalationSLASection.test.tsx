@@ -4,8 +4,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { EscalationSLASection } from "../EscalationSLASection";
 
 jest.mock("../../../lib/hooks", () => ({
-  useRegistry: () => ({ data: { impacts: [{ code: "productionBlocking", label: "Production Blocking" }] } }),
   useEscalationTeams: () => ({ data: [{ name: "team-a", label: "Team A", types: ["escalation"] }] }),
+  useTenantTeams: () => ({ data: [{ name: "tenant-a", label: "Tenant Team A" }] }),
 }));
 
 jest.mock("../TimeSeriesChart", () => ({
@@ -23,20 +23,6 @@ jest.mock("../RefreshButton", () => ({
       {isRefreshing ? "Refreshing..." : "Refresh"}
     </button>
   ),
-}));
-
-jest.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="responsive-container">{children}</div>,
-  BarChart: ({ children, data }: { children: React.ReactNode; data: unknown[] }) => (
-    <div data-testid="bar-chart" data-items={data?.length}>
-      {children}
-    </div>
-  ),
-  Bar: () => <div data-testid="bar" />,
-  CartesianGrid: () => <div />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
-  Tooltip: () => <div />,
 }));
 
 describe("EscalationSLASection", () => {
@@ -59,8 +45,8 @@ describe("EscalationSLASection", () => {
   ];
 
   const topics: EscalationTopic[] = [
-    { tag: "networking", escalations: 2, avgSeconds: 18000, totalSeconds: 36000 },
-    { tag: "access", escalations: 3, avgSeconds: 3600, totalSeconds: 10800 },
+    { tag: "networking", escalations: 2, avgSeconds: 18000, totalSeconds: 36000, avgWaitSeconds: 7200 },
+    { tag: "access", escalations: 3, avgSeconds: 3600, totalSeconds: 10800, avgWaitSeconds: null },
   ];
 
   const renderSection = (overrides: Partial<React.ComponentProps<typeof EscalationSLASection>> = {}) =>
@@ -70,7 +56,8 @@ describe("EscalationSLASection", () => {
         resolutionEscalatedVsNot={resolutionEscalatedVsNot}
         escalationTeamScorecard={scorecard}
         escalationTopics={topics}
-        escalationsByImpact={[{ impactLevel: "productionBlocking", totalEscalations: 2 }]}
+        timeBeforeEscalation={{ escalations: 2, p50: 1800, p90: 3240 }}
+        escalationRateByTeam={[{ team: "tenant-a", tickets: 8, escalatedTickets: 2, rate: 0.25 }]}
         isRefreshing={false}
         onRefresh={jest.fn()}
         {...overrides}
@@ -104,7 +91,7 @@ describe("EscalationSLASection", () => {
     renderSection();
 
     expect(screen.getByText("Resolution: Escalated vs Not Escalated")).toBeInTheDocument();
-    expect(screen.getByText("P50 2.0h · P90 4.0h")).toBeInTheDocument();
+    expect(screen.getByTitle("Escalated, P50: 2.0h")).toBeInTheDocument();
   });
 
   it("uses singular wording for a single ticket", () => {
@@ -117,10 +104,10 @@ describe("EscalationSLASection", () => {
     expect(screen.getByText("1 of 1 ticket opened in this range was escalated")).toBeInTheDocument();
   });
 
-  it("renders escalations by team with labels and a dash for unresolved teams", () => {
+  it("renders escalations by receiving team with labels and a dash for unresolved teams", () => {
     renderSection();
 
-    expect(screen.getByText("Escalations by Team")).toBeInTheDocument();
+    expect(screen.getByText("Escalations by Receiving Team")).toBeInTheDocument();
 
     const teamARow = screen.getByText("Team A").closest("tr") as HTMLElement;
     expect(within(teamARow).getByText("1.5h")).toBeInTheDocument();
@@ -136,8 +123,10 @@ describe("EscalationSLASection", () => {
     const firstRow = screen.getByText("networking").closest("tr") as HTMLElement;
     expect(within(firstRow).getByText("1")).toBeInTheDocument();
     expect(within(firstRow).getByText("10.0h")).toBeInTheDocument();
+    expect(within(firstRow).getByText("2.0h")).toBeInTheDocument();
     const secondRow = screen.getByText("access").closest("tr") as HTMLElement;
     expect(within(secondRow).getByText("2")).toBeInTheDocument();
+    expect(within(secondRow).getByText("—")).toBeInTheDocument();
   });
 
   it("handles missing data without crashing", () => {
@@ -146,25 +135,31 @@ describe("EscalationSLASection", () => {
       resolutionEscalatedVsNot: undefined,
       escalationTeamScorecard: undefined,
       escalationTopics: undefined,
-      escalationsByImpact: undefined,
+      timeBeforeEscalation: undefined,
+      escalationRateByTeam: undefined,
     });
 
     expect(screen.getByText("No escalations in this range")).toBeInTheDocument();
     expect(screen.getByText("No closed tickets in this range")).toBeInTheDocument();
     expect(screen.getByText("No resolved, tagged escalations in this range")).toBeInTheDocument();
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("No escalated tickets in this range")).toBeInTheDocument();
     expect(screen.getByText("0 of 0 tickets opened in this range were escalated")).toBeInTheDocument();
-    expect(screen.getByText("No data available")).toBeInTheDocument();
+  });
+
+  it("shows time before escalating and the rate by requesting team", () => {
+    renderSection();
+
+    expect(screen.getByText("Time Before Escalating")).toBeInTheDocument();
+    expect(screen.getByText("30m")).toBeInTheDocument();
+    expect(screen.getByText("54m")).toBeInTheDocument();
+    const tenantRow = screen.getByText("Tenant Team A").closest("tr") as HTMLElement;
+    expect(within(tenantRow).getByText("25.0%")).toBeInTheDocument();
   });
 
   it("treats a non-object rate payload as empty", () => {
     renderSection({ escalationRate: [] as unknown as EscalationRate });
 
     expect(screen.getByText("Rates:")).toBeInTheDocument();
-  });
-
-  it("keeps the escalations-by-impact chart", () => {
-    renderSection();
-
-    expect(screen.getByTestId("bar-chart")).toHaveAttribute("data-items", "1");
   });
 });

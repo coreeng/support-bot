@@ -25,15 +25,16 @@ function errorPage(message: string, status: number) {
   });
 }
 
-/**
- * Fetches `{ permalink }` from a backend endpoint and redirects the browser to it. Links are opened in a new
- * tab, so failures render a small standalone error page rather than JSON.
- *
- * @param label identifies the resource in logs, e.g. `escalation 42`
- */
-export async function redirectToBackendPermalink(request: NextRequest, backendPath: string, label: string) {
+const NUMERIC_ID = /^\d+$/;
+
+/** Redirects to the `{ permalink }` the backend returns for a ticket or escalation; failures render an error page. */
+export async function redirectToBackendPermalink(request: NextRequest, resource: "ticket" | "escalation", id: string) {
+  if (!NUMERIC_ID.test(id)) {
+    return errorPage(ERROR_MESSAGE, 404);
+  }
+  const label = `${resource} ${id}`;
   try {
-    const response = await backendFetch(request, backendPath);
+    const response = await backendFetch(request, `/${resource}/${id}/permalink`);
     if (!response) return unauthorizedResponse();
 
     if (!response.ok) {

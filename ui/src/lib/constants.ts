@@ -18,7 +18,8 @@ export const QUERY_KEYS = {
   RESOLUTION_ESCALATED_VS_NOT: "resolutionEscalatedVsNot",
   ESCALATION_TEAM_SCORECARD: "escalationTeamScorecard",
   ESCALATION_TOPICS: "escalationTopics",
-  ESCALATIONS_BY_IMPACT: "escalationsByImpact",
+  TIME_BEFORE_ESCALATION: "timeBeforeEscalation",
+  ESCALATION_RATE_BY_TEAM: "escalationRateByTeam",
 
   WEEKLY_COUNTS: "weeklyTicketCounts",
   WEEKLY_COMPARISON: "weeklyComparison",

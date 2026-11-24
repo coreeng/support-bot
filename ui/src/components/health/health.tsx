@@ -1563,7 +1563,7 @@ export default function HealthPage() {
                       <TableHead>Status</TableHead>
                       <TableHead>Opened At</TableHead>
                       <TableHead>Rated</TableHead>
-                      <TableHead>Link</TableHead>
+                      <TableHead>Thread</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

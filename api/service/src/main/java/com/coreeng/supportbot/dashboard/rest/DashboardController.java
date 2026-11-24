@@ -119,11 +119,18 @@ public class DashboardController {
         return dashboardQueryService.getEscalationTopics(dateFrom, dateTo);
     }
 
-    @GetMapping("/escalations-by-impact")
-    public List<ImpactEscalations> getEscalationsByImpact(
+    @GetMapping("/time-before-escalation")
+    public TimeBeforeEscalation getTimeBeforeEscalation(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
-        return dashboardQueryService.getEscalationsByImpact(dateFrom, dateTo);
+        return dashboardQueryService.getTimeBeforeEscalation(dateFrom, dateTo);
+    }
+
+    @GetMapping("/escalation-rate-by-team")
+    public List<TeamEscalationRate> getEscalationRateByTeam(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
+        return dashboardQueryService.getEscalationRateByTeam(dateFrom, dateTo);
     }
 
     // ===== Weekly Trends Endpoints =====

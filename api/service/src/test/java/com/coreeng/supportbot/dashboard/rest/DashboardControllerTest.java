@@ -15,7 +15,9 @@ import com.coreeng.supportbot.dashboard.DashboardData.IncomingVsResolved;
 import com.coreeng.supportbot.dashboard.DashboardData.IncomingVsResolvedGranularity;
 import com.coreeng.supportbot.dashboard.DashboardData.IncomingVsResolvedRate;
 import com.coreeng.supportbot.dashboard.DashboardData.ResolutionByEscalation;
+import com.coreeng.supportbot.dashboard.DashboardData.TeamEscalationRate;
 import com.coreeng.supportbot.dashboard.DashboardData.TeamScorecard;
+import com.coreeng.supportbot.dashboard.DashboardData.TimeBeforeEscalation;
 import com.coreeng.supportbot.dashboard.DashboardQueryService;
 import com.coreeng.supportbot.dashboard.IncomingVsResolvedQuery;
 import java.time.LocalDate;
@@ -132,12 +134,36 @@ class DashboardControllerTest {
     @Test
     void escalationTopics_serialisesRanking() throws Exception {
         when(dashboardQueryService.getEscalationTopics(FROM, TO))
-                .thenReturn(List.of(new EscalationTopic("tag-a", 2, 50.0, 100.0)));
+                .thenReturn(List.of(new EscalationTopic("tag-a", 2, 50.0, 100.0, null)));
 
         mockMvc.perform(withRange(get("/dashboard/escalation-topics")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].tag").value("tag-a"))
-                .andExpect(jsonPath("$[0].totalSeconds").value(100.0));
+                .andExpect(jsonPath("$[0].totalSeconds").value(100.0))
+                .andExpect(jsonPath("$[0].avgWaitSeconds").doesNotExist());
+    }
+
+    @Test
+    void timeBeforeEscalation_serialisesPercentiles() throws Exception {
+        when(dashboardQueryService.getTimeBeforeEscalation(FROM, TO))
+                .thenReturn(new TimeBeforeEscalation(3, 3600.0, 6480.0));
+
+        mockMvc.perform(withRange(get("/dashboard/time-before-escalation")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.escalations").value(3))
+                .andExpect(jsonPath("$.p90").value(6480.0));
+    }
+
+    @Test
+    void escalationRateByTeam_serialisesRows() throws Exception {
+        when(dashboardQueryService.getEscalationRateByTeam(FROM, TO))
+                .thenReturn(List.of(new TeamEscalationRate("team-a", 4, 1, 0.25)));
+
+        mockMvc.perform(withRange(get("/dashboard/escalation-rate-by-team")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].team").value("team-a"))
+                .andExpect(jsonPath("$[0].escalatedTickets").value(1))
+                .andExpect(jsonPath("$[0].rate").value(0.25));
     }
 
     private static final LocalDate FROM = LocalDate.of(2026, 1, 1);

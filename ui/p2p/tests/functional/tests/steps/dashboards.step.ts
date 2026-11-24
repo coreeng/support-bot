@@ -115,7 +115,11 @@ Given("Dashboard API endpoints are mocked", async function (this: CustomWorld) {
 
   await this.page.route("**/api/dashboard/escalation-topics*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
-  await this.page.route("**/api/dashboard/escalations-by-impact*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
+  await this.page.route("**/api/dashboard/time-before-escalation*", (route) =>
+    route.fulfill({ status: 200, body: JSON.stringify({ escalations: 0, p50: 0, p90: 0 }) })
+  );
+
+  await this.page.route("**/api/dashboard/escalation-rate-by-team*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
   await this.page.route("**/api/dashboard/weekly-ticket-counts*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 

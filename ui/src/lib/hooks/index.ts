@@ -27,6 +27,8 @@ import type {
   RepoInsights,
   RequestBreakdown,
   ResolutionByEscalation,
+  TeamEscalationRate,
+  TimeBeforeEscalation,
 } from "@/lib/types/dashboard";
 import type { SummaryData, SummaryStatus, SummaryTeamGroups } from "@/lib/types/summary";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -489,10 +491,18 @@ export function useEscalationTopics(enabled = true, dateFrom?: string, dateTo?: 
   });
 }
 
-export function useEscalationsByImpact(enabled = true, dateFrom?: string, dateTo?: string) {
-  return useQuery<{ impactLevel: string; totalEscalations: number }[]>({
-    queryKey: ["escalationsByImpact", dateFrom, dateTo],
-    queryFn: () => apiGet(`/dashboard/escalations-by-impact${buildParams(dateFrom, dateTo)}`),
+export function useTimeBeforeEscalation(enabled = true, dateFrom?: string, dateTo?: string) {
+  return useQuery<TimeBeforeEscalation>({
+    queryKey: ["timeBeforeEscalation", dateFrom, dateTo],
+    queryFn: () => apiGet(`/dashboard/time-before-escalation${buildParams(dateFrom, dateTo)}`),
+    enabled,
+  });
+}
+
+export function useEscalationRateByTeam(enabled = true, dateFrom?: string, dateTo?: string) {
+  return useQuery<TeamEscalationRate[]>({
+    queryKey: ["escalationRateByTeam", dateFrom, dateTo],
+    queryFn: () => apiGet(`/dashboard/escalation-rate-by-team${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }

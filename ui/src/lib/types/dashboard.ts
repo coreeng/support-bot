@@ -60,7 +60,7 @@ export interface EscalationRate {
   data: EscalationRatePoint[];
 }
 
-/** Resolution percentiles in business seconds for escalated or never-escalated closed tickets. */
+/** Resolution percentiles in seconds for escalated or never-escalated closed tickets. */
 export interface ResolutionByEscalation {
   escalated: boolean;
   tickets: number;
@@ -68,7 +68,7 @@ export interface ResolutionByEscalation {
   p90: number;
 }
 
-/** Per receiving team. Resolution percentiles are business seconds, null when nothing is resolved yet. */
+/** Per receiving team. Resolution percentiles are in seconds, null when nothing is resolved yet. */
 export interface EscalationTeamScorecardRow {
   team: string;
   escalations: number;
@@ -77,17 +77,29 @@ export interface EscalationTeamScorecardRow {
   resolutionP90: number | null;
 }
 
-/** Escalation tag ranked by total business seconds spent in escalation (resolved escalations only). */
+/** Escalation tag ranked by total seconds spent in escalation (resolved escalations only). */
 export interface EscalationTopic {
   tag: string;
   escalations: number;
   avgSeconds: number;
   totalSeconds: number;
+  /** Average seconds tickets waited before these escalations (manual only); null when there are none. */
+  avgWaitSeconds: number | null;
 }
 
-export interface EscalationsByImpact {
-  impactLevel: string;
-  totalEscalations: number;
+/** Time from ticket opening to its first manual escalation. */
+export interface TimeBeforeEscalation {
+  escalations: number;
+  p50: number;
+  p90: number;
+}
+
+/** Share of a requesting team's tickets opened in the range that were escalated. `rate` is a fraction in [0, 1]. */
+export interface TeamEscalationRate {
+  team: string;
+  tickets: number;
+  escalatedTickets: number;
+  rate: number;
 }
 
 export interface WeeklyTicketCounts {

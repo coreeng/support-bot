@@ -47,7 +47,7 @@ describe("redirectToBackendPermalink", () => {
   it("redirects to the permalink the backend returns", async () => {
     mockBackendFetch.mockResolvedValue(new TestResponse({ permalink: "https://example.com/archives/C123/p1" }) as unknown as Response);
 
-    const result = (await redirectToBackendPermalink(request, "/ticket/7/permalink", "ticket 7")) as unknown as {
+    const result = (await redirectToBackendPermalink(request, "ticket", "7")) as unknown as {
       kind: string;
       url: string;
     };
@@ -59,7 +59,7 @@ describe("redirectToBackendPermalink", () => {
   it("returns unauthorized when there is no backend session", async () => {
     mockBackendFetch.mockResolvedValue(null);
 
-    const result = (await redirectToBackendPermalink(request, "/ticket/7/permalink", "ticket 7")) as unknown as { status: number };
+    const result = (await redirectToBackendPermalink(request, "ticket", "7")) as unknown as { status: number };
 
     expect(result.status).toBe(401);
   });
@@ -67,16 +67,34 @@ describe("redirectToBackendPermalink", () => {
   it("renders an error page with the backend status on failure", async () => {
     mockBackendFetch.mockResolvedValue(new TestResponse(null, { status: 404 }) as unknown as Response);
 
-    const result = (await redirectToBackendPermalink(request, "/ticket/7/permalink", "ticket 7")) as unknown as TestResponse;
+    const result = (await redirectToBackendPermalink(request, "ticket", "7")) as unknown as TestResponse;
 
     expect(result.status).toBe(404);
     expect(result.headers).toEqual({ "Content-Type": "text/html" });
   });
 
+  it("builds the escalation path", async () => {
+    mockBackendFetch.mockResolvedValue(new TestResponse({ permalink: "https://example.com/archives/C123/p2" }) as unknown as Response);
+
+    await redirectToBackendPermalink(request, "escalation", "12");
+
+    expect(mockBackendFetch).toHaveBeenCalledWith(request, "/escalation/12/permalink");
+  });
+
+  it.each(["../../dashboard/escalation-rate?dateFrom=1#", "7/../8", "7?x=1", "-1", "1e3", ""])(
+    "rejects the non-numeric id %p without calling the backend",
+    async (id) => {
+      const result = (await redirectToBackendPermalink(request, "ticket", id)) as unknown as TestResponse;
+
+      expect(result.status).toBe(404);
+      expect(mockBackendFetch).not.toHaveBeenCalled();
+    }
+  );
+
   it("refuses non-https permalinks", async () => {
     mockBackendFetch.mockResolvedValue(new TestResponse({ permalink: "javascript:alert(1)" }) as unknown as Response);
 
-    const result = (await redirectToBackendPermalink(request, "/ticket/7/permalink", "ticket 7")) as unknown as TestResponse;
+    const result = (await redirectToBackendPermalink(request, "ticket", "7")) as unknown as TestResponse;
 
     expect(result.status).toBe(502);
   });

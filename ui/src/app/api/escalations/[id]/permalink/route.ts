@@ -3,5 +3,5 @@ import { redirectToBackendPermalink } from "../../../_lib/permalink-redirect";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return redirectToBackendPermalink(request, `/escalation/${id}/permalink`, `escalation ${id}`);
+  return redirectToBackendPermalink(request, "escalation", id);
 }

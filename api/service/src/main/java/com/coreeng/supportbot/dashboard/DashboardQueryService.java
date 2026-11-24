@@ -60,8 +60,12 @@ public class DashboardQueryService {
         return dashboardRepository.getEscalationTopics(dateFrom, dateTo);
     }
 
-    public List<ImpactEscalations> getEscalationsByImpact(LocalDate dateFrom, LocalDate dateTo) {
-        return dashboardRepository.getEscalationsByImpact(dateFrom, dateTo);
+    public TimeBeforeEscalation getTimeBeforeEscalation(LocalDate dateFrom, LocalDate dateTo) {
+        return dashboardRepository.getTimeBeforeEscalation(dateFrom, dateTo);
+    }
+
+    public List<TeamEscalationRate> getEscalationRateByTeam(LocalDate dateFrom, LocalDate dateTo) {
+        return dashboardRepository.getEscalationRateByTeam(dateFrom, dateTo);
     }
 
     public List<WeeklyTicketCounts> getWeeklyTicketCounts() {

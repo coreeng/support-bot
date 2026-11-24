@@ -1,10 +1,18 @@
 // src/components/dashboards/EscalationSLASection.tsx
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useEscalationTeams, useRegistry } from "@/lib/hooks";
-import type { EscalationRate, EscalationTeamScorecardRow, EscalationTopic, ResolutionByEscalation } from "@/lib/types/dashboard";
+import { useEscalationTeams } from "@/lib/hooks";
+import type {
+  EscalationRate,
+  EscalationTeamScorecardRow,
+  EscalationTopic,
+  ResolutionByEscalation,
+  TeamEscalationRate,
+  TimeBeforeEscalation,
+} from "@/lib/types/dashboard";
 import { formatDuration } from "@/lib/utils";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { EscalationRateByTeam } from "./EscalationRateByTeam";
 import { MetricCard } from "./MetricCard";
+import { PercentileCard } from "./PercentileCard";
 import { RefreshButton } from "./RefreshButton";
 import { ResolutionComparison } from "./ResolutionComparison";
 import { TimeSeriesChart } from "./TimeSeriesChart";
@@ -14,7 +22,8 @@ interface EscalationSLASectionProps {
   resolutionEscalatedVsNot: ResolutionByEscalation[] | undefined;
   escalationTeamScorecard: EscalationTeamScorecardRow[] | undefined;
   escalationTopics: EscalationTopic[] | undefined;
-  escalationsByImpact: { impactLevel: string; totalEscalations: number }[] | undefined;
+  timeBeforeEscalation: TimeBeforeEscalation | undefined;
+  escalationRateByTeam: TeamEscalationRate[] | undefined;
   isRefreshing: boolean;
   onRefresh: () => void;
 }
@@ -36,25 +45,17 @@ export function EscalationSLASection({
   resolutionEscalatedVsNot,
   escalationTeamScorecard,
   escalationTopics,
-  escalationsByImpact,
+  timeBeforeEscalation,
+  escalationRateByTeam,
   isRefreshing,
   onRefresh,
 }: EscalationSLASectionProps) {
-  const { data: registryData } = useRegistry();
   const { data: escalationTeams } = useEscalationTeams();
 
-  const impactLabel = (code?: string) => {
-    if (!code) return code;
-    const match = registryData?.impacts?.find((i: { code: string; label: string }) => i.code === code);
-    return match?.label || code;
-  };
+  const escalationCount = timeBeforeEscalation?.escalations ?? 0;
+  const waitValue = (seconds: number | undefined) => (escalationCount > 0 && seconds != null ? formatDuration(seconds) : "—");
 
   const teamLabel = (code: string) => escalationTeams?.find((t) => t.name === code)?.label || code;
-
-  const mappedEscalationsByImpact = escalationsByImpact?.map((item) => ({
-    ...item,
-    impactLevelLabel: impactLabel(item.impactLevel) || item.impactLevel,
-  }));
 
   // Tolerate a non-object payload (e.g. an empty-array mock) as "no data".
   const ratePoints = Array.isArray(escalationRate?.data) ? escalationRate.data : [];
@@ -81,71 +82,40 @@ export function EscalationSLASection({
         <div className="lg:col-span-2">
           <ResolutionComparison data={resolutionEscalatedVsNot} />
         </div>
-        <MetricCard
-          title="Escalation Rate"
-          value={totalTickets > 0 ? formatPercent(totalEscalated / totalTickets) : "—"}
-          description={`${totalEscalated} of ${ticketCount(totalTickets)} opened in this range ${totalEscalated === 1 ? "was" : "were"} escalated`}
-          colorScheme="orange"
-        />
+        <div className="flex flex-col gap-6">
+          <MetricCard
+            title="Escalation Rate"
+            value={totalTickets > 0 ? formatPercent(totalEscalated / totalTickets) : "—"}
+            description={`${totalEscalated} of ${ticketCount(totalTickets)} opened in this range ${totalEscalated === 1 ? "was" : "were"} escalated`}
+            colorScheme="orange"
+          />
+          <PercentileCard
+            title="Time Before Escalating"
+            p50={waitValue(timeBeforeEscalation?.p50)}
+            p90={waitValue(timeBeforeEscalation?.p90)}
+          />
+        </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="mb-6">
         <TimeSeriesChart
           title={`Escalation Rate Over Time (${escalationRate?.granularity === "WEEK" ? "weekly" : "daily"})`}
           data={rateChartData}
-          lines={[{ dataKey: "rate", name: "Escalation rate", color: "var(--chart-1)" }]}
+          lines={[{ dataKey: "rate", name: "Escalation rate", color: "var(--chart-7)" }]}
           yAxisLabel="% of tickets"
           tooltipFormatter={(value, name, item) => [
             `${Number(value).toFixed(1)}% (${item.payload?.escalatedTickets ?? 0} of ${item.payload?.tickets ?? 0})`,
             name,
           ]}
         />
-
-        {/* Escalations by Impact */}
-        <div className="bg-card rounded-xl border p-6">
-          <h2 className="text-foreground mb-4 text-base font-semibold">Escalations by Impact Level</h2>
-          {mappedEscalationsByImpact && mappedEscalationsByImpact.length > 0 ? (
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={mappedEscalationsByImpact}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis
-                  dataKey="impactLevelLabel"
-                  angle={-45}
-                  textAnchor="end"
-                  height={100}
-                  interval={0}
-                  style={{ fontSize: "12px" }}
-                  stroke="var(--border)"
-                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-                />
-                <YAxis stroke="var(--border)" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--popover)",
-                    color: "var(--popover-foreground)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "8px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                  }}
-                  labelStyle={{ color: "var(--popover-foreground)" }}
-                  itemStyle={{ color: "var(--popover-foreground)" }}
-                  cursor={{ stroke: "var(--border)", fill: "var(--accent)" }}
-                />
-                <Bar dataKey="totalEscalations" fill="var(--chart-9)" />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="text-muted-foreground">No data available</p>
-          )}
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <EscalationRateByTeam data={escalationRateByTeam} />
+
         <div className="bg-card rounded-xl border p-6">
-          <h2 className="text-foreground text-base font-semibold">Escalations by Team</h2>
-          <p className="text-muted-foreground mb-4 text-sm">
-            Escalations opened in this range, by receiving team. Resolution counts resolved escalations only.
-          </p>
+          <h2 className="text-foreground text-base font-semibold">Escalations by Receiving Team</h2>
+          <p className="text-muted-foreground mb-4 text-sm">Escalations opened in this range, by the team they were escalated to.</p>
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
@@ -183,11 +153,14 @@ export function EscalationSLASection({
             </Table>
           </div>
         </div>
+      </div>
 
+      <div className="grid grid-cols-1 gap-6">
         <div className="bg-card rounded-xl border p-6">
           <h2 className="text-foreground text-base font-semibold">Most-Escalated Topics</h2>
           <p className="text-muted-foreground mb-4 text-sm">
-            Escalation tags ranked by total time spent in escalation (count × average), resolved escalations only.
+            Escalation tags ranked by total time spent in escalation (count × average), resolved escalations only. Avg Wait Before is how
+            long tickets sat before being manually escalated, across every manual escalation with that tag.
           </p>
           <div className="overflow-hidden rounded-lg border">
             <Table>
@@ -196,8 +169,9 @@ export function EscalationSLASection({
                   <TableHead className="w-12">#</TableHead>
                   <TableHead>Tag</TableHead>
                   <TableHead className="text-right">Escalations</TableHead>
-                  <TableHead className="text-right">Avg Time</TableHead>
-                  <TableHead className="text-right">Total Time</TableHead>
+                  <TableHead className="text-right">Avg Wait Before</TableHead>
+                  <TableHead className="text-right">Avg In Escalation</TableHead>
+                  <TableHead className="text-right">Total In Escalation</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -207,6 +181,9 @@ export function EscalationSLASection({
                       <TableCell className="text-muted-foreground font-mono text-sm tabular-nums">{index + 1}</TableCell>
                       <TableCell className="text-foreground">{topic.tag}</TableCell>
                       <TableCell className="text-right font-mono text-sm tabular-nums">{topic.escalations}</TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums">
+                        {formatOptionalDuration(topic.avgWaitSeconds)}
+                      </TableCell>
                       <TableCell className="text-right font-mono text-sm tabular-nums">{formatDuration(topic.avgSeconds)}</TableCell>
                       <TableCell className="text-right font-mono text-sm font-semibold tabular-nums">
                         {formatDuration(topic.totalSeconds)}
@@ -215,7 +192,7 @@ export function EscalationSLASection({
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-muted-foreground p-16 text-center text-sm">
+                    <TableCell colSpan={6} className="text-muted-foreground p-16 text-center text-sm">
                       No resolved, tagged escalations in this range
                     </TableCell>
                   </TableRow>

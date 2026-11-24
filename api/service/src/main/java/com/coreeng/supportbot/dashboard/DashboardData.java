@@ -38,10 +38,7 @@ public final class DashboardData {
         WEEK
     }
 
-    /**
-     * Share of the tickets opened in a bucket that were escalated at least once. {@code rate} is a fraction in
-     * [0, 1] and is zero when the bucket has no tickets.
-     */
+    /** Share of tickets opened in a bucket that were escalated; {@code rate} is a fraction in [0, 1]. */
     public record EscalationRatePoint(String date, long tickets, long escalatedTickets, double rate) {}
 
     public record EscalationRate(EscalationRateGranularity granularity, List<EscalationRatePoint> data) {
@@ -50,13 +47,10 @@ public final class DashboardData {
         }
     }
 
-    /** Ticket resolution percentiles (business seconds) for escalated or never-escalated closed tickets. */
+    /** Ticket resolution percentiles, in seconds, for escalated or never-escalated closed tickets. */
     public record ResolutionByEscalation(boolean escalated, long tickets, double p50, double p90) {}
 
-    /**
-     * Per receiving team: escalations opened in the window, how many of those are still open, and resolution
-     * percentiles (business seconds, resolved escalations only; null when none are resolved yet).
-     */
+    /** Per receiving team; resolution percentiles are null when nothing is resolved yet. */
     public record TeamScorecard(
             String team,
             long escalations,
@@ -64,13 +58,19 @@ public final class DashboardData {
             @Nullable Double resolutionP50,
             @Nullable Double resolutionP90) {}
 
-    /**
-     * Escalation tag ranked by total business time spent in escalation ({@code escalations × avgSeconds}),
-     * resolved escalations only.
-     */
-    public record EscalationTopic(String tag, long escalations, double avgSeconds, double totalSeconds) {}
+    /** Escalation tag ranked by total time in escalation; {@code avgWaitSeconds} is null without manual escalations. */
+    public record EscalationTopic(
+            String tag,
+            long escalations,
+            double avgSeconds,
+            double totalSeconds,
+            @Nullable Double avgWaitSeconds) {}
 
-    public record ImpactEscalations(String impactLevel, long totalEscalations) {}
+    /** Time from a ticket opening to its first manual escalation. */
+    public record TimeBeforeEscalation(long escalations, double p50, double p90) {}
+
+    /** Share of a requesting team's tickets, opened in the window, that were escalated at least once. */
+    public record TeamEscalationRate(String team, long tickets, long escalatedTickets, double rate) {}
 
     public record WeeklyTicketCounts(String week, long opened, long closed, long escalated, long stale) {}
 
