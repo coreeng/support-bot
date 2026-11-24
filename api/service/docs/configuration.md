@@ -716,14 +716,19 @@ Set these on the **API**:
 ## Documentation Analysis
 
 Documentation analysis classifies a window's closed tickets against the documentation: whether the
-documentation answers the question, does not cover it, or conflicts with support's answer. The
-feature is being built and has no page yet; these settings exist so that it can be configured.
+documentation answers the question, does not cover it, or conflicts with support's answer, and
+shows the results on the Documentation Analysis page (`/documentation-analysis`). What the page
+shows is described in the user guides
+([support engineer](../../../docs/user-guides/role-support-engineer.md#documentation-analysis),
+[leadership](../../../docs/user-guides/role-leadership.md#documentation-analysis)); the GitHub
+permission, timeouts, rate limits, run states and failure codes are in the
+[Documentation Analysis runbook](../../../docs/runbooks/documentation-analysis.md).
 
 - **Enabling.** Off by default. It is on when `documentation-analysis.enabled` is `true` and
   `LLM_PROVIDER` is not `none`. It has its own switch, unlike the Support Summary page, because it
   sends documentation to the LLM provider and costs more per ticket. Leave it off until the feature
-  is released: no page calls it yet, but turning it on lets a call to `GET /documentation-analysis`
-  start work that calls the LLM provider.
+  is released: turning it on shows the page, and every visit to it can start work that calls the
+  LLM provider.
 - **Validation.** While `enabled` is `false` the values are not checked, but a value that cannot
   be read as its type at all (`max-input-tokens: abc`, or `DOCUMENTATION_ANALYSIS_ENABLED` set to
   an empty string) still fails startup. When `enabled` is `true`, startup fails with a message

@@ -15,6 +15,7 @@ Roles are additive — you can hold more than one. Membership is based on Slack 
 |------------|:----:|:----------------:|:----------:|:----------:|
 | View tickets, escalations, tenant requests | ✅ | ✅ | ✅ | ✅ |
 | View the Support Summary | ❌ | ✅ | ✅ | ❌ |
+| View the Documentation Analysis | ❌ | ✅ | ✅ | ❌ |
 | Edit tickets (status, tags, impact, assignee) | ❌ | ✅ | ❌ | ❌ |
 | Close/escalate tickets | ❌ | ✅ | ❌ | ❌ |
 | View metrics (Stats, SLA, Health) | ❌ | ✅ | ✅ | ❌ |
