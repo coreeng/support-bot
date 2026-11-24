@@ -106,7 +106,7 @@ dependencies {
     implementation("com.slack.api:bolt-jakarta-servlet:1.49.0")
     compileOnly("jakarta.websocket:jakarta.websocket-client-api:2.2.0")
     implementation("org.glassfish.tyrus.bundles:tyrus-standalone-client:2.2.0")
-    implementation("com.google.guava:guava:33.4.0-jre")
+    implementation("com.google.guava:guava:33.7.2-jre")
     implementation("org.kohsuke:github-api:1.330")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.85")
     implementation("com.github.ben-manes.caffeine:caffeine")

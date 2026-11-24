@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.ticket.rest;
 
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.slack.SlackException;
@@ -80,7 +81,8 @@ public class BulkReassignmentService {
 
         ImmutableList<Ticket> tickets = ticketRepository.listTickets(query).content();
 
-        return tickets.stream().collect(ImmutableMap.toImmutableMap(Ticket::id, Function.identity()));
+        return tickets.stream()
+                .collect(ImmutableMap.toImmutableMap(ticket -> requireNonNull(ticket.id()), Function.identity()));
     }
 
     private void processReassignments(
