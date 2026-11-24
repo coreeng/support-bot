@@ -60,6 +60,13 @@ class AnalysisPromptRepositoryPostgresTest {
             + " 44 from flyway_schema_history and run the migrations again. An older branch's copy of this test"
             + " deletes every summary version above 1.";
 
+    /** The documentation classification version V47 seeds; tests reset to it. */
+    private static final int SEEDED_DOCUMENTATION_VERSION = 1;
+
+    /** How to recover a local database whose seeded documentation classification prompt was deleted. */
+    private static final String DOCUMENTATION_RESEED_HINT = "Flyway will not re-seed an applied migration: delete"
+            + " version 47 from flyway_schema_history and run the migrations again.";
+
     private final AnalysisPromptRepository repository;
     private final JdbcTemplate jdbcTemplate;
 
@@ -74,8 +81,9 @@ class AnalysisPromptRepositoryPostgresTest {
 
     /**
      * What the migrations leave in use, checked once before any reset can mask it: classification
-     * version 3 (V45) and summary version 2 (V44). Every reset below re-flags those versions itself,
-     * so without this a migration that inserted its row but never switched to it would go unnoticed.
+     * version 3 (V45), summary version 2 (V44) and documentation classification version 1 (V47).
+     * Every reset below re-flags those versions itself, so without this a migration that inserted its
+     * row but never switched to it would go unnoticed.
      */
     @BeforeAll
     void migrationsLeaveTheSeededVersionsInUse() {
@@ -89,7 +97,10 @@ class AnalysisPromptRepositoryPostgresTest {
 
         assertThat(inUse)
                 .as("prompts in use after the migrations. " + why)
-                .containsExactly("classification v" + SEEDED_VERSION, "summary v" + SEEDED_SUMMARY_VERSION);
+                .containsExactly(
+                        "classification v" + SEEDED_VERSION,
+                        "documentation_classification v" + SEEDED_DOCUMENTATION_VERSION,
+                        "summary v" + SEEDED_SUMMARY_VERSION);
     }
 
     private boolean seededVersionExists() {
@@ -137,6 +148,17 @@ class AnalysisPromptRepositoryPostgresTest {
         jdbcTemplate.update(
                 "UPDATE analysis_prompt SET is_in_use = TRUE WHERE type = 'summary' AND version = ?",
                 SEEDED_SUMMARY_VERSION);
+        if (!versionExists("documentation_classification", SEEDED_DOCUMENTATION_VERSION)) {
+            throw new IllegalStateException("Documentation classification prompt version "
+                    + SEEDED_DOCUMENTATION_VERSION + " is missing. " + DOCUMENTATION_RESEED_HINT);
+        }
+        jdbcTemplate.update(
+                "DELETE FROM analysis_prompt WHERE type = 'documentation_classification' AND version > ?",
+                SEEDED_DOCUMENTATION_VERSION);
+        jdbcTemplate.update("UPDATE analysis_prompt SET is_in_use = FALSE WHERE type = 'documentation_classification'");
+        jdbcTemplate.update(
+                "UPDATE analysis_prompt SET is_in_use = TRUE WHERE type = 'documentation_classification' AND version = ?",
+                SEEDED_DOCUMENTATION_VERSION);
     }
 
     @Test
@@ -215,6 +237,19 @@ class AnalysisPromptRepositoryPostgresTest {
     }
 
     @Test
+    void theSeededDocumentationPromptAsksForTheCheckedJsonAnswer() {
+        AnalysisPrompt prompt = repository.findInUse(AnalysisPromptType.DOCUMENTATION_CLASSIFICATION);
+
+        assertThat(prompt).isNotNull();
+        assertThat(prompt.version()).isEqualTo(SEEDED_DOCUMENTATION_VERSION);
+        assertThat(prompt.content())
+                .startsWith("Documentation Gap Classification Prompt\n")
+                .contains("Each page is wrapped in <page path=\"...\">")
+                .contains("one contiguous passage of\n  at most 200 characters")
+                .endsWith("  \"rationale\": \"<one or two sentences>\"\n}\n");
+    }
+
+    @Test
     void versionsAreScopedPerType() {
         // V43 and V44 both seed a version 2, one per type: only a per-type unique constraint lets them
         // coexist.
@@ -228,6 +263,8 @@ class AnalysisPromptRepositoryPostgresTest {
 
         assertThat(repository.findInUse(AnalysisPromptType.CLASSIFICATION)).isNull();
         assertThat(repository.findInUse(AnalysisPromptType.SUMMARY)).isNull();
+        assertThat(repository.findInUse(AnalysisPromptType.DOCUMENTATION_CLASSIFICATION))
+                .isNull();
     }
 
     private void insertPrompt(AnalysisPromptType type, int version, String content, boolean inUse) {
