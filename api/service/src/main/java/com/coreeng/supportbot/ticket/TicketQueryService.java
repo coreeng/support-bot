@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.ticket;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Objects.requireNonNull;
 
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationQuery;
@@ -47,7 +48,8 @@ public class TicketQueryService {
                 Multimaps.index(escalationsPage.content(), Escalation::ticketId);
 
         ImmutableList<DetailedTicket> detailedTickets = ticketsPage.content().stream()
-                .map(ticket -> new DetailedTicket(ticket, ImmutableList.copyOf(escalationsByTicket.get(ticket.id()))))
+                .map(ticket -> new DetailedTicket(
+                        ticket, ImmutableList.copyOf(escalationsByTicket.get(requireNonNull(ticket.id())))))
                 .collect(toImmutableList());
 
         return new Page<>(detailedTickets, ticketsPage.page(), ticketsPage.totalPages(), ticketsPage.totalElements());
