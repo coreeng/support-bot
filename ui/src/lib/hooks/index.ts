@@ -30,6 +30,7 @@ import type {
   TeamEscalationRate,
   TimeBeforeEscalation,
 } from "@/lib/types/dashboard";
+import type { DocAnalysisData, DocAnalysisStatus } from "@/lib/types/documentation-analysis";
 import type { SummaryData, SummaryStatus, SummaryTeamGroups } from "@/lib/types/summary";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getCsrfToken, signOut } from "next-auth/react";
@@ -67,7 +68,9 @@ async function handle401(): Promise<never> {
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
-    public readonly reason?: string
+    public readonly reason?: string,
+    /** The backend's ProblemDetail `detail`, for the routes that forward it. */
+    public readonly detail?: string
   ) {
     super(status === 403 ? "Insufficient permissions" : `API error: ${status}`);
     this.name = "ApiError";
@@ -92,13 +95,15 @@ async function apiGet<T>(path: string, { signal, csrf = false }: ApiGetOptions =
       return handle401();
     }
     let reason: string | undefined;
+    let detail: string | undefined;
     try {
-      const body = (await res.json()) as { code?: string; reason?: string };
+      const body = (await res.json()) as { code?: string; reason?: string; detail?: string };
       reason = body.code ?? body.reason;
+      detail = body.detail;
     } catch {
       // The status code remains sufficient when a proxy returns no JSON body.
     }
-    throw new ApiError(res.status, reason);
+    throw new ApiError(res.status, reason, detail);
   }
   return res.json();
 }
@@ -695,6 +700,52 @@ export function useSummary(from?: string, to?: string, teamGroup?: string, enabl
 
   const pollFailures = pollFailuresSince(lastSuccess, query, result);
   // A new window or a fresh reply starts the count again from that reply.
+  if (lastSuccess.window !== query || lastSuccess.dataUpdatedAt !== result.dataUpdatedAt) {
+    setLastSuccess({ window: query, dataUpdatedAt: result.dataUpdatedAt, errorUpdateCount: result.errorUpdateCount });
+  }
+
+  return { ...result, pollFailures };
+}
+
+// ===== Documentation Analysis Hooks =====
+
+export function useDocAnalysisEnabled() {
+  return useQuery<boolean>({
+    queryKey: ["documentation-analysis", "enabled"],
+    queryFn: async () => {
+      const response = await apiGet<DocAnalysisStatus>("/documentation-analysis/enabled");
+      return response.enabled;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Loads the Documentation Analysis for a window. The request itself may start a run over the
+ * window, so while a run is active, for this window or another, it keeps polling: results appear
+ * as they are saved, and a window held up by another run starts once that run ends.
+ *
+ * Polling stops after `MAX_SUMMARY_POLL_FAILURES` failed polls in a row, as `useSummary`'s does.
+ */
+export function useDocAnalysis(from: string, to: string, enabled = true) {
+  const query = new URLSearchParams({ from, to }).toString();
+  const [lastSuccess, setLastSuccess] = useState<LastSummarySuccess>({ window: query, dataUpdatedAt: 0, errorUpdateCount: 0 });
+
+  const result = useQuery<DocAnalysisData>({
+    queryKey: ["documentation-analysis", from, to],
+    queryFn: () => apiGet(`/documentation-analysis?${query}`, { csrf: true }),
+    enabled,
+    refetchInterval: ({ state }) => {
+      const run = state.data?.run.state;
+      if (run !== "running" && run !== "busy") return false;
+      return pollFailuresSince(lastSuccess, query, state) < MAX_SUMMARY_POLL_FAILURES ? SUMMARY_POLL_MS : false;
+    },
+    staleTime: 0,
+    placeholderData: keepPreviousData,
+    retry: shouldRetryTransientFailure,
+  });
+
+  const pollFailures = pollFailuresSince(lastSuccess, query, result);
   if (lastSuccess.window !== query || lastSuccess.dataUpdatedAt !== result.dataUpdatedAt) {
     setLastSuccess({ window: query, dataUpdatedAt: result.dataUpdatedAt, errorUpdateCount: result.errorUpdateCount });
   }

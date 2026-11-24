@@ -1,6 +1,6 @@
 "use client";
 
-import { type LucideIcon, Activity, AlertCircle, Cable, GaugeCircle, GitPullRequest, Home, Sparkles } from "lucide-react";
+import { type LucideIcon, Activity, AlertCircle, BookOpenCheck, Cable, GaugeCircle, GitPullRequest, Home, Sparkles } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { type UiCapability, hasUiCapability, UI_CAPABILITIES } from "@/lib/auth/capabilities";
-import { useElevateEnabled, useSummaryEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
+import { useDocAnalysisEnabled, useElevateEnabled, useSummaryEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
 
 type NavItem = {
   title: string;
@@ -33,7 +33,7 @@ type NavItem = {
 
 type TabVisibility = {
   requiredCapability?: UiCapability;
-  requiresFeatureFlag?: "summary" | "tenantInsights" | "elevate";
+  requiresFeatureFlag?: "summary" | "documentationAnalysis" | "tenantInsights" | "elevate";
 };
 
 type SupportTab = {
@@ -51,6 +51,12 @@ const SUPPORT_TABS: SupportTab[] = [
     title: "Support Summary",
     icon: Sparkles,
     visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS, requiresFeatureFlag: "summary" },
+  },
+  {
+    path: "/documentation-analysis",
+    title: "Documentation Analysis",
+    icon: BookOpenCheck,
+    visibility: { requiredCapability: UI_CAPABILITIES.VIEW_RESTRICTED_DASHBOARDS, requiresFeatureFlag: "documentationAnalysis" },
   },
   {
     path: "/health",
@@ -86,11 +92,13 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { state } = useSidebar();
   const { user, isLoading } = useAuth();
   const { data: isSummaryEnabled } = useSummaryEnabled();
+  const { data: isDocAnalysisEnabled } = useDocAnalysisEnabled();
   const { data: isTenantInsightsEnabled } = useTenantInsightsEnabled();
   const { data: isElevateEnabled } = useElevateEnabled();
 
   const flags: Record<NonNullable<TabVisibility["requiresFeatureFlag"]>, boolean | undefined> = {
     summary: isSummaryEnabled,
+    documentationAnalysis: isDocAnalysisEnabled,
     tenantInsights: isTenantInsightsEnabled,
     elevate: isElevateEnabled,
   };

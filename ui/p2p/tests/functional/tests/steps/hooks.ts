@@ -135,6 +135,15 @@ Before(async function (this: CustomWorld) {
     });
   });
 
+  // Same reason: the sidebar asks for this on every page too.
+  await this.page.route("**/api/documentation-analysis/enabled", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ enabled: false }),
+    });
+  });
+
   // The summary page asks for its team groups whenever it loads; same reason as above. No groups by
   // default, which hides the selector; summary scenarios that need groups route it themselves.
   await this.page.route("**/api/summary/team-groups", async (route) => {
