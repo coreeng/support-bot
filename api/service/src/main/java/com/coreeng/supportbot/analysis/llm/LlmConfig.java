@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.analysis.llm;
 
+import static dev.langchain4j.model.chat.Capability.RESPONSE_FORMAT_JSON_SCHEMA;
+
 import com.coreeng.supportbot.config.ConditionalOnLlmEnabled;
 import com.coreeng.supportbot.config.LlmProps;
 import dev.langchain4j.http.client.HttpClientBuilder;
@@ -17,6 +19,9 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Builds the one {@link ChatModel} named by {@code llm.provider}. With the provider set to
  * {@code none} this configuration is not registered at all and no client exists.
+ *
+ * <p>Each real client declares that it accepts a JSON schema for its output, because the clients do
+ * not declare it themselves; a caller that asks for structured output checks for it.
  */
 @Configuration
 @ConditionalOnLlmEnabled
@@ -36,6 +41,7 @@ public class LlmConfig {
                 .project(llm.vertex().projectId())
                 .location(llm.vertex().location())
                 .modelName(llm.modelName())
+                .supportedCapabilities(RESPONSE_FORMAT_JSON_SCHEMA)
                 .build();
     }
 
@@ -79,7 +85,8 @@ public class LlmConfig {
                 .modelName(llm.modelName())
                 .customHeaders(
                         Map.of("Authorization", "Basic " + llm.proxy().auth().basicAuthToken()))
-                .timeout(llm.proxy().timeout());
+                .timeout(llm.proxy().timeout())
+                .supportedCapabilities(RESPONSE_FORMAT_JSON_SCHEMA);
         if (httpClientBuilder != null) {
             builder.httpClientBuilder(httpClientBuilder);
         }
@@ -105,7 +112,8 @@ public class LlmConfig {
                 .apiKey(anthropic.apiKey())
                 .modelName(llm.modelName())
                 .maxTokens(anthropic.maxTokens())
-                .timeout(anthropic.timeout());
+                .timeout(anthropic.timeout())
+                .supportedCapabilities(RESPONSE_FORMAT_JSON_SCHEMA);
         if (!anthropic.baseUrl().isEmpty()) {
             builder.baseUrl(anthropic.baseUrl());
         }
