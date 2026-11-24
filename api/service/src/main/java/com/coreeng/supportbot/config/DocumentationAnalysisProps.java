@@ -1,6 +1,10 @@
 package com.coreeng.supportbot.config;
 
+import static java.util.stream.Collectors.joining;
+
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -68,6 +72,21 @@ public record DocumentationAnalysisProps(
         public GitHub {
             repository = repository.trim();
             branch = branch.trim();
+            path = normalisePath(path);
+            fileExtensions = fileExtensions.stream().map(String::trim).toList();
+            copyLocation = copyLocation.trim();
+        }
+
+        /**
+         * Drops empty and {@code .} segments, so the repository root is always {@code ""}. A leading
+         * slash and {@code ..} segments are kept for {@link #validate()} to refuse.
+         */
+        private static String normalisePath(String path) {
+            String trimmed = path.trim();
+            String relative = Arrays.stream(trimmed.split("/"))
+                    .filter(segment -> !segment.isEmpty() && !segment.equals("."))
+                    .collect(joining("/"));
+            return trimmed.startsWith("/") ? "/" + relative : relative;
         }
 
         void validate() {
@@ -81,6 +100,26 @@ public record DocumentationAnalysisProps(
             }
             if (branch.isEmpty()) {
                 throw new IllegalArgumentException(GITHUB_PREFIX + "branch is required" + WHEN_SELECTED);
+            }
+            if (path.startsWith("/") || Arrays.asList(path.split("/")).contains("..")) {
+                throw new IllegalArgumentException(
+                        GITHUB_PREFIX + "path must be relative to the repository root, without '..', got: " + path);
+            }
+            if (fileExtensions.isEmpty()) {
+                throw new IllegalArgumentException(GITHUB_PREFIX + "file-extensions must not be empty");
+            }
+            for (String extension : fileExtensions) {
+                if (extension.length() < 2 || !extension.startsWith(".")) {
+                    throw new IllegalArgumentException(
+                            GITHUB_PREFIX + "file-extensions must each start with '.' and name an extension, got: '"
+                                    + extension + "'");
+                }
+            }
+            Path copy = Path.of(copyLocation).normalize();
+            if (!copy.isAbsolute() || copy.getNameCount() == 0) {
+                throw new IllegalArgumentException(GITHUB_PREFIX
+                        + "copy-location must be an absolute path other than the filesystem root, got: "
+                        + copyLocation);
             }
             requirePositive(maxCopyAge, "source.github.max-copy-age");
             if (maxCopySize.toBytes() <= 0) {

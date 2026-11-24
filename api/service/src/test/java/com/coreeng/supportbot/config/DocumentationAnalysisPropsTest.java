@@ -111,6 +111,15 @@ class DocumentationAnalysisPropsTest {
                 "source.github.repository | example-org     | source.github.repository must be in owner/name format",
                 "source.github.repository | a/b/c           | source.github.repository must be in owner/name format",
                 "source.github.branch     | ' '             | source.github.branch is required",
+                "source.github.path       | /docs           | source.github.path must be relative to the repository root",
+                "source.github.path       | ../docs         | source.github.path must be relative to the repository root",
+                "source.github.path       | docs/../secrets | source.github.path must be relative to the repository root",
+                "source.github.file-extensions | ''         | source.github.file-extensions must not be empty",
+                "source.github.file-extensions | md         | source.github.file-extensions must each start with '.'",
+                "source.github.file-extensions | .md,.      | source.github.file-extensions must each start with '.'",
+                "source.github.copy-location | tmp/copy    | source.github.copy-location must be an absolute path",
+                "source.github.copy-location | /           | source.github.copy-location must be an absolute path",
+                "source.github.copy-location | /tmp/..     | source.github.copy-location must be an absolute path",
                 "source.github.max-copy-age | 0s            | source.github.max-copy-age must be positive",
                 "source.github.max-copy-size | 0B           | source.github.max-copy-size must be positive",
                 "source.github.max-files  | 0               | source.github.max-files must be positive",
@@ -126,6 +135,17 @@ class DocumentationAnalysisPropsTest {
         values.put("documentation-analysis." + setting, value);
 
         assertThatThrownBy(() -> bind(values)).hasStackTraceContaining("documentation-analysis." + message);
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+            delimiter = '|',
+            value = {"'' | ''", ". | ''", "./ | ''", "docs/ | docs", "./docs//guides | docs/guides"})
+    void writesTheDocumentationPathInOneForm(String path, String normalised) {
+        Map<String, Object> values = enabledGitHub();
+        values.put("documentation-analysis.source.github.path", path);
+
+        assertThat(bind(values).source().github().path()).isEqualTo(normalised);
     }
 
     @Test
