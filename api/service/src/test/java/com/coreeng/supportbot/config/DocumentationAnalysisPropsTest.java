@@ -75,7 +75,7 @@ class DocumentationAnalysisPropsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"github", "GITHUB", " GitHub "})
+    @ValueSource(strings = {"github", "GITHUB"})
     void selectsTheSourceCaseInsensitively(String type) {
         Map<String, Object> values = enabledGitHub();
         values.put("documentation-analysis.source.type", type);
@@ -84,7 +84,7 @@ class DocumentationAnalysisPropsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"confluence", ""})
+    @ValueSource(strings = {"confluence", "", " github "})
     void failsWhenEnabledWithAnUnknownSource(String type) {
         Map<String, Object> values = enabledGitHub();
         values.put("documentation-analysis.source.type", type);

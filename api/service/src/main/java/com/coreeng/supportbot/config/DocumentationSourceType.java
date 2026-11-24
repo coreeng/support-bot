@@ -15,7 +15,7 @@ public enum DocumentationSourceType {
     }
 
     static DocumentationSourceType parse(String value) {
-        String normalized = value.trim().replace('-', '_').toUpperCase(Locale.ROOT);
+        String normalized = value.replace('-', '_').toUpperCase(Locale.ROOT);
         return Arrays.stream(values())
                 .filter(candidate -> candidate.name().equals(normalized))
                 .findFirst()
