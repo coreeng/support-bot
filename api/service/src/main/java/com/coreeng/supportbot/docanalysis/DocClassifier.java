@@ -188,6 +188,15 @@ public class DocClassifier {
                 answer.rationale()));
     }
 
+    /**
+     * The {@code prompt_id} a result saved now would carry.
+     *
+     * @throws AnalysisPromptLoadException when no classification prompt is in use
+     */
+    public String currentPromptId() {
+        return promptId(loadPrompt());
+    }
+
     private ChatRequest request(String input) {
         ChatRequest.Builder request = ChatRequest.builder().messages(UserMessage.from(input));
         if (chatModel.supportedCapabilities().contains(RESPONSE_FORMAT_JSON_SCHEMA)) {
@@ -306,7 +315,7 @@ public class DocClassifier {
 
     private ClassificationOutcome.AttemptFailed failed(
             TicketId ticketId, String promptId, String reasonCode, boolean retryable) {
-        DocAnalysis.FailedAttempt attempt = recordFailedAttempt(ticketId, promptId, reasonCode);
+        DocAnalysis.FailedAttempt attempt = recordFailedAttempt(ticketId, promptId, reasonCode, retryable);
         log.info(
                 "Ticket {} failed documentation classification: {} (attempt {})",
                 ticketId,
@@ -317,14 +326,24 @@ public class DocClassifier {
 
     /** Counts on from the ticket's previous failed attempt under the same prompt id, and from one otherwise. */
     DocAnalysis.FailedAttempt recordFailedAttempt(TicketId ticketId, String promptId, String reasonCode) {
+        return recordFailedAttempt(ticketId, promptId, reasonCode, true);
+    }
+
+    /**
+     * A failure that trying again cannot help is saved as out of attempts, so the ticket waits for
+     * the prompt id to change; the table has no column of its own for it.
+     */
+    private DocAnalysis.FailedAttempt recordFailedAttempt(
+            TicketId ticketId, String promptId, String reasonCode, boolean retryable) {
         int previous = repository
                 .findByTicketId(ticketId)
                 .filter(row -> row instanceof DocAnalysis.FailedAttempt
                         && row.promptId().equals(promptId))
                 .map(row -> ((DocAnalysis.FailedAttempt) row).attempts())
                 .orElse(0);
+        int attempts = retryable ? previous + 1 : Math.max(previous + 1, props.maxAttempts());
         DocAnalysis.FailedAttempt attempt =
-                new DocAnalysis.FailedAttempt(ticketId, promptId, clock.instant(), reasonCode, previous + 1);
+                new DocAnalysis.FailedAttempt(ticketId, promptId, clock.instant(), reasonCode, attempts);
         repository.saveFailedAttempt(attempt);
         return attempt;
     }

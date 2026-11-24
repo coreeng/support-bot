@@ -32,8 +32,10 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -549,6 +551,25 @@ class DocClassifierTest {
     }
 
     @Test
+    void savesAFailureThatTryingAgainCannotHelpAsOutOfAttempts() {
+        source.answer(new ContextAnswer.Failed("area_too_large", false));
+
+        assertThat(attemptFailed(classify(THREAD)).attempt().attempts()).isEqualTo(3);
+        assertThat(repository.findByTicketId(TICKET.ticketId()))
+                .get()
+                .extracting(row -> ((DocAnalysis.FailedAttempt) row).attempts())
+                .isEqualTo(3);
+    }
+
+    @Test
+    void reportsThePromptIdResultsAreSavedUnder() {
+        source.answer(new ContextAnswer.NothingCovers("No page covers it.", question("How?", "how")));
+
+        assertThat(classifier().currentPromptId())
+                .isEqualTo(classified(classify(THREAD)).promptId());
+    }
+
+    @Test
     void countsFromOneAfterAFailureUnderAnotherPromptId() {
         repository.saveFailedAttempt(new DocAnalysis.FailedAttempt(TICKET.ticketId(), "old-prompt-id", NOW, "x", 3));
         model.answer(json(answer("undetermined")));
@@ -739,6 +760,27 @@ class DocClassifierTest {
         @Override
         public Optional<DocAnalysis> findByTicketId(TicketId ticketId) {
             return Optional.ofNullable(rows.get(ticketId));
+        }
+
+        @Override
+        public List<TicketToClassify> findDue(
+                LocalDate from,
+                LocalDate to,
+                Collection<String> channelIds,
+                String promptId,
+                Instant failedBefore,
+                int maxAttempts) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int countAttemptedSince(Instant since) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void deleteFailedAttempts(Collection<TicketId> ticketIds, String reasonCode) {
+            throw new UnsupportedOperationException();
         }
     }
 }
