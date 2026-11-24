@@ -407,6 +407,7 @@ documentation-analysis:
       max-copy-age: 24h # Fetch again when the copy is older
       max-copy-size: 50MB # A fetch that keeps more than this fails
       max-files: 5000 # A fetch that keeps more files than this fails
+      context: ${DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_CONTEXT:whole} # whole: every page is sent with every ticket
       max-areas-per-ticket: 2
 ```
 
@@ -741,6 +742,18 @@ Reads the documentation from one GitHub repository. It needs `repository` (`owne
 `..`; leave it empty or set it to `.` for documentation at the root. Each of `file-extensions`
 starts with `.`. `copy-location` is where the bot keeps its copy: an absolute path other than `/`.
 
+`context` sets how the source picks the documentation for a ticket. Its only value, and the
+default, is `whole`: every page is sent with every ticket, in path order, so the documentation as
+a whole has to fit in `max-input-tokens` with room left for the thread and the prompt. When it does
+not, the analysis reports the source as unavailable and classifies no ticket. A ticket whose
+thread takes the total over the limit fails with `context_too_large`. Any other value fails
+startup when the feature is enabled with this source. Changing `context` makes earlier results
+stale, so their tickets are classified again.
+
+A page's product area is the directory directly under `path` that holds it; pages directly in
+`path` have none, and the documentation need not be arranged in areas. A file whose path holds a
+quote, an angle bracket or a control character is left out, and a warning gives the count.
+
 GitHub credentials are read from `pr-review-tracking.github`
 (see [PR review tracking](#pr-review-tracking)), whether or not PR tracking is enabled. When the
 feature is enabled with this source, startup fails, naming the setting, unless that block holds
@@ -764,6 +777,7 @@ Set these on the **API**:
 | `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_REPOSITORY` | The documentation repository, `owner/name`. Required with the GitHub source. |
 | `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_BRANCH` | The branch to read. Default `main`. |
 | `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_PATH` | The directory holding the documentation; empty or `.` for the repository root. Default `docs`. |
+| `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_CONTEXT` | How the source picks the documentation for a ticket. Default `whole`, the only value: every page with every ticket, so the documentation has to fit in `max-input-tokens`. |
 
 ## Single Sign-On (SSO)
 
