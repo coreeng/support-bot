@@ -1,13 +1,17 @@
 package com.coreeng.supportbot.github;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
@@ -16,6 +20,7 @@ import java.util.Date;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.kohsuke.github.GHBranch;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHIssueState;
@@ -30,6 +35,7 @@ import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.HttpException;
 import org.kohsuke.github.PagedIterable;
+import org.kohsuke.github.function.InputStreamFunction;
 
 class Hub4jGitHubClientTest {
 
@@ -193,6 +199,83 @@ class Hub4jGitHubClientTest {
                 .satisfies(
                         ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(0))
                 .hasMessageContaining("my-org/my-repo#1");
+    }
+
+    @Test
+    void getBranchHeadCommitReturnsTheBranchSha() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHBranch branch = mock(GHBranch.class);
+        when(gitHub.getRepository("my-org/docs")).thenReturn(repo);
+        when(repo.getBranch("main")).thenReturn(branch);
+        when(branch.getSHA1()).thenReturn("abc123");
+
+        // when / then
+        assertThat(client.getBranchHeadCommit("my-org/docs", "main")).isEqualTo("abc123");
+    }
+
+    @Test
+    void getBranchHeadCommitWrapsAMissingBranchAs404() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        when(gitHub.getRepository("my-org/docs")).thenReturn(repo);
+        when(repo.getBranch("gone")).thenThrow(new GHFileNotFoundException("Not Found"));
+
+        // when / then
+        assertThatThrownBy(() -> client.getBranchHeadCommit("my-org/docs", "gone"))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("my-org/docs@gone")
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(404));
+    }
+
+    @Test
+    void downloadArchiveStreamsTheArchiveAtTheCommitToTheReader() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        when(gitHub.getRepository("my-org/docs")).thenReturn(repo);
+        when(repo.readTar(any(), eq("abc123"))).thenAnswer(invocation -> invocation
+                .<InputStreamFunction<?>>getArgument(0)
+                .apply(new ByteArrayInputStream("archive".getBytes(UTF_8))));
+
+        // when
+        String read =
+                client.downloadArchive("my-org/docs", "abc123", archive -> new String(archive.readAllBytes(), UTF_8));
+
+        // then
+        assertThat(read).isEqualTo("archive");
+    }
+
+    @Test
+    void downloadArchivePassesOnTheReadersFailureRatherThanReportingItAsGitHubs() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        when(gitHub.getRepository("my-org/docs")).thenReturn(repo);
+        when(repo.readTar(any(), eq("abc123")))
+                .thenAnswer(invocation ->
+                        invocation.<InputStreamFunction<?>>getArgument(0).apply(new ByteArrayInputStream(new byte[0])));
+
+        // when / then
+        assertThatThrownBy(() -> client.downloadArchive("my-org/docs", "abc123", archive -> {
+                    throw new IOException("disk full");
+                }))
+                .isInstanceOf(UncheckedIOException.class)
+                .hasRootCauseMessage("disk full");
+    }
+
+    @Test
+    void downloadArchiveWrapsAnHttpErrorWithItsStatus() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        when(gitHub.getRepository("my-org/docs")).thenReturn(repo);
+        when(repo.readTar(any(), eq("abc123"))).thenThrow(new HttpException(403, "Forbidden", (String) null, null));
+
+        // when / then
+        assertThatThrownBy(() -> client.downloadArchive("my-org/docs", "abc123", archive -> "unread"))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("my-org/docs@abc123")
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(403));
     }
 
     @Test

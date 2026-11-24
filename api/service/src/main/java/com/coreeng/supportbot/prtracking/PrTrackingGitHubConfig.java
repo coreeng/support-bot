@@ -35,14 +35,15 @@ import org.springframework.http.converter.json.MappingJackson2HttpMessageConvert
 import org.springframework.web.client.RestClient;
 
 /**
- * Wires the GitHub adapter for PR tracking. Only activates when at least one repository uses
- * {@code provider: github} (default), so a pure-GitLab deployment can start without a GitHub
- * token. Provider-neutral wiring (the {@link com.coreeng.supportbot.prtracking.source.PrSourceClients}
+ * Wires the GitHub client from the {@code pr-review-tracking.github} credentials, and the GitHub
+ * adapter for PR tracking. The client is built when PR tracking watches a GitHub repository or
+ * documentation analysis reads a GitHub repository, so a pure-GitLab deployment can start without a
+ * GitHub token. The PR-tracking adapter beans keep the PR-tracking conditions.
+ * Provider-neutral wiring (the {@link com.coreeng.supportbot.prtracking.source.PrSourceClients}
  * registry itself) lives in {@link PrTrackingSourceClientsConfig}.
  */
 @Configuration
-@ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
-@Conditional(AnyGithubRepoCondition.class)
+@Conditional(GitHubClientNeededCondition.class)
 public class PrTrackingGitHubConfig {
 
     /**
@@ -57,6 +58,7 @@ public class PrTrackingGitHubConfig {
     @Bean
     public AuthorizationProvider gitHubAuthorizationProvider(PrTrackingProps props) {
         PrTrackingProps.GitHub config = props.github();
+        config.validate();
         if (config.authMode() == PrTrackingProps.AuthMode.APP) {
             PrivateKey privateKey = parsePrivateKey(config.privateKeyPem());
             long installationId = Long.parseLong(config.installationId());
@@ -92,6 +94,8 @@ public class PrTrackingGitHubConfig {
      * the request; the response is read as a raw String and parsed in {@link GitHubGraphQlClient}.
      */
     @Bean
+    @ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
+    @Conditional(AnyGithubRepoCondition.class)
     public RestClient gitHubGraphQlRestClient(
             PrTrackingProps props, AuthorizationProvider gitHubAuthorizationProvider, ObjectMapper objectMapper) {
         ClientHttpRequestInterceptor authInterceptor = (request, body, execution) -> {
@@ -111,11 +115,15 @@ public class PrTrackingGitHubConfig {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
+    @Conditional(AnyGithubRepoCondition.class)
     public GitHubGraphQlClient gitHubGraphQlClient(RestClient gitHubGraphQlRestClient) {
         return new GitHubGraphQlClient(gitHubGraphQlRestClient);
     }
 
     @Bean
+    @ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
+    @Conditional(AnyGithubRepoCondition.class)
     public PrSourceClient gitHubPrSourceClient(
             GitHubClient gitHubClient, GitHubGraphQlClient gitHubGraphQlClient, PrTrackingProps props) {
         return new GitHubPrSourceClient(gitHubClient, gitHubGraphQlClient, props);
