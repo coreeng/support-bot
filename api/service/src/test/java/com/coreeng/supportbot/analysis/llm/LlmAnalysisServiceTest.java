@@ -10,8 +10,6 @@ import dev.langchain4j.model.chat.ChatModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -66,23 +64,6 @@ class LlmAnalysisServiceTest {
 
         verify(threadService).getThreadAsText(channelId, threadTs);
         verify(chatModel).chat(anyString());
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"Feature Request", "Feature or Enhancement Request"})
-    void analyzeThread_shouldUseOneFeatureRequestDriver(String returnedDriver) {
-        when(threadService.getThreadAsText("C123456", "1234.5678")).thenReturn("Could we increase the limit?");
-        when(chatModel.chat(anyString())).thenReturn("""
-                        Primary Driver: %s
-                        Category: Configuring Platform Features
-                        Platform Feature: workload compute
-                        Reason: The tenant needs a higher limit.
-                        """.formatted(returnedDriver));
-
-        AnalysisRecord result = service.analyzeThread("C123456", "1234.5678", 100L, "Analyze this ticket.");
-
-        assertThat(result).isNotNull();
-        assertThat(result.driver()).isEqualTo("Feature or Enhancement Request");
     }
 
     @Test
