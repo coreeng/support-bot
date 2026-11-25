@@ -45,29 +45,62 @@ export interface IncomingVsResolvedRate {
   data: IncomingVsResolvedRatePoint[];
 }
 
-export interface EscalationDurationByTag {
-  tag: string;
-  avgDuration: number;
-}
+export type EscalationRateGranularity = "DAY" | "WEEK";
 
-export interface EscalationPercentageByTag {
-  tag: string;
-  count: number;
-}
-
-export interface EscalationTrendsByDate {
+/** Of the tickets opened in a bucket, how many were escalated. `rate` is a fraction in [0, 1]. */
+export interface EscalationRatePoint {
   date: string;
+  tickets: number;
+  escalatedTickets: number;
+  rate: number;
+}
+
+export interface EscalationRate {
+  granularity: EscalationRateGranularity;
+  data: EscalationRatePoint[];
+}
+
+/** Resolution percentiles in seconds for escalated or never-escalated closed tickets. */
+export interface ResolutionByEscalation {
+  escalated: boolean;
+  tickets: number;
+  p50: number;
+  p90: number;
+}
+
+/** Per receiving team. Resolution percentiles are in seconds, null when nothing is resolved yet. */
+export interface EscalationTeamScorecardRow {
+  team: string;
   escalations: number;
+  open: number;
+  resolutionP50: number | null;
+  resolutionP90: number | null;
 }
 
-export interface EscalationsByTeam {
-  assigneeName: string;
-  totalEscalations: number;
+/** Escalation tag ranked by total seconds spent in escalation (resolved escalations only). */
+export interface EscalationTopic {
+  /** Tag code; the label comes from the registry. */
+  tag: string;
+  escalations: number;
+  avgSeconds: number;
+  totalSeconds: number;
+  /** Average seconds tickets waited before these escalations (manual only); null when there are none. */
+  avgWaitSeconds: number | null;
 }
 
-export interface EscalationsByImpact {
-  impactLevel: string;
-  totalEscalations: number;
+/** Time from ticket opening to its first manual escalation. */
+export interface TimeBeforeEscalation {
+  escalations: number;
+  p50: number;
+  p90: number;
+}
+
+/** Share of a requesting team's tickets opened in the range that were escalated. `rate` is a fraction in [0, 1]. */
+export interface TeamEscalationRate {
+  team: string;
+  tickets: number;
+  escalatedTickets: number;
+  rate: number;
 }
 
 export interface WeeklyTicketCounts {

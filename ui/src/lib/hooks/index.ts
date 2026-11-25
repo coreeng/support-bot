@@ -18,11 +18,17 @@ import type {
   TicketWithLogs,
 } from "@/lib/types";
 import type {
+  EscalationRate,
+  EscalationTeamScorecardRow,
+  EscalationTopic,
   InFlightPr,
   IncomingVsResolvedRate,
   IncomingVsResolvedRequestGranularity,
   RepoInsights,
   RequestBreakdown,
+  ResolutionByEscalation,
+  TeamEscalationRate,
+  TimeBeforeEscalation,
 } from "@/lib/types/dashboard";
 import type { SummaryData, SummaryStatus, SummaryTeamGroups } from "@/lib/types/summary";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -453,42 +459,50 @@ export function useIncomingVsResolvedRate(enabled = true, dateFrom?: string, dat
   });
 }
 
-export function useAvgEscalationDurationByTag(enabled = true, dateFrom?: string, dateTo?: string) {
-  return useQuery<{ tag: string; avgDuration: number }[]>({
-    queryKey: ["avgEscalationDurationByTag", dateFrom, dateTo],
-    queryFn: () => apiGet(`/dashboard/avg-escalation-duration-by-tag${buildParams(dateFrom, dateTo)}`),
+export function useEscalationRate(enabled = true, dateFrom?: string, dateTo?: string) {
+  return useQuery<EscalationRate>({
+    queryKey: ["escalationRate", dateFrom, dateTo],
+    queryFn: () => apiGet(`/dashboard/escalation-rate${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useEscalationPercentageByTag(enabled = true, dateFrom?: string, dateTo?: string) {
-  return useQuery<{ tag: string; count: number }[]>({
-    queryKey: ["escalationPercentageByTag", dateFrom, dateTo],
-    queryFn: () => apiGet(`/dashboard/escalation-percentage-by-tag${buildParams(dateFrom, dateTo)}`),
+export function useResolutionEscalatedVsNot(enabled = true, dateFrom?: string, dateTo?: string) {
+  return useQuery<ResolutionByEscalation[]>({
+    queryKey: ["resolutionEscalatedVsNot", dateFrom, dateTo],
+    queryFn: () => apiGet(`/dashboard/resolution-escalated-vs-not${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useEscalationTrendsByDate(enabled = true, dateFrom?: string, dateTo?: string) {
-  return useQuery<{ date: string; escalations: number }[]>({
-    queryKey: ["escalationTrendsByDate", dateFrom, dateTo],
-    queryFn: () => apiGet(`/dashboard/escalation-trends-by-date${buildParams(dateFrom, dateTo)}`),
+export function useEscalationTeamScorecard(enabled = true, dateFrom?: string, dateTo?: string) {
+  return useQuery<EscalationTeamScorecardRow[]>({
+    queryKey: ["escalationTeamScorecard", dateFrom, dateTo],
+    queryFn: () => apiGet(`/dashboard/escalation-team-scorecard${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useEscalationsByTeam(enabled = true, dateFrom?: string, dateTo?: string) {
-  return useQuery<{ assigneeName: string; totalEscalations: number }[]>({
-    queryKey: ["escalationsByTeam", dateFrom, dateTo],
-    queryFn: () => apiGet(`/dashboard/escalations-by-team${buildParams(dateFrom, dateTo)}`),
+export function useEscalationTopics(enabled = true, dateFrom?: string, dateTo?: string) {
+  return useQuery<EscalationTopic[]>({
+    queryKey: ["escalationTopics", dateFrom, dateTo],
+    queryFn: () => apiGet(`/dashboard/escalation-topics${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useEscalationsByImpact(enabled = true, dateFrom?: string, dateTo?: string) {
-  return useQuery<{ impactLevel: string; totalEscalations: number }[]>({
-    queryKey: ["escalationsByImpact", dateFrom, dateTo],
-    queryFn: () => apiGet(`/dashboard/escalations-by-impact${buildParams(dateFrom, dateTo)}`),
+export function useTimeBeforeEscalation(enabled = true, dateFrom?: string, dateTo?: string) {
+  return useQuery<TimeBeforeEscalation>({
+    queryKey: ["timeBeforeEscalation", dateFrom, dateTo],
+    queryFn: () => apiGet(`/dashboard/time-before-escalation${buildParams(dateFrom, dateTo)}`),
+    enabled,
+  });
+}
+
+export function useEscalationRateByTeam(enabled = true, dateFrom?: string, dateTo?: string) {
+  return useQuery<TeamEscalationRate[]>({
+    queryKey: ["escalationRateByTeam", dateFrom, dateTo],
+    queryFn: () => apiGet(`/dashboard/escalation-rate-by-team${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }

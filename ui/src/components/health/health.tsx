@@ -25,6 +25,7 @@ import {
   TicketLog,
   TicketWithLogs,
 } from "@/lib/types";
+import { slackDeepLink } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ChevronDown, ClipboardList, Headphones, Package, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -1556,6 +1557,7 @@ export default function HealthPage() {
                 <Table>
                   <TableHeader className="bg-muted z-10">
                     <TableRow>
+                      <TableHead>ID</TableHead>
                       <TableHead>Team</TableHead>
                       <TableHead>Impact</TableHead>
                       {isAssignmentEnabled && <TableHead>Support Engineer</TableHead>}
@@ -1568,7 +1570,7 @@ export default function HealthPage() {
                   <TableBody>
                     {paginatedTickets.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAssignmentEnabled ? 7 : 6} className="text-muted-foreground py-8 text-center">
+                        <TableCell colSpan={isAssignmentEnabled ? 8 : 7} className="text-muted-foreground py-8 text-center">
                           <div className="flex flex-col items-center gap-2">
                             <AlertTriangle className="h-6 w-6" />
                             <p className="font-medium">No tickets found</p>
@@ -1581,6 +1583,21 @@ export default function HealthPage() {
                         const { opened } = getOpenedClosed(t);
                         return (
                           <TableRow key={t.id}>
+                            <TableCell className="font-mono tabular-nums">
+                              {t.channelId && t.query?.ts ? (
+                                <a
+                                  href={slackDeepLink(t.channelId, t.query.ts)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-link hover:underline"
+                                  aria-label={`Open ticket ${t.id} in Slack`}
+                                >
+                                  #{t.id}
+                                </a>
+                              ) : (
+                                <>#{t.id}</>
+                              )}
+                            </TableCell>
                             <TableCell>{t.team?.label || t.team?.name || "-"}</TableCell>
                             <TableCell>
                               {registryData?.impacts.find((i: TicketImpact) => i.code === t.impact)?.label || t.impact || "-"}

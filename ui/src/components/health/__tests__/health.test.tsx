@@ -7,6 +7,7 @@
  * - Loading and error states
  */
 
+import type { TicketWithLogs } from "@/lib/types";
 import { clearMockUrlParamsInitial, useMockUrlParams as mockUseUrlParams, setMockUrlParamsInitial } from "@/test-utils/mock-url-params";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -707,6 +708,36 @@ describe("HealthPage", () => {
 
       expect(screen.queryByText("Previous")).not.toBeInTheDocument();
       expect(screen.queryByText("Next")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Ticket Workbench Link", () => {
+    const renderWorkbench = (ticket: ReturnType<typeof createMockTicket> & Pick<TicketWithLogs, "channelId" | "query">) => {
+      mockUseTickets.mockReturnValue({
+        data: { content: [ticket], page: 0, totalPages: 1, totalElements: 1 },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useTickets>);
+      setMockUrlParamsInitial({ tab: "workbench" });
+      render(<HealthPage />, { wrapper: Wrapper });
+    };
+
+    it("links each ticket ID to its Slack thread", () => {
+      const ticket = createMockTicket("42", "opened", "Team A", false);
+      renderWorkbench({ ...ticket, channelId: "C123", query: { ...ticket.query, ts: "1700000000.000100" } });
+
+      const link = screen.getByRole("link", { name: "Open ticket 42 in Slack" });
+      expect(link).toHaveTextContent("#42");
+      expect(link).toHaveAttribute("href", "https://slack.com/archives/C123/p1700000000000100");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    });
+
+    it("shows the ID without a link when the thread is unknown", () => {
+      renderWorkbench(createMockTicket("42", "opened", "Team A", false));
+
+      expect(screen.getByText("#42")).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Open ticket 42 in Slack" })).not.toBeInTheDocument();
     });
   });
 

@@ -14,11 +14,12 @@ export const QUERY_KEYS = {
   RESOLUTION_BY_WEEK: "resolutionTimesByWeek",
   UNRESOLVED_AGES: "unresolvedTicketAges",
 
-  ESCALATION_AVG_DURATION: "avgEscalationDurationByTag",
-  ESCALATION_PERCENTAGE: "escalationPercentageByTag",
-  ESCALATION_TRENDS: "escalationTrendsByDate",
-  ESCALATIONS_BY_TEAM: "escalationsByTeam",
-  ESCALATIONS_BY_IMPACT: "escalationsByImpact",
+  ESCALATION_RATE: "escalationRate",
+  RESOLUTION_ESCALATED_VS_NOT: "resolutionEscalatedVsNot",
+  ESCALATION_TEAM_SCORECARD: "escalationTeamScorecard",
+  ESCALATION_TOPICS: "escalationTopics",
+  TIME_BEFORE_ESCALATION: "timeBeforeEscalation",
+  ESCALATION_RATE_BY_TEAM: "escalationRateByTeam",
 
   WEEKLY_COUNTS: "weeklyTicketCounts",
   WEEKLY_COMPARISON: "weeklyComparison",

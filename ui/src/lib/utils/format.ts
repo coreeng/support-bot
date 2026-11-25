@@ -14,6 +14,21 @@ export function formatDuration(seconds: number): string {
   return `${Math.round(seconds)}s`;
 }
 
+/** Like {@link formatDuration}, with "—" for a missing value. */
+export function formatOptionalDuration(seconds: number | null | undefined): string {
+  return seconds == null ? "—" : formatDuration(seconds);
+}
+
+/** Formats a fraction in [0, 1] as a percentage with one decimal place, e.g. 0.256 → "25.6%". */
+export function formatPercent(fraction: number): string {
+  return `${(fraction * 100).toFixed(1)}%`;
+}
+
+/** "1 ticket", "2 tickets". */
+export function formatTicketCount(count: number): string {
+  return `${count} ${count === 1 ? "ticket" : "tickets"}`;
+}
+
 /**
  * Formats seconds to hours with one decimal place
  * @param seconds - Duration in seconds

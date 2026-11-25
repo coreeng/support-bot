@@ -91,39 +91,46 @@ public class DashboardController {
 
     // ===== Escalation SLA Endpoints =====
 
-    @GetMapping("/avg-escalation-duration-by-tag")
-    public List<TagDuration> getAvgEscalationDurationByTag(
+    @GetMapping("/escalation-rate")
+    public EscalationRate getEscalationRate(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
-        return dashboardQueryService.getAvgEscalationDurationByTag(dateFrom, dateTo);
+        return dashboardQueryService.getEscalationRate(dateFrom, dateTo);
     }
 
-    @GetMapping("/escalation-percentage-by-tag")
-    public List<TagCount> getEscalationPercentageByTag(
+    @GetMapping("/resolution-escalated-vs-not")
+    public List<ResolutionByEscalation> getResolutionEscalatedVsNot(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
-        return dashboardQueryService.getEscalationPercentageByTag(dateFrom, dateTo);
+        return dashboardQueryService.getResolutionEscalatedVsNot(dateFrom, dateTo);
     }
 
-    @GetMapping("/escalation-trends-by-date")
-    public List<DateEscalations> getEscalationTrendsByDate(
+    @GetMapping("/escalation-team-scorecard")
+    public List<TeamScorecard> getEscalationTeamScorecard(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
-        return dashboardQueryService.getEscalationTrendsByDate(dateFrom, dateTo);
+        return dashboardQueryService.getEscalationTeamScorecard(dateFrom, dateTo);
     }
 
-    @GetMapping("/escalations-by-team")
-    public List<TeamEscalations> getEscalationsByTeam(
+    @GetMapping("/escalation-topics")
+    public List<EscalationTopic> getEscalationTopics(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
-        return dashboardQueryService.getEscalationsByTeam(dateFrom, dateTo);
+        return dashboardQueryService.getEscalationTopics(dateFrom, dateTo);
     }
 
-    @GetMapping("/escalations-by-impact")
-    public List<ImpactEscalations> getEscalationsByImpact(
+    @GetMapping("/time-before-escalation")
+    public TimeBeforeEscalation getTimeBeforeEscalation(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
-        return dashboardQueryService.getEscalationsByImpact(dateFrom, dateTo);
+        return dashboardQueryService.getTimeBeforeEscalation(dateFrom, dateTo);
+    }
+
+    @GetMapping("/escalation-rate-by-team")
+    public List<TeamEscalationRate> getEscalationRateByTeam(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
+        return dashboardQueryService.getEscalationRateByTeam(dateFrom, dateTo);
     }
 
     // ===== Weekly Trends Endpoints =====

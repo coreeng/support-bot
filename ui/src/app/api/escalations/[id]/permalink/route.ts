@@ -23,8 +23,14 @@ function errorPage(message: string, status: number) {
   });
 }
 
+const NUMERIC_ID = /^\d+$/;
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // The id is interpolated into the backend path, so anything but digits could reach a different endpoint.
+  if (!NUMERIC_ID.test(id)) {
+    return errorPage("Unable to load Slack link. Please close this tab and try again.", 404);
+  }
 
   try {
     const response = await backendFetch(request, `/escalation/${id}/permalink`);

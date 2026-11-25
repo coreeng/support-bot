@@ -29,15 +29,17 @@ public interface DashboardRepository {
     IncomingVsResolvedRate getIncomingVsResolvedRate(IncomingVsResolvedQuery query);
 
     // Escalation SLAs
-    List<TagDuration> getAvgEscalationDurationByTag(LocalDate dateFrom, LocalDate dateTo);
+    EscalationRate getEscalationRate(LocalDate dateFrom, LocalDate dateTo);
 
-    List<TagCount> getEscalationPercentageByTag(LocalDate dateFrom, LocalDate dateTo);
+    List<ResolutionByEscalation> getResolutionEscalatedVsNot(LocalDate dateFrom, LocalDate dateTo);
 
-    List<DateEscalations> getEscalationTrendsByDate(LocalDate dateFrom, LocalDate dateTo);
+    List<TeamScorecard> getEscalationTeamScorecard(LocalDate dateFrom, LocalDate dateTo);
 
-    List<TeamEscalations> getEscalationsByTeam(LocalDate dateFrom, LocalDate dateTo);
+    List<EscalationTopic> getEscalationTopics(LocalDate dateFrom, LocalDate dateTo);
 
-    List<ImpactEscalations> getEscalationsByImpact(LocalDate dateFrom, LocalDate dateTo);
+    TimeBeforeEscalation getTimeBeforeEscalation(LocalDate dateFrom, LocalDate dateTo);
+
+    List<TeamEscalationRate> getEscalationRateByTeam(LocalDate dateFrom, LocalDate dateTo);
 
     // Weekly Trends
     List<WeeklyTicketCounts> getWeeklyTicketCounts();

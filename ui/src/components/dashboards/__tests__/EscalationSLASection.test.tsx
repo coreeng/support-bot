@@ -1,428 +1,170 @@
 // src/components/dashboards/__tests__/EscalationSLASection.test.tsx
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import type { EscalationRate, EscalationTeamScorecardRow, EscalationTopic, ResolutionByEscalation } from "@/lib/types/dashboard";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { EscalationSLASection } from "../EscalationSLASection";
 
-// Mock child components
-jest.mock("../HorizontalBarChart", () => ({
-  HorizontalBarChart: ({ title, data }: any) => (
-    <div data-testid="horizontal-bar-chart">
-      <h3>{title}</h3>
-      <div>Data items: {data?.length || 0}</div>
-    </div>
-  ),
+jest.mock("../../../lib/hooks", () => ({
+  useEscalationTeams: () => ({ data: [{ name: "team-a", label: "Team A", types: ["escalation"] }] }),
+  useTenantTeams: () => ({ data: [{ name: "tenant-a", label: "Tenant Team A" }] }),
+  useRegistry: () => ({ data: { impacts: [], tags: [{ code: "tag-net", label: "Networking" }] } }),
 }));
 
 jest.mock("../TimeSeriesChart", () => ({
-  TimeSeriesChart: ({ title, data, lines }: any) => (
+  TimeSeriesChart: ({ title, data }: { title: string; data: { rate: number | null }[] }) => (
     <div data-testid="time-series-chart">
       <h3>{title}</h3>
-      <div>Data points: {data?.length || 0}</div>
-      <div>Lines: {lines?.length || 0}</div>
+      <div>Rates: {data.map((d) => d.rate ?? "gap").join(",")}</div>
     </div>
   ),
 }));
 
 jest.mock("../RefreshButton", () => ({
-  RefreshButton: ({ onRefresh, isRefreshing }: any) => (
+  RefreshButton: ({ onRefresh, isRefreshing }: { onRefresh: () => void; isRefreshing: boolean }) => (
     <button data-testid="refresh-button" onClick={onRefresh} disabled={isRefreshing}>
       {isRefreshing ? "Refreshing..." : "Refresh"}
     </button>
   ),
 }));
 
-// Mock Recharts
-jest.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
-  BarChart: ({ children, data }: any) => (
-    <div data-testid="bar-chart" data-items={data?.length}>
-      {children}
-    </div>
-  ),
-  Bar: () => <div data-testid="bar" />,
-  CartesianGrid: () => <div data-testid="grid" />,
-  XAxis: () => <div data-testid="x-axis" />,
-  YAxis: () => <div data-testid="y-axis" />,
-  Tooltip: () => <div data-testid="tooltip" />,
-}));
-
 describe("EscalationSLASection", () => {
-  // Mock values in SECONDS (as returned by the database)
-  const mockAvgEscalationDurationByTag = [
-    { tag: "bug", avgDuration: 30600 }, // 8.5 hours in seconds
-    { tag: "feature", avgDuration: 44280 }, // 12.3 hours in seconds
-    { tag: "incident", avgDuration: 15120 }, // 4.2 hours in seconds
-  ];
-
-  const mockEscalationPercentageByTag = [
-    { tag: "bug", count: 25 },
-    { tag: "feature", count: 18 },
-    { tag: "incident", count: 42 },
-  ];
-
-  const mockEscalationTrendsByDate = [
-    { date: "2024-01-01", escalations: 10 },
-    { date: "2024-01-02", escalations: 15 },
-    { date: "2024-01-03", escalations: 12 },
-  ];
-
-  const mockEscalationsByTeam = [
-    { assigneeName: "Team A", totalEscalations: 30 },
-    { assigneeName: "Team B", totalEscalations: 25 },
-    { assigneeName: "Team C", totalEscalations: 20 },
-  ];
-
-  const mockEscalationsByImpact = [
-    { impactLevel: "productionBlocking", totalEscalations: 15 },
-    { impactLevel: "abnormalBehaviour", totalEscalations: 30 },
-    { impactLevel: "bauBlocking", totalEscalations: 10 },
-  ];
-
-  const mockOnRefresh = jest.fn();
-
-  const renderSection = (ui: React.ReactElement) => {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  const escalationRate: EscalationRate = {
+    granularity: "DAY",
+    data: [
+      { date: "2024-01-01", tickets: 4, escalatedTickets: 1, rate: 0.25 },
+      { date: "2024-01-02", tickets: 6, escalatedTickets: 3, rate: 0.5 },
+      { date: "2024-01-03", tickets: 0, escalatedTickets: 0, rate: 0 },
+    ],
   };
 
-  beforeEach(() => {
-    jest.clearAllMocks();
+  const resolutionEscalatedVsNot: ResolutionByEscalation[] = [
+    { escalated: true, tickets: 4, p50: 7200, p90: 14400 },
+    { escalated: false, tickets: 6, p50: 3600, p90: 5400 },
+  ];
+
+  const scorecard: EscalationTeamScorecardRow[] = [
+    { team: "team-a", escalations: 3, open: 1, resolutionP50: 5400, resolutionP90: 9000 },
+    { team: "team-b", escalations: 1, open: 1, resolutionP50: null, resolutionP90: null },
+  ];
+
+  const topics: EscalationTopic[] = [
+    { tag: "tag-net", escalations: 2, avgSeconds: 18000, totalSeconds: 36000, avgWaitSeconds: 7200 },
+    { tag: "tag-access", escalations: 3, avgSeconds: 3600, totalSeconds: 10800, avgWaitSeconds: null },
+  ];
+
+  const renderSection = (overrides: Partial<React.ComponentProps<typeof EscalationSLASection>> = {}) =>
+    render(
+      <EscalationSLASection
+        escalationRate={escalationRate}
+        resolutionEscalatedVsNot={resolutionEscalatedVsNot}
+        escalationTeamScorecard={scorecard}
+        escalationTopics={topics}
+        timeBeforeEscalation={{ escalations: 2, p50: 1800, p90: 3240 }}
+        escalationRateByTeam={[{ team: "tenant-a", tickets: 8, escalatedTickets: 2, rate: 0.25 }]}
+        isRefreshing={false}
+        onRefresh={jest.fn()}
+        {...overrides}
+      />
+    );
+
+  it("renders the header and wires the refresh button", () => {
+    const onRefresh = jest.fn();
+    renderSection({ onRefresh });
+
+    expect(screen.getByText("Escalation Analysis")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("refresh-button"));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
-  describe("Rendering", () => {
-    it("should render section header", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
+  it("shows the overall escalation rate from the summed cohort", () => {
+    renderSection();
 
-      expect(screen.getByText("Escalation Analysis")).toBeInTheDocument();
-      expect(screen.getByText("Track escalation patterns and team performance")).toBeInTheDocument();
-    });
-
-    it("should render refresh button", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      expect(screen.getByTestId("refresh-button")).toBeInTheDocument();
-    });
-
-    it("should render Average Escalation Duration chart", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      expect(screen.getByText("Average Escalation Duration by Tag (Top 15)")).toBeInTheDocument();
-    });
-
-    it("should render Escalation Count by Tag chart", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      expect(screen.getByText("Escalation Count by Tag (Top 15)")).toBeInTheDocument();
-    });
-
-    it("should render Escalation Trends Over Time chart", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      expect(screen.getByText("Escalation Trends Over Time")).toBeInTheDocument();
-    });
-
-    it("should render Escalations by Team chart", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      expect(screen.getByText("Escalations by Team (Top 10)")).toBeInTheDocument();
-    });
-
-    it("should render Escalations by Impact chart", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      expect(screen.getByText("Escalations by Impact Level")).toBeInTheDocument();
-    });
+    expect(screen.getByText("40.0%")).toBeInTheDocument();
+    expect(screen.getByText("4 of 10 tickets opened in this range were escalated, manually or automatically")).toBeInTheDocument();
   });
 
-  describe("Empty States", () => {
-    it("should handle empty avgEscalationDurationByTag", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={[]}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
+  it("plots the rate as a percentage per bucket", () => {
+    renderSection();
 
-      // Should show 0 data items for that chart
-      const charts = screen.getAllByTestId("horizontal-bar-chart");
-      expect(charts[0]).toHaveTextContent("Data items: 0");
-    });
-
-    it("should handle undefined data gracefully", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={undefined}
-          escalationPercentageByTag={undefined}
-          escalationTrendsByDate={undefined}
-          escalationsByTeam={undefined}
-          escalationsByImpact={undefined}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      // All charts should still render but with 0 data
-      const horizontalCharts = screen.getAllByTestId("horizontal-bar-chart");
-      horizontalCharts.forEach((chart) => {
-        expect(chart).toHaveTextContent("Data items: 0");
-      });
-    });
-
-    it("should handle empty escalation trends", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={[]}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      // TimeSeriesChart should show 0 data points
-      expect(screen.getByText("Data points: 0")).toBeInTheDocument();
-    });
-
-    it("should handle empty escalations by team", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={[]}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      // Should render BarChart (for impact) - team chart is HorizontalBarChart
-      const barChart = screen.getByTestId("bar-chart");
-      expect(barChart).toBeInTheDocument();
-    });
+    expect(screen.getByText("Escalation Rate Over Time (daily)")).toBeInTheDocument();
+    expect(screen.getByText("Rates: 25,50,gap")).toBeInTheDocument();
   });
 
-  describe("Refresh Functionality", () => {
-    it("should call onRefresh when refresh button is clicked", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
+  it("leads with the escalated vs not-escalated resolution comparison", () => {
+    renderSection();
 
-      const refreshButton = screen.getByTestId("refresh-button");
-      refreshButton.click();
-
-      expect(mockOnRefresh).toHaveBeenCalledTimes(1);
-    });
-
-    it("should show refreshing state", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={true}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      expect(screen.getByText("Refreshing...")).toBeInTheDocument();
-    });
+    expect(screen.getByText("Resolution: Escalated vs Not Escalated")).toBeInTheDocument();
+    expect(screen.getByTitle("Escalated, P50: 2.0h")).toBeInTheDocument();
   });
 
-  describe("Data Integrity", () => {
-    it("should render all 5 charts with data", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      // Should have 3 HorizontalBarCharts (duration, count, team)
-      expect(screen.getAllByTestId("horizontal-bar-chart")).toHaveLength(3);
-
-      // Should have 1 TimeSeriesChart (trends)
-      expect(screen.getByTestId("time-series-chart")).toBeInTheDocument();
-
-      // Should have 1 regular BarChart (impact)
-      expect(screen.getByTestId("bar-chart")).toBeInTheDocument();
+  it("uses singular wording for a single ticket", () => {
+    renderSection({
+      escalationRate: { granularity: "DAY", data: [{ date: "2024-01-01", tickets: 1, escalatedTickets: 1, rate: 1 }] },
+      resolutionEscalatedVsNot: [{ escalated: true, tickets: 1, p50: 60, p90: 60 }],
     });
 
-    it("should handle large datasets", () => {
-      const largeTags = Array.from({ length: 20 }, (_, i) => ({
-        tag: `tag-${i}`,
-        avgDuration: Math.random() * 24 * 3600, // Random duration in seconds (up to 24 hours)
-      }));
-
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={largeTags}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      // Should show 20 data items
-      const firstChart = screen.getAllByTestId("horizontal-bar-chart")[0];
-      expect(firstChart).toHaveTextContent("Data items: 20");
-    });
-
-    it("should display correct data counts", () => {
-      renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      // Duration chart: 3 items
-      // Count chart: 3 items
-      // Team chart: 3 items
-      const horizontalCharts = screen.getAllByTestId("horizontal-bar-chart");
-      expect(horizontalCharts[0]).toHaveTextContent("Data items: 3");
-      expect(horizontalCharts[1]).toHaveTextContent("Data items: 3");
-      expect(horizontalCharts[2]).toHaveTextContent("Data items: 3");
-    });
+    expect(screen.getByText("(1 ticket)")).toBeInTheDocument();
+    expect(screen.getByText("1 of 1 ticket opened in this range was escalated, manually or automatically")).toBeInTheDocument();
   });
 
-  describe("Layout", () => {
-    it("should render charts in responsive grid", () => {
-      const { container } = renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
+  it("renders escalations by receiving team with labels and a dash for unresolved teams", () => {
+    renderSection();
 
-      // Should have grid containers
-      const grids = container.querySelectorAll(".grid");
-      expect(grids.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Escalations by Receiving Team")).toBeInTheDocument();
+
+    const teamARow = screen.getByText("Team A").closest("tr") as HTMLElement;
+    expect(within(teamARow).getByText("1.5h")).toBeInTheDocument();
+    expect(within(teamARow).getByText("2.5h")).toBeInTheDocument();
+
+    const teamBRow = screen.getByText("team-b").closest("tr") as HTMLElement;
+    expect(within(teamBRow).getAllByText("—")).toHaveLength(2);
+  });
+
+  it("ranks topics in the order the API returns them, labelled from the registry", () => {
+    renderSection();
+
+    const firstRow = screen.getByText("Networking").closest("tr") as HTMLElement;
+    expect(within(firstRow).getByText("1")).toBeInTheDocument();
+    expect(within(firstRow).getByText("10.0h")).toBeInTheDocument();
+    expect(within(firstRow).getByText("2.0h")).toBeInTheDocument();
+    // A code missing from the registry is shown as is.
+    const secondRow = screen.getByText("tag-access").closest("tr") as HTMLElement;
+    expect(within(secondRow).getByText("2")).toBeInTheDocument();
+    expect(within(secondRow).getByText("—")).toBeInTheDocument();
+    expect(screen.getByText(/average time from a ticket opening to each manual escalation with the tag/)).toBeInTheDocument();
+  });
+
+  it("handles missing data without crashing", () => {
+    renderSection({
+      escalationRate: undefined,
+      resolutionEscalatedVsNot: undefined,
+      escalationTeamScorecard: undefined,
+      escalationTopics: undefined,
+      timeBeforeEscalation: undefined,
+      escalationRateByTeam: undefined,
     });
 
-    it("should have proper spacing between sections", () => {
-      const { container } = renderSection(
-        <EscalationSLASection
-          avgEscalationDurationByTag={mockAvgEscalationDurationByTag}
-          escalationPercentageByTag={mockEscalationPercentageByTag}
-          escalationTrendsByDate={mockEscalationTrendsByDate}
-          escalationsByTeam={mockEscalationsByTeam}
-          escalationsByImpact={mockEscalationsByImpact}
-          isRefreshing={false}
-          onRefresh={mockOnRefresh}
-        />
-      );
+    expect(screen.getByText("No escalations in this range")).toBeInTheDocument();
+    expect(screen.getByText("No closed tickets in this range")).toBeInTheDocument();
+    expect(screen.getByText("No resolved, tagged escalations in this range")).toBeInTheDocument();
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("No escalated tickets in this range")).toBeInTheDocument();
+    expect(screen.getByText("0 of 0 tickets opened in this range were escalated, manually or automatically")).toBeInTheDocument();
+  });
 
-      // Check for gap classes
-      const grids = container.querySelectorAll(".grid");
-      grids.forEach((grid) => {
-        expect(grid.className).toContain("gap-6");
-      });
-    });
+  it("shows time before escalating and the rate by requesting team", () => {
+    renderSection();
+
+    expect(screen.getByText("Time Before Escalating")).toBeInTheDocument();
+    expect(screen.getByText("From a ticket opening to its first manual escalation")).toBeInTheDocument();
+    expect(screen.getByText("30m")).toBeInTheDocument();
+    expect(screen.getByText("54m")).toBeInTheDocument();
+    const tenantRow = screen.getByText("Tenant Team A").closest("tr") as HTMLElement;
+    expect(within(tenantRow).getByText("25.0%")).toBeInTheDocument();
+  });
+
+  it("treats a non-object rate payload as empty", () => {
+    renderSection({ escalationRate: [] as unknown as EscalationRate });
+
+    expect(screen.getByText("Rates:")).toBeInTheDocument();
   });
 });

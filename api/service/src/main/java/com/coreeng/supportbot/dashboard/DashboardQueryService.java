@@ -44,24 +44,28 @@ public class DashboardQueryService {
         return dashboardRepository.getIncomingVsResolvedRate(query);
     }
 
-    public List<TagDuration> getAvgEscalationDurationByTag(LocalDate dateFrom, LocalDate dateTo) {
-        return dashboardRepository.getAvgEscalationDurationByTag(dateFrom, dateTo);
+    public EscalationRate getEscalationRate(LocalDate dateFrom, LocalDate dateTo) {
+        return dashboardRepository.getEscalationRate(dateFrom, dateTo);
     }
 
-    public List<TagCount> getEscalationPercentageByTag(LocalDate dateFrom, LocalDate dateTo) {
-        return dashboardRepository.getEscalationPercentageByTag(dateFrom, dateTo);
+    public List<ResolutionByEscalation> getResolutionEscalatedVsNot(LocalDate dateFrom, LocalDate dateTo) {
+        return dashboardRepository.getResolutionEscalatedVsNot(dateFrom, dateTo);
     }
 
-    public List<DateEscalations> getEscalationTrendsByDate(LocalDate dateFrom, LocalDate dateTo) {
-        return dashboardRepository.getEscalationTrendsByDate(dateFrom, dateTo);
+    public List<TeamScorecard> getEscalationTeamScorecard(LocalDate dateFrom, LocalDate dateTo) {
+        return dashboardRepository.getEscalationTeamScorecard(dateFrom, dateTo);
     }
 
-    public List<TeamEscalations> getEscalationsByTeam(LocalDate dateFrom, LocalDate dateTo) {
-        return dashboardRepository.getEscalationsByTeam(dateFrom, dateTo);
+    public List<EscalationTopic> getEscalationTopics(LocalDate dateFrom, LocalDate dateTo) {
+        return dashboardRepository.getEscalationTopics(dateFrom, dateTo);
     }
 
-    public List<ImpactEscalations> getEscalationsByImpact(LocalDate dateFrom, LocalDate dateTo) {
-        return dashboardRepository.getEscalationsByImpact(dateFrom, dateTo);
+    public TimeBeforeEscalation getTimeBeforeEscalation(LocalDate dateFrom, LocalDate dateTo) {
+        return dashboardRepository.getTimeBeforeEscalation(dateFrom, dateTo);
+    }
+
+    public List<TeamEscalationRate> getEscalationRateByTeam(LocalDate dateFrom, LocalDate dateTo) {
+        return dashboardRepository.getEscalationRateByTeam(dateFrom, dateTo);
     }
 
     public List<WeeklyTicketCounts> getWeeklyTicketCounts() {

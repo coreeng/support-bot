@@ -17,7 +17,13 @@ The main dashboard. Useful for weekly reviews and spotting trends:
 - **First response SLA** — distribution and percentile charts showing how quickly tickets received a first reply
 - **Resolution SLA** — how long tickets took to close, broken down by week and by tag
 - **Weekly ticket counts** — volume over time, good for spotting demand spikes
-- **Escalation breakdowns** — escalations by team, tag, and impact; trends over time; percentage escalated by tag
+- **Escalation analysis**:
+  - **Escalation rate**: the share of tickets opened in the window that were escalated. It is shown overall and over time, so it isn't skewed by ticket volume.
+  - **Resolution, escalated vs not escalated**: p50/p90 time to resolve closed tickets, with escalated and not-escalated bars side by side. Tickets are measured to their last interaction, not to when the ticket was closed.
+  - **Time before escalating**: p50/p90 of how long tickets opened in the window waited before their first manual escalation.
+  - **Escalation rate by requesting team**: which teams' tickets get escalated most.
+  - **Escalations by receiving team**: for each team escalated to, the number of escalations, how many are still open, and p50/p90 resolution time.
+  - **Most-escalated topics**: escalation tags ranked by total time spent in escalation (count × average), with how long tickets waited before being manually escalated. Use this list to prioritise runbook and training work.
 - **Top escalated tags this week** — quick view of which areas are generating the most escalation pressure
 
 ### SLA page
@@ -59,10 +65,11 @@ A group's totals are at most the whole window's: tickets with no team, or not ra
 ### Weekly metrics review
 
 Open the Stats page and check:
+
 1. Weekly ticket count — is volume trending up or down?
 2. First-response SLA distribution — are most tickets getting a response within the target window?
 3. Top escalated tags — are there recurring topics that could be addressed with runbooks or docs?
-4. Escalations by team — are any tenant teams disproportionately escalating?
+4. Escalation rate and escalations by receiving team: is the share of escalated tickets moving, and where are escalations waiting longest?
 
 ### Escalation trend investigation
 
