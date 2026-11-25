@@ -111,7 +111,8 @@ I have a Slack thread with the following content:
 
             for (String line : response.lines().toList()) {
                 if (line.startsWith("Primary Driver:")) {
-                    driver = line.replace("Primary Driver:", "").trim();
+                    String label = line.replace("Primary Driver:", "").trim();
+                    driver = "Feature Request".equals(label) ? "Feature or Enhancement Request" : label;
                 } else if (line.startsWith("Category:")) {
                     category = line.replace("Category:", "").trim();
                 } else if (line.startsWith("Platform Feature:")) {

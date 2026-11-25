@@ -40,18 +40,17 @@ class AnalysisPromptRepositoryPostgresTest {
     private static final String FIRST_PROMPT_ID = "a306429c1eea579c033108c4c70ff859e9fc02e91fb1dffd643d1f209b16dde5";
 
     /**
-     * SHA-256 of the V43 seed, the prompt in use. Any drift in that seed re-classifies every thread
+     * SHA-256 of the V45 seed, the prompt in use. Any drift in that seed re-classifies every thread
      * whose analysis it stamped.
      */
-    private static final String SEEDED_PROMPT_ID = "74afee4056e8b4505be52743eba2ab40e15715e19c619b569746d85429149f76";
+    private static final String SEEDED_PROMPT_ID = "72534ce796d150627b743a19bfed68737a38c77688451304130cebdf4a364d88";
 
     /** The latest classification version a migration seeds; tests reset to it. */
-    private static final int SEEDED_VERSION = 2;
+    private static final int SEEDED_VERSION = 3;
 
     /** How to recover a local database whose seeded classification prompt was deleted. */
-    private static final String RESEED_HINT = "Flyway will not re-seed an applied migration: delete version 43 from"
-            + " flyway_schema_history and run the migrations again. An older branch's copy of this test deletes"
-            + " every classification version above 1.";
+    private static final String RESEED_HINT = "Flyway will not re-seed an applied migration: delete version 45 from"
+            + " flyway_schema_history and run the migrations again with classification version 2 present.";
 
     /** The latest summary version a migration seeds (V44); tests reset to it. */
     private static final int SEEDED_SUMMARY_VERSION = 2;
@@ -75,7 +74,7 @@ class AnalysisPromptRepositoryPostgresTest {
 
     /**
      * What the migrations leave in use, checked once before any reset can mask it: classification
-     * version 2 (V43) and summary version 2 (V44). Every reset below re-flags those versions itself,
+     * version 3 (V45) and summary version 2 (V44). Every reset below re-flags those versions itself,
      * so without this a migration that inserted its row but never switched to it would go unnoticed.
      */
     @BeforeAll
@@ -83,8 +82,8 @@ class AnalysisPromptRepositoryPostgresTest {
         List<String> inUse = jdbcTemplate.queryForList(
                 "SELECT type || ' v' || version FROM analysis_prompt WHERE is_in_use ORDER BY type", String.class);
         String why = seededVersionExists()
-                ? "Classification version " + SEEDED_VERSION + " exists but is not the one in use: V43 did not"
-                        + " switch to it, or the flags were changed since. Fix V43, or on a local database set"
+                ? "Classification version " + SEEDED_VERSION + " exists but is not the one in use: V45 did not"
+                        + " switch to it, or the flags were changed since. Fix V45, or on a local database set"
                         + " is_in_use on classification version " + SEEDED_VERSION + " only."
                 : "Classification version " + SEEDED_VERSION + " is missing. " + RESEED_HINT;
 
@@ -159,14 +158,16 @@ class AnalysisPromptRepositoryPostgresTest {
     }
 
     @Test
-    void theSeededPromptOffersTheProductBugDriver() {
+    void theSeededPromptListsTheCanonicalDrivers() {
         AnalysisPrompt prompt = repository.findInUse(AnalysisPromptType.CLASSIFICATION);
 
         assertThat(prompt).isNotNull();
         assertThat(prompt.content())
                 .contains("D. Product Bug")
+                .contains("E. Feature or Enhancement Request")
+                .doesNotContain("Feature Request")
                 .contains("Primary Driver: <one of: Knowledge Gap, Product Usability Problem, Product Temporary Issue,"
-                        + " Product Bug, Feature Request, Task Request>");
+                        + " Product Bug, Feature or Enhancement Request, Task Request>");
     }
 
     @Test
