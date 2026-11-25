@@ -1,6 +1,6 @@
 // src/components/dashboards/ResolutionComparison.tsx
 import type { ResolutionByEscalation } from "@/lib/types/dashboard";
-import { formatDuration } from "@/lib/utils";
+import { formatOptionalDuration, formatTicketCount } from "@/lib/utils";
 
 interface ResolutionComparisonProps {
   data: ResolutionByEscalation[] | undefined;
@@ -17,21 +17,16 @@ const MEASURES = [
   { key: "p90", title: "90th percentile resolution time", tag: "P90" },
 ] as const;
 
-function ticketCount(count: number): string {
-  return `${count} ${count === 1 ? "ticket" : "tickets"}`;
-}
-
-function formatValue(seconds: number | undefined): string {
-  return seconds == null ? "—" : formatDuration(seconds);
-}
-
 export function ResolutionComparison({ data }: ResolutionComparisonProps) {
   const rows = GROUPS.map((group) => ({ ...group, stats: data?.find((r) => r.escalated === group.escalated) }));
   const hasData = rows.some((row) => row.stats);
 
   return (
     <div className="bg-card rounded-xl border p-6">
-      <h2 className="text-foreground mb-4 text-base font-semibold">Resolution: Escalated vs Not Escalated</h2>
+      <h2 className="text-foreground text-base font-semibold">Resolution: Escalated vs Not Escalated</h2>
+      <p className="text-muted-foreground mb-4 text-sm">
+        Closed tickets opened in this range, split by whether they were ever escalated, manually or automatically.
+      </p>
 
       {hasData ? (
         <>
@@ -40,7 +35,7 @@ export function ResolutionComparison({ data }: ResolutionComparisonProps) {
               <span key={row.label} className="text-foreground flex items-center gap-2 text-sm">
                 <span className={`h-2.5 w-2.5 rounded-sm ${row.color}`} aria-hidden />
                 {row.label}
-                <span className="text-muted-foreground">({ticketCount(row.stats?.tickets ?? 0)})</span>
+                <span className="text-muted-foreground">({formatTicketCount(row.stats?.tickets ?? 0)})</span>
               </span>
             ))}
           </div>
@@ -62,13 +57,15 @@ export function ResolutionComparison({ data }: ResolutionComparisonProps) {
                         <div
                           key={row.label}
                           className="grid grid-cols-[7rem_1fr_4rem] items-center gap-3"
-                          title={`${row.label}, ${measure.tag}: ${formatValue(seconds)}`}
+                          title={`${row.label}, ${measure.tag}: ${formatOptionalDuration(seconds)}`}
                         >
                           <span className="text-muted-foreground text-sm">{row.label}</span>
                           <div className="bg-muted h-3 overflow-hidden rounded-full">
                             <div className={`h-full rounded-full ${row.color}`} style={{ width }} />
                           </div>
-                          <span className="text-foreground text-right font-mono text-sm tabular-nums">{formatValue(seconds)}</span>
+                          <span className="text-foreground text-right font-mono text-sm tabular-nums">
+                            {formatOptionalDuration(seconds)}
+                          </span>
                         </div>
                       );
                     })}

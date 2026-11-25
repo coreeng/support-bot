@@ -3,17 +3,13 @@ package com.coreeng.supportbot.ticket.rest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.coreeng.supportbot.rating.RatingService;
 import com.coreeng.supportbot.rating.RatingTicketNotFoundException;
 import com.coreeng.supportbot.slack.MessageTs;
-import com.coreeng.supportbot.slack.client.SlackClient;
-import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
@@ -57,9 +53,6 @@ class TicketControllerTest {
     @Mock
     private RatingService ratingService;
 
-    @Mock
-    private SlackClient slackClient;
-
     private TicketController controller;
     private MockMvc mockMvc;
 
@@ -74,8 +67,7 @@ class TicketControllerTest {
                 ticketEscalationValidator,
                 ratingService,
                 mapper,
-                teamSuggestionsService,
-                slackClient);
+                teamSuggestionsService);
         DefaultFormattingConversionService conversionService = new DefaultFormattingConversionService();
         conversionService.addFormatter(new TicketIdFormatter());
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -86,36 +78,6 @@ class TicketControllerTest {
         lenient()
                 .when(ticketEscalationValidator.validate(any(), any()))
                 .thenReturn(TicketEscalationValidator.ValidationResult.valid());
-    }
-
-    @Test
-    void permalinkResolvesQueryMessageLink() throws Exception {
-        MessageTs queryTs = MessageTs.of("1700000000.000100");
-        when(queryService.findById(ticketId)).thenReturn(Ticket.createNew(queryTs, "C123"));
-        when(slackClient.getPermalink(new SlackGetMessageByTsRequest("C123", queryTs)))
-                .thenReturn("https://example.com/archives/C123/p1700000000000100");
-
-        mockMvc.perform(get("/ticket/{id}/permalink", ticketId.id()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permalink").value("https://example.com/archives/C123/p1700000000000100"));
-    }
-
-    @Test
-    void permalinkReturnsNotFoundForUnknownTicket() throws Exception {
-        when(queryService.findById(ticketId)).thenReturn(null);
-
-        mockMvc.perform(get("/ticket/{id}/permalink", ticketId.id())).andExpect(status().isNotFound());
-
-        verifyNoInteractions(slackClient);
-    }
-
-    @Test
-    void permalinkReturnsServerErrorWhenSlackFails() throws Exception {
-        MessageTs queryTs = MessageTs.of("1700000000.000100");
-        when(queryService.findById(ticketId)).thenReturn(Ticket.createNew(queryTs, "C123"));
-        when(slackClient.getPermalink(any())).thenThrow(new RuntimeException("slack down"));
-
-        mockMvc.perform(get("/ticket/{id}/permalink", ticketId.id())).andExpect(status().isInternalServerError());
     }
 
     @Test

@@ -18,6 +18,12 @@ describe("ResolutionComparison", () => {
     expect(screen.getByText("(6 tickets)")).toBeInTheDocument();
   });
 
+  it("says that automatic escalations count as escalated", () => {
+    render(<ResolutionComparison data={data} />);
+
+    expect(screen.getByText(/whether they were ever escalated, manually or automatically/)).toBeInTheDocument();
+  });
+
   it("shows each percentile with a labelled bar per group", () => {
     render(<ResolutionComparison data={data} />);
 

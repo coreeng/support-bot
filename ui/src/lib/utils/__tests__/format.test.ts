@@ -1,6 +1,14 @@
 // src/lib/utils/__tests__/format.test.ts
 import { formatHoursToDHMS } from "../chart";
-import { calculatePercentageChange, formatDate, formatInterval, formatUtcDateTime } from "../format";
+import {
+  calculatePercentageChange,
+  formatDate,
+  formatInterval,
+  formatOptionalDuration,
+  formatPercent,
+  formatTicketCount,
+  formatUtcDateTime,
+} from "../format";
 
 describe("formatInterval", () => {
   it("should format simple time intervals", () => {
@@ -111,5 +119,30 @@ describe("formatUtcDateTime", () => {
 
   it("returns the input unchanged when it is not a parseable instant", () => {
     expect(formatUtcDateTime("not-a-date")).toBe("not-a-date");
+  });
+});
+
+describe("formatOptionalDuration", () => {
+  it("formats a duration and shows a dash when it is missing", () => {
+    expect(formatOptionalDuration(5400)).toBe("1.5h");
+    expect(formatOptionalDuration(0)).toBe("0s");
+    expect(formatOptionalDuration(null)).toBe("—");
+    expect(formatOptionalDuration(undefined)).toBe("—");
+  });
+});
+
+describe("formatPercent", () => {
+  it("formats a fraction with one decimal place", () => {
+    expect(formatPercent(0.256)).toBe("25.6%");
+    expect(formatPercent(0)).toBe("0.0%");
+    expect(formatPercent(1)).toBe("100.0%");
+  });
+});
+
+describe("formatTicketCount", () => {
+  it("pluralises tickets", () => {
+    expect(formatTicketCount(1)).toBe("1 ticket");
+    expect(formatTicketCount(0)).toBe("0 tickets");
+    expect(formatTicketCount(3)).toBe("3 tickets");
   });
 });

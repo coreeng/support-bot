@@ -79,6 +79,7 @@ export interface EscalationTeamScorecardRow {
 
 /** Escalation tag ranked by total seconds spent in escalation (resolved escalations only). */
 export interface EscalationTopic {
+  /** Tag code; the label comes from the registry. */
   tag: string;
   escalations: number;
   avgSeconds: number;

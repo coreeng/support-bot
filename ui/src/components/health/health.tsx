@@ -25,6 +25,7 @@ import {
   TicketLog,
   TicketWithLogs,
 } from "@/lib/types";
+import { slackDeepLink } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ChevronDown, ClipboardList, Headphones, Package, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -1556,6 +1557,7 @@ export default function HealthPage() {
                 <Table>
                   <TableHeader className="bg-muted z-10">
                     <TableRow>
+                      <TableHead>ID</TableHead>
                       <TableHead>Team</TableHead>
                       <TableHead>Impact</TableHead>
                       {isAssignmentEnabled && <TableHead>Support Engineer</TableHead>}
@@ -1563,7 +1565,6 @@ export default function HealthPage() {
                       <TableHead>Status</TableHead>
                       <TableHead>Opened At</TableHead>
                       <TableHead>Rated</TableHead>
-                      <TableHead>Thread</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1582,6 +1583,21 @@ export default function HealthPage() {
                         const { opened } = getOpenedClosed(t);
                         return (
                           <TableRow key={t.id}>
+                            <TableCell className="font-mono tabular-nums">
+                              {t.channelId && t.query?.ts ? (
+                                <a
+                                  href={slackDeepLink(t.channelId, t.query.ts)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-link hover:underline"
+                                  aria-label={`Open ticket ${t.id} in Slack`}
+                                >
+                                  #{t.id}
+                                </a>
+                              ) : (
+                                <>#{t.id}</>
+                              )}
+                            </TableCell>
                             <TableCell>{t.team?.label || t.team?.name || "-"}</TableCell>
                             <TableCell>
                               {registryData?.impacts.find((i: TicketImpact) => i.code === t.impact)?.label || t.impact || "-"}
@@ -1619,17 +1635,6 @@ export default function HealthPage() {
                               ) : (
                                 <span className="text-muted-foreground">No</span>
                               )}
-                            </TableCell>
-                            <TableCell>
-                              <a
-                                href={`/api/tickets/${encodeURIComponent(t.id)}/permalink`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-link hover:underline"
-                                aria-label={`Open ticket ${t.id} in Slack`}
-                              >
-                                View
-                              </a>
                             </TableCell>
                           </TableRow>
                         );

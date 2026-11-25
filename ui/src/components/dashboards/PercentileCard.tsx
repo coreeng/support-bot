@@ -7,10 +7,12 @@ interface PercentileCardProps {
   p90: string;
   p75?: string;
   icon?: React.ReactNode;
+  /** Optional line under the percentiles saying what is measured. */
+  description?: string;
   colorScheme?: "blue" | "green" | "purple";
 }
 
-export function PercentileCard({ title, p50, p90, p75, icon }: PercentileCardProps) {
+export function PercentileCard({ title, p50, p90, p75, icon, description }: PercentileCardProps) {
   return (
     <div className="bg-card rounded-xl border p-6">
       <div className="mb-6 flex items-center gap-2">
@@ -34,6 +36,7 @@ export function PercentileCard({ title, p50, p90, p75, icon }: PercentileCardPro
           <p className="text-foreground mt-2 font-mono text-2xl font-semibold tracking-tight tabular-nums">{p90}</p>
         </div>
       </div>
+      {description && <p className="text-muted-foreground mt-4 text-sm">{description}</p>}
     </div>
   );
 }

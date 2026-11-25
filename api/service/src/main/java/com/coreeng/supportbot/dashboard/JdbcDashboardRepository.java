@@ -331,15 +331,14 @@ public class JdbcDashboardRepository implements DashboardRepository {
         return earliestActivity;
     }
 
-    static IncomingVsResolvedGranularity resolveEmptyResultGranularity(
-            IncomingVsResolvedQuery.@Nullable Granularity granularity) {
+    static Granularity resolveEmptyResultGranularity(IncomingVsResolvedQuery.@Nullable Granularity granularity) {
         if (granularity == IncomingVsResolvedQuery.Granularity.HOUR) {
-            return IncomingVsResolvedGranularity.HOUR;
+            return Granularity.HOUR;
         }
         if (granularity == IncomingVsResolvedQuery.Granularity.WEEK) {
-            return IncomingVsResolvedGranularity.WEEK;
+            return Granularity.WEEK;
         }
-        return IncomingVsResolvedGranularity.DAY;
+        return Granularity.DAY;
     }
 
     private List<String> normalizeTeams(@Nullable List<String> teams) {
@@ -467,7 +466,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
         }
     }
 
-    record IncomingVsResolvedBucketing(IncomingVsResolvedGranularity granularity, String truncUnit, String interval) {
+    record IncomingVsResolvedBucketing(Granularity granularity, String truncUnit, String interval) {
 
         private static final int LEGACY_DAILY_BUCKET_THRESHOLD_DAYS = 60;
         private static final int MAX_HOURLY_RANGE_DAYS = 4;
@@ -491,15 +490,15 @@ public class JdbcDashboardRepository implements DashboardRepository {
         }
 
         private static IncomingVsResolvedBucketing hourly() {
-            return new IncomingVsResolvedBucketing(IncomingVsResolvedGranularity.HOUR, "hour", "'1 hour'::interval");
+            return new IncomingVsResolvedBucketing(Granularity.HOUR, "hour", "'1 hour'::interval");
         }
 
         private static IncomingVsResolvedBucketing daily() {
-            return new IncomingVsResolvedBucketing(IncomingVsResolvedGranularity.DAY, "day", "'1 day'::interval");
+            return new IncomingVsResolvedBucketing(Granularity.DAY, "day", "'1 day'::interval");
         }
 
         private static IncomingVsResolvedBucketing weekly() {
-            return new IncomingVsResolvedBucketing(IncomingVsResolvedGranularity.WEEK, "week", "'1 week'::interval");
+            return new IncomingVsResolvedBucketing(Granularity.WEEK, "week", "'1 week'::interval");
         }
 
         private static IncomingVsResolvedQuery.Granularity resolveGranularity(
@@ -553,58 +552,63 @@ public class JdbcDashboardRepository implements DashboardRepository {
                     ORDER BY o.date DESC, o.id DESC LIMIT 1)
                 ORDER BY tl.id LIMIT 1)))""";
 
-    /** Windows up to this many days are bucketed by day; longer (or unbounded) windows by week. */
-    private static final long MAX_DAILY_ESCALATION_RATE_RANGE_DAYS = 31;
-
     @Override
     public EscalationRate getEscalationRate(LocalDate dateFrom, LocalDate dateTo) {
-        EscalationRateGranularity granularity = resolveEscalationRateGranularity(dateFrom, dateTo);
-        String truncUnit = granularity == EscalationRateGranularity.DAY ? "day" : "week";
+        Granularity granularity = Granularity.dayOrWeekForRange(dateFrom, dateTo);
+        String unit = granularity.unit();
+        boolean bounded = dateFrom != null && dateTo != null;
         String dateFilter = buildDateFilter(dateFrom, dateTo, "td.first_open_ts");
+        // A bounded window fills every bucket in it; an unbounded one spans the buckets that have tickets.
+        String seriesStart = bounded ? sqlBucketOf(unit, dateFrom) : "(SELECT MIN(bucket) FROM counts)";
+        String seriesEnd = bounded ? sqlBucketOf(unit, dateTo) : "(SELECT MAX(bucket) FROM counts)";
 
-        // Of the tickets opened in a bucket, how many were ever escalated.
+        // Of the tickets opened in a bucket, how many were ever escalated; buckets with no tickets are 0.
         String sql = """
             WITH cohort AS (
                 SELECT
-                    date_trunc('%s', td.first_open_ts::timestamptz) AS bucket,
+                    date_trunc('%1$s', td.first_open_ts::timestamptz) AS bucket,
                     EXISTS (SELECT 1 FROM escalation e WHERE e.ticket_id = td.ticket_id) AS escalated
                 FROM aggregated_ticket_data td
                 WHERE td.ticket_id IS NOT NULL
                   AND td.first_open_ts IS NOT NULL
-                  %s
+                  %2$s
+            ),
+            counts AS (
+                SELECT
+                    bucket,
+                    COUNT(*) AS tickets,
+                    COUNT(*) FILTER (WHERE escalated) AS escalated_tickets
+                FROM cohort
+                GROUP BY bucket
+            ),
+            series AS (
+                SELECT generate_series(%3$s, %4$s, '1 %1$s'::interval) AS bucket
             )
             SELECT
-                bucket,
-                COUNT(*) AS tickets,
-                COUNT(*) FILTER (WHERE escalated) AS escalated_tickets
-            FROM cohort
-            GROUP BY bucket
-            ORDER BY bucket
-            """.formatted(truncUnit, dateFilter);
+                s.bucket,
+                COALESCE(c.tickets, 0) AS tickets,
+                COALESCE(c.escalated_tickets, 0) AS escalated_tickets
+            FROM series s
+            LEFT JOIN counts c ON c.bucket = s.bucket
+            ORDER BY s.bucket
+            """.formatted(unit, dateFilter, seriesStart, seriesEnd);
 
         List<EscalationRatePoint> points = dsl.resultQuery(sql).fetch(r -> {
             long tickets = nullToZero(r.get("tickets", Long.class));
             long escalated = nullToZero(r.get("escalated_tickets", Long.class));
+            LocalDate bucket =
+                    r.get("bucket", Timestamp.class).toLocalDateTime().toLocalDate();
+            // A week starting before the window is labelled from the window's first day.
+            LocalDate label = bounded && bucket.isBefore(dateFrom) ? dateFrom : bucket;
             return new EscalationRatePoint(
-                    r.get("bucket", Timestamp.class)
-                            .toLocalDateTime()
-                            .toLocalDate()
-                            .format(ISO_DATE),
-                    tickets,
-                    escalated,
-                    tickets == 0 ? 0.0 : (double) escalated / tickets);
+                    label.format(ISO_DATE), tickets, escalated, tickets == 0 ? 0.0 : (double) escalated / tickets);
         });
         return new EscalationRate(granularity, points);
     }
 
-    static EscalationRateGranularity resolveEscalationRateGranularity(
-            @Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
-        if (dateFrom == null || dateTo == null) {
-            return EscalationRateGranularity.WEEK;
-        }
-        return dateTo.isAfter(dateFrom.plusDays(MAX_DAILY_ESCALATION_RATE_RANGE_DAYS))
-                ? EscalationRateGranularity.WEEK
-                : EscalationRateGranularity.DAY;
+    /** The start of the bucket holding {@code date}, truncated the same way as the ticket timestamps. */
+    private static String sqlBucketOf(String unit, LocalDate date) {
+        return "date_trunc('" + unit + "', '" + date.format(ISO_DATE) + "'::date::timestamptz)";
     }
 
     @Override
@@ -691,13 +695,11 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public List<EscalationTopic> getEscalationTopics(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "ed.open_ts");
 
-        // Ranked by total time of resolved escalations; the wait counts every manual escalation.
-        // Tags sharing a label form one topic, counting each escalation once.
+        // Every column covers resolved escalations; the wait, only the manual ones among them.
         String sql = """
             WITH per_escalation AS (
                 SELECT
-                    ed.escalation_id,
-                    ed.tags,
+                    ed.tag_ids,
                     CASE WHEN ed.resolved_ts IS NOT NULL
                         THEN EXTRACT(EPOCH FROM business_time_between(ed.open_ts, %1$s, 'Europe/London'))
                     END AS duration,
@@ -709,19 +711,19 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 JOIN escalation e ON e.id = ed.escalation_id
                 LEFT JOIN aggregated_ticket_data td ON td.ticket_id = ed.ticket_id
                 WHERE ed.open_ts IS NOT NULL
-                  AND ed.tags IS NOT NULL
+                  AND ed.tag_ids IS NOT NULL
                   %2$s
             ),
             durations AS (
-                SELECT DISTINCT pe.escalation_id, tag, pe.duration, pe.wait
-                FROM per_escalation pe, unnest(pe.tags) AS tag
+                SELECT tag, pe.duration, pe.wait
+                FROM per_escalation pe, unnest(pe.tag_ids) AS tag
             )
             SELECT
                 tag,
                 COUNT(duration) AS escalations,
                 AVG(duration) AS avg_seconds,
                 SUM(duration) AS total_seconds,
-                AVG(wait) AS avg_wait_seconds
+                AVG(wait) FILTER (WHERE duration IS NOT NULL) AS avg_wait_seconds
             FROM durations
             GROUP BY tag
             HAVING COUNT(duration) > 0

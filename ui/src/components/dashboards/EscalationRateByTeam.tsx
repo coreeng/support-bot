@@ -2,6 +2,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useTenantTeams } from "@/lib/hooks";
 import type { TeamEscalationRate } from "@/lib/types/dashboard";
+import { formatPercent } from "@/lib/utils";
 
 interface EscalationRateByTeamProps {
   data: TeamEscalationRate[] | undefined;
@@ -15,7 +16,9 @@ export function EscalationRateByTeam({ data }: EscalationRateByTeamProps) {
   return (
     <div className="bg-card rounded-xl border p-6">
       <h2 className="text-foreground text-base font-semibold">Escalation Rate by Requesting Team</h2>
-      <p className="text-muted-foreground mb-4 text-sm">Teams whose tickets were escalated most in this range.</p>
+      <p className="text-muted-foreground mb-4 text-sm">
+        Teams whose tickets were escalated most in this range, manually or automatically.
+      </p>
 
       <div className="overflow-hidden rounded-lg border">
         <Table>
@@ -30,7 +33,7 @@ export function EscalationRateByTeam({ data }: EscalationRateByTeamProps) {
           <TableBody>
             {rows.length > 0 ? (
               rows.map((row) => {
-                const percent = `${(row.rate * 100).toFixed(1)}%`;
+                const percent = formatPercent(row.rate);
                 return (
                   <TableRow key={row.team}>
                     <TableCell className="text-foreground">{teamLabel(row.team)}</TableCell>

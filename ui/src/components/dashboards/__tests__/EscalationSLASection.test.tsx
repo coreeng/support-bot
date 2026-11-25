@@ -6,13 +6,14 @@ import { EscalationSLASection } from "../EscalationSLASection";
 jest.mock("../../../lib/hooks", () => ({
   useEscalationTeams: () => ({ data: [{ name: "team-a", label: "Team A", types: ["escalation"] }] }),
   useTenantTeams: () => ({ data: [{ name: "tenant-a", label: "Tenant Team A" }] }),
+  useRegistry: () => ({ data: { impacts: [], tags: [{ code: "tag-net", label: "Networking" }] } }),
 }));
 
 jest.mock("../TimeSeriesChart", () => ({
-  TimeSeriesChart: ({ title, data }: { title: string; data: { rate: number }[] }) => (
+  TimeSeriesChart: ({ title, data }: { title: string; data: { rate: number | null }[] }) => (
     <div data-testid="time-series-chart">
       <h3>{title}</h3>
-      <div>Rates: {data.map((d) => d.rate).join(",")}</div>
+      <div>Rates: {data.map((d) => d.rate ?? "gap").join(",")}</div>
     </div>
   ),
 }));
@@ -31,6 +32,7 @@ describe("EscalationSLASection", () => {
     data: [
       { date: "2024-01-01", tickets: 4, escalatedTickets: 1, rate: 0.25 },
       { date: "2024-01-02", tickets: 6, escalatedTickets: 3, rate: 0.5 },
+      { date: "2024-01-03", tickets: 0, escalatedTickets: 0, rate: 0 },
     ],
   };
 
@@ -45,8 +47,8 @@ describe("EscalationSLASection", () => {
   ];
 
   const topics: EscalationTopic[] = [
-    { tag: "networking", escalations: 2, avgSeconds: 18000, totalSeconds: 36000, avgWaitSeconds: 7200 },
-    { tag: "access", escalations: 3, avgSeconds: 3600, totalSeconds: 10800, avgWaitSeconds: null },
+    { tag: "tag-net", escalations: 2, avgSeconds: 18000, totalSeconds: 36000, avgWaitSeconds: 7200 },
+    { tag: "tag-access", escalations: 3, avgSeconds: 3600, totalSeconds: 10800, avgWaitSeconds: null },
   ];
 
   const renderSection = (overrides: Partial<React.ComponentProps<typeof EscalationSLASection>> = {}) =>
@@ -77,14 +79,14 @@ describe("EscalationSLASection", () => {
     renderSection();
 
     expect(screen.getByText("40.0%")).toBeInTheDocument();
-    expect(screen.getByText("4 of 10 tickets opened in this range were escalated")).toBeInTheDocument();
+    expect(screen.getByText("4 of 10 tickets opened in this range were escalated, manually or automatically")).toBeInTheDocument();
   });
 
   it("plots the rate as a percentage per bucket", () => {
     renderSection();
 
     expect(screen.getByText("Escalation Rate Over Time (daily)")).toBeInTheDocument();
-    expect(screen.getByText("Rates: 25,50")).toBeInTheDocument();
+    expect(screen.getByText("Rates: 25,50,gap")).toBeInTheDocument();
   });
 
   it("leads with the escalated vs not-escalated resolution comparison", () => {
@@ -101,7 +103,7 @@ describe("EscalationSLASection", () => {
     });
 
     expect(screen.getByText("(1 ticket)")).toBeInTheDocument();
-    expect(screen.getByText("1 of 1 ticket opened in this range was escalated")).toBeInTheDocument();
+    expect(screen.getByText("1 of 1 ticket opened in this range was escalated, manually or automatically")).toBeInTheDocument();
   });
 
   it("renders escalations by receiving team with labels and a dash for unresolved teams", () => {
@@ -117,16 +119,18 @@ describe("EscalationSLASection", () => {
     expect(within(teamBRow).getAllByText("—")).toHaveLength(2);
   });
 
-  it("ranks topics in the order the API returns them", () => {
+  it("ranks topics in the order the API returns them, labelled from the registry", () => {
     renderSection();
 
-    const firstRow = screen.getByText("networking").closest("tr") as HTMLElement;
+    const firstRow = screen.getByText("Networking").closest("tr") as HTMLElement;
     expect(within(firstRow).getByText("1")).toBeInTheDocument();
     expect(within(firstRow).getByText("10.0h")).toBeInTheDocument();
     expect(within(firstRow).getByText("2.0h")).toBeInTheDocument();
-    const secondRow = screen.getByText("access").closest("tr") as HTMLElement;
+    // A code missing from the registry is shown as is.
+    const secondRow = screen.getByText("tag-access").closest("tr") as HTMLElement;
     expect(within(secondRow).getByText("2")).toBeInTheDocument();
     expect(within(secondRow).getByText("—")).toBeInTheDocument();
+    expect(screen.getByText(/average time from a ticket opening to each manual escalation with the tag/)).toBeInTheDocument();
   });
 
   it("handles missing data without crashing", () => {
@@ -144,13 +148,14 @@ describe("EscalationSLASection", () => {
     expect(screen.getByText("No resolved, tagged escalations in this range")).toBeInTheDocument();
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("No escalated tickets in this range")).toBeInTheDocument();
-    expect(screen.getByText("0 of 0 tickets opened in this range were escalated")).toBeInTheDocument();
+    expect(screen.getByText("0 of 0 tickets opened in this range were escalated, manually or automatically")).toBeInTheDocument();
   });
 
   it("shows time before escalating and the rate by requesting team", () => {
     renderSection();
 
     expect(screen.getByText("Time Before Escalating")).toBeInTheDocument();
+    expect(screen.getByText("From a ticket opening to its first manual escalation")).toBeInTheDocument();
     expect(screen.getByText("30m")).toBeInTheDocument();
     expect(screen.getByText("54m")).toBeInTheDocument();
     const tenantRow = screen.getByText("Tenant Team A").closest("tr") as HTMLElement;

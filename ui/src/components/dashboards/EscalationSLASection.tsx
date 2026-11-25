@@ -1,6 +1,6 @@
 // src/components/dashboards/EscalationSLASection.tsx
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useEscalationTeams } from "@/lib/hooks";
+import { useEscalationTeams, useRegistry } from "@/lib/hooks";
 import type {
   EscalationRate,
   EscalationTeamScorecardRow,
@@ -9,7 +9,7 @@ import type {
   TeamEscalationRate,
   TimeBeforeEscalation,
 } from "@/lib/types/dashboard";
-import { formatDuration } from "@/lib/utils";
+import { formatDuration, formatOptionalDuration, formatPercent, formatTicketCount } from "@/lib/utils";
 import { EscalationRateByTeam } from "./EscalationRateByTeam";
 import { MetricCard } from "./MetricCard";
 import { PercentileCard } from "./PercentileCard";
@@ -28,18 +28,6 @@ interface EscalationSLASectionProps {
   onRefresh: () => void;
 }
 
-function formatPercent(fraction: number): string {
-  return `${(fraction * 100).toFixed(1)}%`;
-}
-
-function ticketCount(count: number): string {
-  return `${count} ${count === 1 ? "ticket" : "tickets"}`;
-}
-
-function formatOptionalDuration(seconds: number | null | undefined): string {
-  return seconds == null ? "—" : formatDuration(seconds);
-}
-
 export function EscalationSLASection({
   escalationRate,
   resolutionEscalatedVsNot,
@@ -51,11 +39,13 @@ export function EscalationSLASection({
   onRefresh,
 }: EscalationSLASectionProps) {
   const { data: escalationTeams } = useEscalationTeams();
+  const { data: registry } = useRegistry();
 
   const escalationCount = timeBeforeEscalation?.escalations ?? 0;
   const waitValue = (seconds: number | undefined) => (escalationCount > 0 && seconds != null ? formatDuration(seconds) : "—");
 
   const teamLabel = (code: string) => escalationTeams?.find((t) => t.name === code)?.label || code;
+  const tagLabel = (code: string) => registry?.tags.find((t) => t.code === code)?.label || code;
 
   // Tolerate a non-object payload (e.g. an empty-array mock) as "no data".
   const ratePoints = Array.isArray(escalationRate?.data) ? escalationRate.data : [];
@@ -63,7 +53,8 @@ export function EscalationSLASection({
   const totalEscalated = ratePoints.reduce((sum, p) => sum + p.escalatedTickets, 0);
   const rateChartData = ratePoints.map((p) => ({
     week: p.date,
-    rate: Math.round(p.rate * 1000) / 10,
+    // A bucket with no tickets has no rate: null leaves a gap in the line instead of a drop to 0%.
+    rate: p.tickets > 0 ? Math.round(p.rate * 1000) / 10 : null,
     tickets: p.tickets,
     escalatedTickets: p.escalatedTickets,
   }));
@@ -86,11 +77,12 @@ export function EscalationSLASection({
           <MetricCard
             title="Escalation Rate"
             value={totalTickets > 0 ? formatPercent(totalEscalated / totalTickets) : "—"}
-            description={`${totalEscalated} of ${ticketCount(totalTickets)} opened in this range ${totalEscalated === 1 ? "was" : "were"} escalated`}
+            description={`${totalEscalated} of ${formatTicketCount(totalTickets)} opened in this range ${totalEscalated === 1 ? "was" : "were"} escalated, manually or automatically`}
             colorScheme="orange"
           />
           <PercentileCard
             title="Time Before Escalating"
+            description="From a ticket opening to its first manual escalation"
             p50={waitValue(timeBeforeEscalation?.p50)}
             p90={waitValue(timeBeforeEscalation?.p90)}
           />
@@ -104,7 +96,9 @@ export function EscalationSLASection({
           lines={[{ dataKey: "rate", name: "Escalation rate", color: "var(--chart-7)" }]}
           yAxisLabel="% of tickets"
           tooltipFormatter={(value, name, item) => [
-            `${Number(value).toFixed(1)}% (${item.payload?.escalatedTickets ?? 0} of ${item.payload?.tickets ?? 0})`,
+            value == null
+              ? "No tickets"
+              : `${formatPercent(Number(value) / 100)} (${item.payload?.escalatedTickets ?? 0} of ${item.payload?.tickets ?? 0})`,
             name,
           ]}
         />
@@ -159,8 +153,8 @@ export function EscalationSLASection({
         <div className="bg-card rounded-xl border p-6">
           <h2 className="text-foreground text-base font-semibold">Most-Escalated Topics</h2>
           <p className="text-muted-foreground mb-4 text-sm">
-            Escalation tags ranked by total time spent in escalation (count × average), resolved escalations only. Avg Wait Before is how
-            long tickets sat before being manually escalated, across every manual escalation with that tag.
+            Escalation tags ranked by total time spent in escalation (count × average), resolved escalations only. Avg Wait Before is the
+            average time from a ticket opening to each manual escalation with the tag.
           </p>
           <div className="overflow-hidden rounded-lg border">
             <Table>
@@ -179,7 +173,7 @@ export function EscalationSLASection({
                   escalationTopics.map((topic, index) => (
                     <TableRow key={topic.tag}>
                       <TableCell className="text-muted-foreground font-mono text-sm tabular-nums">{index + 1}</TableCell>
-                      <TableCell className="text-foreground">{topic.tag}</TableCell>
+                      <TableCell className="text-foreground">{tagLabel(topic.tag)}</TableCell>
                       <TableCell className="text-right font-mono text-sm tabular-nums">{topic.escalations}</TableCell>
                       <TableCell className="text-right font-mono text-sm tabular-nums">
                         {formatOptionalDuration(topic.avgWaitSeconds)}

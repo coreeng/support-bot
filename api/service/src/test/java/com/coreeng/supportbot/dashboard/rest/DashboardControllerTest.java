@@ -8,11 +8,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.coreeng.supportbot.dashboard.DashboardData.EscalationRate;
-import com.coreeng.supportbot.dashboard.DashboardData.EscalationRateGranularity;
 import com.coreeng.supportbot.dashboard.DashboardData.EscalationRatePoint;
 import com.coreeng.supportbot.dashboard.DashboardData.EscalationTopic;
+import com.coreeng.supportbot.dashboard.DashboardData.Granularity;
 import com.coreeng.supportbot.dashboard.DashboardData.IncomingVsResolved;
-import com.coreeng.supportbot.dashboard.DashboardData.IncomingVsResolvedGranularity;
 import com.coreeng.supportbot.dashboard.DashboardData.IncomingVsResolvedRate;
 import com.coreeng.supportbot.dashboard.DashboardData.ResolutionByEscalation;
 import com.coreeng.supportbot.dashboard.DashboardData.TeamEscalationRate;
@@ -54,7 +53,7 @@ class DashboardControllerTest {
         IncomingVsResolvedQuery query =
                 new IncomingVsResolvedQuery(from, to, true, teams, IncomingVsResolvedQuery.Granularity.AUTO);
         when(dashboardQueryService.getIncomingVsResolvedRate(query))
-                .thenReturn(new IncomingVsResolvedRate(IncomingVsResolvedGranularity.DAY, List.of()));
+                .thenReturn(new IncomingVsResolvedRate(Granularity.DAY, List.of()));
 
         controller.getIncomingVsResolvedRate(teams, true, IncomingVsResolvedQuery.Granularity.AUTO, from, to);
 
@@ -66,7 +65,7 @@ class DashboardControllerTest {
         IncomingVsResolvedQuery query =
                 new IncomingVsResolvedQuery(null, null, false, null, IncomingVsResolvedQuery.Granularity.AUTO);
         when(dashboardQueryService.getIncomingVsResolvedRate(query))
-                .thenReturn(new IncomingVsResolvedRate(IncomingVsResolvedGranularity.DAY, List.of()));
+                .thenReturn(new IncomingVsResolvedRate(Granularity.DAY, List.of()));
 
         controller.getIncomingVsResolvedRate(null, null, IncomingVsResolvedQuery.Granularity.AUTO, null, null);
 
@@ -77,8 +76,7 @@ class DashboardControllerTest {
     void incomingVsResolvedRate_acceptsUppercaseGranularityBinding() throws Exception {
         when(dashboardQueryService.getIncomingVsResolvedRate(any()))
                 .thenReturn(new IncomingVsResolvedRate(
-                        IncomingVsResolvedGranularity.HOUR,
-                        List.of(new IncomingVsResolved("2026-01-01T00:00:00Z", 2, 1))));
+                        Granularity.HOUR, List.of(new IncomingVsResolved("2026-01-01T00:00:00Z", 2, 1))));
 
         mockMvc.perform(get("/dashboard/incoming-vs-resolved-rate")
                         .param("granularity", "AUTO")
@@ -96,7 +94,7 @@ class DashboardControllerTest {
         LocalDate to = LocalDate.of(2026, 1, 7);
         when(dashboardQueryService.getEscalationRate(from, to))
                 .thenReturn(new EscalationRate(
-                        EscalationRateGranularity.DAY, List.of(new EscalationRatePoint("2026-01-01", 4, 1, 0.25))));
+                        Granularity.DAY, List.of(new EscalationRatePoint("2026-01-01", 4, 1, 0.25))));
 
         mockMvc.perform(get("/dashboard/escalation-rate")
                         .param("dateFrom", "2026-01-01")

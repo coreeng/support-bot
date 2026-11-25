@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.within;
 
 import com.coreeng.supportbot.dashboard.DashboardData.EscalationRate;
-import com.coreeng.supportbot.dashboard.DashboardData.EscalationRateGranularity;
 import com.coreeng.supportbot.dashboard.DashboardData.EscalationRatePoint;
 import com.coreeng.supportbot.dashboard.DashboardData.EscalationTopic;
+import com.coreeng.supportbot.dashboard.DashboardData.Granularity;
 import com.coreeng.supportbot.dashboard.DashboardData.ResolutionByEscalation;
 import com.coreeng.supportbot.dashboard.DashboardData.TeamEscalationRate;
 import com.coreeng.supportbot.dashboard.DashboardData.TeamScorecard;
@@ -116,12 +116,40 @@ class JdbcDashboardRepositoryEscalationPostgresTest {
     void escalationRateIsShareOfEachDaysTicketCohort() {
         EscalationRate rate = repository.getEscalationRate(FROM, TO);
 
-        assertThat(rate.granularity()).isEqualTo(EscalationRateGranularity.DAY);
+        // Days 4 and 5 have no tickets, so they are filled with zeros.
+        assertThat(rate.granularity()).isEqualTo(Granularity.DAY);
         assertThat(rate.data())
                 .extracting(
                         EscalationRatePoint::date, EscalationRatePoint::tickets, EscalationRatePoint::escalatedTickets)
-                .containsExactly(tuple("2001-01-08", 2L, 1L), tuple("2001-01-09", 2L, 2L), tuple("2001-01-10", 1L, 0L));
-        assertThat(rate.data()).extracting(EscalationRatePoint::rate).containsExactly(0.5, 1.0, 0.0);
+                .containsExactly(
+                        tuple("2001-01-08", 2L, 1L),
+                        tuple("2001-01-09", 2L, 2L),
+                        tuple("2001-01-10", 1L, 0L),
+                        tuple("2001-01-11", 0L, 0L),
+                        tuple("2001-01-12", 0L, 0L));
+        assertThat(rate.data()).extracting(EscalationRatePoint::rate).containsExactly(0.5, 1.0, 0.0, 0.0, 0.0);
+    }
+
+    @Test
+    void weeklyEscalationRateFillsEmptyWeeksAndLabelsTheFirstFromTheWindowStart() {
+        // Starts on day 3, part-way through a week: days 1 and 2 fall outside, so the first week holds day 3 only.
+        LocalDate from = LocalDate.of(2001, 1, 10);
+        LocalDate to = LocalDate.of(2001, 2, 20);
+
+        EscalationRate rate = repository.getEscalationRate(from, to);
+
+        assertThat(rate.granularity()).isEqualTo(Granularity.WEEK);
+        assertThat(rate.data())
+                .extracting(
+                        EscalationRatePoint::date, EscalationRatePoint::tickets, EscalationRatePoint::escalatedTickets)
+                .containsExactly(
+                        tuple("2001-01-10", 1L, 0L),
+                        tuple("2001-01-15", 0L, 0L),
+                        tuple("2001-01-22", 0L, 0L),
+                        tuple("2001-01-29", 0L, 0L),
+                        tuple("2001-02-05", 0L, 0L),
+                        tuple("2001-02-12", 0L, 0L),
+                        tuple("2001-02-19", 0L, 0L));
     }
 
     @Test
@@ -237,7 +265,7 @@ class JdbcDashboardRepositoryEscalationPostgresTest {
     }
 
     @Test
-    void topicsCountAnEscalationOnceWhenTwoOfItsTagsShareALabel() {
+    void topicsKeepTagsThatShareALabelApart() {
         jdbcTemplate.update(
                 "INSERT INTO tag (code, label) VALUES (?, ?), (?, ?) ON CONFLICT (code) DO NOTHING",
                 TAG_SHARED_1,
@@ -251,8 +279,10 @@ class JdbcDashboardRepositoryEscalationPostgresTest {
         long open = insertTicket(at(23, 9), null);
         insertEscalation(open, TEAM_A, at(23, 10), null, TAG_Y);
 
-        assertThat(repository.getEscalationTopics(day, day)).singleElement().satisfies(r -> {
-            assertThat(r.tag()).isEqualTo(SHARED_LABEL);
+        List<EscalationTopic> result = repository.getEscalationTopics(day, day);
+
+        assertThat(result).extracting(EscalationTopic::tag).containsExactly(TAG_SHARED_1, TAG_SHARED_2);
+        assertThat(result).allSatisfy(r -> {
             assertThat(r.escalations()).isEqualTo(1);
             assertThat(r.totalSeconds()).isCloseTo(HOUR, within(1.0));
             assertThat(r.avgWaitSeconds()).isCloseTo(HOUR, within(1.0));
@@ -368,12 +398,12 @@ class JdbcDashboardRepositoryEscalationPostgresTest {
         assertThat(x.avgSeconds()).isCloseTo(4 * HOUR, within(1.0));
         assertThat(x.avgWaitSeconds()).isCloseTo(HOUR, within(1.0));
 
-        // Day 2's resolved manual escalation (6h) and the bot one (1h) are timed; the open one is not.
-        // The wait averages both manual escalations, open or not (1h and 2h).
+        // Day 2's resolved manual escalation (6h) and the bot one (1h) are timed; the open one is left out.
+        // So the wait covers only the resolved manual one (1h), not the open one (2h).
         EscalationTopic y = result.get(1);
         assertThat(y.escalations()).isEqualTo(2);
         assertThat(y.totalSeconds()).isCloseTo(7 * HOUR, within(1.0));
-        assertThat(y.avgWaitSeconds()).isCloseTo(1.5 * HOUR, within(1.0));
+        assertThat(y.avgWaitSeconds()).isCloseTo(HOUR, within(1.0));
     }
 
     @Test

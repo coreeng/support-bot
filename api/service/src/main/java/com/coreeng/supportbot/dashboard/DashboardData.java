@@ -1,6 +1,8 @@
 package com.coreeng.supportbot.dashboard;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import org.jspecify.annotations.Nullable;
 
 /** Transport-neutral result types returned by dashboard analytics queries. */
@@ -19,13 +21,29 @@ public final class DashboardData {
 
     public record IncomingVsResolved(String time, long incoming, long resolved) {}
 
-    public enum IncomingVsResolvedGranularity {
+    /** Bucket size of a dashboard time series. */
+    public enum Granularity {
         HOUR,
         DAY,
-        WEEK
+        WEEK;
+
+        private static final long MAX_DAILY_RANGE_DAYS = 31;
+
+        /** By day for windows up to a month; by week for longer or unbounded windows. */
+        public static Granularity dayOrWeekForRange(@Nullable LocalDate from, @Nullable LocalDate to) {
+            if (from == null || to == null) {
+                return WEEK;
+            }
+            return to.isAfter(from.plusDays(MAX_DAILY_RANGE_DAYS)) ? WEEK : DAY;
+        }
+
+        /** The Postgres {@code date_trunc} / interval unit for this granularity. */
+        public String unit() {
+            return name().toLowerCase(Locale.ROOT);
+        }
     }
 
-    public record IncomingVsResolvedRate(IncomingVsResolvedGranularity granularity, List<IncomingVsResolved> data) {
+    public record IncomingVsResolvedRate(Granularity granularity, List<IncomingVsResolved> data) {
         public IncomingVsResolvedRate {
             data = List.copyOf(data);
         }
@@ -33,15 +51,10 @@ public final class DashboardData {
 
     public record TagCount(String tag, long count) {}
 
-    public enum EscalationRateGranularity {
-        DAY,
-        WEEK
-    }
-
     /** Share of tickets opened in a bucket that were escalated; {@code rate} is a fraction in [0, 1]. */
     public record EscalationRatePoint(String date, long tickets, long escalatedTickets, double rate) {}
 
-    public record EscalationRate(EscalationRateGranularity granularity, List<EscalationRatePoint> data) {
+    public record EscalationRate(Granularity granularity, List<EscalationRatePoint> data) {
         public EscalationRate {
             data = List.copyOf(data);
         }
@@ -58,7 +71,10 @@ public final class DashboardData {
             @Nullable Double resolutionP50,
             @Nullable Double resolutionP90) {}
 
-    /** Escalation tag ranked by total time in escalation; {@code avgWaitSeconds} is null without manual escalations. */
+    /**
+     * Escalation tag (by code) ranked by total time of its resolved escalations; {@code avgWaitSeconds} is null
+     * when none of them was manual.
+     */
     public record EscalationTopic(
             String tag,
             long escalations,

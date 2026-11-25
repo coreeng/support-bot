@@ -56,12 +56,14 @@ export interface ParsedTicketLog extends TicketLog {
 
 export type TicketWithLogs = {
   id: string;
+  channelId?: string;
   status: string;
   team?: { name: string; label?: string; active?: boolean } | null;
   query?: {
     link?: string;
     text?: string;
     date?: string;
+    ts?: string;
   };
   summary?: string | null;
   impact: string;

@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
-import { backendFetch } from "../backend-fetch";
-import { redirectToBackendPermalink } from "../permalink-redirect";
+import { backendFetch } from "../../../../_lib/backend-fetch";
+import { GET } from "../route";
 
-jest.mock("../backend-fetch", () => ({
+jest.mock("../../../../_lib/backend-fetch", () => ({
   backendFetch: jest.fn(),
   unauthorizedResponse: jest.fn(() => ({ kind: "unauthorized", status: 401 })),
 }));
@@ -13,7 +13,7 @@ jest.mock("next/server", () => ({
 
 const mockBackendFetch = backendFetch as jest.MockedFunction<typeof backendFetch>;
 
-// jsdom has no fetch Response; a minimal stand-in covering what the helper reads and builds.
+// jsdom has no fetch Response; a minimal stand-in covering what the route reads and builds.
 class TestResponse {
   status: number;
   ok: boolean;
@@ -35,8 +35,9 @@ class TestResponse {
 global.Response = TestResponse as unknown as typeof Response;
 
 const request = {} as NextRequest;
+const callRoute = (id: string) => GET(request, { params: Promise.resolve({ id }) });
 
-describe("redirectToBackendPermalink", () => {
+describe("GET /api/escalations/[id]/permalink", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(console, "error").mockImplementation();
@@ -47,19 +48,16 @@ describe("redirectToBackendPermalink", () => {
   it("redirects to the permalink the backend returns", async () => {
     mockBackendFetch.mockResolvedValue(new TestResponse({ permalink: "https://example.com/archives/C123/p1" }) as unknown as Response);
 
-    const result = (await redirectToBackendPermalink(request, "ticket", "7")) as unknown as {
-      kind: string;
-      url: string;
-    };
+    const result = (await callRoute("12")) as unknown as { kind: string; url: string };
 
-    expect(mockBackendFetch).toHaveBeenCalledWith(request, "/ticket/7/permalink");
+    expect(mockBackendFetch).toHaveBeenCalledWith(request, "/escalation/12/permalink");
     expect(result).toEqual(expect.objectContaining({ kind: "redirect", url: "https://example.com/archives/C123/p1" }));
   });
 
   it("returns unauthorized when there is no backend session", async () => {
     mockBackendFetch.mockResolvedValue(null);
 
-    const result = (await redirectToBackendPermalink(request, "ticket", "7")) as unknown as { status: number };
+    const result = (await callRoute("12")) as unknown as { status: number };
 
     expect(result.status).toBe(401);
   });
@@ -67,24 +65,16 @@ describe("redirectToBackendPermalink", () => {
   it("renders an error page with the backend status on failure", async () => {
     mockBackendFetch.mockResolvedValue(new TestResponse(null, { status: 404 }) as unknown as Response);
 
-    const result = (await redirectToBackendPermalink(request, "ticket", "7")) as unknown as TestResponse;
+    const result = (await callRoute("12")) as unknown as TestResponse;
 
     expect(result.status).toBe(404);
     expect(result.headers).toEqual({ "Content-Type": "text/html" });
   });
 
-  it("builds the escalation path", async () => {
-    mockBackendFetch.mockResolvedValue(new TestResponse({ permalink: "https://example.com/archives/C123/p2" }) as unknown as Response);
-
-    await redirectToBackendPermalink(request, "escalation", "12");
-
-    expect(mockBackendFetch).toHaveBeenCalledWith(request, "/escalation/12/permalink");
-  });
-
   it.each(["../../dashboard/escalation-rate?dateFrom=1#", "7/../8", "7?x=1", "-1", "1e3", ""])(
     "rejects the non-numeric id %p without calling the backend",
     async (id) => {
-      const result = (await redirectToBackendPermalink(request, "ticket", id)) as unknown as TestResponse;
+      const result = (await callRoute(id)) as unknown as TestResponse;
 
       expect(result.status).toBe(404);
       expect(mockBackendFetch).not.toHaveBeenCalled();
@@ -94,7 +84,7 @@ describe("redirectToBackendPermalink", () => {
   it("refuses non-https permalinks", async () => {
     mockBackendFetch.mockResolvedValue(new TestResponse({ permalink: "javascript:alert(1)" }) as unknown as Response);
 
-    const result = (await redirectToBackendPermalink(request, "ticket", "7")) as unknown as TestResponse;
+    const result = (await callRoute("12")) as unknown as TestResponse;
 
     expect(result.status).toBe(502);
   });
