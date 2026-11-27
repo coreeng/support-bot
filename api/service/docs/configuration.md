@@ -722,8 +722,8 @@ feature is being built and has no page yet; these settings exist so that it can 
 - **Enabling.** Off by default. It is on when `documentation-analysis.enabled` is `true` and
   `LLM_PROVIDER` is not `none`. It has its own switch, unlike the Support Summary page, because it
   sends documentation to the LLM provider and costs more per ticket. Leave it off until the feature
-  is released: turning it on today only validates the settings and the GitHub credentials, and
-  later releases will start work that calls the LLM provider.
+  is released: no page calls it yet, but turning it on lets a call to `GET /documentation-analysis`
+  start work that calls the LLM provider.
 - **Validation.** While `enabled` is `false` the values are not checked, but a value that cannot
   be read as its type at all (`max-input-tokens: abc`, or `DOCUMENTATION_ANALYSIS_ENABLED` set to
   an empty string) still fails startup. When `enabled` is `true`, startup fails with a message
@@ -734,6 +734,11 @@ feature is being built and has no page yet; these settings exist so that it can 
 - **Documentation source.** One source supplies the documentation, chosen by `source.type`. Each
   source has its settings under `source.<type>`, and only the selected one's are validated. The
   only source is `github`.
+- **Window and roles.** `GET /documentation-analysis` takes the window rules of `GET /summary`:
+  `from` and `to` default to the 14 days ending yesterday (UTC), and a window that ends before it
+  starts or exceeds 92 days is rejected with `DOCUMENTATION_ANALYSIS_WINDOW_INVALID`. Serving it
+  starts a run over the window when tickets are due, so it is open to `LEADERSHIP` and
+  `SUPPORT_ENGINEER` only. `GET /documentation-analysis/enabled` is open to any authenticated user.
 
 ### GitHub source
 

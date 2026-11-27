@@ -18,6 +18,7 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -175,6 +176,7 @@ public class DocClassifier {
 
         DocClassification classification = classification(answer.verdict());
         boolean cites = classification == DocClassification.CORRECT || classification == DocClassification.INCORRECT;
+        List<String> docPaths = classification == DocClassification.NOT_APPLICABLE ? List.of() : answer.docPaths();
         return saved(result(
                 ticketId,
                 promptId,
@@ -182,10 +184,31 @@ public class DocClassifier {
                 classification,
                 sourceQuestion != null ? sourceQuestion : new DistilledQuestion(answer.question(), answer.tags()),
                 answer.answerSummary(),
-                pages.areasSupplied(),
-                classification == DocClassification.NOT_APPLICABLE ? List.of() : answer.docPaths(),
+                countedAreas(pages, docPaths),
+                docPaths,
                 cites ? answer.evidenceQuote() : null,
                 answer.rationale()));
+    }
+
+    /**
+     * The areas the ticket counts under, the one to count it under first: that of the first page it
+     * names, then, when the source chose among areas, the areas it supplied. Judged against the
+     * whole documentation, a ticket that names no page has no area.
+     */
+    private static List<String> countedAreas(ContextAnswer.Pages pages, List<String> docPaths) {
+        List<String> areas = new ArrayList<>();
+        if (!docPaths.isEmpty()) {
+            for (DocumentationPage page : pages.pages()) {
+                String area = page.area();
+                if (page.id().equals(docPaths.getFirst()) && area != null) {
+                    areas.add(area);
+                }
+            }
+        }
+        if (!pages.areasNotSupplied().isEmpty()) {
+            pages.areasSupplied().stream().filter(area -> !areas.contains(area)).forEach(areas::add);
+        }
+        return areas;
     }
 
     /**

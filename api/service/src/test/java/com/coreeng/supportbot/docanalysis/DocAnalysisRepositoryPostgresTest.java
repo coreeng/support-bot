@@ -171,6 +171,36 @@ class DocAnalysisRepositoryPostgresTest {
     }
 
     @Test
+    void findsTheWindowsClosedTicketsWithTheirRowsWhateverThePromptIdOldestFirst() {
+        TicketId last = closedTicket("ts-window-last-day", "2026-03-22T23:59:00");
+        TicketId first = closedTicket("ts-window-first-day", "2026-03-09T00:00:00");
+        TicketId stale = closedTicket("ts-window-stale", "2026-03-12T09:00:00");
+        closedTicket("ts-window-after", "2026-03-23T00:00:00");
+        SummaryTestFixtures.insertTicket(
+                jdbcTemplate, CHANNEL, "ts-window-open", LocalDateTime.parse("2026-03-10T09:00:00"), "opened", null);
+        SummaryTestFixtures.insertTicket(
+                jdbcTemplate,
+                OTHER_CHANNEL,
+                "ts-window-other-channel",
+                LocalDateTime.parse("2026-03-10T09:00:00"),
+                "closed",
+                null);
+        DocAnalysis.Result result = result(first, DocClassification.MISSING);
+        repository.saveResult(result);
+        var attempt = new DocAnalysis.FailedAttempt(stale, "older-prompt", NOW, "undetermined", 1);
+        repository.saveFailedAttempt(attempt);
+
+        assertThat(repository.findWindow(FROM, TO, List.of(CHANNEL)))
+                .containsExactly(
+                        new WindowTicket(
+                                first, CHANNEL, "ts-window-first-day", Instant.parse("2026-03-09T00:00:00Z"), result),
+                        new WindowTicket(
+                                stale, CHANNEL, "ts-window-stale", Instant.parse("2026-03-12T09:00:00Z"), attempt),
+                        new WindowTicket(
+                                last, CHANNEL, "ts-window-last-day", Instant.parse("2026-03-22T23:59:00Z"), null));
+    }
+
+    @Test
     void countsResultsAndFailuresSavedSinceTheGivenTime() {
         Instant later = NOW.plus(Duration.ofDays(30));
         Instant since = later.minus(Duration.ofHours(24));

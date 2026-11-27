@@ -72,6 +72,8 @@ class DocClassifierTest {
             page("guides/builds.md", "builds", "# Builds\n\nBuilds run on every push.\n");
     private static final ContextAnswer.Pages AREA_PAGES =
             new ContextAnswer.Pages(List.of(KEYS, BUILDS), List.of("access", "builds"), List.of("networking"), null);
+    private static final ContextAnswer.Pages WHOLE_PAGES =
+            new ContextAnswer.Pages(List.of(KEYS, BUILDS), List.of("access", "builds"), List.of(), null);
     private static final String QUOTE = "To rotate a key, run the rotate command from the console.";
 
     private final FakeChatModel model = new FakeChatModel();
@@ -198,6 +200,72 @@ class DocClassifierTest {
         assertThat(result.docPaths()).containsExactly(KEYS.id(), BUILDS.id());
         assertThat(result.productAreas()).containsExactly("access", "builds");
         assertThat(result.evidenceQuote()).isNull();
+    }
+
+    @Test
+    void countsATicketCitingAPageOfTheSecondAreaSuppliedUnderThatAreaFirst() {
+        Map<String, Object> answer = answer("correct");
+        answer.put("doc_paths", List.of(BUILDS.id()));
+        answer.put("evidence_quote", "Builds run on every push.");
+        model.answer(json(answer));
+
+        assertThat(classified(classify(THREAD)).productAreas()).containsExactly("builds", "access");
+    }
+
+    @Test
+    void countsATicketCitingAPageWithNoAreaUnderTheAreasSuppliedInTheSourcesOrder() {
+        DocumentationPage root = page("index.md", null, QUOTE);
+        source.answer(new ContextAnswer.Pages(
+                List.of(root, BUILDS, KEYS), List.of("builds", "access"), List.of("net"), null));
+        Map<String, Object> answer = answer("correct");
+        answer.put("doc_paths", List.of(root.id()));
+        answer.put("evidence_quote", QUOTE);
+        model.answer(json(answer));
+
+        assertThat(classified(classify(THREAD)).productAreas()).containsExactly("builds", "access");
+    }
+
+    @Test
+    void countsATicketJudgedAgainstTheWholeDocumentationUnderTheAreaOfThePageItCitesAlone() {
+        source.answer(WHOLE_PAGES);
+        Map<String, Object> answer = answer("incorrect");
+        answer.put("doc_paths", List.of(BUILDS.id()));
+        answer.put("evidence_quote", "Builds run on every push.");
+        answer.put("answer_summary", "Support said builds run nightly.");
+        model.answer(json(answer));
+
+        assertThat(classified(classify(THREAD)).productAreas()).containsExactly("builds");
+    }
+
+    @Test
+    void countsAMissingTicketJudgedAgainstTheWholeDocumentationUnderTheAreaOfTheFirstClosestPage() {
+        source.answer(WHOLE_PAGES);
+        Map<String, Object> answer = answer("missing");
+        answer.put("doc_paths", List.of(BUILDS.id(), KEYS.id()));
+        model.answer(json(answer));
+
+        assertThat(classified(classify(THREAD)).productAreas()).containsExactly("builds");
+    }
+
+    @Test
+    void countsATicketJudgedAgainstTheWholeDocumentationThatNamesNoPageUnderNoArea() {
+        source.answer(WHOLE_PAGES);
+        model.answer(json(answer("missing")));
+
+        assertThat(classified(classify(THREAD)).productAreas()).isEmpty();
+
+        model.answer(json(answer("not_applicable")));
+
+        assertThat(classified(classify(THREAD)).productAreas()).isEmpty();
+    }
+
+    @Test
+    void countsANotApplicableTicketUnderTheAreasTheSourceChose() {
+        Map<String, Object> answer = answer("not_applicable");
+        answer.put("doc_paths", List.of(BUILDS.id()));
+        model.answer(json(answer));
+
+        assertThat(classified(classify(THREAD)).productAreas()).containsExactly("access", "builds");
     }
 
     @Test
@@ -770,6 +838,11 @@ class DocClassifierTest {
                 String promptId,
                 Instant failedBefore,
                 int maxAttempts) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<WindowTicket> findWindow(LocalDate from, LocalDate to, Collection<String> channelIds) {
             throw new UnsupportedOperationException();
         }
 

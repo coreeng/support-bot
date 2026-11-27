@@ -113,6 +113,31 @@ public class JdbcDocAnalysisRepository implements DocAnalysisRepository {
     }
 
     @Override
+    public List<WindowTicket> findWindow(LocalDate from, LocalDate to, Collection<String> channelIds) {
+        if (channelIds.isEmpty()) {
+            return List.of();
+        }
+        return dsl.select(TICKET.ID, QUERY.CHANNEL_ID, QUERY.TS, QUERY.DATE)
+                .select(DOC_ANALYSIS.fields())
+                .from(TICKET)
+                .join(QUERY)
+                .on(QUERY.ID.eq(TICKET.QUERY_ID))
+                .leftJoin(DOC_ANALYSIS)
+                .on(DOC_ANALYSIS.TICKET_ID.eq(TICKET.ID))
+                .where(TICKET.STATUS.eq(TicketStatus.closed))
+                .and(QUERY.CHANNEL_ID.in(channelIds))
+                .and(QUERY.DATE.ge(from.atStartOfDay().toInstant(ZoneOffset.UTC)))
+                .and(QUERY.DATE.lt(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)))
+                .orderBy(QUERY.DATE, TICKET.ID)
+                .fetch(r -> new WindowTicket(
+                        new TicketId(r.get(TICKET.ID)),
+                        r.get(QUERY.CHANNEL_ID),
+                        r.get(QUERY.TS),
+                        r.get(QUERY.DATE),
+                        r.get(DOC_ANALYSIS.TICKET_ID) == null ? null : toDocAnalysis(r.into(DOC_ANALYSIS))));
+    }
+
+    @Override
     public int countAttemptedSince(Instant since) {
         return dsl.fetchCount(DOC_ANALYSIS, DOC_ANALYSIS.ANALYSED_AT.ge(since).or(DOC_ANALYSIS.FAILED_AT.ge(since)));
     }
