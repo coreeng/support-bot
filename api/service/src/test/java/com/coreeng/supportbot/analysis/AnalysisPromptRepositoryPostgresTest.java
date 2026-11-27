@@ -67,6 +67,13 @@ class AnalysisPromptRepositoryPostgresTest {
     private static final String DOCUMENTATION_RESEED_HINT = "Flyway will not re-seed an applied migration: delete"
             + " version 47 from flyway_schema_history and run the migrations again.";
 
+    /** The documentation routing version V48 seeds; tests reset to it. */
+    private static final int SEEDED_ROUTING_VERSION = 1;
+
+    /** How to recover a local database whose seeded documentation routing prompt was deleted. */
+    private static final String ROUTING_RESEED_HINT = "Flyway will not re-seed an applied migration: delete"
+            + " version 48 from flyway_schema_history and run the migrations again.";
+
     private final AnalysisPromptRepository repository;
     private final JdbcTemplate jdbcTemplate;
 
@@ -81,7 +88,8 @@ class AnalysisPromptRepositoryPostgresTest {
 
     /**
      * What the migrations leave in use, checked once before any reset can mask it: classification
-     * version 3 (V45), summary version 2 (V44) and documentation classification version 1 (V47).
+     * version 3 (V45), summary version 2 (V44), documentation classification version 1 (V47) and
+     * documentation routing version 1 (V48).
      * Every reset below re-flags those versions itself, so without this a migration that inserted its
      * row but never switched to it would go unnoticed.
      */
@@ -100,6 +108,7 @@ class AnalysisPromptRepositoryPostgresTest {
                 .containsExactly(
                         "classification v" + SEEDED_VERSION,
                         "documentation_classification v" + SEEDED_DOCUMENTATION_VERSION,
+                        "documentation_routing v" + SEEDED_ROUTING_VERSION,
                         "summary v" + SEEDED_SUMMARY_VERSION);
     }
 
@@ -159,6 +168,17 @@ class AnalysisPromptRepositoryPostgresTest {
         jdbcTemplate.update(
                 "UPDATE analysis_prompt SET is_in_use = TRUE WHERE type = 'documentation_classification' AND version = ?",
                 SEEDED_DOCUMENTATION_VERSION);
+        if (!versionExists("documentation_routing", SEEDED_ROUTING_VERSION)) {
+            throw new IllegalStateException("Documentation routing prompt version " + SEEDED_ROUTING_VERSION
+                    + " is missing. " + ROUTING_RESEED_HINT);
+        }
+        jdbcTemplate.update(
+                "DELETE FROM analysis_prompt WHERE type = 'documentation_routing' AND version > ?",
+                SEEDED_ROUTING_VERSION);
+        jdbcTemplate.update("UPDATE analysis_prompt SET is_in_use = FALSE WHERE type = 'documentation_routing'");
+        jdbcTemplate.update(
+                "UPDATE analysis_prompt SET is_in_use = TRUE WHERE type = 'documentation_routing' AND version = ?",
+                SEEDED_ROUTING_VERSION);
     }
 
     @Test
@@ -250,6 +270,18 @@ class AnalysisPromptRepositoryPostgresTest {
     }
 
     @Test
+    void theSeededRoutingPromptAsksForUpToTheConfiguredNumberOfAreas() {
+        AnalysisPrompt prompt = repository.findInUse(AnalysisPromptType.DOCUMENTATION_ROUTING);
+
+        assertThat(prompt).isNotNull();
+        assertThat(prompt.version()).isEqualTo(SEEDED_ROUTING_VERSION);
+        assertThat(prompt.content())
+                .startsWith("Documentation Routing Prompt (GitHub source)\n")
+                .contains("Choose up to {{max_areas}} areas from <page_index>, most likely first.")
+                .endsWith("  \"reason\": \"<one sentence on why these areas, or why none>\"\n}\n");
+    }
+
+    @Test
     void versionsAreScopedPerType() {
         // V43 and V44 both seed a version 2, one per type: only a per-type unique constraint lets them
         // coexist.
@@ -264,6 +296,8 @@ class AnalysisPromptRepositoryPostgresTest {
         assertThat(repository.findInUse(AnalysisPromptType.CLASSIFICATION)).isNull();
         assertThat(repository.findInUse(AnalysisPromptType.SUMMARY)).isNull();
         assertThat(repository.findInUse(AnalysisPromptType.DOCUMENTATION_CLASSIFICATION))
+                .isNull();
+        assertThat(repository.findInUse(AnalysisPromptType.DOCUMENTATION_ROUTING))
                 .isNull();
     }
 

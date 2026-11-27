@@ -8,7 +8,9 @@ import java.util.Locale;
 /** How the GitHub documentation source finds the context for a thread. */
 public enum GitHubSourceContext {
     /** Every page, for every thread. */
-    WHOLE;
+    WHOLE,
+    /** The pages of the product areas a routing call chooses for the thread, and the root pages. */
+    ROUTED;
 
     static final String PROPERTY = DocumentationAnalysisProps.PREFIX + ".source.github.context";
 

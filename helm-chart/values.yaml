@@ -182,8 +182,8 @@ configMap:
     #       max-copy-age: 24h
     #       max-copy-size: 50MB
     #       max-files: 5000
-    #       context: whole # every page with every ticket; must fit in max-input-tokens
-    #       max-areas-per-ticket: 2
+    #       context: whole # whole: every page with every ticket, must fit in max-input-tokens; routed: only the product areas a model call picks
+    #       max-areas-per-ticket: 2 # used when context is routed
 
 # UI deployment (disabled by default for backward compatibility)
 ui:

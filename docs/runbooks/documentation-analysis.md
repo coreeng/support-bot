@@ -35,8 +35,9 @@ leadership and support engineers. `GET /documentation-analysis/enabled` reports 
 both the provider and the switch are on.
 
 Migration `V47` seeds the documentation classification prompt (`analysis_prompt.type =
-'documentation_classification'`, version 1) and marks it as in use. Nothing needs to be run by
-hand.
+'documentation_classification'`, version 1) and `V48` the GitHub source's routing prompt
+(`'documentation_routing'`, version 1, used only with `context: routed`), and marks both as in
+use. Nothing needs to be run by hand.
 
 There is no scheduled job and no button. Each visit to the page, and each poll it makes while a run
 is active, may start a run over the window shown. Leave the feature off until the deployment is
@@ -58,14 +59,33 @@ repository to what the token or App can read; it needs no other permission for t
 
 ## Size, context and timeouts
 
-The GitHub source sends the **whole documentation with every ticket**
-(`documentation-analysis.source.github.context: whole`, the only value). Three limits follow:
+`documentation-analysis.source.github.context` (`DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_CONTEXT`)
+sets how much documentation the GitHub source sends:
+
+- **`whole`**, the default, sends the **whole documentation with every ticket**. Use it when the
+  documentation fits in `max-input-tokens`.
+- **`routed`** first makes a **routing call** for each ticket, given an index of the pages
+  (path, and the title and description from each page's frontmatter) and the thread. It picks up to
+  `max-areas-per-ticket` (default `2`) product areas, the directories directly under `path`, and
+  only their pages, with the pages directly in `path`, are sent to the classification. Use it
+  when the documentation does not fit in `max-input-tokens`. Each ticket then costs two calls,
+  except a ticket the routing call finds is not a documentation question, or that no area covers,
+  which is saved as `not_applicable` or `missing` after the routing call alone.
+
+Three limits follow:
 
 - **`max-input-tokens`** (`DOCUMENTATION_ANALYSIS_MAX_INPUT_TOKENS`, default `150000`) is the
   bot's limit on one classification call: documentation, thread and prompt together. Sizes are
   estimated at 3.5 characters a token; this is an estimate, not the model's tokenizer.
-  - When the documentation alone is over the limit, every run stops as `source_unavailable` with a
-    reason that names `documentation-analysis.max-input-tokens` and the estimated size.
+  - With `whole`, when the documentation alone is over the limit, every run stops as
+    `source_unavailable` with a reason that names `documentation-analysis.max-input-tokens`, the
+    estimated size, and suggests `routed`.
+  - With `routed`, every run stops as `source_unavailable` when no page sits in a product area, or
+    when the pages directly in `path` alone are over the limit. An area that, with those pages, is
+    over the limit is logged when a run starts
+    (`Product area <name> is estimated at <n> tokens with the root pages, ...`); its tickets fail
+    with `area_too_large`. When two areas picked for a ticket are over the limit together, only
+    the first is sent.
   - When one ticket's thread takes the call over the limit, that ticket fails with
     `context_too_large`.
 - **The model's context window.** `max-input-tokens` has to be below it, with room for the answer
@@ -82,8 +102,8 @@ The GitHub source sends the **whole documentation with every ticket**
   Summary and the analysis run.
 
 Changing `max-input-tokens`, the classification prompt, or a source setting that changes what it
-returns (`source.type`, `context`, `repository`, `branch`, `path`, `file-extensions`) makes every
-earlier result stale: it is hidden and its ticket is classified again on the next visit to its
+returns (`source.type`, `context`, `repository`, `branch`, `path`, `file-extensions`, and with
+`routed` also the routing prompt and `max-areas-per-ticket`) makes every earlier result stale: it is hidden and its ticket is classified again on the next visit to its
 window. A change to the documentation itself does not: a result is kept, with the version it was
 made against, until one of those settings changes.
 
@@ -98,7 +118,9 @@ made against, until one of those settings changes.
   `documentation-analysis`) and its own worker, so it can call the provider while a Support Summary
   refresh or a manual `POST /analysis/run` is also calling it. Within each run calls stay one at a
   time, `LLM_REQUEST_DELAY` apart. Check the provider's limits for two callers at once, and above
-  all its **input tokens per minute**: each documentation call is as large as the documentation.
+  all its **input tokens per minute**: with `whole` each documentation call is as large as the
+  documentation. With `routed` a ticket makes up to two calls one after the other, the routing
+  call and the classification, with no `LLM_REQUEST_DELAY` between them.
 - No cost or token figures have been measured for this feature yet. Watch the provider's usage
   after enabling it.
 
@@ -116,7 +138,7 @@ clears it.
 | `provider_outage` | Five tickets in a row failed on the provider. The run stopped and no run starts before the time shown (`run-retry-delay`, default `15m`). | Check the provider's status, quota and the timeouts above. The five failures are not kept, so those tickets are tried again on the next run. |
 | `daily_limit_reached` | The run stopped at `max-tickets-per-day`, or none could start because the limit is reached. | Wait, or raise the limit. |
 | `failed` | The run ended on an unexpected error. The API logs `Documentation analysis for <from>..<to> failed` with the cause. | Fix the cause. The next visit starts a new run. |
-| `no_prompt` | No documentation classification prompt is in use, so nothing can be classified. Every ticket counts as not yet classified. | Put a version in use (below). |
+| `no_prompt` | No documentation classification prompt is in use, or, with `context: routed`, no routing prompt, so nothing can be classified. Every ticket counts as not yet classified. | Put a version in use (below). |
 
 To put the documentation classification prompt back in use:
 
@@ -125,6 +147,8 @@ UPDATE analysis_prompt SET is_in_use = TRUE
 WHERE type = 'documentation_classification'
   AND version = (SELECT max(version) FROM analysis_prompt WHERE type = 'documentation_classification');
 ```
+
+The routing prompt is put back the same way, with `type = 'documentation_routing'`.
 
 A run interrupted by a restart keeps its `async_job` row and resumes at startup. Tickets already
 saved are not classified again.
@@ -144,12 +168,14 @@ SELECT failure_reason, count(*) FROM doc_analysis WHERE failed_at IS NOT NULL GR
 | Code | What it means | What to do |
 |---|---|---|
 | `provider_error` | The provider call failed after three retries (waits of 5, 20 and 60 seconds): a rate limit, a timeout, a server or network error. | Check the timeouts and rate limits above. Five in a row stop the run as a provider outage instead. |
-| `invalid_response` | The model answered, but the answer could not be read or broke the contract: a classification outside the four, no page or quote where one is required, no summary of support's answer for a conflict. | Occasional ones are expected and are retried. Many suggest the model is unsuited, or that its output is cut off (on Anthropic, check `ANTHROPIC_MAX_TOKENS`). |
+| `invalid_response` | The model answered, but the answer could not be read or broke the contract: a classification outside the four, no page or quote where one is required, no summary of support's answer for a conflict. With `routed`, also a routing answer without a question or reason, or with more areas than `max-areas-per-ticket`. | Occasional ones are expected and are retried. Many suggest the model is unsuited, or that its output is cut off (on Anthropic, check `ANTHROPIC_MAX_TOKENS`). |
 | `quote_not_found` | A `correct` or `incorrect` answer quoted a passage that is not in the page it cites. | None; retried. This keeps unsupported verdicts off the page. |
 | `unknown_page` | The answer named a page the documentation does not hold. | None; retried. |
 | `no_support_answer` | The answer was `incorrect`, but the thread has no message from a support engineer to conflict with. | None; retried. |
 | `undetermined` | The model said the documentation it was given cannot settle the question, or the thread is too unclear. | None; retried. It is not a fifth classification. |
 | `context_too_large` | The thread, the prompt and the documentation together are over `max-input-tokens`. | Not retried until a setting changes. See [Size, context and timeouts](#size-context-and-timeouts). |
+| `unknown_area` | With `routed`: the routing call picked a product area the documentation does not have. | None; retried. |
+| `area_too_large` | With `routed`: the first area picked, with the pages directly in `path`, is over what the ticket may be sent. | Not retried until a setting changes. Split the area into smaller ones, or raise `max-input-tokens` if the model allows it. |
 | `thread_unavailable` | The Slack thread could not be fetched. | Check the bot's Slack access to the channel. |
 | `source_error` | The documentation source failed on this ticket. | Check the API log at the time of the failure. |
 
@@ -188,6 +214,14 @@ The run also stops as `source_unavailable` when the copy is fetched but cannot b
   contents of `copy-location` and restart the API; the next run fetches a fresh copy.
 - *The documentation is estimated at N tokens, more than documentation-analysis.max-input-tokens
   ...* See [Size, context and timeouts](#size-context-and-timeouts).
+- With `routed`: *The documentation is not arranged in product areas ...* Move the pages into
+  directories under `path`, one for each product area, or use `whole`.
+- With `routed`: *The pages directly in the configured path are estimated at N tokens ...* Move
+  some of them into product areas.
+
+With `routed`, a page whose frontmatter is not valid YAML is listed in the index by its first
+heading instead, with the warning
+`Indexed N documentation pages by their first heading: their frontmatter is not valid YAML`.
 
 A file whose path holds a quote, an angle bracket or a control character is left out, with the
 warning `Left out N documentation files whose paths hold a quote, angle bracket or control character`.

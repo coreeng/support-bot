@@ -1,13 +1,16 @@
 package com.coreeng.supportbot.docanalysis.source.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.DocumentationAnalysisProps;
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.docanalysis.DocumentationSource;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.prtracking.PrTrackingGitHubConfig;
 import com.coreeng.supportbot.prtracking.source.PrSourceClient;
+import dev.langchain4j.model.chat.ChatModel;
 import java.nio.file.Path;
 import java.time.Clock;
 import org.junit.jupiter.api.Test;
@@ -47,11 +50,12 @@ class GitHubSourceConfigTest {
                 .withPropertyValues(enabled())
                 .withPropertyValues(
                         "pr-review-tracking.github.token=test-token",
-                        "documentation-analysis.source.github.context=routed")
-                .run(context -> assertThat(context)
-                        .getFailure()
-                        .hasStackTraceContaining(
-                                "documentation-analysis.source.github.context must be one of whole but was 'routed'"));
+                        "documentation-analysis.source.github.context=search")
+                .run(
+                        context -> assertThat(context)
+                                .getFailure()
+                                .hasStackTraceContaining(
+                                        "documentation-analysis.source.github.context must be one of whole, routed but was 'search'"));
     }
 
     @Test
@@ -117,6 +121,16 @@ class GitHubSourceConfigTest {
         @Bean
         Clock clock() {
             return Clock.systemUTC();
+        }
+
+        @Bean
+        ChatModel chatModel() {
+            return mock(ChatModel.class);
+        }
+
+        @Bean
+        AnalysisService analysisService() {
+            return mock(AnalysisService.class);
         }
     }
 }

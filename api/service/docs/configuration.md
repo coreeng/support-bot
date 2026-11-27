@@ -407,8 +407,8 @@ documentation-analysis:
       max-copy-age: 24h # Fetch again when the copy is older
       max-copy-size: 50MB # A fetch that keeps more than this fails
       max-files: 5000 # A fetch that keeps more files than this fails
-      context: ${DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_CONTEXT:whole} # whole: every page is sent with every ticket
-      max-areas-per-ticket: 2
+      context: ${DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_CONTEXT:whole} # whole: every page with every ticket, when the documentation fits in max-input-tokens; routed: only the product areas a model call picks, when it does not
+      max-areas-per-ticket: 2 # Product areas the model may pick for one ticket; used when context is routed
 ```
 
 For deployment versatility across different secret delivery mechanisms, you can base64-encode the PEM file into a single line before storing it:
@@ -752,17 +752,39 @@ Reads the documentation from one GitHub repository. It needs `repository` (`owne
 `..`; leave it empty or set it to `.` for documentation at the root. Each of `file-extensions`
 starts with `.`. `copy-location` is where the bot keeps its copy: an absolute path other than `/`.
 
-`context` sets how the source picks the documentation for a ticket. Its only value, and the
-default, is `whole`: every page is sent with every ticket, in path order, so the documentation as
-a whole has to fit in `max-input-tokens` with room left for the thread and the prompt. When it does
-not, the analysis reports the source as unavailable and classifies no ticket. A ticket whose
-thread takes the total over the limit fails with `context_too_large`. Any other value fails
-startup when the feature is enabled with this source. Changing `context` makes earlier results
-stale, so their tickets are classified again.
+`context` sets how the source picks the documentation for a ticket. Any value other than `whole` or
+`routed` fails startup when the feature is enabled with this source. Changing `context` makes
+earlier results stale, so their tickets are classified again.
+
+- **`whole`**, the default: every page is sent with every ticket, in path order, with no extra
+  model call. Use it when the documentation fits in `max-input-tokens` with room left for the
+  thread and the prompt. When it does not, the analysis reports the source as unavailable, with a
+  reason that suggests `routed`, and classifies no ticket. A ticket whose thread takes the total
+  over the limit fails with `context_too_large`.
+- **`routed`**: for documentation too large to send whole. Each ticket first gets a routing call
+  to the model, given an index of the pages and the thread. It states the question, tags it,
+  decides whether it is a documentation question at all, and picks up to `max-areas-per-ticket`
+  (default `2`) product areas, most likely first. Only the pages of those areas and the pages
+  directly in `path` are sent to the classification. A ticket that is not a documentation
+  question, or that no area covers, is saved as `not_applicable` or `missing` without the
+  classification call. The routing prompt is stored in `analysis_prompt` with the type
+  `documentation_routing`; changing it or `max-areas-per-ticket` makes earlier results stale.
 
 A page's product area is the directory directly under `path` that holds it; pages directly in
-`path` have none, and the documentation need not be arranged in areas. A file whose path holds a
-quote, an angle bracket or a control character is left out, and a warning gives the count.
+`path` have none. With `whole` the documentation need not be arranged in areas. With `routed` it
+must be:
+
+- the source is unavailable when no page sits in an area, or when the pages directly in `path`
+  alone are over `max-input-tokens`, since they are sent with every ticket;
+- an area that, with those pages, is over `max-input-tokens` is logged as a warning when a run
+  starts, since its tickets will fail with `area_too_large`;
+- the index lists each page of an area by path, with the `title` and `description` of its YAML
+  frontmatter. A page without frontmatter, or without a `title` in it, is listed by its first
+  Markdown heading. Frontmatter that is not valid YAML is ignored for that page, and a warning
+  gives the count.
+
+A file whose path holds a quote, an angle bracket or a control character is left out, and a
+warning gives the count.
 
 GitHub credentials are read from `pr-review-tracking.github`
 (see [PR review tracking](#pr-review-tracking)), whether or not PR tracking is enabled. When the
@@ -787,7 +809,7 @@ Set these on the **API**:
 | `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_REPOSITORY` | The documentation repository, `owner/name`. Required with the GitHub source. |
 | `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_BRANCH` | The branch to read. Default `main`. |
 | `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_PATH` | The directory holding the documentation; empty or `.` for the repository root. Default `docs`. |
-| `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_CONTEXT` | How the source picks the documentation for a ticket. Default `whole`, the only value: every page with every ticket, so the documentation has to fit in `max-input-tokens`. |
+| `DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_CONTEXT` | How the source picks the documentation for a ticket. Default `whole`: every page with every ticket, for documentation that fits in `max-input-tokens`. `routed`: only the product areas a routing call picks for each ticket, for documentation that does not. |
 
 ## Single Sign-On (SSO)
 
