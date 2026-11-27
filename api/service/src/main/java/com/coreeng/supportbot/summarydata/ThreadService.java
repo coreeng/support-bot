@@ -2,7 +2,9 @@ package com.coreeng.supportbot.summarydata;
 
 import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.teams.SupportTeamService;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
 import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
@@ -20,6 +22,7 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -32,11 +35,13 @@ public class ThreadService {
     private static final String WHITE_CHECK_MARK_EMOJI = "white_check_mark";
 
     private final SlackClient slackClient;
+    private final SupportTeamService supportTeamService;
     private final ImmutableList<Pattern> compiledPatterns;
     private final Set<String> exceptions;
 
-    public ThreadService(SlackClient slackClient, SummaryAreaProps props) {
+    public ThreadService(SlackClient slackClient, SupportTeamService supportTeamService, SummaryAreaProps props) {
         this.slackClient = slackClient;
+        this.supportTeamService = supportTeamService;
         var sanitisation = props.sanitisation();
         this.compiledPatterns = sanitisation.patterns().stream()
                 .map(ThreadService::compilePattern)
@@ -69,6 +74,21 @@ public class ThreadService {
      * @return List of message texts from all messages in the thread
      */
     public ImmutableList<String> getAllThreadMessageTexts(String channelId, String threadTs) {
+        ImmutableList<String> messageTexts = fetchThreadMessages(channelId, threadTs).stream()
+                .map(Message::getText)
+                .filter(ThreadService::hasText)
+                .collect(ImmutableList.toImmutableList());
+
+        log.debug("Extracted {} non-empty message texts", messageTexts.size());
+
+        return messageTexts;
+    }
+
+    private static boolean hasText(@Nullable String text) {
+        return text != null && !text.isEmpty();
+    }
+
+    private ImmutableList<Message> fetchThreadMessages(String channelId, String threadTs) {
         log.debug("Fetching all messages from thread: channel={}, threadTs={}", channelId, threadTs);
 
         List<Message> allMessages = new ArrayList<>();
@@ -139,15 +159,7 @@ public class ThreadService {
             throw new RuntimeException("Interrupted while waiting for rate limit", ie);
         }
 
-        // Extract text from all messages, filtering out null/empty texts
-        ImmutableList<String> messageTexts = allMessages.stream()
-                .map(Message::getText)
-                .filter(text -> text != null && !text.isEmpty())
-                .collect(ImmutableList.toImmutableList());
-
-        log.debug("Extracted {} non-empty message texts", messageTexts.size());
-
-        return messageTexts;
+        return ImmutableList.copyOf(allMessages);
     }
 
     private String applySanitisation(String text) {
@@ -172,6 +184,43 @@ public class ThreadService {
         log.debug("Processed thread text, final length: {} characters", result.length());
 
         return result;
+    }
+
+    /**
+     * The thread with each message prefixed by its author's role: {@code [bot]}, {@code [tenant]} for
+     * whoever raised the ticket or is outside the support team, or {@code [support]}. No names or user
+     * ids are included. The label goes on after sanitisation, which collapses a message to one line,
+     * so message text cannot forge one.
+     */
+    public String getThreadAsRoleLabelledText(String channelId, String threadTs) {
+        ImmutableList<Message> messages = fetchThreadMessages(channelId, threadTs);
+        if (messages.isEmpty()) {
+            return "";
+        }
+        String raiser = messages.getFirst().getUser();
+        List<String> lines = new ArrayList<>();
+        for (Message message : messages) {
+            if (!hasText(message.getText())) {
+                continue;
+            }
+            String text = applySanitisation(message.getText());
+            // A label on an emptied message would still count as a support answer.
+            if (!text.isEmpty()) {
+                lines.add(roleLabel(message, raiser) + " " + text);
+            }
+        }
+        return String.join("\n\n", lines);
+    }
+
+    private String roleLabel(Message message, @Nullable String raiser) {
+        if (message.getBotId() != null) {
+            return "[bot]";
+        }
+        String author = message.getUser();
+        if (author == null || author.equals(raiser)) {
+            return "[tenant]";
+        }
+        return supportTeamService.isMemberByUserId(SlackId.user(author)) ? "[support]" : "[tenant]";
     }
 
     /**

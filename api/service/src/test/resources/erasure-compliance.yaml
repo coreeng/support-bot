@@ -25,6 +25,26 @@ async_job:
     - data
     - started_at
 
+doc_analysis:
+  reviewed:
+    - ticket_id
+    - prompt_id
+    - classification
+    - source
+    - docs_version
+    - question
+    - answer_summary
+    - tags
+    - product_areas
+    - doc_paths
+    - evidence_quote
+    - rationale
+    - model
+    - analysed_at
+    - failed_at
+    - failure_reason
+    - attempts
+
 elevate_integrity_items:
   reviewed:
     - type
