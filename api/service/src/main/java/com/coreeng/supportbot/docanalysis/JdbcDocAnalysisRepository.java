@@ -1,10 +1,17 @@
 package com.coreeng.supportbot.docanalysis;
 
 import static com.coreeng.supportbot.dbschema.Tables.DOC_ANALYSIS;
+import static com.coreeng.supportbot.dbschema.Tables.QUERY;
+import static com.coreeng.supportbot.dbschema.Tables.TICKET;
 import static java.util.Objects.requireNonNull;
 
+import com.coreeng.supportbot.dbschema.enums.TicketStatus;
 import com.coreeng.supportbot.dbschema.tables.records.DocAnalysisRecord;
 import com.coreeng.supportbot.ticket.TicketId;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -72,6 +79,52 @@ public class JdbcDocAnalysisRepository implements DocAnalysisRepository {
                 .where(DOC_ANALYSIS.TICKET_ID.eq(ticketId.id()))
                 .fetchOptional()
                 .map(JdbcDocAnalysisRepository::toDocAnalysis);
+    }
+
+    @Override
+    public List<TicketToClassify> findDue(
+            LocalDate from,
+            LocalDate to,
+            Collection<String> channelIds,
+            String promptId,
+            Instant failedBefore,
+            int maxAttempts) {
+        if (channelIds.isEmpty()) {
+            return List.of();
+        }
+        return dsl.select(TICKET.ID, QUERY.CHANNEL_ID, QUERY.TS)
+                .from(TICKET)
+                .join(QUERY)
+                .on(QUERY.ID.eq(TICKET.QUERY_ID))
+                .leftJoin(DOC_ANALYSIS)
+                .on(DOC_ANALYSIS.TICKET_ID.eq(TICKET.ID))
+                .where(TICKET.STATUS.eq(TicketStatus.closed))
+                .and(QUERY.CHANNEL_ID.in(channelIds))
+                .and(QUERY.DATE.ge(from.atStartOfDay().toInstant(ZoneOffset.UTC)))
+                .and(QUERY.DATE.lt(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)))
+                .and(DOC_ANALYSIS
+                        .TICKET_ID
+                        .isNull()
+                        .or(DOC_ANALYSIS.PROMPT_ID.ne(promptId))
+                        .or(DOC_ANALYSIS.FAILED_AT.le(failedBefore).and(DOC_ANALYSIS.ATTEMPTS.lt(maxAttempts))))
+                .orderBy(QUERY.DATE, TICKET.ID)
+                .fetch(r ->
+                        new TicketToClassify(new TicketId(r.get(TICKET.ID)), r.get(QUERY.CHANNEL_ID), r.get(QUERY.TS)));
+    }
+
+    @Override
+    public int countAttemptedSince(Instant since) {
+        return dsl.fetchCount(DOC_ANALYSIS, DOC_ANALYSIS.ANALYSED_AT.ge(since).or(DOC_ANALYSIS.FAILED_AT.ge(since)));
+    }
+
+    @Override
+    @Transactional
+    public void deleteFailedAttempts(Collection<TicketId> ticketIds, String reasonCode) {
+        dsl.deleteFrom(DOC_ANALYSIS)
+                .where(DOC_ANALYSIS.TICKET_ID.in(
+                        ticketIds.stream().map(TicketId::id).toList()))
+                .and(DOC_ANALYSIS.FAILURE_REASON.eq(reasonCode))
+                .execute();
     }
 
     private static DocAnalysis toDocAnalysis(DocAnalysisRecord row) {
