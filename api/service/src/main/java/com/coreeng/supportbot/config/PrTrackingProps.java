@@ -25,10 +25,12 @@ public record PrTrackingProps(
         List<Repository> repositories,
         GitHub github,
         @Nullable Gitlab gitlab,
-        SlaDiscovery slaDiscovery) {
+        SlaDiscovery slaDiscovery,
+        OutcomeEmojis outcomeEmojis) {
 
     private static final Set<String> VALID_DURATION_UNITS = Set.of("hours", "days", "weeks");
 
+    @ConstructorBinding
     public PrTrackingProps(
             boolean enabled,
             String pollCron,
@@ -39,7 +41,8 @@ public record PrTrackingProps(
             @Nullable List<Repository> repositories,
             @Nullable GitHub github,
             @Nullable Gitlab gitlab,
-            @Nullable SlaDiscovery slaDiscovery) {
+            @Nullable SlaDiscovery slaDiscovery,
+            @Nullable OutcomeEmojis outcomeEmojis) {
         this.enabled = enabled;
         this.pollCron = pollCron;
         this.durationUnit = durationUnit == null ? "days" : durationUnit.toLowerCase(Locale.ROOT);
@@ -66,6 +69,7 @@ public record PrTrackingProps(
         this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
         this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
         this.gitlab = gitlab;
+        this.outcomeEmojis = outcomeEmojis == null ? OutcomeEmojis.none() : outcomeEmojis;
 
         if (enabled) {
             if (!VALID_DURATION_UNITS.contains(this.durationUnit)) {
@@ -94,6 +98,25 @@ public record PrTrackingProps(
                 validateConfig(this.github);
             }
         }
+    }
+
+    /**
+     * Test convenience constructor for setups predating {@code outcome-emojis}. Config binding is
+     * pinned to the canonical constructor by {@link ConstructorBinding}: with two constructors and no
+     * annotation, Spring Boot's binder resolves no bind constructor.
+     */
+    public PrTrackingProps(
+            boolean enabled,
+            String pollCron,
+            @Nullable String prEmoji,
+            @Nullable List<String> tags,
+            @Nullable String impact,
+            @Nullable String durationUnit,
+            @Nullable List<Repository> repositories,
+            @Nullable GitHub github,
+            @Nullable Gitlab gitlab,
+            @Nullable SlaDiscovery slaDiscovery) {
+        this(enabled, pollCron, prEmoji, tags, impact, durationUnit, repositories, github, gitlab, slaDiscovery, null);
     }
 
     /**
@@ -479,6 +502,41 @@ public record PrTrackingProps(
         private static void checkBlank(@Nullable String value, String field) {
             if (value != null && value.isBlank()) {
                 throw new IllegalArgumentException("messages." + field + " must not be blank when provided");
+            }
+        }
+    }
+
+    /**
+     * Optional Slack emojis that replace {@code pr-emoji} on the ticket's query message once every tracked
+     * PR on the ticket has resolved. {@code merged} covers both a PR seen merged and one approved and
+     * ready to merge (where tracking ends for repos without {@code requires-codeowners}), and is also used
+     * for every ticket with several tracked PRs; {@code closed} covers a ticket whose single PR was closed
+     * without merging. An unset outcome leaves {@code pr-emoji} in place, as before.
+     */
+    public record OutcomeEmojis(
+            @Nullable String merged, @Nullable String closed) {
+
+        public OutcomeEmojis {
+            checkOutcomeEmoji(merged, "merged");
+            checkOutcomeEmoji(closed, "closed");
+        }
+
+        public static OutcomeEmojis none() {
+            return new OutcomeEmojis(null, null);
+        }
+
+        private static void checkOutcomeEmoji(@Nullable String value, String field) {
+            if (value == null) {
+                return;
+            }
+            if (value.isBlank()) {
+                throw new IllegalArgumentException(
+                        "pr-review-tracking.outcome-emojis." + field + " must not be blank when provided");
+            }
+            // Leading/trailing only: Slack writes skin-tone variants as `name::skin-tone-2`.
+            if (value.startsWith(":") || value.endsWith(":")) {
+                throw new IllegalArgumentException("pr-review-tracking.outcome-emojis." + field
+                        + " must be the bare emoji name without surrounding colons, got: " + value);
             }
         }
     }

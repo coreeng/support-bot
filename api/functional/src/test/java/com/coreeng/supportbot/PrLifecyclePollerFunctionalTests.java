@@ -13,6 +13,7 @@ import com.coreeng.supportbot.testkit.RatingRequestMessage;
 import com.coreeng.supportbot.testkit.ReactionAddedExpectation;
 import com.coreeng.supportbot.testkit.SlackMessage;
 import com.coreeng.supportbot.testkit.SlackTestKit;
+import com.coreeng.supportbot.testkit.Stub;
 import com.coreeng.supportbot.testkit.SupportBotClient;
 import com.coreeng.supportbot.testkit.TestKit;
 import com.coreeng.supportbot.testkit.TestKitExtension;
@@ -103,6 +104,9 @@ public class PrLifecyclePollerFunctionalTests {
                         .userId(testKit.as(tenant).userId())
                         .receiver(new RatingRequestMessage.Receiver(ticket.ticketId()))
                         .build());
+        // The ticket's only PR closed without merging: pr-emoji is swapped for the "closed" outcome emoji.
+        var closedOutcomeStub = stubOutcomeEmojiAdded("pr-closed", ticket.channelId(), ticket.queryTs());
+        var prEmojiRemovedStub = stubPrEmojiRemoved(ticket.channelId(), ticket.queryTs());
 
         supportBotClient.test().triggerPrTrackingPoll();
 
@@ -113,6 +117,8 @@ public class PrLifecyclePollerFunctionalTests {
             resolvedReactionStub.assertIsCalled();
             getQueryMessageStub.assertIsCalled();
             ratingRequestStub.assertIsCalled();
+            closedOutcomeStub.assertIsCalled();
+            prEmojiRemovedStub.assertIsCalled();
         });
 
         var updatedTicket = supportBotClient.findTicketByQueryTs(ticket.channelId(), ticket.queryTs());
@@ -154,6 +160,10 @@ public class PrLifecyclePollerFunctionalTests {
                 .wiremock()
                 .stubGitHubGetPullRequest("Poll GitHub PR #2 open", PR_REPO, 2, "open", prCreatedAt.toString());
         var closeNoticeStub = testKit.slack().wiremock().stubChatPostMessage("Poll close notice", ticket.channelId());
+        // PR #2 is still active, so pr-emoji stays and no outcome emoji is added yet.
+        var closedOutcomeStub = stubOutcomeEmojiAdded("pr-closed", ticket.channelId(), ticket.queryTs());
+        var mergedOutcomeStub = stubOutcomeEmojiAdded("pr-merged", ticket.channelId(), ticket.queryTs());
+        var prEmojiRemovedStub = stubPrEmojiRemoved(ticket.channelId(), ticket.queryTs());
 
         supportBotClient.test().triggerPrTrackingPoll();
 
@@ -162,11 +172,212 @@ public class PrLifecyclePollerFunctionalTests {
             githubOpenStub.assertIsCalled();
             closeNoticeStub.assertIsCalled();
         });
+        closedOutcomeStub.assertIsNotCalled();
+        mergedOutcomeStub.assertIsNotCalled();
+        prEmojiRemovedStub.assertIsNotCalled();
+        closedOutcomeStub.cleanUp();
+        mergedOutcomeStub.cleanUp();
+        prEmojiRemovedStub.cleanUp();
 
         var updatedTicket = supportBotClient.findTicketByQueryTs(ticket.channelId(), ticket.queryTs());
         assertThat(updatedTicket).isNotNull();
         assertThat(updatedTicket.status()).isEqualTo("opened");
         assertThat(updatedTicket.escalated()).isFalse();
+    }
+
+    @Test
+    public void whenTheLastClosablePrMergesButAThreadReplyPrIsStillOpen_ticketClosesButKeepsPrEmoji() {
+        // The one case where auto-close and the emoji swap disagree: auto-close only waits for PRs linked in
+        // the original message, while the emoji waits for every tracked PR, including thread-reply ones.
+        String queryText = "Please review my PRs";
+        SeededTicket ticket = createOpenedTicket(queryText);
+
+        Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+        supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticket.ticketId())
+                        .githubRepo(PR_REPO)
+                        .prNumber(1)
+                        .prCreatedAt(prCreatedAt)
+                        .slaDeadline(prCreatedAt.plus(Duration.ofHours(24)))
+                        .owningTeam("wow")
+                        .build());
+        supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticket.ticketId())
+                        .githubRepo(PR_REPO)
+                        .prNumber(2)
+                        .prCreatedAt(prCreatedAt)
+                        .slaDeadline(prCreatedAt.plus(Duration.ofHours(24)))
+                        .owningTeam("wow")
+                        .canAutoCloseTicket(false)
+                        .build());
+
+        var githubMergedStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequestMerged("Poll GitHub PR #1 merged", PR_REPO, 1, prCreatedAt.toString());
+        var githubOpenStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("Poll GitHub PR #2 open", PR_REPO, 2, "open", prCreatedAt.toString());
+        var mergedNoticeStub = testKit.slack().wiremock().stubChatPostMessage("Poll merged notice", ticket.channelId());
+        var updateStub = testKit.slack()
+                .wiremock()
+                .stubMessageUpdated(MessageUpdatedExpectation.<TicketMessage>builder()
+                        .description("Ticket form updated to closed")
+                        .channelId(ticket.channelId())
+                        .ts(ticket.formMessageTs())
+                        .threadTs(ticket.queryTs())
+                        .receiver(new TicketMessage.Receiver())
+                        .build());
+        var resolvedReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Resolved reaction")
+                        .reaction("white_check_mark")
+                        .channelId(ticket.channelId())
+                        .ts(ticket.queryTs())
+                        .build());
+        var getQueryMessageStub = testKit.slack()
+                .wiremock()
+                .stubGetMessage(MessageToGet.builder()
+                        .description("Get query message for close flow")
+                        .channelId(ticket.channelId())
+                        .ts(ticket.queryTs())
+                        .threadTs(ticket.queryTs())
+                        .text(queryText)
+                        .blocksJson("[]")
+                        .userId(testKit.as(tenant).userId())
+                        .botId(null)
+                        .build());
+        var ratingRequestStub = testKit.slack()
+                .wiremock()
+                .stubEphemeralMessagePosted(EphemeralMessageExpectation.<RatingRequestMessage>builder()
+                        .description("Rating request prompt")
+                        .channelId(ticket.channelId())
+                        .threadTs(ticket.queryTs())
+                        .userId(testKit.as(tenant).userId())
+                        .receiver(new RatingRequestMessage.Receiver(ticket.ticketId()))
+                        .build());
+        var mergedOutcomeStub = stubOutcomeEmojiAdded("pr-merged", ticket.channelId(), ticket.queryTs());
+        var prEmojiRemovedStub = stubPrEmojiRemoved(ticket.channelId(), ticket.queryTs());
+
+        supportBotClient.test().triggerPrTrackingPoll();
+
+        await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
+            githubMergedStub.assertIsCalled();
+            githubOpenStub.assertIsCalled();
+            mergedNoticeStub.assertIsCalled();
+            updateStub.assertIsCalled();
+            resolvedReactionStub.assertIsCalled();
+            getQueryMessageStub.assertIsCalled();
+            ratingRequestStub.assertIsCalled();
+        });
+        mergedOutcomeStub.assertIsNotCalled();
+        prEmojiRemovedStub.assertIsNotCalled();
+        mergedOutcomeStub.cleanUp();
+        prEmojiRemovedStub.cleanUp();
+
+        var updatedTicket = supportBotClient.findTicketByQueryTs(ticket.channelId(), ticket.queryTs());
+        assertThat(updatedTicket).isNotNull();
+        assertThat(updatedTicket.status()).isEqualTo("closed");
+    }
+
+    @Test
+    public void whenTheOnlyTrackedPrMerges_swapsPrEmojiForMergedEmoji() {
+        // A thread-reply PR (canAutoCloseTicket=false): the ticket stays open, but the emoji on the
+        // top-level message is still swapped.
+        String channelId = testKit.config().mocks().slack().supportChannelId();
+        MessageTs queryTs = MessageTs.now();
+        var ticket = supportBotClient
+                .test()
+                .createTicket(SupportBotClient.TicketToCreateRequest.builder()
+                        .channelId(channelId)
+                        .queryTs(queryTs)
+                        .createdMessageTs(MessageTs.now())
+                        .build());
+        Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+        supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticket.id())
+                        .githubRepo(PR_REPO)
+                        .prNumber(1)
+                        .prCreatedAt(prCreatedAt)
+                        .slaDeadline(prCreatedAt.plus(Duration.ofHours(24)))
+                        .owningTeam("wow")
+                        .canAutoCloseTicket(false)
+                        .build());
+
+        var githubMergedStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequestMerged("Poll GitHub PR merged", PR_REPO, 1, prCreatedAt.toString());
+        var mergedNoticeStub = testKit.slack().wiremock().stubChatPostMessage("Poll merged notice", channelId);
+        var mergedOutcomeStub = stubOutcomeEmojiAdded("pr-merged", channelId, queryTs);
+        var prEmojiRemovedStub = stubPrEmojiRemoved(channelId, queryTs);
+
+        supportBotClient.test().triggerPrTrackingPoll();
+
+        await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
+            githubMergedStub.assertIsCalled();
+            mergedNoticeStub.assertIsCalled();
+            mergedOutcomeStub.assertIsCalled();
+            prEmojiRemovedStub.assertIsCalled();
+        });
+    }
+
+    @Test
+    public void whenSeveralTrackedPrsAllResolve_swapsOnceToMergedEvenIfAllClosedWithoutMerge() {
+        // Both PRs close without merging in the same poll. Only the one that resolves last swaps the emoji,
+        // and a ticket with several tracked PRs always ends on "merged", whichever order they're processed
+        // in. canAutoCloseTicket=false keeps the ticket close flow out of the picture.
+        String channelId = testKit.config().mocks().slack().supportChannelId();
+        MessageTs queryTs = MessageTs.now();
+        var ticket = supportBotClient
+                .test()
+                .createTicket(SupportBotClient.TicketToCreateRequest.builder()
+                        .channelId(channelId)
+                        .queryTs(queryTs)
+                        .createdMessageTs(MessageTs.now())
+                        .build());
+        Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+        for (int prNumber : new int[] {1, 2}) {
+            supportBotClient
+                    .test()
+                    .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                            .ticketId(ticket.id())
+                            .githubRepo(PR_REPO)
+                            .prNumber(prNumber)
+                            .prCreatedAt(prCreatedAt)
+                            .slaDeadline(prCreatedAt.plus(Duration.ofHours(24)))
+                            .owningTeam("wow")
+                            .canAutoCloseTicket(false)
+                            .build());
+        }
+
+        var githubClosedStub1 = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("Poll GitHub PR #1 closed", PR_REPO, 1, "closed", prCreatedAt.toString());
+        var githubClosedStub2 = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("Poll GitHub PR #2 closed", PR_REPO, 2, "closed", prCreatedAt.toString());
+        var closureNoticesStub = testKit.slack().wiremock().stubChatPostMessage("Poll closure notices", channelId);
+        var mergedOutcomeStub = stubOutcomeEmojiAdded("pr-merged", channelId, queryTs);
+        var closedOutcomeStub = stubOutcomeEmojiAdded("pr-closed", channelId, queryTs);
+        var prEmojiRemovedStub = stubPrEmojiRemoved(channelId, queryTs);
+
+        supportBotClient.test().triggerPrTrackingPoll();
+
+        await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
+            githubClosedStub1.assertIsCalled();
+            githubClosedStub2.assertIsCalled();
+            closureNoticesStub.assertIsCalled(2);
+            mergedOutcomeStub.assertIsCalled();
+            prEmojiRemovedStub.assertIsCalled();
+        });
+        closedOutcomeStub.assertIsNotCalled();
+        closedOutcomeStub.cleanUp();
     }
 
     @Test
@@ -320,6 +531,28 @@ public class PrLifecyclePollerFunctionalTests {
     }
 
     private record SeededTicket(long ticketId, String channelId, MessageTs queryTs, MessageTs formMessageTs) {}
+
+    private Stub stubOutcomeEmojiAdded(String emoji, String channelId, MessageTs queryTs) {
+        return testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Outcome emoji :" + emoji + ": added")
+                        .reaction(emoji)
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+    }
+
+    private Stub stubPrEmojiRemoved(String channelId, MessageTs queryTs) {
+        return testKit.slack()
+                .wiremock()
+                .stubReactionRemove(ReactionAddedExpectation.builder()
+                        .description("Open PR emoji removed")
+                        .reaction("pr")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+    }
 
     // -------------------------------------------------------------------------
     // State machine transition tests — seed records directly, no Slack events

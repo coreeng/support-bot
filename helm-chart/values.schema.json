@@ -381,6 +381,14 @@
                 "enabled": { "type": "boolean" },
                 "poll-cron": { "type": "string" },
                 "pr-emoji": { "type": "string" },
+                "outcome-emojis": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "merged": { "type": "string" },
+                    "closed": { "type": "string" }
+                  }
+                },
                 "duration-unit": { "type": "string" },
                 "tags": {
                   "oneOf": [

@@ -42,6 +42,63 @@ class PrTrackingConfigValidationTest {
     }
 
     @Test
+    void bindsOutcomeEmojisBlock() {
+        // Regression guard: PrTrackingProps has two constructors, so binding relies on @ConstructorBinding
+        // on the canonical one. Without it Spring Boot deduces no bind constructor, so this Binder returns
+        // unbound and the application would fail to create the PrTrackingProps bean.
+        Map<String, Object> source = new HashMap<>();
+        source.put("p.enabled", "false");
+        source.put("p.pr-emoji", "pr");
+        source.put("p.outcome-emojis.merged", "pr-merged");
+        source.put("p.outcome-emojis.closed", "pr-closed");
+
+        var bound =
+                new Binder(new MapConfigurationPropertySource(source)).bind("p", Bindable.of(PrTrackingProps.class));
+
+        assertThat(bound.isBound()).isTrue();
+        assertThat(bound.get().outcomeEmojis()).isEqualTo(new PrTrackingProps.OutcomeEmojis("pr-merged", "pr-closed"));
+    }
+
+    @Test
+    void defaultsToNoOutcomeEmojisWhenBlockIsAbsent() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("p.enabled", "false");
+        source.put("p.pr-emoji", "pr");
+
+        var bound =
+                new Binder(new MapConfigurationPropertySource(source)).bind("p", Bindable.of(PrTrackingProps.class));
+
+        assertThat(bound.isBound()).isTrue();
+        assertThat(bound.get().outcomeEmojis()).isEqualTo(PrTrackingProps.OutcomeEmojis.none());
+    }
+
+    @Test
+    void acceptsOutcomeEmojisWhenEnabled() {
+        assertThatCode(() -> enabledPropsWithOutcomeEmojis(new PrTrackingProps.OutcomeEmojis("pr-merged", "pr-closed")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsBlankOutcomeEmoji() {
+        assertThatThrownBy(() -> new PrTrackingProps.OutcomeEmojis(" ", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("outcome-emojis.merged must not be blank");
+    }
+
+    @Test
+    void rejectsOutcomeEmojiWrappedInColons() {
+        assertThatThrownBy(() -> new PrTrackingProps.OutcomeEmojis(null, ":pr-closed:"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("outcome-emojis.closed must be the bare emoji name without surrounding colons");
+    }
+
+    @Test
+    void acceptsSkinToneOutcomeEmoji() {
+        assertThatCode(() -> new PrTrackingProps.OutcomeEmojis("thumbsup::skin-tone-2", null))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void acceptsValidTokenModeWhenEnabled() {
         // when / then
         assertThatCode(() -> new PrTrackingProps(
@@ -1144,6 +1201,21 @@ class PrTrackingConfigValidationTest {
     }
 
     // ---- helpers --------------------------------------------------------------------------------
+
+    private static PrTrackingProps enabledPropsWithOutcomeEmojis(PrTrackingProps.OutcomeEmojis outcomeEmojis) {
+        return new PrTrackingProps(
+                true,
+                "0 0 9-18 * * 1-5",
+                "pr",
+                List.of("tag"),
+                "low",
+                DEFAULT_DURATION_UNIT,
+                List.of(validRepo()),
+                validTokenGithub(),
+                null,
+                DEFAULT_SLA_DISCOVERY,
+                outcomeEmojis);
+    }
 
     private static PrTrackingProps.Repository validRepo() {
         return validRepoWithName("my-org/onboarding-repo");

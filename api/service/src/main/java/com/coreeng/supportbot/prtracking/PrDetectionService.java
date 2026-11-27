@@ -85,6 +85,7 @@ public class PrDetectionService {
     private final SlaLookup slaLookup;
     private final PrMessageRenderer messageRenderer;
     private final PrUrlResolver prUrlResolver;
+    private final PrOutcomeReactions prOutcomeReactions;
 
     // Whether any configured repo has a non-empty exclude-author-teams list. Fixed at config-bind
     // time, so it is computed once (lazily) rather than re-streamed on every message.
@@ -536,9 +537,7 @@ public class PrDetectionService {
                 .addArgument(ticketId::id)
                 .log("PR {}#{} tracking record created for ticket {}");
 
-        MessageTs queryTs = ticket.queryTs();
-        String channelId = ticket.channelId();
-        addReaction(prTrackingProps.prEmoji(), queryTs, channelId);
+        markPrTracked(ticket);
 
         // Evaluate reviews (already fetched with the PR) to determine initial lifecycle state.
         // Note: wall-clock time progresses between the review evaluation and the SLA deadline check
@@ -655,7 +654,7 @@ public class PrDetectionService {
                 .addArgument(ticketId::id)
                 .log("PR {}#{} tracking record created for ticket {} (no-SLA repo)");
 
-        addReaction(prTrackingProps.prEmoji(), ticket.queryTs(), ticket.channelId());
+        markPrTracked(ticket);
         String teamLabel = resolveTeamLabel(repoConfig.owningTeam());
 
         // Mirror the SLA branch: inspect reviews already fetched with the PR so that a no-SLA PR
@@ -789,7 +788,7 @@ public class PrDetectionService {
                 .addArgument(() -> slaDeadline == null ? "none" : slaDeadline)
                 .log("PR {}#{} tracking record created for ticket {} (codeowner repo, review deadline: {})");
 
-        addReaction(prTrackingProps.prEmoji(), ticket.queryTs(), ticket.channelId());
+        markPrTracked(ticket);
 
         // Skip the DETECTED message if the gate's already satisfied (it would be factually wrong to say
         // "waiting on code owners") — the record and reaction still land, and the poller catches up next
@@ -1612,27 +1611,40 @@ public class PrDetectionService {
         return duration.isNegative() ? Duration.ZERO : duration;
     }
 
-    private void addReaction(String emoji, MessageTs queryTs, String channelId) {
+    /**
+     * Adds {@code pr-emoji} and, only once it is on the message, clears any outcome emoji left by earlier,
+     * already-resolved PRs — so a failed add never leaves the ticket with no PR marker at all.
+     */
+    private void markPrTracked(Ticket ticket) {
+        if (addReaction(prTrackingProps.prEmoji(), ticket.queryTs(), ticket.channelId())) {
+            prOutcomeReactions.onPrTracked(ticket);
+        }
+    }
+
+    /** Returns true when the reaction is on the message afterwards (added now, or already there). */
+    private boolean addReaction(String emoji, MessageTs queryTs, String channelId) {
         try {
             slackClient.addReaction(ReactionsAddRequest.builder()
                     .name(emoji)
                     .channel(channelId)
                     .timestamp(queryTs.ts())
                     .build());
+            return true;
         } catch (SlackException e) {
             if ("already_reacted".equals(e.getError())) {
                 log.atDebug()
                         .addArgument(emoji)
                         .addArgument(queryTs)
                         .log(":{}:  reaction already present on message {}");
-            } else {
-                log.atWarn()
-                        .setCause(e)
-                        .addArgument(emoji)
-                        .addArgument(queryTs)
-                        .addArgument(e::getError)
-                        .log("Failed to add :{}: reaction to message {}: {}");
+                return true;
             }
+            log.atWarn()
+                    .setCause(e)
+                    .addArgument(emoji)
+                    .addArgument(queryTs)
+                    .addArgument(e::getError)
+                    .log("Failed to add :{}: reaction to message {}: {}");
+            return false;
         }
     }
 

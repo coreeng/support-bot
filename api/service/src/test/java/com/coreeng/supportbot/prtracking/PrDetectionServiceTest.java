@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -111,6 +112,9 @@ class PrDetectionServiceTest {
     @Mock
     private PrMessageRenderer messageRenderer;
 
+    @Mock
+    private PrOutcomeReactions prOutcomeReactions;
+
     @Captor
     private ArgumentCaptor<SlackPostMessageRequest> postMessageCaptor;
 
@@ -143,7 +147,8 @@ class PrDetectionServiceTest {
                 slackTicketsProps,
                 slaLookup,
                 messageRenderer,
-                prUrlResolver);
+                prUrlResolver,
+                prOutcomeReactions);
         lenient().when(slackTicketsProps.expectedInitialReaction()).thenReturn("eyes");
         lenient().when(slaLookup.getSla(any(), any(), anyInt())).thenReturn(SLA_24H);
         lenient().when(prTrackingProps.tags()).thenReturn(List.of("pr-review"));
@@ -284,6 +289,12 @@ class PrDetectionServiceTest {
             // close before the first lifecycle poll ever runs (approved then dismissed overnight or over
             // a weekend) and never reopens, so detection must not leave this to the poller alone.
             verify(prTrackingRepository).markCodeownerReviewRequested(1L);
+            // and, once the record is saved and the pr emoji is on, any outcome emoji from earlier resolved PRs
+            // is cleared.
+            InOrder inOrder = inOrder(prTrackingRepository, slackClient, prOutcomeReactions);
+            inOrder.verify(prTrackingRepository).insertIfAbsent(any());
+            inOrder.verify(slackClient).addReaction(argThat(req -> PR_EMOJI.equals(req.getName())));
+            inOrder.verify(prOutcomeReactions).onPrTracked(ticketWithIdMatching(1L));
         }
 
         @Test
@@ -1788,6 +1799,22 @@ class PrDetectionServiceTest {
         }
 
         @Test
+        void clearsOutcomeEmojisAfterAddingThePrEmoji() {
+            // given
+            setupDetectedPr(Instant.now().minus(Duration.ofHours(1)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            // The record is inserted first: onPrTracked's "is this the ticket's first PR?" check counts it.
+            InOrder inOrder = inOrder(prTrackingRepository, slackClient, prOutcomeReactions);
+            inOrder.verify(prTrackingRepository).insertIfAbsent(any());
+            inOrder.verify(slackClient).addReaction(argThat(req -> PR_EMOJI.equals(req.getName())));
+            inOrder.verify(prOutcomeReactions).onPrTracked(ticketWithIdMatching(1L));
+        }
+
+        @Test
         void doesNotEscalateWhenSlaIsNotYetBreached() {
             // given — PR created 1 hour ago, SLA is 24 hours, not yet breached
             setupDetectedPr(Instant.now().minus(Duration.ofHours(1)));
@@ -2170,6 +2197,10 @@ class PrDetectionServiceTest {
             assertThat(newTrackingCaptor.getValue().repo()).isEqualTo(NO_SLA_REPO);
             // Slack: pr emoji reaction + base "eyes" reaction (2 total) + tracking message (no SLA info)
             verify(slackClient, times(2)).addReaction(any());
+            InOrder inOrder = inOrder(prTrackingRepository, slackClient, prOutcomeReactions);
+            inOrder.verify(prTrackingRepository).insertIfAbsent(any());
+            inOrder.verify(slackClient).addReaction(argThat(req -> PR_EMOJI.equals(req.getName())));
+            inOrder.verify(prOutcomeReactions).onPrTracked(ticketWithIdMatching(1L));
             verify(slackClient).postMessage(postMessageCaptor.capture());
             assertThat(postMessageCaptor.getValue().message().getText())
                     .contains(
@@ -3362,6 +3393,8 @@ class PrDetectionServiceTest {
 
             // then — no exception thrown; SLA reply was still posted
             verify(slackClient).postMessage(any());
+            // and an emoji that was already there counts as added, so stale outcome emojis are cleared
+            verify(prOutcomeReactions).onPrTracked(ticketWithIdMatching(1L));
         }
 
         @Test
@@ -3376,6 +3409,8 @@ class PrDetectionServiceTest {
 
             // then — no exception thrown; SLA reply was still posted
             verify(slackClient).postMessage(any());
+            // and the outcome emoji is left alone: removing it after a failed add would leave no PR marker
+            verify(prOutcomeReactions, never()).onPrTracked(any());
         }
 
         @Test
@@ -4239,5 +4274,10 @@ class PrDetectionServiceTest {
                 null,
                 false,
                 false);
+    }
+
+    private static Ticket ticketWithIdMatching(long id) {
+        return argThat(
+                ticket -> ticket != null && ticket.id() != null && ticket.id().id() == id);
     }
 }
