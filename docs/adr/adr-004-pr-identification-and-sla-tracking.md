@@ -4,6 +4,7 @@
 **Status:** Accepted
 **Amended:** 2026-06-23 — author-admission gate ([#285](https://github.com/coreeng/support-bot/pull/285)) added ahead of the §5 side effects.
 **Amended:** 2026-06-24 — author admission reworked to a Slack-poster deny-list (`exclude-author-teams`), resolved via the bot's platform teams instead of the VCS provider.
+**Amended:** 2026-11 — the `pr-review-tracking.github` credentials gained a second reader: documentation analysis reads its GitHub source with them and checks them at startup, whether or not PR tracking is enabled ([ADR-012](adr-012-documentation-gap-analysis.md)).
 
 ---
 

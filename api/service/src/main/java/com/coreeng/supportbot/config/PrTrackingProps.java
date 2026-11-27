@@ -91,7 +91,7 @@ public record PrTrackingProps(
                     throw new IllegalArgumentException(
                             "pr-review-tracking.github must be configured when any repo uses provider=github");
                 }
-                validateConfig(this.github);
+                this.github.validate();
             }
         }
     }
@@ -206,28 +206,6 @@ public record PrTrackingProps(
                         "pr-review-tracking.repositories[].name contains duplicates: " + repository.name());
             }
         }
-    }
-
-    private static void validateConfig(GitHub githubConfig) {
-        if (githubConfig.authMode() == null) {
-            throw new IllegalArgumentException("pr-review-tracking.github.auth-mode must not be blank when enabled");
-        }
-        if (isBlank(githubConfig.apiBaseUrl())) {
-            throw new IllegalArgumentException("pr-review-tracking.github.api-base-url must not be blank");
-        }
-        if (githubConfig.authMode() == AuthMode.APP) {
-            requireNotBlank(
-                    githubConfig.appId(), "pr-review-tracking.github.app-id must not be blank when auth-mode=app");
-            requireNotBlank(
-                    githubConfig.installationId(),
-                    "pr-review-tracking.github.installation-id must not be blank when auth-mode=app");
-            requireValidInstallationId(githubConfig.installationId());
-            requireNotBlank(
-                    githubConfig.privateKeyPem(),
-                    "pr-review-tracking.github.private-key-pem must not be blank when auth-mode=app");
-            return;
-        }
-        requireNotBlank(githubConfig.token(), "pr-review-tracking.github.token must not be blank when auth-mode=token");
     }
 
     private static void validateMessages(Messages messages, boolean isNoSlaRepo, String repoName) {
@@ -517,6 +495,28 @@ public record PrTrackingProps(
 
         public static GitHub defaultTokenModeConfig() {
             return new GitHub(AuthMode.TOKEN, "", "", "", "", "");
+        }
+
+        /** Fails, naming the setting, unless this block holds usable credentials. */
+        public void validate() {
+            if (authMode == null) {
+                throw new IllegalArgumentException("pr-review-tracking.github.auth-mode must not be blank");
+            }
+            if (isBlank(apiBaseUrl)) {
+                throw new IllegalArgumentException("pr-review-tracking.github.api-base-url must not be blank");
+            }
+            if (authMode == AuthMode.APP) {
+                requireNotBlank(appId, "pr-review-tracking.github.app-id must not be blank when auth-mode=app");
+                requireNotBlank(
+                        installationId,
+                        "pr-review-tracking.github.installation-id must not be blank when auth-mode=app");
+                requireValidInstallationId(installationId);
+                requireNotBlank(
+                        privateKeyPem,
+                        "pr-review-tracking.github.private-key-pem must not be blank when auth-mode=app");
+                return;
+            }
+            requireNotBlank(token, "pr-review-tracking.github.token must not be blank when auth-mode=token");
         }
 
         @Override

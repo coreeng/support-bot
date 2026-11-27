@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.prtracking.PrTrackingGitHubConfig;
+import com.coreeng.supportbot.prtracking.source.PrSourceClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
@@ -54,6 +55,7 @@ class PrTrackingGitHubConfigTest {
         runner.run(context -> {
             assertThat(context).hasSingleBean(GitHub.class);
             assertThat(context).hasSingleBean(GitHubClient.class);
+            assertThat(context).hasSingleBean(PrSourceClient.class);
         });
     }
 

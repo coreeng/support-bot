@@ -1,6 +1,8 @@
 package com.coreeng.supportbot.github;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
@@ -142,6 +144,53 @@ public final class Hub4jGitHubClient implements GitHubClient {
         } catch (IOException e) {
             throw new GitHubApiException(
                     0, "GitHub API call failed listing team members for %s/%s".formatted(org, teamSlug), e);
+        }
+    }
+
+    @Override
+    public String getBranchHeadCommit(String repositoryName, String branch) {
+        try {
+            return github.getRepository(repositoryName).getBranch(branch).getSHA1();
+        } catch (GHFileNotFoundException e) {
+            throw new GitHubApiException(404, "Branch not found: %s@%s".formatted(repositoryName, branch), e);
+        } catch (HttpException e) {
+            throw new GitHubApiException(
+                    e.getResponseCode(),
+                    "GitHub API %d resolving branch %s@%s".formatted(e.getResponseCode(), repositoryName, branch),
+                    e);
+        } catch (IOException e) {
+            throw new GitHubApiException(
+                    0, "GitHub API call failed resolving branch %s@%s".formatted(repositoryName, branch), e);
+        }
+    }
+
+    @Override
+    public <T> T downloadArchive(String repositoryName, String commit, ArchiveReader<T> reader) {
+        try {
+            return github.getRepository(repositoryName).readTar(archive -> readUnchecked(reader, archive), commit);
+        } catch (GHFileNotFoundException e) {
+            throw new GitHubApiException(404, "Archive not found: %s@%s".formatted(repositoryName, commit), e);
+        } catch (HttpException e) {
+            throw new GitHubApiException(
+                    e.getResponseCode(),
+                    "GitHub API %d downloading archive of %s@%s".formatted(e.getResponseCode(), repositoryName, commit),
+                    e);
+        } catch (IOException e) {
+            throw new GitHubApiException(
+                    0, "GitHub API call failed downloading archive of %s@%s".formatted(repositoryName, commit), e);
+        }
+    }
+
+    /**
+     * hub4j turns an {@link IOException} thrown while it holds the response into an {@link
+     * HttpException} carrying the response's status, so a failure of the reader would look like one
+     * of GitHub's.
+     */
+    private static <T> T readUnchecked(ArchiveReader<T> reader, InputStream archive) {
+        try {
+            return reader.read(archive);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

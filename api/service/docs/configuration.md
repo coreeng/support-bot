@@ -334,7 +334,7 @@ pr-review-tracking:
         default: 48h # SLA duration (e.g. 48h, 7d). See the reference below for file-based and per-path SLAs.
   sla-discovery:
     cache: PT24H # How long to cache SLA files fetched from repositories
-  github: # Required only if any repo uses provider: github
+  github: # Required if any repo uses provider: github, or documentation analysis uses its GitHub source
     api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
     auth-mode: ${GITHUB_AUTH_MODE:token} # token | app
     token: ${GITHUB_TOKEN:} # Personal Access Token — used only when auth-mode=token
@@ -721,8 +721,8 @@ feature is being built and has no page yet; these settings exist so that it can 
 - **Enabling.** Off by default. It is on when `documentation-analysis.enabled` is `true` and
   `LLM_PROVIDER` is not `none`. It has its own switch, unlike the Support Summary page, because it
   sends documentation to the LLM provider and costs more per ticket. Leave it off until the feature
-  is released: turning it on today only validates the settings, and later releases will require
-  GitHub credentials and start work that calls the LLM provider.
+  is released: turning it on today only validates the settings and the GitHub credentials, and
+  later releases will start work that calls the LLM provider.
 - **Validation.** While `enabled` is `false` the values are not checked, but a value that cannot
   be read as its type at all (`max-input-tokens: abc`, or `DOCUMENTATION_ANALYSIS_ENABLED` set to
   an empty string) still fails startup. When `enabled` is `true`, startup fails with a message
@@ -737,10 +737,16 @@ feature is being built and has no page yet; these settings exist so that it can 
 ### GitHub source
 
 Reads the documentation from one GitHub repository. It needs `repository` (`owner/name`). The
-`path` is the directory holding the documentation, relative to the repository root; leave it empty
-or set it to `.` for documentation at the root. `copy-location` is where the bot keeps its copy.
-GitHub credentials will be read from `pr-review-tracking.github`
-(see [PR review tracking](#pr-review-tracking)), whether or not PR tracking is enabled.
+`path` is the directory holding the documentation, relative to the repository root and without
+`..`; leave it empty or set it to `.` for documentation at the root. Each of `file-extensions`
+starts with `.`. `copy-location` is where the bot keeps its copy: an absolute path other than `/`.
+
+GitHub credentials are read from `pr-review-tracking.github`
+(see [PR review tracking](#pr-review-tracking)), whether or not PR tracking is enabled. When the
+feature is enabled with this source, startup fails, naming the setting, unless that block holds
+usable credentials: a `token` with `auth-mode: token`, or `app-id`, `installation-id` and
+`private-key-pem` with `auth-mode: app`. They need read access to the documentation repository's
+contents.
 
 ### Environment variables
 
@@ -919,7 +925,7 @@ pr-review-tracking:
   sla-discovery:
     cache: PT24H                           # optional; TTL for in-repo SLA files and GitLab group/branch lookups (default: PT24H)
 
-  github:                                  # required only if any repo uses provider: github
+  github:                                  # required if any repo uses provider: github, or documentation analysis uses its GitHub source
     api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
     auth-mode:    ${GITHUB_AUTH_MODE:token}      # token | app (default: token)
     token:        ${GITHUB_TOKEN:}               # PAT — required when auth-mode=token
@@ -947,7 +953,7 @@ pr-review-tracking:
 | `impact` | when enabled | — | A code from `enums.impacts`, applied to the ticket on auto-close. |
 | `duration-unit` | — | `days` | How a bare numeric SLA value is interpreted: `hours`, `days`, or `weeks`. |
 | `sla-discovery.cache` | — | `PT24H` | TTL (ISO-8601 duration) for cached in-repo SLA files and GitLab group-membership / default-branch lookups. |
-| `github` | when any GitHub repo | — | GitHub connection block (see [Token permissions](#token-permissions)). |
+| `github` | when any GitHub repo, or documentation analysis uses the GitHub source | — | GitHub connection block (see [Token permissions](#token-permissions)). Documentation analysis reads its credentials from here too, whether or not PR tracking is enabled; see [GitHub source](#github-source). |
 | `gitlab` | when any GitLab repo | — | GitLab connection block (see [Token permissions](#token-permissions)). |
 | `repositories` | when enabled | — | Repositories to watch; at least one entry. See [Per-repository configuration](#per-repository-configuration). |
 

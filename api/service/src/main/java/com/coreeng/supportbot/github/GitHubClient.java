@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.github;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
@@ -33,4 +35,21 @@ public interface GitHubClient {
      * @throws GitHubApiException on any GitHub API failure (not found, auth, server errors, network)
      */
     List<String> resolveTeamReviewers(String org, String teamSlug);
+
+    /** @throws GitHubApiException on any GitHub API failure, a missing branch included */
+    String getBranchHeadCommit(String repositoryName, String branch);
+
+    /**
+     * Streams the repository's gzipped tar archive at {@code commit} to {@code reader}, and returns
+     * what it returns. The stream is closed afterwards.
+     *
+     * @throws GitHubApiException when GitHub refuses the download or the connection fails
+     * @throws java.io.UncheckedIOException wrapping an {@link IOException} thrown by the reader
+     */
+    <T> T downloadArchive(String repositoryName, String commit, ArchiveReader<T> reader);
+
+    @FunctionalInterface
+    interface ArchiveReader<T> {
+        T read(InputStream gzippedTar) throws IOException;
+    }
 }
