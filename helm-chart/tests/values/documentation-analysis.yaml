@@ -11,4 +11,5 @@ configMap:
           path: docs
           file-extensions: [.md, .mdx]
           max-copy-size: 50MB
+          context: whole
           max-areas-per-ticket: 2

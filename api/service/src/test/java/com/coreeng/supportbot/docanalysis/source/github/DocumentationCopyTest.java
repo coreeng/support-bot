@@ -246,6 +246,7 @@ class DocumentationCopyTest {
                 Duration.ofHours(24),
                 DataSize.ofBytes(1_000),
                 3,
+                "whole",
                 2);
     }
 

@@ -74,7 +74,7 @@ tests:
     asserts:
       - matchRegex:
           path: data["application.yaml"]
-          pattern: 'documentation-analysis:\n\s+enabled: true\n\s+failure-retry-delay: 24h\n\s+max-input-tokens: 150000\n\s+source:\n\s+github:\n\s+file-extensions:\n\s+- \.md\n\s+- \.mdx\n\s+max-areas-per-ticket: 2\n\s+max-copy-size: 50MB\n\s+path: docs\n\s+repository: example-org/docs\n\s+type: github'
+          pattern: 'documentation-analysis:\n\s+enabled: true\n\s+failure-retry-delay: 24h\n\s+max-input-tokens: 150000\n\s+source:\n\s+github:\n\s+context: whole\n\s+file-extensions:\n\s+- \.md\n\s+- \.mdx\n\s+max-areas-per-ticket: 2\n\s+max-copy-size: 50MB\n\s+path: docs\n\s+repository: example-org/docs\n\s+type: github'
 
   - it: rejects an unknown documentation analysis setting
     set:
@@ -89,6 +89,13 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "failure-retry-delay"
+
+  - it: rejects an unknown documentation analysis context
+    set:
+      configMap.config.documentation-analysis.source.github.context: routed
+    asserts:
+      - failedTemplate:
+          errorPattern: "context"
 
   - it: rejects a documentation analysis copy size without a unit
     set:

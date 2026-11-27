@@ -182,6 +182,7 @@ configMap:
     #       max-copy-age: 24h
     #       max-copy-size: 50MB
     #       max-files: 5000
+    #       context: whole # every page with every ticket; must fit in max-input-tokens
     #       max-areas-per-ticket: 2
 
 # UI deployment (disabled by default for backward compatibility)

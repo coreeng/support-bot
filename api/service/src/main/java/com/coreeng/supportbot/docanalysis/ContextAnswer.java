@@ -97,6 +97,9 @@ public sealed interface ContextAnswer {
         /** A model answered and the answer could not be read or broke its contract. */
         public static final String INVALID_RESPONSE = "invalid_response";
 
+        /** The pages are over the budget. The thread and the budget do not change, so neither will this. */
+        public static final String CONTEXT_TOO_LARGE = "context_too_large";
+
         private static final Pattern REASON_CODE = Pattern.compile("[a-z][a-z0-9_]{0,63}");
 
         public Failed {

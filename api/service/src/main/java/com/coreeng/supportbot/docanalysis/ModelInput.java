@@ -101,8 +101,12 @@ public final class ModelInput {
         return result.replace("<", "");
     }
 
+    static boolean isAttributeValue(String value) {
+        return value.chars().noneMatch(c -> c == '"' || c == '<' || c == '>' || Character.isISOControl(c));
+    }
+
     static void requireAttributeValue(String name, String value) {
-        if (value.chars().anyMatch(c -> c == '"' || c == '<' || c == '>' || Character.isISOControl(c))) {
+        if (!isAttributeValue(value)) {
             throw new IllegalArgumentException(
                     name + " must not contain a quote, angle bracket or control character: " + value);
         }

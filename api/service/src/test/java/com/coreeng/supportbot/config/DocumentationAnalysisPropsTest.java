@@ -42,6 +42,7 @@ class DocumentationAnalysisPropsTest {
         assertThat(github.maxCopyAge()).isEqualTo(Duration.ofHours(24));
         assertThat(github.maxCopySize()).isEqualTo(DataSize.ofMegabytes(50));
         assertThat(github.maxFiles()).isEqualTo(5000);
+        assertThat(github.selectedContext()).isEqualTo(GitHubSourceContext.WHOLE);
         assertThat(github.maxAreasPerTicket()).isEqualTo(2);
     }
 
@@ -51,6 +52,7 @@ class DocumentationAnalysisPropsTest {
         values.put("documentation-analysis.source.type", "confluence");
         values.put("documentation-analysis.max-input-tokens", "0");
         values.put("documentation-analysis.source.github.repository", "not-a-repository");
+        values.put("documentation-analysis.source.github.context", "unknown");
 
         assertThat(bind(values).enabled()).isFalse();
     }
@@ -75,7 +77,7 @@ class DocumentationAnalysisPropsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"github", "GITHUB", " GitHub "})
+    @ValueSource(strings = {"github", "GITHUB"})
     void selectsTheSourceCaseInsensitively(String type) {
         Map<String, Object> values = enabledGitHub();
         values.put("documentation-analysis.source.type", type);
@@ -84,7 +86,7 @@ class DocumentationAnalysisPropsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"confluence", ""})
+    @ValueSource(strings = {"confluence", "", " github "})
     void failsWhenEnabledWithAnUnknownSource(String type) {
         Map<String, Object> values = enabledGitHub();
         values.put("documentation-analysis.source.type", type);
@@ -124,6 +126,8 @@ class DocumentationAnalysisPropsTest {
                 "source.github.max-copy-size | 0B           | source.github.max-copy-size must be positive",
                 "source.github.max-files  | 0               | source.github.max-files must be positive",
                 "source.github.max-areas-per-ticket | 0     | source.github.max-areas-per-ticket must be positive",
+                "source.github.context    | routed          | source.github.context must be one of whole but was 'routed'",
+                "source.github.context    | ' whole'        | source.github.context must be one of whole but was ' whole'",
                 "max-input-tokens         | 0               | max-input-tokens must be positive",
                 "max-tickets-per-day      | -1              | max-tickets-per-day must be positive",
                 "failure-retry-delay      | 0s              | failure-retry-delay must be positive",

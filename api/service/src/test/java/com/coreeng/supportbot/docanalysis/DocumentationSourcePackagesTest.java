@@ -67,7 +67,6 @@ class DocumentationSourcePackagesTest {
                 .implement(DocumentationSession.class)
                 .should()
                 .resideInAPackage(SOURCES_PACKAGE + ".(*)..")
-                .allowEmptyShould(true)
                 .check(PRODUCTION);
     }
 
