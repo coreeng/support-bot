@@ -442,3 +442,26 @@ summary-area:
 team-groups:
   display-name: ${TEAM_GROUPS_DISPLAY_NAME:Team group} # The noun the UI calls a group by, e.g. Domain, Tribe
   # attribute: department # A team attribute name, from k8s-generic `attributes` or a static team's `attributes`
+
+# Documentation analysis: classifies closed tickets against the documentation. Off by default; on
+# when `enabled` is true and llm.provider is not `none`. The analysis's settings are at the top and
+# each documentation source's under `source`; only the selected source's settings are validated.
+documentation-analysis:
+  enabled: ${DOCUMENTATION_ANALYSIS_ENABLED:false}
+  max-input-tokens: ${DOCUMENTATION_ANALYSIS_MAX_INPUT_TOKENS:150000} # Estimated size limit of one classification call
+  max-tickets-per-day: ${DOCUMENTATION_ANALYSIS_MAX_TICKETS_PER_DAY:500} # Tickets attempted in any 24 hours
+  failure-retry-delay: ${DOCUMENTATION_ANALYSIS_FAILURE_RETRY_DELAY:24h} # Wait before a failed ticket is attempted again
+  max-attempts: ${DOCUMENTATION_ANALYSIS_MAX_ATTEMPTS:3} # Failed attempts before a ticket waits for a prompt or setting change
+  run-retry-delay: ${DOCUMENTATION_ANALYSIS_RUN_RETRY_DELAY:15m} # Wait before a run starts again after the provider stopped one
+  source:
+    type: ${DOCUMENTATION_ANALYSIS_SOURCE_TYPE:github} # Which source supplies the documentation: github
+    github: # Credentials are read from pr-review-tracking.github
+      repository: ${DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_REPOSITORY:} # owner/name; required when this source is selected
+      branch: ${DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_BRANCH:main}
+      path: ${DOCUMENTATION_ANALYSIS_SOURCE_GITHUB_PATH:docs} # Directory holding the documentation; empty or . for the repository root
+      file-extensions: [.md, .mdx]
+      copy-location: /tmp/documentation-analysis
+      max-copy-age: 24h # Fetch again when the copy is older
+      max-copy-size: 50MB # A fetch that keeps more than this fails
+      max-files: 5000 # A fetch that keeps more files than this fails
+      max-areas-per-ticket: 2

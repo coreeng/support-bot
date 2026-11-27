@@ -161,6 +161,28 @@ configMap:
     # team-groups:
     #   display-name: Domain
     #   attribute: department
+    # Documentation analysis: classifies closed tickets against the documentation. Off by default;
+    # needs an LLM provider too. GitHub credentials are read from pr-review-tracking.github.
+    # See api/service/docs/configuration.md.
+    # documentation-analysis:
+    #   enabled: true
+    #   max-input-tokens: 150000
+    #   max-tickets-per-day: 500
+    #   failure-retry-delay: 24h
+    #   max-attempts: 3
+    #   run-retry-delay: 15m
+    #   source:
+    #     type: github
+    #     github:
+    #       repository: example-org/docs
+    #       branch: main
+    #       path: docs # empty or . for the repository root
+    #       file-extensions: [.md, .mdx]
+    #       copy-location: /tmp/documentation-analysis
+    #       max-copy-age: 24h
+    #       max-copy-size: 50MB
+    #       max-files: 5000
+    #       max-areas-per-ticket: 2
 
 # UI deployment (disabled by default for backward compatibility)
 ui:
