@@ -6,7 +6,7 @@ This guide assumes you are also familiar with the [base user guide](./role-user.
 
 ## What leadership adds over the base role
 
-`ROLE_LEADERSHIP` unlocks the metrics dashboards and the Support Summary page. Everything else (viewing tickets on the home page, viewing escalations) is the same as any authenticated user.
+`ROLE_LEADERSHIP` unlocks the metrics dashboards, the Support Summary page and the Documentation Analysis page. Everything else (viewing tickets on the home page, viewing escalations) is the same as any authenticated user.
 
 ## Metrics dashboard
 
@@ -53,6 +53,23 @@ If your deployment has team groups set up, a selector next to the window dropdow
 The group is part of the page's address, so you can share or bookmark a link that opens straight on, say, last month for one group. Its first visit may take a moment while the narrative is written for that group; after that it loads instantly like any other window.
 
 A group's totals are at most the whole window's: tickets with no team, or not raised by a tenant, belong to no group.
+
+## Documentation Analysis
+
+The **Documentation Analysis** page (`/documentation-analysis`) shows whether the documentation answers what tenants asked, so you can see which pages are missing or wrong. It is listed under **Support Summary** in the sidebar when the feature is enabled on your deployment, and it uses the same window dropdown.
+
+Each closed ticket in the window gets one of four classifications:
+
+- **Conflicts with support's answer** — the documentation and the answer support gave in the thread disagree. It does not say which one is wrong: the page may be out of date, or the answer may be. The ticket shows the quoted passage beside a summary of support's answer so you can judge.
+- **Missing** — the documentation does not cover the question. The ticket names the closest pages, if any, which show where a new page belongs.
+- **Correct** — the documentation answers the question. The ticket shows the page and the passage that answer it.
+- **Not applicable** — not a question for the documentation, such as a request for a change to the platform.
+
+The page leads with the gaps: counts for each classification (plus the tickets not yet classified, and how many of those failed), **Missing documentation by product area**, **Pages cited** with how many tickets each page answers or conflicts with, counts for each product area, and the tickets themselves, conflicts and missing first. Filter the tickets by classification, and open any of them in Slack or as a ticket. The page also shows the documentation version each ticket was judged against, and the documentation's current version and last refresh.
+
+Opening the page starts the work: it classifies the window's tickets in the background and fills in as results are saved. There is nothing to run. A large window fills in over time, because a daily limit caps the tickets classified in any 24 hours; come back later to see the rest. Results already saved stay on the page whatever the analysis is doing.
+
+A result is not redone when the documentation changes: a ticket stays **Missing** after its page is written, and it shows the documentation version it was judged against. Use the window to compare periods, not to check whether a page you just wrote has closed a gap.
 
 ## What leadership cannot do
 

@@ -86,6 +86,31 @@ There is no **Run Analysis** button any more. Opening the page classifies any cl
 
 **Team groups.** When the deployment configures team groups (called **Team groups** by default; see [configuration](../../api/service/docs/configuration.md#team-groups)), a selector next to the window dropdown narrows the page — narrative, chips and every breakdown — to one group's tenant teams, and the strip above the cards names the group shown (hover for its teams). The choice is in the URL, so links can be shared. Opening a group classifies only that group's tickets; tickets another view already classified are not classified again. A group's totals leave out tickets with no team or marked "Not a Tenant", which is why they are lower than **All teams**. Correcting a ticket's **Author's team** moves it between groups, and the affected narratives are regenerated on their next visit.
 
+## Documentation Analysis
+
+The **Documentation Analysis** page (`/documentation-analysis`) shows whether the documentation answers what tenants asked. It sits under **Support Summary** in the sidebar, and appears only when the feature is enabled on your deployment, and only for support engineers and leadership. It uses the same window picker and default window (**Last 2 Weeks**) as the Support Summary.
+
+Each closed ticket in the window gets one of four classifications:
+
+- **Conflicts with support's answer** — the documentation and the answer support gave in the thread disagree. It does not say which one is wrong: the page may be out of date, or the answer may be. The ticket shows the quoted passage beside a summary of support's answer so you can judge.
+- **Missing** — the documentation does not cover the question. The ticket names the closest pages, if any, which show where a new page belongs.
+- **Correct** — the documentation answers the question. The ticket shows the page and the passage that answer it.
+- **Not applicable** — not a question for the documentation, such as a request for a change to the platform.
+
+The page then shows:
+
+- A strip with the window, the number of closed tickets in it, and the documentation's current version (a commit, shortened) and when it was last refreshed.
+- A count for each classification, the number **Not yet classified**, and how many of those failed to classify.
+- **Missing documentation by product area** and **Pages cited** (correct and conflicting tickets by the page they cite), each ranked by count. Expand a row to see its newest tickets. A product area is the top-level directory of the documentation; tickets without one are under **No area**.
+- The counts for each product area.
+- The tickets, conflicts and missing documentation first. Use the **Classification** filter to show one classification. Each ticket shows its question, product area, tags, the page or pages named, the quoted passage, the rationale and the documentation version it was judged against, with **Open in Slack** and **View ticket**.
+
+**Opening the page starts the work.** There is no button: a visit classifies the window's tickets that have no result yet, in the background, and the page shows progress and fills in as results are saved. A large window fills in over time, because a daily limit caps how many tickets are classified in any 24 hours; open it again later to continue. Only one window is analysed at a time, so the page may say another window is being analysed and wait for it. If the page says the documentation could not be read, the LLM provider is failing, the daily limit is reached or the run failed, results already saved stay on the page; see the [Documentation Analysis runbook](../runbooks/documentation-analysis.md#run-states) for what each means.
+
+**A result is not redone when the documentation changes.** Each ticket is judged once, against the documentation as it was then, and the ticket shows that version. A ticket stays **Missing** after its page is written. Results are redone only when the analysis itself changes (its prompt or some of its settings); until a ticket has been redone it counts as not yet classified.
+
+A ticket that could not be classified is tried again later, a few times at most; the runbook lists the reasons.
+
 ## Escalations
 
 You can view the full escalations list and its filters. To escalate a ticket, use the **Escalate** button on the bot's ticket message in the Slack thread — see [Escalating a ticket](#escalating-a-ticket) above.

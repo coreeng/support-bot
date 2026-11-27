@@ -5,12 +5,13 @@
  * Kept out of backend-fetch.ts so route tests can exercise it for real: that module pulls in
  * next-auth, which the Jest transform cannot load.
  */
-export async function backendErrorResponse(response: Response) {
-  let code: string | undefined;
+export async function backendErrorResponse(response: Response, { forwardDetail = false }: { forwardDetail?: boolean } = {}) {
+  let body: { code?: string; detail?: string } | undefined;
   try {
-    code = ((await response.json()) as { code?: string })?.code;
+    body = (await response.json()) as { code?: string; detail?: string };
   } catch {
     // Proxies and gateways can answer with a non-JSON body; the status alone still reaches the client.
   }
-  return Response.json({ error: `Backend error: ${response.status}`, code }, { status: response.status });
+  const detail = forwardDetail ? body?.detail : undefined;
+  return Response.json({ error: `Backend error: ${response.status}`, code: body?.code, detail }, { status: response.status });
 }

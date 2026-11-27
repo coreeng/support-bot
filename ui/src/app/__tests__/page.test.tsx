@@ -1,6 +1,6 @@
 import { useTeamFilter } from "@/contexts/TeamFilterContext";
 import { useAuth } from "@/hooks/useAuth";
-import { useElevateEnabled, useSummaryEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
+import { useDocAnalysisEnabled, useElevateEnabled, useSummaryEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
 import { render, screen, waitFor } from "@testing-library/react";
 import { useRouter } from "next/navigation";
 import DashboardLayoutComponent from "../(dashboard)/layout";
@@ -22,6 +22,7 @@ jest.mock("../../contexts/TeamFilterContext", () => ({
 
 jest.mock("../../lib/hooks", () => ({
   useSummaryEnabled: jest.fn(),
+  useDocAnalysisEnabled: jest.fn(),
   useTenantInsightsEnabled: jest.fn(),
   useElevateEnabled: jest.fn(),
 }));
@@ -72,6 +73,7 @@ const mockRouter = {
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseTeamFilter = useTeamFilter as jest.MockedFunction<typeof useTeamFilter>;
 const mockUseSummaryEnabled = useSummaryEnabled as jest.MockedFunction<typeof useSummaryEnabled>;
+const mockUseDocAnalysisEnabled = useDocAnalysisEnabled as jest.MockedFunction<typeof useDocAnalysisEnabled>;
 const mockUseTenantInsightsEnabled = useTenantInsightsEnabled as jest.MockedFunction<typeof useTenantInsightsEnabled>;
 const mockUseElevateEnabled = useElevateEnabled as jest.MockedFunction<typeof useElevateEnabled>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
@@ -90,6 +92,7 @@ describe("Dashboard - restricted tabs visibility", () => {
     jest.clearAllMocks();
     mockUseRouter.mockReturnValue(mockRouter as any);
     mockUseSummaryEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+    mockUseDocAnalysisEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseElevateEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTeamFilter.mockReturnValue({
@@ -333,6 +336,7 @@ describe("Dashboard - Elevate nav item visibility", () => {
     jest.clearAllMocks();
     mockUseRouter.mockReturnValue(mockRouter as any);
     mockUseSummaryEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+    mockUseDocAnalysisEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
     mockUseTeamFilter.mockReturnValue({
       hasUnrestrictedDataScope: true,
@@ -388,5 +392,73 @@ describe("Dashboard - Elevate nav item visibility", () => {
       expect(screen.getByText("Elevate")).toBeInTheDocument();
     });
     expect(screen.getByText("Integrations")).toBeInTheDocument();
+  });
+});
+
+describe("Dashboard - Documentation Analysis nav item visibility", () => {
+  const signInWithRoles = (roles: string[]) =>
+    mockUseAuth.mockReturnValue({
+      user: { id: "user@example.com", name: "User", email: "user@example.com", roles, teams: [] },
+      isLoading: false,
+      isAuthenticated: true,
+      logout: jest.fn(),
+      isLeadership: roles.includes("LEADERSHIP"),
+      isEscalationTeam: false,
+      isSupportEngineer: roles.includes("SUPPORT_ENGINEER"),
+      actualEscalationTeams: [],
+    });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseRouter.mockReturnValue(mockRouter as any);
+    mockUseSummaryEnabled.mockReturnValue({ data: true, isLoading: false, error: null } as any);
+    mockUseDocAnalysisEnabled.mockReturnValue({ data: true, isLoading: false, error: null } as any);
+    mockUseTenantInsightsEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+    mockUseElevateEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+    mockUseTeamFilter.mockReturnValue({
+      hasUnrestrictedDataScope: true,
+      selectedTeam: null,
+      setSelectedTeam: jest.fn(),
+      effectiveTeams: [],
+      allTeams: [],
+      initialized: true,
+      teamScope: { mode: "uninitialized" as const },
+      hasNoTeamScope: false,
+      isViewingAllTeams: false,
+      isViewingAsEscalationTeam: false,
+    });
+  });
+
+  it.each([["LEADERSHIP"], ["SUPPORT_ENGINEER"]])(
+    "lists the page right under Support Summary for %s when the feature is on",
+    async (role) => {
+      signInWithRoles([role]);
+
+      renderDashboard();
+
+      const link = await screen.findByRole("link", { name: "Documentation Analysis" });
+      expect(link).toHaveAttribute("href", "/documentation-analysis");
+      const titles = screen.getAllByRole("link").map((each) => each.textContent);
+      expect(titles.indexOf("Documentation Analysis")).toBe(titles.indexOf("Support Summary") + 1);
+    }
+  );
+
+  it("hides the page when the feature is off", async () => {
+    signInWithRoles(["SUPPORT_ENGINEER"]);
+    mockUseDocAnalysisEnabled.mockReturnValue({ data: false, isLoading: false, error: null } as any);
+
+    renderDashboard();
+
+    expect(await screen.findByText("Support Summary")).toBeInTheDocument();
+    expect(screen.queryByText("Documentation Analysis")).not.toBeInTheDocument();
+  });
+
+  it("hides the page from a user with neither leadership nor support engineer", async () => {
+    signInWithRoles(["USER", "ESCALATION"]);
+
+    renderDashboard();
+
+    expect(await screen.findByText("Home")).toBeInTheDocument();
+    expect(screen.queryByText("Documentation Analysis")).not.toBeInTheDocument();
   });
 });
