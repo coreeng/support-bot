@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.coreeng.supportbot.config.LlmProps;
 import com.coreeng.supportbot.config.LlmProvider;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
+import dev.langchain4j.model.chat.Capability;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.model.vertexai.gemini.VertexAiGeminiChatModel;
@@ -158,6 +159,22 @@ class LlmConfigTest {
                             .hasMessageContaining("llm.provider must be one of none, vertex, proxy, anthropic, stub")
                             .hasMessageContaining("vertexai");
                 });
+    }
+
+    @Test
+    void everyRealClientAcceptsAJsonSchemaForItsOutput() {
+        assertAcceptsJsonSchema("vertex", vertexProperties());
+        assertAcceptsJsonSchema("proxy", proxyProperties());
+        assertAcceptsJsonSchema("anthropic", anthropicProperties());
+    }
+
+    private void assertAcceptsJsonSchema(String provider, String[] properties) {
+        contextRunner
+                .withPropertyValues(properties)
+                .withPropertyValues("llm.provider=" + provider)
+                .run(context -> assertThat(context.getBean(ChatModel.class).supportedCapabilities())
+                        .as(provider)
+                        .contains(Capability.RESPONSE_FORMAT_JSON_SCHEMA));
     }
 
     @Test

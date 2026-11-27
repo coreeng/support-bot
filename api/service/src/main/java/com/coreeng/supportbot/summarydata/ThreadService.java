@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.summarydata;
 
-import com.coreeng.supportbot.config.SummaryAreaProps;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
@@ -16,10 +15,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -36,29 +32,12 @@ public class ThreadService {
 
     private final SlackClient slackClient;
     private final SupportTeamService supportTeamService;
-    private final ImmutableList<Pattern> compiledPatterns;
-    private final Set<String> exceptions;
+    private final ThreadSanitiser sanitiser;
 
-    public ThreadService(SlackClient slackClient, SupportTeamService supportTeamService, SummaryAreaProps props) {
+    public ThreadService(SlackClient slackClient, SupportTeamService supportTeamService, ThreadSanitiser sanitiser) {
         this.slackClient = slackClient;
         this.supportTeamService = supportTeamService;
-        var sanitisation = props.sanitisation();
-        this.compiledPatterns = sanitisation.patterns().stream()
-                .map(ThreadService::compilePattern)
-                .collect(ImmutableList.toImmutableList());
-        this.exceptions = sanitisation.exceptions().stream()
-                .map(s -> s.toLowerCase(Locale.ROOT))
-                .collect(Collectors.toUnmodifiableSet());
-        log.info("Loaded {} sanitisation patterns and {} exceptions", compiledPatterns.size(), exceptions.size());
-    }
-
-    private static Pattern compilePattern(String regex) {
-        try {
-            return Pattern.compile(regex);
-        } catch (PatternSyntaxException e) {
-            throw new IllegalArgumentException(
-                    "Invalid sanitisation pattern: \"" + regex + "\" — " + e.getDescription(), e);
-        }
+        this.sanitiser = sanitiser;
     }
 
     /**
@@ -162,24 +141,12 @@ public class ThreadService {
         return ImmutableList.copyOf(allMessages);
     }
 
-    private String applySanitisation(String text) {
-        for (Pattern pattern : compiledPatterns) {
-            text = pattern.matcher(text).replaceAll(match -> {
-                if (exceptions.contains(match.group().toLowerCase(Locale.ROOT))) {
-                    return match.group();
-                }
-                return "";
-            });
-        }
-        return text.replaceAll("\\s+", " ").trim();
-    }
-
     public String getThreadAsText(String channelId, String threadTs) {
         log.debug("Fetching thread as text: channel={}, threadTs={}", channelId, threadTs);
 
         ImmutableList<String> messageTexts = getAllThreadMessageTexts(channelId, threadTs);
 
-        String result = messageTexts.stream().map(this::applySanitisation).collect(Collectors.joining("\n\n"));
+        String result = messageTexts.stream().map(sanitiser::sanitise).collect(Collectors.joining("\n\n"));
 
         log.debug("Processed thread text, final length: {} characters", result.length());
 
@@ -203,7 +170,7 @@ public class ThreadService {
             if (!hasText(message.getText())) {
                 continue;
             }
-            String text = applySanitisation(message.getText());
+            String text = sanitiser.sanitise(message.getText());
             // A label on an emptied message would still count as a support answer.
             if (!text.isEmpty()) {
                 lines.add(roleLabel(message, raiser) + " " + text);

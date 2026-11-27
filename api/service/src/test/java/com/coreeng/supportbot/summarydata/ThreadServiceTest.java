@@ -433,7 +433,7 @@ class ThreadServiceTest {
                 sanitisation,
                 new SummaryAreaProps.Page(1000, java.time.Duration.ofMinutes(15)),
                 new SummaryAreaProps.OfflineExport("classpath:placeholder-analysis-bundle.zip"));
-        return new ThreadService(slackClient, supportTeamService, props);
+        return new ThreadService(slackClient, supportTeamService, new ThreadSanitiser(props));
     }
 
     private ConversationsRepliesResponse singlePageResponse(List<Message> messages) {

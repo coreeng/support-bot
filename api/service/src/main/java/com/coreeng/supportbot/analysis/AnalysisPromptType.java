@@ -17,7 +17,10 @@ public enum AnalysisPromptType {
     CLASSIFICATION("classification"),
 
     /** Windowed prose summary rendered on the Support Summary page. */
-    SUMMARY("summary");
+    SUMMARY("summary"),
+
+    /** Per-ticket documentation gap classifier: drives {@code doc_analysis}. */
+    DOCUMENTATION_CLASSIFICATION("documentation_classification");
 
     /** The value stored in {@code analysis_prompt.type}. */
     private final String dbValue;
